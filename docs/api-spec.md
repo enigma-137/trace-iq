@@ -1,5 +1,7 @@
 # API Spec
 
+Status as of 2026-06-27: this is the target API contract. The current API app has module shells only; these endpoints still need controllers, validation, persistence, and tests.
+
 ## Event Ingestion
 
 `POST /v1/events`

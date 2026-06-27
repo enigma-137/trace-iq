@@ -6,6 +6,9 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "lint": "eslint \"src/**/*.ts\"",
+    "migrate": "node scripts/migrate.js",
+    "migrate:help": "node scripts/migrate.js --help",
+    "migrate:status": "node scripts/migrate.js status",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

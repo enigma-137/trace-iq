@@ -20,6 +20,76 @@ TraceIQ v1 is ready when a real product team can:
 - View basic project health, ingestion volume, and error states.
 - Use the product locally or in a single production-like hosted environment.
 
+## Implementation Sync: 2026-06-27
+
+The repository is still in the foundation stage. The current codebase contains the intended monorepo shape and domain boundaries, but most product behavior is not implemented yet.
+
+### Current Codebase State
+
+- Root npm workspaces are configured for `apps/*` and `packages/*`.
+- `apps/api` has a NestJS app shell and domain modules for auth, organizations, projects, events, funnels, analytics, users, replay, AI, and billing.
+- API modules are currently empty module shells; there are no controllers, services, repositories, migrations, workers, or persisted ingestion endpoints yet.
+- `apps/dashboard` is a Next.js app with a coming-soon/preview page, not an authenticated analytics dashboard.
+- `apps/marketing` is a minimal Next.js marketing page.
+- `packages/sdk-js` exposes `initialize`, `identify`, `track`, `page`, and `group` method shapes, but the browser client does not yet create IDs, persist session state, enrich payloads, batch events, or send network requests.
+- `packages/types` contains the initial `TraceIQEvent`, device, network, and timeline contracts.
+- `packages/shared` contains a small timeline projection helper.
+- `docker-compose.yml` provides local PostgreSQL and Redis services.
+- `.env.example` exists and matches the documented local service URLs.
+
+### Verified Gaps
+
+- Docker CLI is not currently available in the local shell, so PostgreSQL and Redis could not be verified with `docker compose ps` from this environment.
+- There is no migration runner or first schema migration yet.
+- There is no event ingestion controller for `POST /v1/events` or `POST /v1/events/batch`.
+- There is no BullMQ queue producer or worker implementation yet.
+- There is no dashboard API client, project setup flow, event stream, user list, user timeline, funnel builder, or insight UI yet.
+- Plain `git status` is blocked by Git safe-directory ownership configuration in this environment; Git inspection works with a one-off `safe.directory` override.
+
+### Immediate Alignment Target
+
+Before deeper analytics work starts, Phase 0 should produce a clean runnable baseline:
+
+```text
+Install -> typecheck -> run API/dashboard/marketing -> run Postgres/Redis -> hit API health endpoint
+```
+
+After that, Phase 1 should add migrations and the durable event model, then Phase 2 and Phase 3 should be built together enough to send a real browser event into PostgreSQL.
+
+### Foundation Progress
+
+- `npm install` completes successfully.
+- `npm run typecheck` passes across the workspace.
+- `npm run build` passes across the workspace.
+- `GET /health` returns `200 OK` from the compiled API server.
+- Generated TypeScript build info files are ignored by `.gitignore`.
+- Plain SQL migrations are selected for the MVP and the initial migration folder exists at `apps/api/migrations`.
+- First schema migration exists for organizations, projects, write keys, users, sessions, and events.
+- API migration runner exists at `apps/api/scripts/migrate.js`.
+
+## Target Customer Domains
+
+TraceIQ should be shaped around behavior analytics for fintechs, ecommerce teams, and delivery/logistics apps. The platform should stay domain-flexible, but seed data, examples, dashboards, and insight templates should prove value in these three verticals.
+
+### Fintech Journeys
+
+- Signup and onboarding.
+- KYC start, submission, review, failure, retry, and approval.
+- Wallet funding, transfer initiation, payment attempt, payment failure, and payment success.
+- Fraud or risk review states where they affect conversion.
+
+### Ecommerce Journeys
+
+- Product viewed, search performed, product added to cart, checkout started, payment attempted, purchase completed, refund requested, and repeat purchase.
+- Cart abandonment and payment failure diagnosis.
+- Campaign, coupon, device, and geography segmentation.
+
+### Delivery App Journeys
+
+- Address added, quote viewed, order created, rider assigned, pickup completed, delivery completed, cancellation, failed delivery, and support contact.
+- Marketplace matching, fulfilment delay, cancellation, and delivery success diagnostics.
+- Customer, merchant, courier, location, and time-window segmentation.
+
 ## Guiding Constraints
 
 - TypeScript everywhere.
@@ -47,12 +117,14 @@ Purpose: turn the scaffold into a runnable developer baseline.
 
 ### Engineering Tasks
 
-- Add missing Next.js and NestJS baseline config.
+- Resolve package TypeScript configuration so root `npm run typecheck` passes with shared package imports.
+- Confirm Next.js and NestJS baseline config is complete enough for local development.
 - Add ESLint and Prettier config.
 - Add package-level `build`, `lint`, and `typecheck` consistency.
 - Add basic CI workflow for install, typecheck, lint, and build.
-- Add health check endpoint to API.
-- Add database migration tool decision and initial migration folder.
+- Add health check endpoint to API. Status: done for `GET /health`.
+- Add database migration tool decision and initial migration folder. Status: plain SQL migrations selected under `apps/api/migrations`.
+- Add a short current-state script or checklist for verifying API, dashboard, marketing, PostgreSQL, and Redis locally.
 
 ### Exit Criteria
 
@@ -71,6 +143,7 @@ Purpose: create the durable core records that every feature depends on.
 - Database connection module in the API.
 - Repository interfaces for event writes and timeline reads.
 - Seed script for local development.
+- Vertical seed journeys for fintech, ecommerce, and delivery apps.
 
 ### Core Tables
 
@@ -93,6 +166,7 @@ Purpose: create the durable core records that every feature depends on.
 - Store raw event `properties`, `deviceInfo`, `networkInfo`, and `context` as JSONB.
 - Add basic data retention configuration at project level.
 - Add local seed data that demonstrates onboarding, KYC, and payment journeys.
+- Add local seed data that demonstrates ecommerce checkout and delivery fulfillment journeys.
 
 ### Exit Criteria
 
