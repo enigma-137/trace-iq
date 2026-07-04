@@ -20,6 +20,8 @@ Run migrations from the API workspace:
 ```bash
 npm run migrate -w @traceiq/api
 npm run migrate:status -w @traceiq/api
+npm run seed -w @traceiq/api
 ```
 
 The runner reads `DATABASE_URL` and falls back to the local development URL documented in `.env.example`.
+Set `DATABASE_SSL=true` for hosted Postgres providers that require SSL.

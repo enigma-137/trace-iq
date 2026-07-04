@@ -4,6 +4,7 @@ const { Client } = require('pg');
 
 const migrationsDir = path.resolve(__dirname, '..', 'migrations');
 const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://traceiq:traceiq@localhost:5432/traceiq';
+const ssl = process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined;
 const command = process.argv[2] ?? 'up';
 
 async function ensureMigrationsTable(client) {
@@ -83,7 +84,7 @@ async function main() {
     throw new Error(`Unknown migration command "${command}". Use "up" or "status".`);
   }
 
-  const client = new Client({ connectionString: databaseUrl });
+  const client = new Client({ connectionString: databaseUrl, ssl });
   await client.connect();
 
   try {

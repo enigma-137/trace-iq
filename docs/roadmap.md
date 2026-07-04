@@ -66,6 +66,8 @@ After that, Phase 1 should add migrations and the durable event model, then Phas
 - Plain SQL migrations are selected for the MVP and the initial migration folder exists at `apps/api/migrations`.
 - First schema migration exists for organizations, projects, write keys, users, sessions, and events.
 - API migration runner exists at `apps/api/scripts/migrate.js`.
+- API database module exists for pooled PostgreSQL queries.
+- Seed script exists for a default organization, project, and write key.
 
 ## Target Customer Domains
 

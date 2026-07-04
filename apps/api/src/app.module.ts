@@ -10,9 +10,11 @@ import { ReplayModule } from './modules/replay/replay.module';
 import { UsersModule } from './modules/users/users.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AppController } from './app.controller';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
+    DatabaseModule,
     AuthModule,
     OrganizationsModule,
     ProjectsModule,

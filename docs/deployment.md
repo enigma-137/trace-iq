@@ -8,6 +8,8 @@ Local dependencies run through Docker Compose:
 docker compose up -d
 ```
 
+If Docker is not available, use Railway PostgreSQL for the MVP database. See `docs/railway-postgres.md`.
+
 ## Environments
 
 - Development: local apps and Docker-managed services.
