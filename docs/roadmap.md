@@ -41,7 +41,7 @@ The repository is still in the foundation stage. The current codebase contains t
 
 - Docker CLI is not currently available in the local shell, so PostgreSQL and Redis could not be verified with `docker compose ps` from this environment.
 - There is no migration runner or first schema migration yet.
-- There is no event ingestion controller for `POST /v1/events` or `POST /v1/events/batch`.
+- Batch ingestion via `POST /v1/events/batch` is not implemented yet.
 - There is no BullMQ queue producer or worker implementation yet.
 - There is no dashboard API client, project setup flow, event stream, user list, user timeline, funnel builder, or insight UI yet.
 - Plain `git status` is blocked by Git safe-directory ownership configuration in this environment; Git inspection works with a one-off `safe.directory` override.
@@ -68,6 +68,8 @@ After that, Phase 1 should add migrations and the durable event model, then Phas
 - API migration runner exists at `apps/api/scripts/migrate.js`.
 - API database module exists for pooled PostgreSQL queries.
 - Seed script exists for a default organization, project, and write key.
+- `POST /v1/events` exists for single-event ingestion with write-key authentication.
+- `GET /v1/events/recent` exists for early event visibility before the dashboard is wired.
 
 ## Target Customer Domains
 

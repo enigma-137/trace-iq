@@ -7,11 +7,11 @@ Status as of 2026-06-27: this is the target API contract. The current API app ha
 `POST /v1/events`
 
 Accepts a single event from SDKs or trusted server clients.
+Use the project write key in the `x-traceiq-write-key` header.
 
 ```json
 {
-  "organizationId": "org_123",
-  "projectId": "proj_123",
+  "projectId": "proj_demo",
   "userId": "user_123",
   "sessionId": "sess_123",
   "eventName": "signup_completed",
@@ -21,6 +21,21 @@ Accepts a single event from SDKs or trusted server clients.
   "timestamp": "2026-06-24T00:00:00.000Z"
 }
 ```
+
+Current MVP response:
+
+```json
+{
+  "accepted": true,
+  "eventId": "evt_..."
+}
+```
+
+## Recent Events
+
+`GET /v1/events/recent?projectId=proj_demo&limit=25`
+
+Returns recent events for early dashboard/API verification.
 
 ## Batch Ingestion
 
