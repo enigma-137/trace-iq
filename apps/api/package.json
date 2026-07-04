@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/clean-dist.js",
     "dev": "nest start --watch",
+    "prebuild": "node scripts/clean-dist.js",
     "build": "nest build",
     "lint": "eslint \"src/**/*.ts\"",
     "migrate": "node scripts/migrate.js",

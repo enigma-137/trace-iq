@@ -1,6 +1,14 @@
-import type { TraceIQEvent } from '@traceiq/types';
-
-export interface IngestEventInput extends Omit<TraceIQEvent, 'id' | 'timestamp'> {
+export interface IngestEventInput {
+  organizationId: string;
+  projectId: string;
+  userId?: string;
+  anonymousId?: string;
+  sessionId: string;
+  eventName: string;
+  properties: Record<string, unknown>;
+  deviceInfo?: Record<string, unknown>;
+  networkInfo?: Record<string, unknown>;
+  context?: Record<string, unknown>;
   timestamp?: string;
 }
 
