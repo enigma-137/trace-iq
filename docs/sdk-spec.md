@@ -5,7 +5,8 @@ The JavaScript SDK exposes five core methods:
 ```ts
 traceiq.initialize({
   projectId: 'proj_123',
-  writeKey: 'write_key'
+  writeKey: 'write_key',
+  endpoint: 'http://localhost:4000'
 });
 
 traceiq.identify({
@@ -31,5 +32,15 @@ traceiq.group({
 - Track anonymous and identified users.
 - Attach session metadata.
 - Enrich events with device and page context.
-- Transport events reliably with batching and retries in a future implementation.
+- Transport individual events to `POST /v1/events`.
+- Add batching and retries in a future implementation.
 - Provide replay capture hooks behind an abstraction layer.
+
+## Current MVP Behavior
+
+- `initialize()` stores project config and creates anonymous/session IDs.
+- `track()` posts events to the API with `x-traceiq-write-key`.
+- `identify()` stores the current user and emits `$identify`.
+- `page()` emits `$page`.
+- `group()` stores organization/account context and emits `$group`.
+- Failed TraceIQ requests are caught so the host app does not crash.

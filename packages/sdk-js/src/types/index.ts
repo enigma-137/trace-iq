@@ -4,6 +4,7 @@ export interface TraceIQInitOptions {
   endpoint?: string;
   autoTrackPageViews?: boolean;
   enableReplay?: boolean;
+  debug?: boolean;
 }
 
 export interface TraceIQIdentity {
