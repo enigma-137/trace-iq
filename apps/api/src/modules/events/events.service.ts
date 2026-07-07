@@ -52,7 +52,7 @@ export class EventsService {
     await this.database.query(
       `
         INSERT INTO events (
-          id,
+          e.id,
           organization_id,
           project_id,
           user_id,
