@@ -6,6 +6,8 @@ This roadmap defines the path from the current foundation scaffold to a usable v
 Install SDK -> Capture events -> Store clean data -> Explore users and funnels -> Diagnose conversion problems
 ```
 
+For a shorter friend-facing build plan, see [MVP Collaboration Plan](./mvp-collaboration-plan.md). That plan treats Supabase Auth, organization membership, and project write-key management as part of the first usable MVP slice instead of a later dashboard-only phase.
+
 ## MVP Definition
 
 TraceIQ v1 is ready when a real product team can:
@@ -136,22 +138,27 @@ Purpose: turn the scaffold into a runnable developer baseline.
 - CI validates the monorepo baseline.
 - No app depends on undocumented manual setup.
 
-## Phase 1: Data Model and Persistence
+## Phase 1: Authenticated Data Model and Persistence
 
-Purpose: create the durable core records that every feature depends on.
+Purpose: create the durable core records and account model that every feature depends on. Authentication, organization membership, and project write-key management should be designed here so the dashboard and SDK do not need to be rewired later.
 
 ### Deliverables
 
+- Supabase Auth integration plan for dashboard users.
+- `organization_members` table for account-to-organization access.
+- Role model for `owner`, `admin`, and `member`.
 - PostgreSQL schema for organizations, projects, users, anonymous identities, sessions, events, timeline events, funnels, and funnel steps.
 - Migration workflow.
 - Database connection module in the API.
 - Repository interfaces for event writes and timeline reads.
 - Seed script for local development.
 - Vertical seed journeys for fintech, ecommerce, and delivery apps.
+- Project write-key generation, revoke, and rotate path.
 
 ### Core Tables
 
 - `organizations`
+- `organization_members`
 - `projects`
 - `project_write_keys`
 - `users`
@@ -166,6 +173,8 @@ Purpose: create the durable core records that every feature depends on.
 ### Engineering Tasks
 
 - Define IDs and timestamp conventions.
+- Map Supabase user IDs to organization memberships.
+- Protect dashboard-facing API routes by organization and project membership.
 - Add indexes for common queries: project events by time, user timeline by time, session events by time, funnel event lookups.
 - Store raw event `properties`, `deviceInfo`, `networkInfo`, and `context` as JSONB.
 - Add basic data retention configuration at project level.
@@ -175,6 +184,8 @@ Purpose: create the durable core records that every feature depends on.
 ### Exit Criteria
 
 - Events can be persisted and queried by project, user, session, and time range.
+- Dashboard users can only access organizations and projects where they are members.
+- SDK ingestion uses project write keys, not Supabase user tokens.
 - Timeline projection has a clear storage path.
 - Local seed data renders realistic product journeys.
 
@@ -247,7 +258,7 @@ Purpose: give users a usable product surface instead of isolated APIs.
 - Dashboard app layout with navigation for overview, events, users, funnels, settings, and billing placeholder.
 - Organization and project creation screens.
 - Project settings screen with project ID, write key, allowed origins, and SDK snippet.
-- Basic auth placeholder or local development auth mode.
+- Supabase-backed auth screens and protected dashboard routes.
 - Event stream page showing recent events.
 - Empty, loading, and error states.
 

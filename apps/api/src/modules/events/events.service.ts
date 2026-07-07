@@ -52,7 +52,7 @@ export class EventsService {
     await this.database.query(
       `
         INSERT INTO events (
-          e.id,
+          id,
           organization_id,
           project_id,
           user_id,
@@ -96,7 +96,7 @@ export class EventsService {
     const result = await this.database.query(
       `
         SELECT
-          id,
+          e.id,
           e.project_id AS "projectId",
           e.user_id AS "userId",
           u.external_id AS "externalUserId",
@@ -158,44 +158,23 @@ export class EventsService {
       return null;
     }
 
-    const existing = await this.database.query<UserRecord>(
-      `
-        SELECT id
-        FROM users
-        WHERE project_id = $1
-          AND external_id = $2
-        LIMIT 1
-      `,
-      [projectId, safeExternalId]
-    );
-
-    const existingUser = existing.rows[0];
-    if (existingUser) {
-      await this.database.query(
-        `
-          UPDATE users
-          SET anonymous_id = COALESCE(anonymous_id, $3),
-              last_seen_at = now(),
-              updated_at = now()
-          WHERE project_id = $1
-            AND external_id = $2
-        `,
-        [projectId, safeExternalId, anonymousId ?? null]
-      );
-
-      return existingUser.id;
-    }
-
     const userId = `usr_${randomUUID()}`;
-    await this.database.query(
+    const result = await this.database.query<UserRecord>(
       `
         INSERT INTO users (id, project_id, external_id, anonymous_id)
         VALUES ($1, $2, $3, $4)
+        ON CONFLICT (project_id, external_id)
+        WHERE external_id IS NOT NULL
+        DO UPDATE
+        SET anonymous_id = COALESCE(users.anonymous_id, EXCLUDED.anonymous_id),
+            last_seen_at = now(),
+            updated_at = now()
+        RETURNING id
       `,
       [userId, projectId, safeExternalId, anonymousId ?? null]
     );
 
-    return userId;
+    return result.rows[0]?.id ?? userId;
   }
 
   private async ensureSession(

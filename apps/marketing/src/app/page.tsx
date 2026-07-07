@@ -176,7 +176,7 @@ export default function MarketingHomePage() {
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-600 text-white shadow-lg">
-              <TraceIcon className="size-5" />
+              {/* <TraceIcon className="size-5" /> */}
             </div>
             <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
               TraceIQ
