@@ -97,20 +97,22 @@ export class EventsService {
       `
         SELECT
           id,
-          project_id AS "projectId",
-          user_id AS "userId",
-          anonymous_id AS "anonymousId",
-          session_id AS "sessionId",
-          event_name AS "eventName",
-          properties,
-          device_info AS "deviceInfo",
-          network_info AS "networkInfo",
-          context,
-          occurred_at AS "occurredAt",
-          received_at AS "receivedAt"
-        FROM events
-        WHERE project_id = $1
-        ORDER BY received_at DESC
+          e.project_id AS "projectId",
+          e.user_id AS "userId",
+          u.external_id AS "externalUserId",
+          e.anonymous_id AS "anonymousId",
+          e.session_id AS "sessionId",
+          e.event_name AS "eventName",
+          e.properties,
+          e.device_info AS "deviceInfo",
+          e.network_info AS "networkInfo",
+          e.context,
+          e.occurred_at AS "occurredAt",
+          e.received_at AS "receivedAt"
+        FROM events e
+        LEFT JOIN users u ON u.id = e.user_id
+        WHERE e.project_id = $1
+        ORDER BY e.received_at DESC
         LIMIT $2
       `,
       [requiredProjectId, safeLimit]
