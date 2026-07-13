@@ -3,9 +3,8 @@ import { AuthForm } from './AuthForm';
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<main className="auth-shell" />}>
+    <Suspense fallback={<main className="grid min-h-screen place-items-center bg-slate-50" />}>
       <AuthForm />
     </Suspense>
   );
 }
-
