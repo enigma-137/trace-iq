@@ -8,11 +8,25 @@ Initial migration target:
 
 ```text
 organizations
+organization_members
 projects
 project_write_keys
 users
 sessions
 events
+```
+
+Auth/project-access migration target:
+
+```text
+organization_members
+organizations.created_by_user_id
+projects.created_by_user_id
+projects.allowed_origins
+project_write_keys.created_by_user_id
+project_write_keys.revoked_by_user_id
+project_write_keys.last_used_at
+project_write_keys.expires_at
 ```
 
 Run migrations from the API workspace:

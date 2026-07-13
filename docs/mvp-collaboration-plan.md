@@ -16,7 +16,7 @@ Create account -> Create project -> Copy SDK snippet -> Track events -> View use
 
 - Keep the MVP backend in TypeScript/NestJS so the API, dashboard, SDK, and shared types stay in one language.
 - Use Supabase Auth for dashboard login and user sessions.
-- Use Neon Postgres as the primary database for the MVP.
+- Use managed Postgres for the MVP. Neon can stay as the app database for now; Supabase Postgres is also viable if we later want auth and data in one provider.
 - Use plain SQL migrations for now.
 - Use project write keys for SDK ingestion.
 - Avoid a separate Python backend service until there is a clear reason to split the system.
