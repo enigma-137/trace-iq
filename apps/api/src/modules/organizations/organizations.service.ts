@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { QueryResultRow } from 'pg';
 import { DatabaseService, QueryExecutor } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 
@@ -8,18 +9,14 @@ export interface BootstrapSetupRequest {
   projectName?: string;
 }
 
-interface OrganizationRow {
+interface SetupRow extends QueryResultRow {
   id: string;
   name: string;
   slug: string;
   role: 'owner' | 'admin' | 'member';
-}
-
-interface ProjectRow {
-  id: string;
-  organization_id: string;
-  name: string;
-  slug: string;
+  project_id: string | null;
+  project_name: string | null;
+  project_slug: string | null;
 }
 
 @Injectable()
@@ -27,7 +24,7 @@ export class OrganizationsService {
   constructor(private readonly database: DatabaseService) {}
 
   async getSetup(user: DashboardUser) {
-    const result = await this.database.query<OrganizationRow & ProjectRow>(
+    const result = await this.database.query<SetupRow>(
       `
         SELECT
           o.id,
@@ -73,8 +70,8 @@ export class OrganizationsService {
         ? {
             id: projectId,
             organizationId: row.id,
-            name: row.project_name,
-            slug: row.project_slug
+            name: row.project_name ?? '',
+            slug: row.project_slug ?? ''
           }
         : null,
       writeKey: null,
@@ -113,7 +110,7 @@ export class OrganizationsService {
 
   private async getExistingSetup(client: QueryExecutor, user: DashboardUser) {
     const result = await client.query<
-      {
+      QueryResultRow & {
         organization_id: string;
         organization_name: string;
         organization_slug: string;
@@ -271,4 +268,3 @@ export class OrganizationsService {
     );
   }
 }
-

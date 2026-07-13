@@ -14,12 +14,21 @@ declare module 'pg' {
     ssl?: { rejectUnauthorized?: boolean };
   }
 
+  export interface PoolClient {
+    query<T extends QueryResultRow = QueryResultRow>(
+      text: string,
+      values?: readonly unknown[]
+    ): Promise<QueryResult<T>>;
+    release(): void;
+  }
+
   export class Pool {
     constructor(config?: PoolConfig);
     query<T extends QueryResultRow = QueryResultRow>(
       text: string,
       values?: readonly unknown[]
     ): Promise<QueryResult<T>>;
+    connect(): Promise<PoolClient>;
     end(): Promise<void>;
   }
 }
