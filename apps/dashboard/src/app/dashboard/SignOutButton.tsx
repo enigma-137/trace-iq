@@ -15,7 +15,7 @@ export function SignOutButton() {
 
   return (
     <button
-      className="min-h-12 min-w-28 rounded-lg border border-slate-950 bg-white px-4 font-extrabold text-slate-950 transition hover:bg-slate-100"
+      className="inline-flex h-9 items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
       type="button"
       onClick={handleSignOut}
     >

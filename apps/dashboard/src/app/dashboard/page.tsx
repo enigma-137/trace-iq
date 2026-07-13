@@ -6,6 +6,15 @@ import { SignOutButton } from './SignOutButton';
 
 export const dynamic = 'force-dynamic';
 
+const navItems = [
+  { label: 'Overview', href: '/dashboard', active: true },
+  { label: 'Setup', href: '/dashboard' },
+  { label: 'Events', href: '/sdk-demo' },
+  { label: 'Users', href: '/dashboard' },
+  { label: 'Funnels', href: '/dashboard' },
+  { label: 'Docs', href: '/docs' }
+];
+
 export default async function DashboardPage() {
   if (!hasSupabaseServerConfig()) {
     redirect('/auth/login?missingConfig=1');
@@ -21,34 +30,103 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-8 text-slate-950 sm:px-10 lg:px-16">
-      <header className="flex items-start justify-between gap-6 max-md:flex-col">
-        <div>
-          <Link className="text-sm font-extrabold uppercase tracking-normal text-slate-950" href="/">
-            TraceIQ
+    <main className="min-h-screen bg-[#070a12] text-slate-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1440px]">
+        <aside className="hidden w-64 shrink-0 border-r border-slate-800/80 bg-slate-950/70 px-5 py-6 lg:block">
+          <Link className="flex items-center gap-3" href="/">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-400 text-sm font-black text-slate-950">
+              TQ
+            </span>
+            <span>
+              <span className="block text-sm font-black uppercase tracking-normal text-white">TraceIQ</span>
+              <span className="block text-xs text-slate-500">Product analytics</span>
+            </span>
           </Link>
-          <p className="mt-1 text-slate-600">Authenticated dashboard</p>
-        </div>
-        <SignOutButton />
-      </header>
 
-      <section className="max-w-5xl py-16 md:py-20" aria-labelledby="dashboard-title">
-        <p className="mb-3 text-xs font-extrabold uppercase tracking-normal text-slate-600">
-          Supabase Auth connected
-        </p>
-        <h1
-          id="dashboard-title"
-          className="max-w-5xl text-5xl font-medium leading-none tracking-normal text-slate-950 md:text-7xl"
-        >
-          Welcome back{user.email ? `, ${user.email}` : ''}.
-        </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-          This page is protected by the Supabase session. Create your first organization and project, then
-          install the SDK on a browser website.
-        </p>
-      </section>
+          <nav className="mt-8 grid gap-1" aria-label="Dashboard navigation">
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                  item.active
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
+                }`}
+                href={item.href}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </aside>
 
-      <SetupPanel />
+        <section className="min-w-0 flex-1">
+          <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-[#070a12]/90 px-5 py-4 backdrop-blur md:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-normal text-cyan-300">Dashboard</p>
+                <h1 id="dashboard-title" className="mt-1 truncate text-xl font-semibold tracking-normal text-white">
+                  Overview
+                </h1>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="hidden min-w-0 text-right sm:block">
+                  <p className="truncate text-sm font-medium text-slate-200">{user.email ?? 'Account'}</p>
+                  <p className="text-xs text-slate-500">Owner workspace</p>
+                </div>
+                <SignOutButton />
+              </div>
+            </div>
+
+            <nav className="mt-4 flex gap-2 overflow-x-auto lg:hidden" aria-label="Mobile dashboard navigation">
+              {navItems.map((item) => (
+                <Link
+                  key={item.label}
+                  className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ${
+                    item.active ? 'bg-slate-800 text-white' : 'text-slate-400'
+                  }`}
+                  href={item.href}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </header>
+
+          <div className="px-5 py-6 md:px-8">
+            <section
+              className="mb-6 grid gap-4 rounded-lg border border-slate-800 bg-slate-950/60 p-5 md:grid-cols-[minmax(0,1fr)_auto]"
+              aria-labelledby="dashboard-title"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-400">Get started</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-normal text-white">
+                  Connect your first product.
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Create a workspace project, copy the SDK snippet, and send your first live browser event.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <Metric label="Events" value="Live" />
+                <Metric label="SDK" value="Ready" />
+                <Metric label="Keys" value="Hashed" />
+              </div>
+            </section>
+
+            <SetupPanel />
+          </div>
+        </section>
+      </div>
     </main>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-24 rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-100">{value}</p>
+    </div>
   );
 }

@@ -31,7 +31,7 @@ export function SetupPanel() {
   const [organizationName, setOrganizationName] = useState('My Organization');
   const [projectName, setProjectName] = useState('Web App');
   const [setup, setSetup] = useState<SetupResponse | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,7 +54,7 @@ export function SetupPanel() {
     const token = await getAccessToken();
 
     if (!token) {
-      setStatus('Your dashboard session expired. Sign in again.');
+      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
       setIsLoading(false);
       return;
     }
@@ -68,7 +68,7 @@ export function SetupPanel() {
     setIsLoading(false);
 
     if (!response.ok) {
-      setStatus(await readError(response));
+      setStatus({ tone: 'error', message: await readError(response) });
       return;
     }
 
@@ -83,7 +83,7 @@ export function SetupPanel() {
     const token = await getAccessToken();
 
     if (!token) {
-      setStatus('Your dashboard session expired. Sign in again.');
+      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
       setIsSubmitting(false);
       return;
     }
@@ -103,32 +103,39 @@ export function SetupPanel() {
     setIsSubmitting(false);
 
     if (!response.ok) {
-      setStatus(await readError(response));
+      setStatus({ tone: 'error', message: await readError(response) });
       return;
     }
 
     setSetup((await response.json()) as SetupResponse);
-    setStatus('Project setup complete.');
+    setStatus({ tone: 'success', message: 'Project setup complete.' });
   }
 
   return (
-    <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-6" aria-labelledby="setup-title">
-      <div className="max-w-3xl">
-        <p className="mb-3 text-xs font-extrabold uppercase tracking-normal text-slate-600">Project setup</p>
-        <h2 id="setup-title" className="text-3xl font-semibold leading-tight tracking-normal text-slate-950 md:text-5xl">
-          Create your first tracking project.
-        </h2>
-        <p className="mt-4 leading-7 text-slate-600">
-          This creates an organization, adds you as owner, creates a project, and gives you the first SDK
-          write key.
-        </p>
+    <section className="grid gap-5 rounded-lg border border-slate-800 bg-slate-950/70 p-5" aria-labelledby="setup-title">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <div className="max-w-3xl">
+          <p className="mb-2 text-xs font-bold uppercase tracking-normal text-cyan-300">Project setup</p>
+          <h2 id="setup-title" className="text-2xl font-semibold leading-tight tracking-normal text-white">
+            Create your tracking workspace
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+            Create an organization, a project, and the first SDK write key for browser event tracking.
+          </p>
+        </div>
+        <span className="w-fit rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+          Phase 1 setup
+        </span>
       </div>
 
-      <form className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={handleSubmit}>
-        <label className="grid gap-2 text-xs font-extrabold uppercase text-slate-600" htmlFor="organizationName">
+      <form
+        className="grid items-end gap-3 rounded-lg border border-slate-800 bg-slate-900/50 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+        onSubmit={handleSubmit}
+      >
+        <label className="grid gap-2 text-xs font-bold uppercase text-slate-400" htmlFor="organizationName">
           Organization name
           <input
-            className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal normal-case text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200"
+            className="min-h-10 rounded-md border border-slate-700 bg-slate-950 px-3 text-sm font-normal normal-case text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             id="organizationName"
             value={organizationName}
             onChange={(event) => setOrganizationName(event.target.value)}
@@ -136,10 +143,10 @@ export function SetupPanel() {
           />
         </label>
 
-        <label className="grid gap-2 text-xs font-extrabold uppercase text-slate-600" htmlFor="projectName">
+        <label className="grid gap-2 text-xs font-bold uppercase text-slate-400" htmlFor="projectName">
           Project name
           <input
-            className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal normal-case text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200"
+            className="min-h-10 rounded-md border border-slate-700 bg-slate-950 px-3 text-sm font-normal normal-case text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             id="projectName"
             value={projectName}
             onChange={(event) => setProjectName(event.target.value)}
@@ -148,7 +155,7 @@ export function SetupPanel() {
         </label>
 
         <button
-          className="min-h-12 rounded-lg border border-slate-950 bg-slate-950 px-5 font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+          className="min-h-10 rounded-md bg-cyan-400 px-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60"
           type="submit"
           disabled={isSubmitting || isLoading}
         >
@@ -156,7 +163,17 @@ export function SetupPanel() {
         </button>
       </form>
 
-      {status ? <p className="rounded-lg bg-emerald-50 p-3 text-emerald-700">{status}</p> : null}
+      {status ? (
+        <p
+          className={`rounded-md border px-3 py-2 text-sm ${
+            status.tone === 'success'
+              ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+              : 'border-rose-400/30 bg-rose-400/10 text-rose-200'
+          }`}
+        >
+          {status.message}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <SetupCard label="Organization" value={setup?.organization?.name ?? 'Not created'} detail={setup?.organization?.id} />
@@ -165,12 +182,12 @@ export function SetupPanel() {
       </div>
 
       {setup?.sdkSnippet ? (
-        <div className="grid gap-3">
+        <div className="grid gap-3 rounded-lg border border-slate-800 bg-slate-900/50 p-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-950">SDK snippet</h3>
-            <p className="text-slate-600">Use this in a browser app to send the first real event.</p>
+            <h3 className="text-base font-semibold text-white">SDK snippet</h3>
+            <p className="mt-1 text-sm text-slate-400">Use this in a browser app to send the first real event.</p>
           </div>
-          <pre className="overflow-x-auto rounded-lg bg-slate-950 p-5 text-sm text-slate-200">
+          <pre className="overflow-x-auto rounded-md border border-slate-800 bg-[#05070c] p-4 text-sm text-slate-300">
             <code>{setup.sdkSnippet}</code>
           </pre>
         </div>
@@ -181,15 +198,15 @@ export function SetupPanel() {
 
 function SetupCard({ label, value, detail }: { label: string; value: string; detail?: string | null }) {
   return (
-    <article className="min-h-56 rounded-lg border border-slate-200 bg-white p-6">
-      <span className="text-xs font-black uppercase tracking-normal text-slate-500">{label}</span>
-      <h2 className="mt-5 text-xl font-semibold tracking-normal text-slate-950">{value}</h2>
+    <article className="min-h-40 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+      <span className="text-xs font-bold uppercase tracking-normal text-slate-500">{label}</span>
+      <h2 className="mt-4 text-lg font-semibold tracking-normal text-white">{value}</h2>
       {detail ? (
-        <code className="mt-4 block rounded-md bg-slate-100 p-3 text-sm text-slate-700 [overflow-wrap:anywhere]">
+        <code className="mt-4 block rounded-md border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300 [overflow-wrap:anywhere]">
           {detail}
         </code>
       ) : (
-        <p className="mt-3 leading-7 text-slate-600">Waiting for setup.</p>
+        <p className="mt-3 text-sm leading-6 text-slate-500">Waiting for setup.</p>
       )}
     </article>
   );
