@@ -163,7 +163,7 @@ input {
   text-transform: uppercase;
 }
 
-h1 {
+.coming-soon-shell h1 {
   max-width: 880px;
   margin: 0;
   color: #ffffff;
@@ -369,7 +369,7 @@ h1 {
     align-items: flex-start;
   }
 
-  h1 {
+  .coming-soon-shell h1 {
     font-size: clamp(3.1rem, 18vw, 4.8rem);
   }
 
