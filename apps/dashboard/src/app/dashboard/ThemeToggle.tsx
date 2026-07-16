@@ -39,13 +39,51 @@ export function ThemeToggle() {
   }
 
   return (
-    <button
-      className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800"
-      type="button"
-      onClick={handleToggle}
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+   <button
+  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-900 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+  type="button"
+  onClick={handleToggle}
+  aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+>
+  {theme === "dark" ? (
+    // Sun Icon
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      {theme === 'dark' ? 'Light' : 'Dark'}
-    </button>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="M4.93 4.93l1.41 1.41" />
+      <path d="M17.66 17.66l1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="M4.93 19.07l1.41-1.41" />
+      <path d="M17.66 6.34l1.41-1.41" />
+    </svg>
+  ) : (
+    // Moon Icon
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3c0 .28-.01.56-.01.84A7.95 7.95 0 0 0 20.16 12c.28 0 .56-.01.84-.01z" />
+    </svg>
+  )}
+</button>
   );
 }

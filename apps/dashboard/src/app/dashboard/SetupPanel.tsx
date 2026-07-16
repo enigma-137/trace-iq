@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { DashboardDialog } from './DashboardDialog';
 
 interface SetupResponse {
   hasSetup: boolean;
@@ -35,6 +36,7 @@ export function SetupPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false);
   const hasProject = Boolean(setup?.project);
 
   useEffect(() => {
@@ -114,14 +116,6 @@ export function SetupPanel() {
   }
 
   async function handleRegenerateWriteKey() {
-    const confirmed = window.confirm(
-      'Regenerating will revoke the current active write key for this project. Continue?'
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setIsRegenerating(true);
     setStatus(null);
 
@@ -148,6 +142,7 @@ export function SetupPanel() {
     }
 
     setSetup((await response.json()) as SetupResponse);
+    setIsRegenerateDialogOpen(false);
     setStatus({ tone: 'success', message: 'New write key generated. Copy it now; it will be hidden later.' });
   }
 
@@ -272,12 +267,52 @@ export function SetupPanel() {
             className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900 transition hover:border-slate-500 hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white dark:hover:text-white"
             type="button"
             disabled={isRegenerating}
-            onClick={handleRegenerateWriteKey}
+            onClick={() => setIsRegenerateDialogOpen(true)}
           >
             {isRegenerating ? 'Regenerating...' : 'Regenerate write key'}
           </button>
         </div>
       ) : null}
+
+      <DashboardDialog
+        open={isRegenerateDialogOpen}
+        title="Regenerate write key?"
+        description="This revokes the current active write key for this project. Any website using the old key will stop sending events until the SDK snippet is updated."
+        onClose={() => {
+          if (!isRegenerating) {
+            setIsRegenerateDialogOpen(false);
+          }
+        }}
+        footer={
+          <>
+            <button
+              className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+              type="button"
+              disabled={isRegenerating}
+              onClick={() => setIsRegenerateDialogOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="h-10 rounded-md bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+              type="button"
+              disabled={isRegenerating}
+              onClick={handleRegenerateWriteKey}
+            >
+              {isRegenerating ? 'Regenerating...' : 'Regenerate key'}
+            </button>
+          </>
+        }
+      >
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+          <p className="text-sm font-semibold text-slate-950 dark:text-white">
+            Copy the new key immediately after regeneration.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            For security, TraceIQ only shows the full write key once. The dashboard will keep showing the prefix after this.
+          </p>
+        </div>
+      </DashboardDialog>
     </section>
   );
 }
