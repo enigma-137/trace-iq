@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
+import { DashboardUser } from '../auth/auth.service';
 import { DatabaseService } from '../../database/database.service';
 
 type JsonObject = Record<string, unknown>;
@@ -92,7 +93,52 @@ export class EventsService {
   async listRecentEvents(projectId: string, limit = 25) {
     const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? Math.trunc(limit) : 25, 1), 100);
     const requiredProjectId = this.requiredString(projectId, 'projectId');
+    const events = await this.queryRecentEvents(requiredProjectId, safeLimit);
 
+    return {
+      events
+    };
+  }
+
+  async listDashboardRecentEvents(user: DashboardUser, limit = 50) {
+    const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? Math.trunc(limit) : 50, 1), 100);
+    const result = await this.database.query(
+      `
+        SELECT
+          p.id,
+          p.name,
+          p.slug,
+          o.id AS "organizationId",
+          o.name AS "organizationName",
+          om.role
+        FROM organization_members om
+        JOIN organizations o ON o.id = om.organization_id
+        JOIN projects p ON p.organization_id = o.id
+        WHERE om.user_id = $1
+        ORDER BY o.created_at ASC, p.created_at ASC
+        LIMIT 1
+      `,
+      [user.id]
+    );
+
+    const project = result.rows[0];
+
+    if (!project) {
+      return {
+        project: null,
+        events: []
+      };
+    }
+
+    const events = await this.queryRecentEvents(project.id as string, safeLimit);
+
+    return {
+      project,
+      events
+    };
+  }
+
+  private async queryRecentEvents(projectId: string, limit: number) {
     const result = await this.database.query(
       `
         SELECT
@@ -115,12 +161,10 @@ export class EventsService {
         ORDER BY e.received_at DESC
         LIMIT $2
       `,
-      [requiredProjectId, safeLimit]
+      [projectId, limit]
     );
 
-    return {
-      events: result.rows
-    };
+    return result.rows;
   }
 
   private async authenticateWriteKey(writeKey: string, projectId: string): Promise<WriteKeyRecord> {
