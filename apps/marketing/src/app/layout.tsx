@@ -1,5 +1,6 @@
 import './globals.css';
 import type { ReactNode } from 'react';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 
 const inter = Inter({
@@ -8,11 +9,19 @@ const inter = Inter({
   display: 'swap',
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'TraceIQ | Developer-First Behavior Intelligence',
   description: 'Understand user behavior, conversion friction, and product journeys in real-time. Built for fintech, SaaS, and growth-stage startups.',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=5',
-  themeColor: '#09090b',
+  icons: {
+    icon: '/favicon.ico'
+  }
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#09090b'
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -24,4 +33,3 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
-

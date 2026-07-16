@@ -65,8 +65,12 @@ export function AuthForm() {
         aria-labelledby="auth-title"
       >
         <div>
-          <Link className="text-sm font-extrabold uppercase tracking-normal text-slate-950" href="/">
-            TraceIQ
+          <Link className="inline-flex" href="/" aria-label="TraceIQ home">
+            <img
+              className="h-9 w-auto"
+              src="/brand/logo-black-no-bg.png"
+              alt="TraceIQ"
+            />
           </Link>
           <p className="mb-2 mt-7 text-xs font-extrabold uppercase tracking-normal text-slate-600">
             Dashboard access

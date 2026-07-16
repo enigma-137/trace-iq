@@ -30,17 +30,15 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#070a12] text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1440px]">
+    <main className="min-h-screen bg-black text-slate-100">
+      <div className="flex min-h-screen w-full">
         <aside className="hidden w-64 shrink-0 border-r border-slate-800/80 bg-slate-950/70 px-5 py-6 lg:block">
-          <Link className="flex items-center gap-3" href="/">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-400 text-sm font-black text-slate-950">
-              TQ
-            </span>
-            <span>
-              <span className="block text-sm font-black uppercase tracking-normal text-white">TraceIQ</span>
-              <span className="block text-xs text-slate-500">Product analytics</span>
-            </span>
+          <Link className="flex items-center gap-3" href="/" aria-label="TraceIQ home">
+            <img
+              className="h-9 w-auto"
+              src="/brand/logo-white-no-bg.png"
+              alt="TraceIQ"
+            />
           </Link>
 
           <nav className="mt-8 grid gap-1" aria-label="Dashboard navigation">
@@ -61,13 +59,20 @@ export default async function DashboardPage() {
         </aside>
 
         <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-[#070a12]/90 px-5 py-4 backdrop-blur md:px-8">
+          <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-black/90 px-5 py-4 backdrop-blur md:px-8">
             <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-normal text-cyan-300">Dashboard</p>
-                <h1 id="dashboard-title" className="mt-1 truncate text-xl font-semibold tracking-normal text-white">
-                  Overview
-                </h1>
+              <div className="flex min-w-0 items-center gap-3">
+                <img
+                  className="h-8 w-auto lg:hidden"
+                  src="/brand/logo-white-no-bg.png"
+                  alt="TraceIQ"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Dashboard</p>
+                  <h1 id="dashboard-title" className="mt-1 truncate text-xl font-semibold tracking-normal text-white">
+                    Overview
+                  </h1>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="hidden min-w-0 text-right sm:block">
@@ -93,18 +98,18 @@ export default async function DashboardPage() {
             </nav>
           </header>
 
-          <div className="px-5 py-6 md:px-8">
+          <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">
             <section
-              className="mb-6 grid gap-4 rounded-lg border border-slate-800 bg-slate-950/60 p-5 md:grid-cols-[minmax(0,1fr)_auto]"
+              className="mb-6 grid gap-4 rounded-lg border border-slate-800 bg-slate-950/60 p-5 xl:grid-cols-[minmax(0,1fr)_auto]"
               aria-labelledby="dashboard-title"
             >
               <div>
-                <p className="text-sm font-medium text-slate-400">Get started</p>
+                <p className="text-sm font-medium text-slate-400">Workspace</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-normal text-white">
-                  Connect your first product.
+                  Event tracking setup
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Create a workspace project, copy the SDK snippet, and send your first live browser event.
+                  Manage your project credentials, SDK snippet, and browser event installation.
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">

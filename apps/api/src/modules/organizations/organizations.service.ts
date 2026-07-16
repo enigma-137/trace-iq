@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { QueryResultRow } from 'pg';
 import { DatabaseService, QueryExecutor } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
@@ -104,6 +104,40 @@ export class OrganizationsService {
         project,
         writeKey,
         sdkSnippet: this.createSdkSnippet(project.id, writeKey.value)
+      };
+    });
+  }
+
+  async regenerateWriteKey(user: DashboardUser) {
+    return this.database.transaction(async (client) => {
+      const existing = await this.getExistingSetup(client, user);
+
+      if (!existing.organization || !existing.project) {
+        throw new BadRequestException('Create an organization and project before regenerating a write key.');
+      }
+
+      if (!['owner', 'admin'].includes(existing.organization.role)) {
+        throw new ForbiddenException('Only owners and admins can regenerate project write keys.');
+      }
+
+      await client.query(
+        `
+          UPDATE project_write_keys
+          SET revoked_at = now(), revoked_by_user_id = $2
+          WHERE project_id = $1
+            AND revoked_at IS NULL;
+        `,
+        [existing.project.id, user.id]
+      );
+
+      const writeKey = await this.createWriteKey(client, user, existing.project.id, 'Regenerated write key');
+
+      return {
+        hasSetup: true,
+        organization: existing.organization,
+        project: existing.project,
+        writeKey,
+        sdkSnippet: this.createSdkSnippet(existing.project.id, writeKey.value)
       };
     });
   }
@@ -216,7 +250,12 @@ export class OrganizationsService {
     return project;
   }
 
-  private async createWriteKey(client: QueryExecutor, user: DashboardUser, projectId: string) {
+  private async createWriteKey(
+    client: QueryExecutor,
+    user: DashboardUser,
+    projectId: string,
+    name = 'Default write key'
+  ) {
     const value = `trq_live_${randomBytes(24).toString('base64url')}`;
     const keyHash = createHash('sha256').update(value).digest('hex');
 
@@ -225,7 +264,7 @@ export class OrganizationsService {
         INSERT INTO project_write_keys (id, project_id, key_prefix, key_hash, name, created_by_user_id)
         VALUES ($1, $2, $3, $4, $5, $6);
       `,
-      [`pwk_${randomUUID()}`, projectId, value.slice(0, 16), keyHash, 'Default write key', user.id]
+      [`pwk_${randomUUID()}`, projectId, value.slice(0, 16), keyHash, name, user.id]
     );
 
     return {

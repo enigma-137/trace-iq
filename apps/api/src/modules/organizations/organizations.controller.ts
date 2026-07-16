@@ -10,18 +10,23 @@ export class OrganizationsController {
   ) {}
 
   @Get()
-  getSetup(@Headers('authorization') authorization?: string) {
-    const user = this.authService.getDashboardUser(authorization);
+  async getSetup(@Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
     return this.organizationsService.getSetup(user);
   }
 
   @Post('bootstrap')
-  bootstrapSetup(
+  async bootstrapSetup(
     @Body() body: BootstrapSetupRequest,
     @Headers('authorization') authorization?: string
   ) {
-    const user = this.authService.getDashboardUser(authorization);
+    const user = await this.authService.getDashboardUser(authorization);
     return this.organizationsService.bootstrapSetup(user, body);
   }
-}
 
+  @Post('write-key/regenerate')
+  async regenerateWriteKey(@Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.organizationsService.regenerateWriteKey(user);
+  }
+}

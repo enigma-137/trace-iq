@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 export interface DashboardUser {
@@ -6,25 +5,24 @@ export interface DashboardUser {
   email?: string;
 }
 
-interface SupabaseJwtPayload {
-  sub?: string;
+interface SupabaseUserResponse {
+  id?: string;
   email?: string;
-  exp?: number;
 }
 
 @Injectable()
 export class AuthService {
-  getDashboardUser(authorizationHeader?: string): DashboardUser {
+  async getDashboardUser(authorizationHeader?: string): Promise<DashboardUser> {
     const token = this.getBearerToken(authorizationHeader);
-    const payload = this.verifySupabaseJwt(token);
+    const user = await this.getSupabaseUser(token);
 
-    if (!payload.sub) {
-      throw new UnauthorizedException('Supabase token is missing a subject.');
+    if (!user.id) {
+      throw new UnauthorizedException('Supabase session is missing a user ID.');
     }
 
     return {
-      id: payload.sub,
-      email: payload.email
+      id: user.id,
+      email: user.email
     };
   }
 
@@ -36,56 +34,25 @@ export class AuthService {
     return authorizationHeader.slice('Bearer '.length).trim();
   }
 
-  private verifySupabaseJwt(token: string): SupabaseJwtPayload {
-    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  private async getSupabaseUser(token: string): Promise<SupabaseUserResponse> {
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!jwtSecret) {
-      throw new UnauthorizedException('SUPABASE_JWT_SECRET is not configured.');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new UnauthorizedException('Supabase API auth environment variables are not configured.');
     }
 
-    const [encodedHeader, encodedPayload, signature] = token.split('.');
+    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${token}`
+      }
+    });
 
-    if (!encodedHeader || !encodedPayload || !signature) {
-      throw new UnauthorizedException('Invalid bearer token.');
+    if (!response.ok) {
+      throw new UnauthorizedException('Invalid or expired dashboard session.');
     }
 
-    const header = this.decodeJson<{ alg?: string }>(encodedHeader);
-
-    if (header.alg !== 'HS256') {
-      throw new UnauthorizedException('Unsupported Supabase token algorithm.');
-    }
-
-    const expectedSignature = Buffer.from(
-      createHmac('sha256', jwtSecret).update(`${encodedHeader}.${encodedPayload}`).digest()
-    ).toString('base64url');
-
-    if (!this.safeEqual(signature, expectedSignature)) {
-      throw new UnauthorizedException('Invalid bearer token signature.');
-    }
-
-    const payload = this.decodeJson<SupabaseJwtPayload>(encodedPayload);
-    const nowInSeconds = Math.floor(Date.now() / 1000);
-
-    if (payload.exp && payload.exp <= nowInSeconds) {
-      throw new UnauthorizedException('Bearer token has expired.');
-    }
-
-    return payload;
-  }
-
-  private decodeJson<T>(encoded: string): T {
-    try {
-      return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as T;
-    } catch {
-      throw new UnauthorizedException('Invalid bearer token encoding.');
-    }
-  }
-
-  private safeEqual(left: string, right: string): boolean {
-    const leftBuffer = Buffer.from(left);
-    const rightBuffer = Buffer.from(right);
-
-    return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+    return (await response.json()) as SupabaseUserResponse;
   }
 }
-
