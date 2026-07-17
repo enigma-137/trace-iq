@@ -24,6 +24,9 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
+  "optionalDependencies": {
+    "geoip-lite": "^1.4.10"
+  },
   "devDependencies": {
     "@nestjs/cli": "^10.4.2",
     "@types/node": "^20.14.12",

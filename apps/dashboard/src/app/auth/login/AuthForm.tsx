@@ -59,9 +59,9 @@ export function AuthForm() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-50 px-5 py-8 text-slate-950">
+    <main className="grid min-h-screen place-items-center bg-neutral-50 px-5 py-8 text-neutral-950">
       <section
-        className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)]"
+        className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)]"
         aria-labelledby="auth-title"
       >
         <div>
@@ -72,29 +72,29 @@ export function AuthForm() {
               alt="TraceIQ"
             />
           </Link>
-          <p className="mb-2 mt-7 text-xs font-extrabold uppercase tracking-normal text-slate-600">
+          <p className="mb-2 mt-7 text-xs font-extrabold uppercase tracking-normal text-neutral-600">
             Dashboard access
           </p>
           <h1
             id="auth-title"
-            className="text-4xl font-medium leading-none tracking-normal text-slate-950 sm:text-5xl"
+            className="text-4xl font-medium leading-none tracking-normal text-neutral-950 sm:text-5xl"
           >
             {mode === 'signin' ? 'Sign in to TraceIQ' : 'Create your TraceIQ account'}
           </h1>
-          <p className="mt-4 leading-7 text-slate-600">
+          <p className="mt-4 leading-7 text-neutral-600">
             Supabase Auth powers dashboard access. SDK ingestion still uses project write keys.
           </p>
         </div>
 
         <div
-          className="my-7 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1"
+          className="my-7 grid grid-cols-2 gap-2 rounded-lg bg-neutral-100 p-1"
           role="tablist"
           aria-label="Authentication mode"
         >
           <button
             type="button"
             className={`min-h-10 rounded-md font-extrabold transition ${
-              mode === 'signin' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'
+              mode === 'signin' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-600'
             }`}
             onClick={() => setMode('signin')}
           >
@@ -103,7 +103,7 @@ export function AuthForm() {
           <button
             type="button"
             className={`min-h-10 rounded-md font-extrabold transition ${
-              mode === 'signup' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'
+              mode === 'signup' ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-600'
             }`}
             onClick={() => setMode('signup')}
           >
@@ -112,11 +112,11 @@ export function AuthForm() {
         </div>
 
         <form className="grid gap-3" onSubmit={handleSubmit}>
-          <label className="text-xs font-extrabold uppercase text-slate-600" htmlFor="email">
+          <label className="text-xs font-extrabold uppercase text-neutral-600" htmlFor="email">
             Email
           </label>
           <input
-            className="min-h-12 rounded-lg border border-slate-300 px-3 text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200"
+            className="min-h-12 rounded-lg border border-neutral-300 px-3 text-neutral-950 outline-none transition focus:border-neutral-950 focus:ring-2 focus:ring-neutral-200"
             id="email"
             name="email"
             type="email"
@@ -126,11 +126,11 @@ export function AuthForm() {
             required
           />
 
-          <label className="text-xs font-extrabold uppercase text-slate-600" htmlFor="password">
+          <label className="text-xs font-extrabold uppercase text-neutral-600" htmlFor="password">
             Password
           </label>
           <input
-            className="min-h-12 rounded-lg border border-slate-300 px-3 text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200"
+            className="min-h-12 rounded-lg border border-neutral-300 px-3 text-neutral-950 outline-none transition focus:border-neutral-950 focus:ring-2 focus:ring-neutral-200"
             id="password"
             name="password"
             type="password"
@@ -142,7 +142,7 @@ export function AuthForm() {
           />
 
           <button
-            className="mt-3 min-h-12 rounded-lg border border-slate-950 bg-slate-950 px-4 font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-3 min-h-12 rounded-lg border border-neutral-950 bg-neutral-950 px-4 font-extrabold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
             type="submit"
             disabled={isSubmitting || missingConfig}
           >

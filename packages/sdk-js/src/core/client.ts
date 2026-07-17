@@ -10,6 +10,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private groupContext?: TraceIQGroup;
   private anonymousId?: string;
   private sessionId?: string;
+  private errorHandlersInstalled = false;
 
   initialize(options: TraceIQInitOptions): void {
     this.options = {
@@ -19,8 +20,67 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.anonymousId = this.loadOrCreateId('localStorage', ANONYMOUS_ID_STORAGE_KEY, 'anon');
     this.sessionId = this.loadOrCreateId('sessionStorage', SESSION_ID_STORAGE_KEY, 'sess');
 
+    if (options.autoCaptureExceptions !== false) {
+      this.installErrorHandlers();
+    }
+
     if (options.autoTrackPageViews) {
       this.page();
+    }
+  }
+
+  captureException(error: unknown, properties: Record<string, unknown> = {}): void {
+    const normalized = this.normalizeError(error);
+    this.track('$exception', {
+      type: normalized.type,
+      message: normalized.message,
+      stack: normalized.stack,
+      handled: true,
+      ...properties
+    });
+  }
+
+  private installErrorHandlers(): void {
+    if (typeof window === 'undefined' || this.errorHandlersInstalled) {
+      return;
+    }
+    this.errorHandlersInstalled = true;
+
+    window.addEventListener('error', (event: ErrorEvent) => {
+      const normalized = this.normalizeError(event.error ?? event.message);
+      this.track('$exception', {
+        type: normalized.type,
+        message: normalized.message,
+        stack: normalized.stack,
+        source: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        handled: false
+      });
+    });
+
+    window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+      const normalized = this.normalizeError(event.reason);
+      this.track('$exception', {
+        type: normalized.type || 'UnhandledRejection',
+        message: normalized.message,
+        stack: normalized.stack,
+        handled: false
+      });
+    });
+  }
+
+  private normalizeError(error: unknown): { type: string; message: string; stack?: string } {
+    if (error instanceof Error) {
+      return { type: error.name || 'Error', message: error.message, stack: error.stack };
+    }
+    if (typeof error === 'string') {
+      return { type: 'Error', message: error };
+    }
+    try {
+      return { type: 'Error', message: JSON.stringify(error) };
+    } catch {
+      return { type: 'Error', message: 'Unknown error' };
     }
   }
 
@@ -73,6 +133,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
       sessionId: this.sessionId,
       eventName,
       properties,
+      deviceInfo: this.buildDeviceInfo(),
+      networkInfo: this.buildNetworkInfo(),
       context: this.buildContext(),
       timestamp: new Date().toISOString()
     };
@@ -126,6 +188,97 @@ export class BrowserTraceIQClient implements TraceIQClient {
       },
       timezone: this.getTimezone()
     };
+  }
+
+  private buildDeviceInfo(): Record<string, unknown> {
+    const navigator = this.getNavigator();
+    const userAgent = navigator?.userAgent ?? '';
+    const os = this.detectOs(userAgent);
+    const deviceType = this.detectDeviceType(userAgent);
+    const browser = this.detectBrowser(userAgent);
+
+    return {
+      platform: 'web',
+      os: os.name,
+      osVersion: os.version,
+      deviceType,
+      browser: browser.name,
+      browserVersion: browser.version,
+      userAgent,
+      viewport: this.getScreen(),
+      locale: navigator?.language
+    };
+  }
+
+  private buildNetworkInfo(): Record<string, unknown> {
+    const connection = this.getConnection();
+    return {
+      // ipAddress + geo (country/region/city) are resolved server-side from the request.
+      connectionType: connection?.type,
+      effectiveType: connection?.effectiveType
+    };
+  }
+
+  private detectOs(ua: string): { name?: string; version?: string } {
+    if (/iPhone|iPad|iPod/i.test(ua)) {
+      const match = ua.match(/OS (\d+[_.]\d+)/);
+      return { name: 'iOS', version: match?.[1]?.replace(/_/g, '.') };
+    }
+    if (/Android/i.test(ua)) {
+      const match = ua.match(/Android (\d+(?:\.\d+)?)/);
+      return { name: 'Android', version: match?.[1] };
+    }
+    if (/Windows NT/i.test(ua)) {
+      const match = ua.match(/Windows NT (\d+\.\d+)/);
+      return { name: 'Windows', version: match?.[1] };
+    }
+    if (/Mac OS X/i.test(ua)) {
+      const match = ua.match(/Mac OS X (\d+[_.]\d+)/);
+      return { name: 'macOS', version: match?.[1]?.replace(/_/g, '.') };
+    }
+    if (/Linux/i.test(ua)) {
+      return { name: 'Linux' };
+    }
+    return {};
+  }
+
+  private detectDeviceType(ua: string): 'desktop' | 'mobile' | 'tablet' | 'unknown' {
+    if (/iPad|Tablet|(Android(?!.*Mobile))/i.test(ua)) {
+      return 'tablet';
+    }
+    if (/Mobi|iPhone|iPod|Android/i.test(ua)) {
+      return 'mobile';
+    }
+    if (ua) {
+      return 'desktop';
+    }
+    return 'unknown';
+  }
+
+  private detectBrowser(ua: string): { name?: string; version?: string } {
+    const patterns: Array<{ name: string; re: RegExp }> = [
+      { name: 'Edge', re: /Edg\/(\d+[.\d]*)/ },
+      { name: 'Opera', re: /OPR\/(\d+[.\d]*)/ },
+      { name: 'Chrome', re: /Chrome\/(\d+[.\d]*)/ },
+      { name: 'Firefox', re: /Firefox\/(\d+[.\d]*)/ },
+      { name: 'Safari', re: /Version\/(\d+[.\d]*).*Safari/ }
+    ];
+    for (const { name, re } of patterns) {
+      const match = ua.match(re);
+      if (match) {
+        return { name, version: match[1] };
+      }
+    }
+    return {};
+  }
+
+  private getConnection(): { type?: string; effectiveType?: string } | undefined {
+    try {
+      const nav = this.getNavigator() as (Navigator & { connection?: { type?: string; effectiveType?: string } }) | undefined;
+      return nav?.connection;
+    } catch {
+      return undefined;
+    }
   }
 
   private loadOrCreateId(storageType: 'localStorage' | 'sessionStorage', key: string, prefix: string): string {

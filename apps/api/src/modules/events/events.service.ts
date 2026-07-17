@@ -2,8 +2,15 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import { createHash, randomUUID } from 'node:crypto';
 import { DashboardUser } from '../auth/auth.service';
 import { DatabaseService } from '../../database/database.service';
+import { extractClientIp, resolveGeo } from '../../common/geo';
 
 type JsonObject = Record<string, unknown>;
+
+export interface IngestMeta {
+  ip?: string;
+  forwardedFor?: string;
+  headers?: Record<string, string | undefined>;
+}
 
 interface WriteKeyRecord {
   [column: string]: unknown;
@@ -39,7 +46,7 @@ export interface IngestEventResponse {
 export class EventsService {
   constructor(private readonly database: DatabaseService) {}
 
-  async ingest(input: IngestEventRequest): Promise<IngestEventResponse> {
+  async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
     const writeKey = this.requiredString(input.writeKey, 'writeKey');
     const projectId = this.requiredString(input.projectId, 'projectId');
     const eventName = this.requiredString(input.eventName, 'eventName');
@@ -48,6 +55,7 @@ export class EventsService {
     const anonymousId = this.optionalString(input.anonymousId);
     const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId);
     const sessionId = await this.ensureSession(auth.project_id, input.sessionId, userId, anonymousId, input.context);
+    const networkInfo = this.buildNetworkInfo(input.networkInfo, meta);
     const eventId = `evt_${randomUUID()}`;
 
     await this.database.query(
@@ -78,7 +86,7 @@ export class EventsService {
         eventName,
         JSON.stringify(input.properties ?? {}),
         JSON.stringify(input.deviceInfo ?? {}),
-        JSON.stringify(input.networkInfo ?? {}),
+        JSON.stringify(networkInfo),
         JSON.stringify(input.context ?? {}),
         occurredAt.toISOString()
       ]
@@ -247,6 +255,16 @@ export class EventsService {
     );
 
     return safeSessionId;
+  }
+
+  private buildNetworkInfo(clientNetworkInfo: JsonObject | undefined, meta: IngestMeta): JsonObject {
+    const clientIp = extractClientIp(meta.forwardedFor, meta.ip);
+    const geo = resolveGeo(clientIp, meta.headers ?? {});
+    // Server-resolved IP + geo win over anything the (untrusted) client sent.
+    return {
+      ...(clientNetworkInfo ?? {}),
+      ...geo
+    };
   }
 
   private parseTimestamp(timestamp?: string): Date {

@@ -3,6 +3,7 @@ export interface TraceIQInitOptions {
   writeKey: string;
   endpoint?: string;
   autoTrackPageViews?: boolean;
+  autoCaptureExceptions?: boolean;
   enableReplay?: boolean;
   debug?: boolean;
 }
@@ -23,4 +24,5 @@ export interface TraceIQClient {
   track(eventName: string, properties?: Record<string, unknown>): void;
   page(name?: string, properties?: Record<string, unknown>): void;
   group(group: TraceIQGroup): void;
+  captureException(error: unknown, properties?: Record<string, unknown>): void;
 }

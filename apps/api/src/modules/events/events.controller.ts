@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Ip, Post, Query } from '@nestjs/common';
 import { EventsService, IngestEventRequest } from './events.service';
 
 @Controller('v1/events')
@@ -8,12 +8,16 @@ export class EventsController {
   @Post()
   ingestEvent(
     @Body() body: IngestEventRequest,
-    @Headers('x-traceiq-write-key') writeKeyHeader?: string
+    @Headers() headers: Record<string, string | undefined>,
+    @Ip() ip?: string
   ) {
-    return this.eventsService.ingest({
-      ...body,
-      writeKey: writeKeyHeader ?? body.writeKey
-    });
+    return this.eventsService.ingest(
+      {
+        ...body,
+        writeKey: headers['x-traceiq-write-key'] ?? body.writeKey
+      },
+      { ip, forwardedFor: headers['x-forwarded-for'], headers }
+    );
   }
 
   @Get('recent')
