@@ -4,10 +4,14 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
 
 type TrendInterval = 'hour' | 'day' | 'week';
+type TrendMeasure = 'count' | 'unique' | 'sum' | 'avg';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_INTERVALS: TrendInterval[] = ['hour', 'day', 'week'];
+const ALLOWED_MEASURES: TrendMeasure[] = ['count', 'unique', 'sum', 'avg'];
 const BUCKET_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS"Z"';
+// Matches a plain integer or decimal so a JSONB text value can be safely cast to numeric.
+const NUMERIC_GUARD = "'^-?[0-9]+(\\.[0-9]+)?$'";
 
 // Well-known breakdown dimensions map to device_info / network_info JSONB columns.
 // Values are trusted SQL fragments (fixed whitelist), never user input.
@@ -25,6 +29,7 @@ export interface TrendPoint {
   bucket: string;
   total: number;
   uniques: number;
+  value: number;
 }
 
 export interface TrendSeries {
@@ -36,11 +41,20 @@ export interface TrendsResponse {
   project: ResolvedProject;
   event: string;
   interval: TrendInterval;
+  measure: TrendMeasure;
+  property: string | null;
   from: string;
   to: string;
   breakdown: string | null;
   buckets: string[];
   series: TrendSeries[];
+  // Accurate whole-window totals for the headline stat + period-over-period comparison.
+  // (Unique/avg can't be derived by summing buckets, so they're computed separately.)
+  summary: {
+    current: number;
+    previous: number;
+    days: number;
+  };
 }
 
 export interface OverviewResponse {
@@ -50,6 +64,12 @@ export interface OverviewResponse {
     events24h: number;
     users: number;
     sessions: number;
+  };
+  // GTV = sum of the numeric `amount` property across events (last 30d vs the 30d before).
+  revenue: {
+    total: number;
+    previous: number;
+    transactions: number;
   };
   topEvents: Array<{ eventName: string; total: number }>;
   topDevices: Array<{ name: string; total: number }>;
@@ -76,6 +96,7 @@ export interface WebAnalyticsResponse {
   countries: Array<{ name: string; total: number }>;
   sources: Array<{ channel: string; visitors: number }>;
   activeHours: number[][];
+  frustratingPages: Array<{ path: string; errors: number; rageClicks: number; users: number }>;
 }
 
 @Injectable()
@@ -92,6 +113,7 @@ export class AnalyticsService {
       return {
         project: null,
         totals: { events: 0, events24h: 0, users: 0, sessions: 0 },
+        revenue: { total: 0, previous: 0, transactions: 0 },
         topEvents: [],
         topDevices: [],
         topCountries: [],
@@ -164,11 +186,34 @@ export class AnalyticsService {
       [project.id]
     );
 
+    const revenueResult = await this.database.query<{
+      current_revenue: number;
+      previous_revenue: number;
+      current_transactions: number;
+    }>(
+      `
+        WITH rev AS (
+          SELECT
+            occurred_at,
+            CASE WHEN properties->>'amount' ~ ${NUMERIC_GUARD} THEN (properties->>'amount')::numeric END AS amount
+          FROM events
+          WHERE project_id = $1 AND occurred_at >= now() - interval '60 days'
+        )
+        SELECT
+          COALESCE(sum(amount) FILTER (WHERE occurred_at >= now() - interval '30 days'), 0)::float AS current_revenue,
+          COALESCE(sum(amount) FILTER (WHERE occurred_at < now() - interval '30 days'), 0)::float AS previous_revenue,
+          count(amount) FILTER (WHERE occurred_at >= now() - interval '30 days')::int AS current_transactions
+        FROM rev
+      `,
+      [project.id]
+    );
+
     const to = new Date();
     const from = new Date(to.getTime() - 14 * DAY_MS);
     const sparkline = this.zeroFill(this.generateBuckets(from, to, 'day'), sparklineRows.rows);
 
     const totals = totalsResult.rows[0];
+    const revenue = revenueResult.rows[0];
 
     return {
       project,
@@ -177,6 +222,11 @@ export class AnalyticsService {
         events24h: totals?.events_24h ?? 0,
         users: totals?.total_users ?? 0,
         sessions: totals?.total_sessions ?? 0
+      },
+      revenue: {
+        total: revenue?.current_revenue ?? 0,
+        previous: revenue?.previous_revenue ?? 0,
+        transactions: revenue?.current_transactions ?? 0
       },
       topEvents: topEventsResult.rows,
       topDevices: topDevices.rows,
@@ -209,10 +259,24 @@ export class AnalyticsService {
 
   async getTrends(
     user: DashboardUser,
-    params: { event?: string; interval?: string; days?: string; breakdown?: string; projectId?: string }
+    params: {
+      event?: string;
+      interval?: string;
+      days?: string;
+      breakdown?: string;
+      measure?: string;
+      property?: string;
+      projectId?: string;
+    }
   ): Promise<TrendsResponse> {
     const event = this.requiredString(params.event, 'event');
     const interval = this.parseInterval(params.interval);
+    const measure = this.parseMeasure(params.measure);
+    // A property is only meaningful (and required) for sum/avg aggregations.
+    const property =
+      measure === 'sum' || measure === 'avg'
+        ? this.requiredString(params.property, 'property')
+        : this.optionalString(params.property) ?? null;
     const days = this.clampDays(params.days, interval);
     const breakdown = this.optionalString(params.breakdown) ?? null;
     const project = await this.projects.requireActiveProject(user, params.projectId);
@@ -225,68 +289,129 @@ export class AnalyticsService {
 
     if (breakdown) {
       const dimensionSource = DIMENSION_SOURCES[breakdown.toLowerCase()];
-      const breakdownExpr = dimensionSource
-        ? `COALESCE(NULLIF(${dimensionSource}, ''), '(none)')`
-        : `COALESCE(NULLIF(properties->>$6, ''), '(none)')`;
-      const params = dimensionSource
-        ? [project.id, event, interval, from.toISOString(), to.toISOString()]
-        : [project.id, event, interval, from.toISOString(), to.toISOString(), breakdown];
+      const queryParams: unknown[] = [project.id, event, interval, from.toISOString(), to.toISOString()];
 
-      const rows = await this.database.query<{ bucket: string; breakdown_key: string; total: number }>(
+      let breakdownExpr: string;
+      if (dimensionSource) {
+        breakdownExpr = `COALESCE(NULLIF(${dimensionSource}, ''), '(none)')`;
+      } else {
+        queryParams.push(breakdown);
+        breakdownExpr = `COALESCE(NULLIF(properties->>$${queryParams.length}, ''), '(none)')`;
+      }
+
+      const valueExpr = this.buildMeasureExpr(measure, property, queryParams);
+
+      const rows = await this.database.query<{ bucket: string; breakdown_key: string; total: number; value: number }>(
         `
           SELECT
             to_char(date_trunc($3, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
             ${breakdownExpr} AS breakdown_key,
-            count(*)::int AS total
+            count(*)::int AS total,
+            ${valueExpr} AS value
           FROM events
           WHERE project_id = $1 AND event_name = $2
             AND occurred_at >= $4 AND occurred_at < $5
           GROUP BY 1, 2
           ORDER BY 1 ASC
         `,
-        params
+        queryParams
       );
 
-      const byKey = new Map<string, Map<string, number>>();
+      const byKey = new Map<string, Map<string, { total: number; value: number }>>();
       for (const row of rows.rows) {
-        const keyMap = byKey.get(row.breakdown_key) ?? new Map<string, number>();
-        keyMap.set(row.bucket, row.total);
+        const keyMap = byKey.get(row.breakdown_key) ?? new Map<string, { total: number; value: number }>();
+        keyMap.set(row.bucket, { total: row.total, value: row.value });
         byKey.set(row.breakdown_key, keyMap);
       }
 
       series = [...byKey.entries()].map(([key, keyMap]) => ({
         key,
-        points: buckets.map((bucket) => ({ bucket, total: keyMap.get(bucket) ?? 0, uniques: 0 }))
+        points: buckets.map((bucket) => {
+          const entry = keyMap.get(bucket);
+          return { bucket, total: entry?.total ?? 0, uniques: 0, value: entry?.value ?? 0 };
+        })
       }));
     } else {
-      const rows = await this.database.query<{ bucket: string; total: number; uniques: number }>(
+      const queryParams: unknown[] = [project.id, event, interval, from.toISOString(), to.toISOString()];
+      const valueExpr = this.buildMeasureExpr(measure, property, queryParams);
+
+      const rows = await this.database.query<{ bucket: string; total: number; uniques: number; value: number }>(
         `
           SELECT
             to_char(date_trunc($3, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
             count(*)::int AS total,
-            count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS uniques
+            count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS uniques,
+            ${valueExpr} AS value
           FROM events
           WHERE project_id = $1 AND event_name = $2
             AND occurred_at >= $4 AND occurred_at < $5
           GROUP BY 1
           ORDER BY 1 ASC
         `,
-        [project.id, event, interval, from.toISOString(), to.toISOString()]
+        queryParams
       );
 
       series = [{ key: event, points: this.zeroFill(buckets, rows.rows) }];
     }
 
+    const previousFrom = new Date(from.getTime() - days * DAY_MS);
+    const [current, previous] = await Promise.all([
+      this.computeMeasureTotal(project.id, event, from, to, measure, property),
+      this.computeMeasureTotal(project.id, event, previousFrom, from, measure, property)
+    ]);
+
     return {
       project,
       event,
       interval,
+      measure,
+      property,
       from: from.toISOString(),
       to: to.toISOString(),
       breakdown,
       buckets,
-      series
+      series,
+      summary: { current, previous, days }
     };
+  }
+
+  // Single-number aggregate over the whole window — used for the headline stat and the
+  // previous-period comparison. Correct for unique/avg where per-bucket sums would not be.
+  private async computeMeasureTotal(
+    projectId: string,
+    event: string,
+    from: Date,
+    to: Date,
+    measure: TrendMeasure,
+    property: string | null
+  ): Promise<number> {
+    const queryParams: unknown[] = [projectId, event, from.toISOString(), to.toISOString()];
+    const valueExpr = this.buildMeasureExpr(measure, property, queryParams);
+    const result = await this.database.query<{ value: number }>(
+      `
+        SELECT ${valueExpr} AS value
+        FROM events
+        WHERE project_id = $1 AND event_name = $2
+          AND occurred_at >= $3 AND occurred_at < $4
+      `,
+      queryParams
+    );
+    return result.rows[0]?.value ?? 0;
+  }
+
+  // Builds the SQL aggregate expression for the selected measure, appending any
+  // needed property param to `queryParams` (so the placeholder index stays correct).
+  private buildMeasureExpr(measure: TrendMeasure, property: string | null, queryParams: unknown[]): string {
+    if ((measure === 'sum' || measure === 'avg') && property) {
+      queryParams.push(property);
+      const propExpr = `properties->>$${queryParams.length}`;
+      const agg = measure === 'sum' ? 'sum' : 'avg';
+      return `COALESCE(${agg}(CASE WHEN ${propExpr} ~ ${NUMERIC_GUARD} THEN (${propExpr})::numeric END), 0)::float`;
+    }
+    if (measure === 'unique') {
+      return "count(DISTINCT COALESCE(user_id::text, anonymous_id))::float";
+    }
+    return 'count(*)::float';
   }
 
   async getWebAnalytics(user: DashboardUser, daysParam?: string, projectId?: string): Promise<WebAnalyticsResponse> {
@@ -305,7 +430,8 @@ export class AnalyticsService {
         devices: [],
         countries: [],
         sources: [],
-        activeHours: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))
+        activeHours: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)),
+        frustratingPages: []
       };
     }
 
@@ -398,6 +524,31 @@ export class AnalyticsService {
       }
     }
 
+    const frustratingPages = await this.database.query<{ path: string; errors: number; rageClicks: number; users: number }>(
+      `
+        SELECT
+          path,
+          count(*) FILTER (WHERE event_name = '$exception')::int AS errors,
+          count(*) FILTER (WHERE event_name = '$rageclick')::int AS "rageClicks",
+          count(DISTINCT actor)::int AS users
+        FROM (
+          SELECT
+            COALESCE(NULLIF(context->'page'->>'path', ''), '(unknown)') AS path,
+            event_name,
+            COALESCE(user_id::text, anonymous_id) AS actor
+          FROM events
+          WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+            AND event_name IN ('$exception', '$rageclick')
+        ) s
+        GROUP BY path
+        ORDER BY (
+          count(*) FILTER (WHERE event_name = '$exception') + count(*) FILTER (WHERE event_name = '$rageclick')
+        ) DESC
+        LIMIT 10
+      `,
+      [project.id, from.toISOString(), to.toISOString()]
+    );
+
     return {
       project,
       days,
@@ -408,7 +559,8 @@ export class AnalyticsService {
       devices: devices.rows,
       countries: countries.rows,
       sources: sources.rows,
-      activeHours
+      activeHours,
+      frustratingPages: frustratingPages.rows
     };
   }
 
@@ -459,11 +611,15 @@ export class AnalyticsService {
     return Math.min(Math.max(Math.trunc(parsed), 1), 365);
   }
 
-  private zeroFill(buckets: string[], rows: Array<{ bucket: string; total: number; uniques?: number }>): TrendPoint[] {
+  private zeroFill(
+    buckets: string[],
+    rows: Array<{ bucket: string; total: number; uniques?: number; value?: number }>
+  ): TrendPoint[] {
     const byBucket = new Map(rows.map((row) => [row.bucket, row]));
     return buckets.map((bucket) => {
       const row = byBucket.get(bucket);
-      return { bucket, total: row?.total ?? 0, uniques: row?.uniques ?? 0 };
+      // `value` defaults to `total` for callers (web analytics) that only track a single count.
+      return { bucket, total: row?.total ?? 0, uniques: row?.uniques ?? 0, value: row?.value ?? row?.total ?? 0 };
     });
   }
 
@@ -519,6 +675,14 @@ export class AnalyticsService {
       throw new BadRequestException(`interval must be one of: ${ALLOWED_INTERVALS.join(', ')}.`);
     }
     return candidate as TrendInterval;
+  }
+
+  private parseMeasure(value?: string): TrendMeasure {
+    const candidate = (value ?? 'count').toLowerCase();
+    if (!ALLOWED_MEASURES.includes(candidate as TrendMeasure)) {
+      throw new BadRequestException(`measure must be one of: ${ALLOWED_MEASURES.join(', ')}.`);
+    }
+    return candidate as TrendMeasure;
   }
 
   private clampDays(value: string | undefined, interval: TrendInterval): number {

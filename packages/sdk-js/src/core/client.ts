@@ -11,6 +11,9 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private anonymousId?: string;
   private sessionId?: string;
   private errorHandlersInstalled = false;
+  private clickHandlersInstalled = false;
+  private recentClicks: Array<{ t: number; x: number; y: number }> = [];
+  private lastRageAt = 0;
 
   initialize(options: TraceIQInitOptions): void {
     this.options = {
@@ -22,6 +25,10 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
     if (options.autoCaptureExceptions !== false) {
       this.installErrorHandlers();
+    }
+
+    if (options.autoCaptureRageClicks !== false) {
+      this.installClickHandlers();
     }
 
     if (options.autoTrackPageViews) {
@@ -68,6 +75,41 @@ export class BrowserTraceIQClient implements TraceIQClient {
         handled: false
       });
     });
+  }
+
+  private installClickHandlers(): void {
+    if (typeof window === 'undefined' || this.clickHandlersInstalled) {
+      return;
+    }
+    this.clickHandlersInstalled = true;
+
+    window.addEventListener(
+      'click',
+      (event: MouseEvent) => {
+        const now = Date.now();
+        // Keep only clicks within the last second.
+        this.recentClicks = this.recentClicks.filter((c) => now - c.t < 1000);
+        this.recentClicks.push({ t: now, x: event.clientX, y: event.clientY });
+
+        // Rage click: 3+ clicks in ~1s within a small radius, throttled to once/sec.
+        if (this.recentClicks.length >= 3 && now - this.lastRageAt > 1000) {
+          const clustered = this.recentClicks.every(
+            (c) => Math.abs(c.x - event.clientX) < 30 && Math.abs(c.y - event.clientY) < 30
+          );
+          if (clustered) {
+            this.lastRageAt = now;
+            this.recentClicks = [];
+            const target = event.target as Element | null;
+            this.track('$rageclick', {
+              x: event.clientX,
+              y: event.clientY,
+              element: target?.tagName ? target.tagName.toLowerCase() : undefined
+            });
+          }
+        }
+      },
+      true
+    );
   }
 
   private normalizeError(error: unknown): { type: string; message: string; stack?: string } {

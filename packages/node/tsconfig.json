@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    // Emit CommonJS so backend services can both `require()` and `import` the SDK,
+    // regardless of their own module setup. (Overrides the repo's bundler defaults.)
+    "module": "CommonJS",
+    "moduleResolution": "Node"
+  },
+  "include": ["src/**/*.ts"]
+}

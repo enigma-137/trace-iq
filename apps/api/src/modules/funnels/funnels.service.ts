@@ -102,6 +102,39 @@ export class FunnelsService {
     return this.getFunnel(user, funnelId, body.projectId);
   }
 
+  async update(user: DashboardUser, funnelId: string, body: CreateFunnelRequest): Promise<FunnelDetail> {
+    const project = await this.projects.requireActiveProject(user, body.projectId);
+    await this.loadFunnel(project.id, funnelId);
+    const name = this.requiredString(body.name, 'name');
+    const steps = this.normalizeSteps(body.steps);
+
+    await this.database.transaction(async (client) => {
+      await client.query(`UPDATE funnels SET name = $1, updated_at = now() WHERE id = $2 AND project_id = $3`, [
+        name,
+        funnelId,
+        project.id
+      ]);
+      await client.query(`DELETE FROM funnel_steps WHERE funnel_id = $1`, [funnelId]);
+      for (let index = 0; index < steps.length; index += 1) {
+        const step = steps[index];
+        await client.query(
+          `INSERT INTO funnel_steps (id, funnel_id, step_order, event_name, label) VALUES ($1, $2, $3, $4, $5)`,
+          [`fst_${randomUUID()}`, funnelId, index, step.eventName, step.label ?? null]
+        );
+      }
+    });
+
+    return this.getFunnel(user, funnelId, body.projectId);
+  }
+
+  async remove(user: DashboardUser, funnelId: string, projectId?: string): Promise<{ deleted: boolean }> {
+    const project = await this.projects.requireActiveProject(user, projectId);
+    await this.loadFunnel(project.id, funnelId);
+    // funnel_steps cascade-delete via FK.
+    await this.database.query(`DELETE FROM funnels WHERE id = $1 AND project_id = $2`, [funnelId, project.id]);
+    return { deleted: true };
+  }
+
   async list(user: DashboardUser, projectId?: string): Promise<{ funnels: FunnelSummary[] }> {
     const project = await this.projects.resolveActiveProject(user, projectId);
 

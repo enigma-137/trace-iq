@@ -1,0 +1,3 @@
+module TraceIQ {
+    header "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/include/TraceIQ-Swift.h"
+}

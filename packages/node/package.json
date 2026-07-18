@@ -1,0 +1,15 @@
+{
+  "name": "@traceiq/node",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TraceIQ server-side SDK for Node.js — capture backend events (payments, payouts, jobs) with trustworthy properties.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  }
+}

@@ -10,6 +10,8 @@ interface TrendControlsProps {
     interval: string;
     days: string;
     breakdown: string;
+    measure: string;
+    property: string;
   };
 }
 
@@ -17,6 +19,13 @@ const INTERVALS = [
   { value: 'hour', label: 'Hourly' },
   { value: 'day', label: 'Daily' },
   { value: 'week', label: 'Weekly' }
+];
+
+const MEASURES = [
+  { value: 'count', label: 'Total count' },
+  { value: 'unique', label: 'Unique users' },
+  { value: 'sum', label: 'Sum of property' },
+  { value: 'avg', label: 'Average of property' }
 ];
 
 const RANGES = [
@@ -43,8 +52,10 @@ export function TrendControls({ eventNames, selected }: TrendControlsProps) {
     });
   }
 
+  const needsProperty = selected.measure === 'sum' || selected.measure === 'avg';
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <Field label="Event">
         <select
           className={selectClass}
@@ -60,6 +71,40 @@ export function TrendControls({ eventNames, selected }: TrendControlsProps) {
           ))}
         </select>
       </Field>
+
+      <Field label="Measure">
+        <select className={selectClass} value={selected.measure} onChange={(event) => update('measure', event.target.value)}>
+          {MEASURES.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      {needsProperty ? (
+        <Field label="Property">
+          <input
+            className={selectClass}
+            list="trend-measure-properties"
+            placeholder="amount"
+            defaultValue={selected.property}
+            onBlur={(event) => update('property', event.target.value.trim())}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                update('property', (event.target as HTMLInputElement).value.trim());
+              }
+            }}
+          />
+          <datalist id="trend-measure-properties">
+            <option value="amount" />
+            <option value="value" />
+            <option value="revenue" />
+            <option value="price" />
+            <option value="quantity" />
+          </datalist>
+        </Field>
+      ) : null}
 
       <Field label="Interval">
         <select className={selectClass} value={selected.interval} onChange={(event) => update('interval', event.target.value)}>

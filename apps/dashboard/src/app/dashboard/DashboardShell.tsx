@@ -11,9 +11,22 @@ const navItems = [
   { label: 'Events', href: '/dashboard/events', key: 'events' },
   { label: 'Funnels', href: '/dashboard/funnels', key: 'funnels' },
   { label: 'Users', href: '/dashboard/users', key: 'users' },
-  { label: 'Errors', href: '/dashboard/errors', key: 'errors' },
-  { label: 'Docs', href: '/docs', key: 'docs' }
+  { label: 'Errors', href: '/dashboard/errors', key: 'errors' }
 ];
+
+const bottomNavItems = [
+  { label: 'Settings', href: '/dashboard/settings', key: 'settings' },
+  { label: 'Docs', href: '/dashboard/docs', key: 'docs' }
+];
+
+const allNavItems = [...navItems, ...bottomNavItems];
+
+const navLinkClass = (isActive: boolean) =>
+  `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition ${
+    isActive
+      ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-900 dark:text-white'
+      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100'
+  }`;
 
 interface DashboardShellProps {
   active: string;
@@ -26,7 +39,7 @@ export function DashboardShell({ active, title, userEmail, children }: Dashboard
   return (
     <main className="min-h-screen bg-white text-neutral-900 dark:bg-black dark:text-neutral-100">
       <div className="flex min-h-screen w-full">
-        <aside className="hidden w-60 shrink-0 border-r border-neutral-200 bg-white px-4 py-6 dark:border-neutral-800 dark:bg-black lg:block">
+        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-neutral-200 bg-white px-4 py-6 dark:border-neutral-800 dark:bg-black lg:flex">
           <Link className="flex items-center gap-2" href="/" aria-label="TraceIQ home">
             <img className="h-8 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
             <img className="hidden h-8 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
@@ -34,15 +47,16 @@ export function DashboardShell({ active, title, userEmail, children }: Dashboard
 
           <nav className="mt-8 grid gap-0.5" aria-label="Dashboard navigation">
             {navItems.map((item) => (
-              <Link
-                key={item.key}
-                className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition ${
-                  item.key === active
-                    ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-900 dark:text-white'
-                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100'
-                }`}
-                href={item.href}
-              >
+              <Link key={item.key} className={navLinkClass(item.key === active)} href={item.href}>
+                <NavIcon name={item.key} />
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <nav className="mt-auto grid gap-0.5 border-t border-neutral-200 pt-3 dark:border-neutral-800" aria-label="Settings navigation">
+            {bottomNavItems.map((item) => (
+              <Link key={item.key} className={navLinkClass(item.key === active)} href={item.href}>
                 <NavIcon name={item.key} />
                 {item.label}
               </Link>
@@ -76,7 +90,7 @@ export function DashboardShell({ active, title, userEmail, children }: Dashboard
             </div>
 
             <nav className="mt-4 flex gap-1.5 overflow-x-auto lg:hidden" aria-label="Mobile dashboard navigation">
-              {navItems.map((item) => (
+              {allNavItems.map((item) => (
                 <Link
                   key={item.key}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ${

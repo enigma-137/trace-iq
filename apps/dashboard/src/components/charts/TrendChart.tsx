@@ -1,6 +1,11 @@
+'use client';
+
+import { useRef, useState } from 'react';
+
 interface TrendPoint {
   bucket: string;
   total: number;
+  value: number;
 }
 
 interface TrendSeries {
@@ -12,48 +17,82 @@ interface TrendChartProps {
   buckets: string[];
   series: TrendSeries[];
   interval: 'hour' | 'day' | 'week';
+  // Serializable formatting hint (this is a client component, so we can't pass a function prop).
+  format?: 'number' | 'compact';
+  // When true, the legend shows each series' summed total (valid only for count/sum measures).
+  legendTotals?: boolean;
 }
 
 // Monochrome series styles: solid black/white first, then grays + dash patterns.
 const SERIES_STYLES = [
-  { stroke: 'stroke-neutral-900 dark:stroke-white', dash: '' },
-  { stroke: 'stroke-neutral-400', dash: '6 4' },
-  { stroke: 'stroke-neutral-600 dark:stroke-neutral-300', dash: '2 4' },
-  { stroke: 'stroke-neutral-500', dash: '10 4' },
-  { stroke: 'stroke-neutral-700 dark:stroke-neutral-400', dash: '1 5' },
-  { stroke: 'stroke-neutral-300 dark:stroke-neutral-600', dash: '' }
+  { stroke: 'stroke-neutral-900 dark:stroke-white', fill: 'fill-neutral-900 dark:fill-white', dash: '' },
+  { stroke: 'stroke-neutral-400', fill: 'fill-neutral-400', dash: '6 4' },
+  { stroke: 'stroke-neutral-600 dark:stroke-neutral-300', fill: 'fill-neutral-600 dark:fill-neutral-300', dash: '2 4' },
+  { stroke: 'stroke-neutral-500', fill: 'fill-neutral-500', dash: '10 4' },
+  { stroke: 'stroke-neutral-700 dark:stroke-neutral-400', fill: 'fill-neutral-700 dark:fill-neutral-400', dash: '1 5' },
+  { stroke: 'stroke-neutral-300 dark:stroke-neutral-600', fill: 'fill-neutral-300 dark:fill-neutral-600', dash: '' }
 ];
 
 const WIDTH = 760;
 const HEIGHT = 260;
-const PAD = { top: 16, right: 16, bottom: 28, left: 40 };
+const PAD = { top: 16, right: 16, bottom: 28, left: 48 };
 
-export function TrendChart({ buckets, series, interval }: TrendChartProps) {
+const compactFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+
+export function TrendChart({ buckets, series, interval, format = 'number', legendTotals = false }: TrendChartProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [hover, setHover] = useState<number | null>(null);
+
+  const fmt = (value: number) =>
+    format === 'compact' ? compactFmt.format(value) : Math.round(value).toLocaleString('en-US');
+
   const plotWidth = WIDTH - PAD.left - PAD.right;
   const plotHeight = HEIGHT - PAD.top - PAD.bottom;
 
-  const maxY = Math.max(1, ...series.flatMap((s) => s.points.map((p) => p.total)));
+  const maxY = Math.max(1, ...series.flatMap((s) => s.points.map((p) => p.value)));
   const stepCount = Math.max(buckets.length - 1, 1);
 
   const xFor = (index: number) => PAD.left + (index / stepCount) * plotWidth;
   const yFor = (value: number) => PAD.top + plotHeight - (value / maxY) * plotHeight;
 
-  const gridValues = [0, Math.round(maxY / 2), maxY];
+  const gridValues = [0, maxY / 2, maxY];
   const labelIndexes = pickLabelIndexes(buckets.length);
-  const total = series.reduce((sum, s) => sum + s.points.reduce((inner, p) => inner + p.total, 0), 0);
+  const total = series.reduce((sum, s) => sum + s.points.reduce((inner, p) => inner + p.value, 0), 0);
 
   if (total === 0) {
     return (
       <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/40">
-        No events in this window yet.
+        No data in this window yet.
       </div>
     );
   }
 
+  function handleMove(event: React.MouseEvent<SVGSVGElement>) {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const xInSvg = ((event.clientX - rect.left) / rect.width) * WIDTH;
+    let index = Math.round(((xInSvg - PAD.left) / plotWidth) * stepCount);
+    index = Math.max(0, Math.min(buckets.length - 1, index));
+    setHover(index);
+  }
+
+  // Tooltip geometry (kept inside the plot bounds).
+  const tipWidth = 148;
+  const tipHeight = 22 + series.length * 16;
+
   return (
     <div className="w-full">
       <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-64 w-full min-w-[560px]" role="img" aria-label="Event trend chart">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          className="h-64 w-full min-w-[560px]"
+          role="img"
+          aria-label="Event trend chart"
+          onMouseMove={handleMove}
+          onMouseLeave={() => setHover(null)}
+        >
           {gridValues.map((value) => (
             <g key={value}>
               <line
@@ -65,7 +104,7 @@ export function TrendChart({ buckets, series, interval }: TrendChartProps) {
                 strokeWidth={1}
               />
               <text x={PAD.left - 8} y={yFor(value) + 4} textAnchor="end" className="fill-neutral-400 text-[10px] dark:fill-neutral-500">
-                {value}
+                {fmt(value)}
               </text>
             </g>
           ))}
@@ -79,7 +118,7 @@ export function TrendChart({ buckets, series, interval }: TrendChartProps) {
           {series.map((s, seriesIndex) => {
             const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
             const path = s.points
-              .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(point.total)}`)
+              .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(point.value)}`)
               .join(' ');
             return (
               <path
@@ -94,19 +133,81 @@ export function TrendChart({ buckets, series, interval }: TrendChartProps) {
               />
             );
           })}
+
+          {hover !== null ? (
+            <g>
+              <line
+                x1={xFor(hover)}
+                x2={xFor(hover)}
+                y1={PAD.top}
+                y2={PAD.top + plotHeight}
+                className="stroke-neutral-400 dark:stroke-neutral-500"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+              />
+              {series.map((s, seriesIndex) => {
+                const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
+                return (
+                  <circle
+                    key={s.key}
+                    cx={xFor(hover)}
+                    cy={yFor(s.points[hover].value)}
+                    r={3.5}
+                    className={`${style.fill} stroke-white dark:stroke-neutral-950`}
+                    strokeWidth={1.5}
+                  />
+                );
+              })}
+
+              {(() => {
+                const anchorX = xFor(hover);
+                const boxX = Math.min(Math.max(anchorX + 10, PAD.left), WIDTH - PAD.right - tipWidth);
+                const boxY = PAD.top;
+                return (
+                  <g>
+                    <rect
+                      x={boxX}
+                      y={boxY}
+                      width={tipWidth}
+                      height={tipHeight}
+                      rx={6}
+                      className="fill-white stroke-neutral-200 dark:fill-neutral-900 dark:stroke-neutral-700"
+                      strokeWidth={1}
+                    />
+                    <text x={boxX + 10} y={boxY + 15} className="fill-neutral-500 text-[10px] dark:fill-neutral-400">
+                      {formatBucket(buckets[hover], interval, true)}
+                    </text>
+                    {series.map((s, seriesIndex) => (
+                      <text
+                        key={s.key}
+                        x={boxX + 10}
+                        y={boxY + 32 + seriesIndex * 16}
+                        className="fill-neutral-900 text-[11px] dark:fill-white"
+                      >
+                        <tspan className="fill-neutral-500 dark:fill-neutral-400">{truncate(s.key)}: </tspan>
+                        {fmt(s.points[hover].value)}
+                      </text>
+                    ))}
+                  </g>
+                );
+              })()}
+            </g>
+          ) : null}
         </svg>
       </div>
 
-      {series.length > 1 ? (
-        <ul className="mt-3 flex flex-wrap gap-4">
+      {series.length > 1 || legendTotals ? (
+        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
           {series.map((s, seriesIndex) => {
             const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
+            const seriesTotal = s.points.reduce((sum, p) => sum + p.value, 0);
             return (
               <li key={s.key} className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
                 <svg width="20" height="8" aria-hidden>
                   <line x1="0" y1="4" x2="20" y2="4" className={style.stroke} strokeWidth={2} strokeDasharray={style.dash || undefined} />
                 </svg>
-                {s.key}
+                <span className="font-medium text-neutral-800 dark:text-neutral-200">{s.key}</span>
+                {legendTotals ? <span className="text-neutral-400 dark:text-neutral-500">{fmt(seriesTotal)}</span> : null}
               </li>
             );
           })}
@@ -114,6 +215,10 @@ export function TrendChart({ buckets, series, interval }: TrendChartProps) {
       ) : null}
     </div>
   );
+}
+
+function truncate(value: string, max = 16): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
 function pickLabelIndexes(count: number): number[] {
@@ -127,13 +232,24 @@ function pickLabelIndexes(count: number): number[] {
   return [...indexes];
 }
 
-function formatBucket(bucket: string, interval: 'hour' | 'day' | 'week'): string {
+function formatBucket(bucket: string, interval: 'hour' | 'day' | 'week', detailed = false): string {
   const date = new Date(bucket);
   if (Number.isNaN(date.getTime())) {
     return bucket;
   }
   if (interval === 'hour') {
-    return new Intl.DateTimeFormat('en', { hour: 'numeric', timeZone: 'UTC' }).format(date);
+    // Axis stays compact ("3 PM"); tooltip adds the day ("Jul 18, 3 PM").
+    return new Intl.DateTimeFormat('en', {
+      month: detailed ? 'short' : undefined,
+      day: detailed ? 'numeric' : undefined,
+      hour: 'numeric',
+      timeZone: 'UTC'
+    }).format(date);
   }
-  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: detailed ? 'numeric' : undefined,
+    timeZone: 'UTC'
+  }).format(date);
 }

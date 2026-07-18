@@ -14,7 +14,10 @@ const PATHS: Record<string, string> = {
   // Errors — alert triangle
   errors: 'M12 3 2 20h20L12 3ZM12 9v5M12 17.5h.01',
   // Docs — book
-  docs: 'M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5ZM18 3v18'
+  docs: 'M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5ZM18 3v18',
+  // Settings — gear
+  settings:
+    'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19.4 13a7.8 7.8 0 0 0 0-2l2-1.5-2-3.5-2.4 1a7.8 7.8 0 0 0-1.7-1L14.9 3H9.1l-.4 2.5a7.8 7.8 0 0 0-1.7 1l-2.4-1-2 3.5L2.6 11a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7.8 7.8 0 0 0 1.7 1l.4 2.5h5.8l.4-2.5a7.8 7.8 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5Z'
 };
 
 export function NavIcon({ name }: { name: string }) {

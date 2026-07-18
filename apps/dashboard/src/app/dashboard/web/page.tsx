@@ -26,6 +26,7 @@ interface WebAnalyticsResponse {
   countries: Array<{ name: string; total: number }>;
   sources: Array<{ channel: string; visitors: number }>;
   activeHours: number[][];
+  frustratingPages: Array<{ path: string; errors: number; rageClicks: number; users: number }>;
 }
 
 const RANGES = [
@@ -106,7 +107,7 @@ export default async function WebAnalyticsPage({
         </p>
         <TrendChart
           buckets={trend.map((p) => p.bucket)}
-          series={[{ key: 'Visitors', points: trend.map((p) => ({ bucket: p.bucket, total: p.total })) }]}
+          series={[{ key: 'Visitors', points: trend.map((p) => ({ bucket: p.bucket, total: p.total, value: p.total })) }]}
           interval="day"
         />
       </section>
@@ -147,11 +148,42 @@ export default async function WebAnalyticsPage({
         </Card>
       </section>
 
-      <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
+      <section className="mb-6 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
         <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
           Active hours (unique visitors, UTC)
         </p>
         <ActiveHoursHeatmap matrix={data?.activeHours ?? Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))} />
+      </section>
+
+      <section className="rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="border-b border-neutral-200 px-5 py-3 dark:border-neutral-800">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+            Frustrating pages
+          </p>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            Pages generating errors and rage clicks. (Dead-click detection isn&apos;t captured yet.)
+          </p>
+        </div>
+        {(data?.frustratingPages ?? []).length === 0 ? (
+          <p className="p-5 text-sm text-neutral-500 dark:text-neutral-500">No frustration signals captured yet.</p>
+        ) : (
+          <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+            <div className="hidden grid-cols-[1fr_110px_90px_90px] gap-4 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:text-neutral-500 sm:grid">
+              <span>Path</span>
+              <span className="text-right">Rage clicks</span>
+              <span className="text-right">Errors</span>
+              <span className="text-right">Users</span>
+            </div>
+            {(data?.frustratingPages ?? []).map((p) => (
+              <div key={p.path} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_110px_90px_90px] sm:gap-4">
+                <span className="truncate font-mono text-sm text-neutral-800 dark:text-neutral-200">{p.path}</span>
+                <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400 sm:text-right">{p.rageClicks.toLocaleString()}</span>
+                <span className="text-sm tabular-nums text-neutral-700 dark:text-neutral-300 sm:text-right">{p.errors.toLocaleString()}</span>
+                <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400 sm:text-right">{p.users.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </DashboardShell>
   );

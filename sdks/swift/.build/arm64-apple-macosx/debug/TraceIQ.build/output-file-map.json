@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/primary.swiftdeps"
+  },
+  "/Users/samuel/trace/trace-iq/sdks/swift/Sources/TraceIQ/TraceIQ.swift": {
+    "dependencies": "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/TraceIQ.d",
+    "object": "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/TraceIQ.swift.o",
+    "swiftmodule": "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/TraceIQ~partial.swiftmodule",
+    "swift-dependencies": "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/TraceIQ.swiftdeps",
+    "diagnostics": "/Users/samuel/trace/trace-iq/sdks/swift/.build/arm64-apple-macosx/debug/TraceIQ.build/TraceIQ.dia"
+  }
+}

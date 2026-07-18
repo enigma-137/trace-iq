@@ -20,6 +20,20 @@ export class EventsController {
     );
   }
 
+  @Post('batch')
+  ingestBatch(
+    @Body() body: { projectId?: string; writeKey?: string; batch?: IngestEventRequest[] },
+    @Headers() headers: Record<string, string | undefined>,
+    @Ip() ip?: string
+  ) {
+    const writeKey = headers['x-traceiq-write-key'] ?? body.writeKey;
+    return this.eventsService.ingestBatch(writeKey, body.projectId, body.batch, {
+      ip,
+      forwardedFor: headers['x-forwarded-for'],
+      headers
+    });
+  }
+
   @Get('recent')
   listRecentEvents(@Query('projectId') projectId: string, @Query('limit') limit?: string) {
     return this.eventsService.listRecentEvents(projectId, limit ? Number(limit) : undefined);

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "traceiq"
+version = "0.1.0"
+description = "TraceIQ server-side SDK for Python — capture backend events with trustworthy properties."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "TraceIQ" }]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["traceiq*"]

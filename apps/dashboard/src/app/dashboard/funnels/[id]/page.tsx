@@ -1,22 +1,25 @@
 import Link from 'next/link';
 import { DashboardShell } from '../../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
+import { formatCount } from '@/lib/metrics';
 import { FunnelChart } from '@/components/charts/FunnelChart';
 
 export const dynamic = 'force-dynamic';
 
+interface FunnelStep {
+  order: number;
+  eventName: string;
+  label: string | null;
+  count: number;
+  conversionFromStart: number;
+  conversionFromPrevious: number;
+  droppedFromPrevious: number;
+}
+
 interface FunnelResultsResponse {
   funnel: { id: string; name: string };
   days: number;
-  steps: Array<{
-    order: number;
-    eventName: string;
-    label: string | null;
-    count: number;
-    conversionFromStart: number;
-    conversionFromPrevious: number;
-    droppedFromPrevious: number;
-  }>;
+  steps: FunnelStep[];
 }
 
 interface StepUsersResponse {
@@ -72,14 +75,26 @@ export default async function FunnelResultsPage({
     stepUsers = result.data;
   }
 
-  const overall = data && data.steps.length > 0 ? data.steps[data.steps.length - 1].conversionFromStart : 0;
+  const steps = data?.steps ?? [];
+  const overall = steps.length > 0 ? steps[steps.length - 1].conversionFromStart : 0;
+  const startCount = steps[0]?.count ?? 0;
+  const endCount = steps.length > 0 ? steps[steps.length - 1].count : 0;
+  const worstDrop = biggestDrop(steps);
 
   return (
     <DashboardShell active="funnels" title={data?.funnel.name ?? 'Funnel'} userEmail={user.email}>
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/dashboard/funnels" className="text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white">
           ← All funnels
         </Link>
+        {data ? (
+          <Link
+            href={`/dashboard/funnels/${params.id}/edit`}
+            className="inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            Edit funnel
+          </Link>
+        ) : null}
       </div>
 
       {error ? (
@@ -90,17 +105,36 @@ export default async function FunnelResultsPage({
 
       {data ? (
         <>
-          <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex-row sm:items-center">
-            <div>
+          <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex-row sm:items-start">
+            <div className="max-w-xl">
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
                 Overall conversion
               </p>
               <p className="mt-1 text-3xl font-semibold tabular-nums text-neutral-900 dark:text-white">
                 {(overall * 100).toFixed(1)}%
               </p>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-500">across {data.steps.length} steps</p>
+              <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+                {startCount === 0
+                  ? `No one entered this funnel in the last ${days} days.`
+                  : `${formatCount(endCount)} of ${formatCount(startCount)} ${
+                      startCount === 1 ? 'person' : 'people'
+                    } who started completed all ${data.steps.length} steps.`}
+              </p>
+              {worstDrop ? (
+                <Link
+                  href={`/dashboard/funnels/${params.id}?days=${days}&step=${worstDrop.index}&status=dropped`}
+                  className="mt-2 inline-block text-sm text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-300"
+                >
+                  <span className="text-neutral-400 dark:text-neutral-500">Biggest drop-off:</span> Step {worstDrop.index + 1} ·{' '}
+                  {worstDrop.step.label ?? worstDrop.step.eventName} —{' '}
+                  <span className="text-red-600 dark:text-red-400">
+                    {formatPct(worstDrop.dropRate)} ({formatCount(worstDrop.dropCount)}{' '}
+                    {worstDrop.dropCount === 1 ? 'person' : 'people'}) left here.
+                  </span>
+                </Link>
+              ) : null}
             </div>
-            <div className="flex items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-neutral-800">
+            <div className="flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-neutral-800">
               {RANGES.map((range) => (
                 <Link
                   key={range.value}
@@ -201,4 +235,23 @@ function formatDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(date);
+}
+
+function formatPct(ratio: number): string {
+  return `${(ratio * 100).toFixed(0)}%`;
+}
+
+// The step (after the first) that loses the most people in absolute terms — the leak to fix first.
+function biggestDrop(
+  steps: FunnelStep[]
+): { index: number; step: FunnelStep; dropCount: number; dropRate: number } | null {
+  let worst: { index: number; step: FunnelStep; dropCount: number; dropRate: number } | null = null;
+  for (let i = 1; i < steps.length; i += 1) {
+    const dropCount = steps[i].droppedFromPrevious;
+    if (dropCount <= 0) continue;
+    if (!worst || dropCount > worst.dropCount) {
+      worst = { index: i, step: steps[i], dropCount, dropRate: 1 - steps[i].conversionFromPrevious };
+    }
+  }
+  return worst;
 }

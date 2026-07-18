@@ -77,6 +77,14 @@ function pick(list, index) {
   return list[index % list.length];
 }
 
+// Varied purchase amounts so Sum/Average-of-amount insights show a real distribution.
+// Pro plans skew larger; every value gets jitter so no two look identical.
+function purchaseAmount(plan) {
+  const base = plan === 'pro' ? 120 : 40;
+  const spread = plan === 'pro' ? 180 : 60;
+  return Math.round((base + Math.random() * spread) * 100) / 100;
+}
+
 async function main() {
   const now = Date.now();
   let sent = 0;
@@ -119,7 +127,7 @@ async function main() {
         userId,
         sessionId,
         eventName: step.name,
-        properties: { plan, amount: step.name === 'purchase' ? 49 : undefined },
+        properties: { plan, amount: step.name === 'purchase' ? purchaseAmount(plan) : undefined },
         deviceInfo,
         networkInfo,
         context: ctx(PATHS[step.name] ?? '/'),
@@ -141,6 +149,24 @@ async function main() {
         deviceInfo,
         networkInfo,
         context: ctx('/dashboard'),
+        timestamp: new Date(t).toISOString()
+      });
+      sent += 1;
+    }
+
+    // Some users rage-click on a frustrating page.
+    if (i % 5 === 0) {
+      const ragePath = pick(['/login', '/checkout', '/signup'], i);
+      t += 20_000 + Math.floor(Math.random() * 90_000);
+      await send({
+        projectId,
+        userId,
+        sessionId,
+        eventName: '$rageclick',
+        properties: { x: 120, y: 240, element: 'button' },
+        deviceInfo,
+        networkInfo,
+        context: ctx(ragePath),
         timestamp: new Date(t).toISOString()
       });
       sent += 1;

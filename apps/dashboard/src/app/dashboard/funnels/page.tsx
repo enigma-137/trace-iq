@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
-import { FunnelCreateForm } from './FunnelCreateForm';
+import { FunnelForm } from './FunnelForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,7 @@ export default async function FunnelsPage() {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <FunnelCreateForm eventNames={eventNames} />
+        <FunnelForm eventNames={eventNames} />
 
         <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
           <h2 className="mb-3 text-lg font-semibold text-neutral-900 dark:text-white">Your funnels</h2>

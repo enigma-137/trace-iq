@@ -16,7 +16,9 @@
       "@traceiq/shared": ["packages/shared/src"],
       "@traceiq/types": ["packages/types/src"],
       "@traceiq/ui": ["packages/ui/src"],
-      "@traceiq/sdk-js": ["packages/sdk-js/src"]
+      "@traceiq/sdk-js": ["packages/sdk-js/src"],
+      "@traceiq/node": ["packages/node/src"],
+      "@traceiq/react-native": ["packages/react-native/src"]
     }
   }
 }

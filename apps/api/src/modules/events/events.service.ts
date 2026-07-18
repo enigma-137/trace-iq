@@ -42,6 +42,13 @@ export interface IngestEventResponse {
   eventId: string;
 }
 
+export interface BatchIngestResponse {
+  accepted: true;
+  results: Array<{ accepted: boolean; eventId?: string; error?: string }>;
+}
+
+const MAX_BATCH_SIZE = 500;
+
 @Injectable()
 export class EventsService {
   constructor(private readonly database: DatabaseService) {}
@@ -49,9 +56,48 @@ export class EventsService {
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
     const writeKey = this.requiredString(input.writeKey, 'writeKey');
     const projectId = this.requiredString(input.projectId, 'projectId');
+    const auth = await this.authenticateWriteKey(writeKey, projectId);
+    return this.ingestWithAuth(auth, input, meta);
+  }
+
+  // Batch path for server SDKs: authenticate the write key once, then insert every
+  // event. A single bad event fails only itself; the rest still land.
+  async ingestBatch(
+    writeKey: string | undefined,
+    projectId: string | undefined,
+    batch: IngestEventRequest[] | undefined,
+    meta: IngestMeta = {}
+  ): Promise<BatchIngestResponse> {
+    const key = this.requiredString(writeKey, 'writeKey');
+    const pid = this.requiredString(projectId, 'projectId');
+    if (!Array.isArray(batch) || batch.length === 0) {
+      throw new BadRequestException('batch must be a non-empty array of events.');
+    }
+    if (batch.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`batch is limited to ${MAX_BATCH_SIZE} events per request.`);
+    }
+
+    const auth = await this.authenticateWriteKey(key, pid);
+    const results: BatchIngestResponse['results'] = [];
+    for (const item of batch) {
+      try {
+        const res = await this.ingestWithAuth(auth, { ...item, projectId: pid }, meta);
+        results.push({ accepted: true, eventId: res.eventId });
+      } catch (error) {
+        results.push({ accepted: false, error: error instanceof Error ? error.message : 'ingest failed' });
+      }
+    }
+
+    return { accepted: true, results };
+  }
+
+  private async ingestWithAuth(
+    auth: WriteKeyRecord,
+    input: IngestEventRequest,
+    meta: IngestMeta
+  ): Promise<IngestEventResponse> {
     const eventName = this.requiredString(input.eventName, 'eventName');
     const occurredAt = this.parseTimestamp(input.timestamp);
-    const auth = await this.authenticateWriteKey(writeKey, projectId);
     const anonymousId = this.optionalString(input.anonymousId);
     const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId);
     const sessionId = await this.ensureSession(auth.project_id, input.sessionId, userId, anonymousId, input.context);

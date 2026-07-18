@@ -38,9 +38,11 @@ export class AnalyticsController {
     @Query('interval') interval?: string,
     @Query('days') days?: string,
     @Query('breakdown') breakdown?: string,
+    @Query('measure') measure?: string,
+    @Query('property') property?: string,
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
-    return this.analyticsService.getTrends(user, { event, interval, days, breakdown, projectId });
+    return this.analyticsService.getTrends(user, { event, interval, days, breakdown, measure, property, projectId });
   }
 }

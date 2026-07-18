@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { CreateFunnelRequest, FunnelsService } from './funnels.service';
 
@@ -29,6 +29,22 @@ export class FunnelsController {
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     return this.funnelsService.getFunnel(user, id, projectId);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() body: CreateFunnelRequest, @Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.funnelsService.update(user, id, body);
+  }
+
+  @Delete(':id')
+  async remove(
+    @Param('id') id: string,
+    @Headers('authorization') authorization?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.funnelsService.remove(user, id, projectId);
   }
 
   @Get(':id/results')
