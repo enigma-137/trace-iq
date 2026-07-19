@@ -31,6 +31,17 @@ export class AnalyticsController {
     return this.analyticsService.listEventNames(user, projectId);
   }
 
+  @Get('retention')
+  async getRetention(
+    @Headers('authorization') authorization?: string,
+    @Query('weeks') weeks?: string,
+    @Query('filters') filters?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.analyticsService.getRetention(user, { weeks, filters, projectId });
+  }
+
   @Get('insights/trends')
   async getTrends(
     @Headers('authorization') authorization?: string,
@@ -40,9 +51,19 @@ export class AnalyticsController {
     @Query('breakdown') breakdown?: string,
     @Query('measure') measure?: string,
     @Query('property') property?: string,
+    @Query('filters') filters?: string,
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
-    return this.analyticsService.getTrends(user, { event, interval, days, breakdown, measure, property, projectId });
+    return this.analyticsService.getTrends(user, {
+      event,
+      interval,
+      days,
+      breakdown,
+      measure,
+      property,
+      filters,
+      projectId
+    });
   }
 }

@@ -4,6 +4,11 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { EventsModule } from './modules/events/events.module';
 import { FunnelsModule } from './modules/funnels/funnels.module';
+import { CohortsModule } from './modules/cohorts/cohorts.module';
+import { AlertsModule } from './modules/alerts/alerts.module';
+import { FlagsModule } from './modules/flags/flags.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { ExportModule } from './modules/export/export.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ReplayModule } from './modules/replay/replay.module';
@@ -21,6 +26,11 @@ import { DatabaseModule } from './database/database.module';
     ProjectsModule,
     EventsModule,
     FunnelsModule,
+    CohortsModule,
+    AlertsModule,
+    FlagsModule,
+    WebhooksModule,
+    ExportModule,
     AnalyticsModule,
     UsersModule,
     ReplayModule,

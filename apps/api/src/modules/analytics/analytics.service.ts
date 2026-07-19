@@ -2,28 +2,15 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
+import { DIMENSION_SOURCES, FilterCondition, buildFilterClause, parseFiltersParam } from '../../common/filters';
+import { ALLOWED_MEASURES, NUMERIC_GUARD, TrendMeasure, buildMeasureExpr } from '../../common/measures';
 
 type TrendInterval = 'hour' | 'day' | 'week';
-type TrendMeasure = 'count' | 'unique' | 'sum' | 'avg';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 const ALLOWED_INTERVALS: TrendInterval[] = ['hour', 'day', 'week'];
-const ALLOWED_MEASURES: TrendMeasure[] = ['count', 'unique', 'sum', 'avg'];
 const BUCKET_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS"Z"';
-// Matches a plain integer or decimal so a JSONB text value can be safely cast to numeric.
-const NUMERIC_GUARD = "'^-?[0-9]+(\\.[0-9]+)?$'";
-
-// Well-known breakdown dimensions map to device_info / network_info JSONB columns.
-// Values are trusted SQL fragments (fixed whitelist), never user input.
-const DIMENSION_SOURCES: Record<string, string> = {
-  os: "device_info->>'os'",
-  device_type: "device_info->>'deviceType'",
-  browser: "device_info->>'browser'",
-  platform: "device_info->>'platform'",
-  country: "network_info->>'country'",
-  region: "network_info->>'region'",
-  city: "network_info->>'city'"
-};
 
 export interface TrendPoint {
   bucket: string;
@@ -75,6 +62,20 @@ export interface OverviewResponse {
   topDevices: Array<{ name: string; total: number }>;
   topCountries: Array<{ name: string; total: number }>;
   sparkline: TrendPoint[];
+}
+
+export interface RetentionCohort {
+  cohort: string; // ISO date of the cohort's week start (UTC Monday)
+  size: number; // actors whose first-ever event fell in this week
+  periods: Array<number | null>; // returning-actor count per week offset; null = week not elapsed yet
+}
+
+export interface RetentionResponse {
+  project: ResolvedProject | null;
+  weeks: number;
+  cohorts: RetentionCohort[];
+  averages: number[]; // size-weighted retention % per period (period 0 = 100)
+  summary: { week1: number; week4: number };
 }
 
 export interface WebTotals {
@@ -266,12 +267,14 @@ export class AnalyticsService {
       breakdown?: string;
       measure?: string;
       property?: string;
+      filters?: string;
       projectId?: string;
     }
   ): Promise<TrendsResponse> {
     const event = this.requiredString(params.event, 'event');
     const interval = this.parseInterval(params.interval);
     const measure = this.parseMeasure(params.measure);
+    const filters = parseFiltersParam(params.filters);
     // A property is only meaningful (and required) for sum/avg aggregations.
     const property =
       measure === 'sum' || measure === 'avg'
@@ -299,7 +302,8 @@ export class AnalyticsService {
         breakdownExpr = `COALESCE(NULLIF(properties->>$${queryParams.length}, ''), '(none)')`;
       }
 
-      const valueExpr = this.buildMeasureExpr(measure, property, queryParams);
+      const valueExpr = buildMeasureExpr(measure, property, queryParams);
+      const filterClause = buildFilterClause(filters, queryParams);
 
       const rows = await this.database.query<{ bucket: string; breakdown_key: string; total: number; value: number }>(
         `
@@ -310,7 +314,7 @@ export class AnalyticsService {
             ${valueExpr} AS value
           FROM events
           WHERE project_id = $1 AND event_name = $2
-            AND occurred_at >= $4 AND occurred_at < $5
+            AND occurred_at >= $4 AND occurred_at < $5${filterClause}
           GROUP BY 1, 2
           ORDER BY 1 ASC
         `,
@@ -333,7 +337,8 @@ export class AnalyticsService {
       }));
     } else {
       const queryParams: unknown[] = [project.id, event, interval, from.toISOString(), to.toISOString()];
-      const valueExpr = this.buildMeasureExpr(measure, property, queryParams);
+      const valueExpr = buildMeasureExpr(measure, property, queryParams);
+      const filterClause = buildFilterClause(filters, queryParams);
 
       const rows = await this.database.query<{ bucket: string; total: number; uniques: number; value: number }>(
         `
@@ -344,7 +349,7 @@ export class AnalyticsService {
             ${valueExpr} AS value
           FROM events
           WHERE project_id = $1 AND event_name = $2
-            AND occurred_at >= $4 AND occurred_at < $5
+            AND occurred_at >= $4 AND occurred_at < $5${filterClause}
           GROUP BY 1
           ORDER BY 1 ASC
         `,
@@ -356,8 +361,8 @@ export class AnalyticsService {
 
     const previousFrom = new Date(from.getTime() - days * DAY_MS);
     const [current, previous] = await Promise.all([
-      this.computeMeasureTotal(project.id, event, from, to, measure, property),
-      this.computeMeasureTotal(project.id, event, previousFrom, from, measure, property)
+      this.computeMeasureTotal(project.id, event, from, to, measure, property, filters),
+      this.computeMeasureTotal(project.id, event, previousFrom, from, measure, property, filters)
     ]);
 
     return {
@@ -383,35 +388,130 @@ export class AnalyticsService {
     from: Date,
     to: Date,
     measure: TrendMeasure,
-    property: string | null
+    property: string | null,
+    filters: FilterCondition[] = []
   ): Promise<number> {
     const queryParams: unknown[] = [projectId, event, from.toISOString(), to.toISOString()];
-    const valueExpr = this.buildMeasureExpr(measure, property, queryParams);
+    const valueExpr = buildMeasureExpr(measure, property, queryParams);
+    const filterClause = buildFilterClause(filters, queryParams);
     const result = await this.database.query<{ value: number }>(
       `
         SELECT ${valueExpr} AS value
         FROM events
         WHERE project_id = $1 AND event_name = $2
-          AND occurred_at >= $3 AND occurred_at < $4
+          AND occurred_at >= $3 AND occurred_at < $4${filterClause}
       `,
       queryParams
     );
     return result.rows[0]?.value ?? 0;
   }
 
-  // Builds the SQL aggregate expression for the selected measure, appending any
-  // needed property param to `queryParams` (so the placeholder index stays correct).
-  private buildMeasureExpr(measure: TrendMeasure, property: string | null, queryParams: unknown[]): string {
-    if ((measure === 'sum' || measure === 'avg') && property) {
-      queryParams.push(property);
-      const propExpr = `properties->>$${queryParams.length}`;
-      const agg = measure === 'sum' ? 'sum' : 'avg';
-      return `COALESCE(${agg}(CASE WHEN ${propExpr} ~ ${NUMERIC_GUARD} THEN (${propExpr})::numeric END), 0)::float`;
+  // Weekly retention: group actors by the week of their first-ever event, then count how
+  // many returned in each later week. Actor = COALESCE(user_id, anonymous_id).
+  async getRetention(
+    user: DashboardUser,
+    params: { weeks?: string; filters?: string; projectId?: string }
+  ): Promise<RetentionResponse> {
+    const weeks = this.clampWeeks(params.weeks);
+    const project = await this.projects.resolveActiveProject(user, params.projectId);
+    if (!project) {
+      return { project: null, weeks, cohorts: [], averages: [], summary: { week1: 0, week4: 0 } };
     }
-    if (measure === 'unique') {
-      return "count(DISTINCT COALESCE(user_id::text, anonymous_id))::float";
+
+    const now = new Date();
+    const currentWeek = this.truncateUtc(now, 'week');
+    const windowStart = new Date(currentWeek.getTime() - (weeks - 1) * WEEK_MS);
+    const maxPeriod = weeks - 1;
+
+    const queryParams: unknown[] = [project.id, windowStart.toISOString(), maxPeriod];
+    const filters = parseFiltersParam(params.filters);
+    const filterClause = buildFilterClause(filters, queryParams);
+
+    const rows = await this.database.query<{ cohort: string; period: number; actors: number }>(
+      `
+        WITH base AS (
+          SELECT COALESCE(user_id::text, anonymous_id) AS actor, occurred_at
+          FROM events
+          WHERE project_id = $1 AND COALESCE(user_id::text, anonymous_id) IS NOT NULL${filterClause}
+        ),
+        first_seen AS (
+          SELECT actor, MIN(occurred_at) AS first_at FROM base GROUP BY actor
+        ),
+        cohorts AS (
+          SELECT actor, date_trunc('week', first_at AT TIME ZONE 'UTC') AS cohort_week
+          FROM first_seen
+          WHERE first_at >= $2
+        ),
+        activity AS (
+          SELECT
+            c.cohort_week,
+            c.actor,
+            floor(
+              EXTRACT(EPOCH FROM (date_trunc('week', b.occurred_at AT TIME ZONE 'UTC') - c.cohort_week)) / 604800
+            )::int AS period
+          FROM base b
+          JOIN cohorts c ON c.actor = b.actor
+        )
+        SELECT to_char(cohort_week, 'YYYY-MM-DD') AS cohort, period, count(DISTINCT actor)::int AS actors
+        FROM activity
+        WHERE period >= 0 AND period <= $3
+        GROUP BY cohort_week, period
+        ORDER BY cohort_week DESC, period ASC
+      `,
+      queryParams
+    );
+
+    const byCohort = new Map<string, Map<number, number>>();
+    for (const row of rows.rows) {
+      const periodMap = byCohort.get(row.cohort) ?? new Map<number, number>();
+      periodMap.set(row.period, row.actors);
+      byCohort.set(row.cohort, periodMap);
     }
-    return 'count(*)::float';
+
+    const cohorts: RetentionCohort[] = [];
+    const periodSums = Array.from({ length: weeks }, () => ({ returned: 0, base: 0 }));
+
+    // Walk newest → oldest week. A cohort formed i weeks ago has i periods elapsed.
+    for (let i = 0; i < weeks; i += 1) {
+      const cohortDate = new Date(currentWeek.getTime() - i * WEEK_MS);
+      const key = cohortDate.toISOString().slice(0, 10);
+      const periodMap = byCohort.get(key);
+      const size = periodMap?.get(0) ?? 0;
+      const periods: Array<number | null> = [];
+
+      for (let p = 0; p < weeks; p += 1) {
+        if (p > i) {
+          periods.push(null); // this week hasn't happened for this cohort yet
+          continue;
+        }
+        const count = periodMap?.get(p) ?? 0;
+        periods.push(count);
+        if (size > 0) {
+          periodSums[p].returned += count;
+          periodSums[p].base += size;
+        }
+      }
+
+      cohorts.push({ cohort: key, size, periods });
+    }
+
+    const averages = periodSums.map((sum) => (sum.base > 0 ? Math.round((sum.returned / sum.base) * 100) : 0));
+
+    return {
+      project,
+      weeks,
+      cohorts,
+      averages,
+      summary: { week1: averages[1] ?? 0, week4: averages[4] ?? 0 }
+    };
+  }
+
+  private clampWeeks(value?: string): number {
+    const parsed = value ? Number(value) : undefined;
+    if (parsed === undefined || !Number.isFinite(parsed)) {
+      return 8;
+    }
+    return Math.min(Math.max(Math.trunc(parsed), 2), 26);
   }
 
   async getWebAnalytics(user: DashboardUser, daysParam?: string, projectId?: string): Promise<WebAnalyticsResponse> {

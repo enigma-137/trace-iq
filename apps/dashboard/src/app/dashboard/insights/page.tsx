@@ -2,6 +2,8 @@ import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { comparisonText, compactNumber, deltaInfo, formatCount } from '@/lib/metrics';
 import { TrendChart } from '@/components/charts/TrendChart';
+import { SegmentBar } from '@/components/SegmentBar';
+import type { FilterCondition } from '@/components/SegmentFilters';
 import { TrendControls } from './TrendControls';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +11,20 @@ export const dynamic = 'force-dynamic';
 interface EventNamesResponse {
   project: { id: string; name: string } | null;
   eventNames: Array<{ eventName: string; total: number }>;
+}
+
+interface CohortsResponse {
+  cohorts: Array<{ id: string; name: string; filters: FilterCondition[] }>;
+}
+
+function parseFiltersParam(raw: string | undefined): FilterCondition[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 type Measure = 'count' | 'unique' | 'sum' | 'avg';
@@ -72,10 +88,10 @@ export default async function InsightsPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const { user, token } = await requireDashboardSession('/dashboard/insights');
-  const { data: eventNamesData, error: eventNamesError } = await dashboardGet<EventNamesResponse>(
-    '/v1/dashboard/insights/event-names',
-    token
-  );
+  const [{ data: eventNamesData, error: eventNamesError }, { data: cohortsData }] = await Promise.all([
+    dashboardGet<EventNamesResponse>('/v1/dashboard/insights/event-names', token),
+    dashboardGet<CohortsResponse>('/v1/dashboard/cohorts', token)
+  ]);
 
   const eventNames = eventNamesData?.eventNames.map((item) => item.eventName) ?? [];
   const selectedEvent = firstParam(searchParams.event) ?? eventNames[0] ?? '';
@@ -86,6 +102,8 @@ export default async function InsightsPage({
   const property = firstParam(searchParams.property)?.trim() ?? '';
   const needsProperty = measure === 'sum' || measure === 'avg';
   const missingProperty = needsProperty && !property;
+  const filtersParam = firstParam(searchParams.filters);
+  const filters = parseFiltersParam(filtersParam);
 
   let trends: TrendsResponse | null = null;
   let trendsError: string | null = null;
@@ -97,6 +115,9 @@ export default async function InsightsPage({
     }
     if (needsProperty) {
       query.set('property', property);
+    }
+    if (filtersParam) {
+      query.set('filters', filtersParam);
     }
     const result = await dashboardGet<TrendsResponse>(`/v1/dashboard/insights/trends?${query.toString()}`, token);
     trends = result.data;
@@ -115,6 +136,9 @@ export default async function InsightsPage({
           eventNames={eventNames}
           selected={{ event: selectedEvent, interval, days, breakdown, measure, property }}
         />
+        <div className="mt-4">
+          <SegmentBar basePath="/dashboard/insights" cohorts={cohortsData?.cohorts ?? []} initialFilters={filters} />
+        </div>
       </section>
 
       {eventNamesError ? <ErrorBanner message={eventNamesError} /> : null}

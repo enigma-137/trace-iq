@@ -10,8 +10,14 @@ const navItems = [
   { label: 'Insights', href: '/dashboard/insights', key: 'insights' },
   { label: 'Events', href: '/dashboard/events', key: 'events' },
   { label: 'Funnels', href: '/dashboard/funnels', key: 'funnels' },
+  { label: 'Retention', href: '/dashboard/retention', key: 'retention' },
+  { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' },
   { label: 'Users', href: '/dashboard/users', key: 'users' },
-  { label: 'Errors', href: '/dashboard/errors', key: 'errors' }
+  { label: 'Errors', href: '/dashboard/errors', key: 'errors' },
+  { label: 'Alerts', href: '/dashboard/alerts', key: 'alerts' },
+  { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },
+  { label: 'Webhooks', href: '/dashboard/webhooks', key: 'webhooks' },
+  { label: 'Export', href: '/dashboard/export', key: 'export' }
 ];
 
 const bottomNavItems = [
@@ -43,6 +49,7 @@ export function DashboardShell({ active, title, userEmail, children }: Dashboard
           <Link className="flex items-center gap-2" href="/" aria-label="TraceIQ home">
             <img className="h-8 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
             <img className="hidden h-8 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
+            <span className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">TraceIQ</span>
           </Link>
 
           <nav className="mt-8 grid gap-0.5" aria-label="Dashboard navigation">

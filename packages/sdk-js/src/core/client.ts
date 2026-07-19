@@ -1,4 +1,4 @@
-import type { TraceIQClient, TraceIQGroup, TraceIQIdentity, TraceIQInitOptions } from '../types';
+import type { TraceIQClient, TraceIQFeatureFlags, TraceIQGroup, TraceIQIdentity, TraceIQInitOptions } from '../types';
 
 const DEFAULT_ENDPOINT = 'http://localhost:4000';
 const ANONYMOUS_ID_STORAGE_KEY = 'traceiq.anonymousId';
@@ -14,6 +14,9 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private clickHandlersInstalled = false;
   private recentClicks: Array<{ t: number; x: number; y: number }> = [];
   private lastRageAt = 0;
+  private featureFlags: Record<string, boolean> = {};
+  private featureFlagPayloads: Record<string, unknown> = {};
+  private featureFlagsLoaded = false;
 
   initialize(options: TraceIQInitOptions): void {
     this.options = {
@@ -155,6 +158,65 @@ export class BrowserTraceIQClient implements TraceIQClient {
       organizationId: group.organizationId,
       traits: group.traits ?? {}
     });
+  }
+
+  async loadFeatureFlags(): Promise<TraceIQFeatureFlags> {
+    const options = this.options;
+    if (!options) {
+      this.debug('TraceIQ has not been initialized.');
+      return { flags: {}, payloads: {} };
+    }
+
+    const endpoint = this.flagsEndpoint(options.endpoint ?? DEFAULT_ENDPOINT);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-traceiq-write-key': options.writeKey
+        },
+        body: JSON.stringify({
+          projectId: options.projectId,
+          distinctId: this.distinctId()
+        })
+      });
+
+      if (!response.ok) {
+        this.debug(`TraceIQ flag evaluation rejected with ${response.status}.`);
+        return { flags: this.featureFlags, payloads: this.featureFlagPayloads };
+      }
+
+      const body = (await response.json()) as Partial<TraceIQFeatureFlags>;
+      this.featureFlags = body.flags ?? {};
+      this.featureFlagPayloads = body.payloads ?? {};
+      this.featureFlagsLoaded = true;
+    } catch (error) {
+      this.debug('TraceIQ flag evaluation failed.', error);
+    }
+
+    return { flags: this.featureFlags, payloads: this.featureFlagPayloads };
+  }
+
+  isFeatureEnabled(key: string): boolean {
+    if (!this.featureFlagsLoaded) {
+      this.debug('Feature flags have not been loaded yet — call loadFeatureFlags() first.');
+    }
+    return this.featureFlags[key] === true;
+  }
+
+  getFeatureFlagPayload(key: string): unknown {
+    if (this.featureFlags[key] !== true) {
+      return undefined;
+    }
+    return this.featureFlagPayloads[key];
+  }
+
+  private distinctId(): string | undefined {
+    return this.identity?.userId ?? this.anonymousId;
+  }
+
+  private flagsEndpoint(endpoint: string): string {
+    return `${endpoint.replace(/\/$/, '')}/v1/flags/evaluate`;
   }
 
   get initialized(): boolean {

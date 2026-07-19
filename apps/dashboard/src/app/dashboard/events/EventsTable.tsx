@@ -64,15 +64,19 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
                   </span>
                 </span>
                 <span className="hidden min-w-0 flex-col items-start lg:flex">
-                  <span className="truncate font-mono text-sm text-neutral-700 [overflow-wrap:anywhere] dark:text-neutral-300">
+                  <span className="block w-full truncate font-mono text-sm text-neutral-700 dark:text-neutral-300">
                     {event.externalUserId ?? event.userId ?? event.anonymousId ?? 'anonymous'}
                   </span>
                   {deviceLocationSummary(event) ? (
-                    <span className="mt-0.5 truncate text-xs text-neutral-400 dark:text-neutral-500">{deviceLocationSummary(event)}</span>
+                    <span className="mt-0.5 block w-full truncate text-xs text-neutral-400 dark:text-neutral-500">
+                      {deviceLocationSummary(event)}
+                    </span>
                   ) : null}
                 </span>
                 <span className="hidden min-w-0 items-start lg:flex">
-                  <span className="truncate font-mono text-sm text-neutral-500 dark:text-neutral-400">{event.sessionId ?? 'none'}</span>
+                  <span className="w-full min-w-0 truncate font-mono text-sm text-neutral-500 dark:text-neutral-400">
+                    {event.sessionId ?? 'none'}
+                  </span>
                 </span>
                 <span className="hidden items-start text-sm text-neutral-500 dark:text-neutral-400 lg:flex">
                   {formatDate(event.receivedAt)}

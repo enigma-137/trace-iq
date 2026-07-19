@@ -38,6 +38,9 @@ export default async function DocsPage() {
     { id: 'swift', label: 'Swift SDK' },
     { id: 'kotlin', label: 'Kotlin SDK' },
     { id: 'ingestion', label: 'Server-side ingestion' },
+    { id: 'flags', label: 'Feature flags' },
+    { id: 'webhooks', label: 'Webhooks' },
+    { id: 'export', label: 'Data export' },
     { id: 'events', label: 'Reserved events' },
     { id: 'features', label: 'Feature guide' }
   ];
@@ -60,7 +63,7 @@ export default async function DocsPage() {
           </Section>
 
           <Section id="methods" title="SDK methods">
-            <P>The browser SDK exposes six methods on the default <Mono>traceiq</Mono> singleton.</P>
+            <P>Core methods on the default <Mono>traceiq</Mono> singleton (feature flags are covered in their own section).</P>
             <Code>{`// Identify the current person (creates/updates a user profile)
 traceiq.identify({ userId: 'user_123', traits: { email: 'a@b.com', plan: 'pro' } });
 
@@ -239,6 +242,111 @@ traceiq.capture("transfer_started", userId = "user_123",
             </P>
           </Section>
 
+          <Section id="flags" title="Feature flags & remote config">
+            <P>
+              Ship code behind a flag and turn it on for a slice of users without a release. Rollout is
+              deterministic and sticky — a user hashed into the rollout stays in as you raise the percentage, so
+              nobody flickers on and off. Create and roll out flags under{' '}
+              <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/flags">
+                Feature flags
+              </a>
+              .
+            </P>
+            <P>
+              With the browser SDK, load this user&apos;s flags once, then read them synchronously. Evaluation uses the
+              current <Mono>userId</Mono> (after <Mono>identify()</Mono>) or the anonymous id, so results are stable
+              per person.
+            </P>
+            <Code>{`// Fetch once (e.g. on app start, and again after identify())
+await traceiq.loadFeatureFlags();
+
+if (traceiq.isFeatureEnabled('new-checkout')) {
+  renderNewCheckout();
+}`}</Code>
+            <P>
+              A flag can also carry a JSON <strong>payload</strong> (remote config) — limits, copy, or a config
+              object. The payload is delivered only when the flag is on for that user, so it doubles as a way to
+              tune behavior without shipping code.
+            </P>
+            <Code>{`// Payload is undefined when the flag is off for this user
+const cfg = traceiq.getFeatureFlagPayload('checkout-limits');
+// e.g. { "maxAmount": 50000, "currency": "NGN" }
+const max = cfg?.maxAmount ?? 100000;`}</Code>
+            <P>
+              Any client can evaluate flags over HTTP — same write key as ingestion, in the{' '}
+              <Mono>x-traceiq-write-key</Mono> header. This is what the SDK calls under the hood.
+            </P>
+            <Code>{`curl -X POST ${apiBaseUrl}/v1/flags/evaluate \\
+  -H 'content-type: application/json' \\
+  -H 'x-traceiq-write-key: YOUR_PROJECT_WRITE_KEY' \\
+  -d '{ "projectId": "${projectId}", "distinctId": "user_123" }'`}</Code>
+            <P>Response — a map of flag → on/off, plus payloads for the flags that are on:</P>
+            <Code>{`{
+  "flags": { "new-checkout": true, "legacy-flow": false },
+  "payloads": { "new-checkout": { "maxAmount": 50000 } }
+}`}</Code>
+          </Section>
+
+          <Section id="webhooks" title="Webhooks">
+            <P>
+              Forward events to another system the moment they land — a data-warehouse loader, an ops tool, a Slack
+              relay. Add a webhook under{' '}
+              <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/webhooks">
+                Webhooks
+              </a>
+              : a URL, an optional signing secret, and either all events or a chosen list. Delivery is best-effort and
+              never blocks or slows down ingestion.
+            </P>
+            <P>Each delivery is a JSON <Mono>POST</Mono> with this body:</P>
+            <Code>{`{
+  "webhookId": "whk_…",
+  "event": "purchase",
+  "eventId": "evt_…",
+  "userId": "user_123",
+  "anonymousId": null,
+  "sessionId": "sess_1",
+  "properties": { "amount": 50000, "currency": "NGN" },
+  "occurredAt": "2026-07-18T10:00:00.000Z",
+  "deliveredAt": "2026-07-18T10:00:00.400Z"
+}`}</Code>
+            <P>
+              If you set a secret, every request carries an <Mono>x-traceiq-signature</Mono> header so you can confirm
+              it came from TraceIQ and wasn&apos;t tampered with — an HMAC-SHA256 of the raw request body:
+            </P>
+            <Code>{`// Node.js — verify the signature
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+function verify(rawBody, header, secret) {
+  const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex');
+  const a = Buffer.from(header ?? '');
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}`}</Code>
+            <P>
+              Use <Mono>Test</Mono> on any webhook to send a sample <Mono>traceiq.webhook.test</Mono> payload and see
+              the response code. Recent deliveries (and failures) are logged on the Webhooks page.
+            </P>
+          </Section>
+
+          <Section id="export" title="Data export">
+            <P>
+              Pull raw events out as CSV or JSON — for a spreadsheet, a notebook, or loading into your own warehouse.
+              The{' '}
+              <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/export">
+                Export
+              </a>{' '}
+              page downloads a date range (optionally one event) with a row cap; CSV flattens the top-level fields and
+              includes the full <Mono>properties</Mono> object as a JSON column.
+            </P>
+            <P>Or call the API directly with your dashboard token:</P>
+            <Code>{`curl '${apiBaseUrl}/v1/dashboard/export/events?from=2026-07-01&to=2026-07-18&event=purchase&limit=10000' \\
+  -H 'Authorization: Bearer YOUR_DASHBOARD_TOKEN'`}</Code>
+            <P>
+              Returns <Mono>{'{ count, truncated, events: [...] }'}</Mono>. Up to 50,000 rows per request — if{' '}
+              <Mono>truncated</Mono> is true, narrow the date range to fetch the rest.
+            </P>
+          </Section>
+
           <Section id="events" title="Reserved events">
             <P>
               Event names prefixed with <Mono>$</Mono> are emitted by the SDK — avoid reusing them for custom events.
@@ -258,11 +366,19 @@ traceiq.capture("transfer_started", userId = "user_123",
             <Bullets
               items={[
                 ['Events', 'Live stream of raw events; expand a row for the full payload (properties, device, network, context).'],
-                ['Insights', 'Trend any event over time (hourly/daily/weekly), broken down by a property or dimension (os, country, …).'],
+                ['Insights', 'Trend any event over time (hourly/daily/weekly), broken down by a property or dimension (os, country, …). Supports measures — count, unique users, sum/avg of a numeric property like amount.'],
                 ['Funnels', 'Ordered-event conversion with per-step drop-off; click a step to see who reached it or dropped off.'],
+                ['Retention', 'Weekly cohort × week-offset grid — of the people who did something in a week, how many came back in later weeks. The core "is it sticky?" view.'],
+                ['Cohorts', 'Saved groups of users defined by the events they did (or didn’t) do, reusable as filters across the product.'],
                 ['Users', 'Identified people and their chronological timelines, device, and location.'],
                 ['Web analytics', 'Visitors, sessions, bounce rate, top paths, sources, devices, geography, active hours, and frustrating pages.'],
-                ['Errors', 'Grouped exceptions with occurrences, affected users, stack traces, and browser/OS breakdown.']
+                ['Errors', 'Grouped exceptions with occurrences, affected users, stack traces, and browser/OS breakdown.'],
+                ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook.'],
+                ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, and JSON payloads (remote config) evaluated by the SDK.'],
+                ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
+                ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
+                ['Identity stitching', 'When an anonymous visitor later identifies, their earlier anonymous events are merged onto the user automatically — one person everywhere.'],
+                ['Segmentation', 'Most views accept filters (os, device, country, region, city, and event properties) so you can slice any metric to a segment.']
               ]}
             />
           </Section>

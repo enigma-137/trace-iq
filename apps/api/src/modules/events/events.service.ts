@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DashboardUser } from '../auth/auth.service';
 import { DatabaseService } from '../../database/database.service';
 import { extractClientIp, resolveGeo } from '../../common/geo';
+import { WebhooksService } from '../webhooks/webhooks.service';
 
 type JsonObject = Record<string, unknown>;
 
@@ -51,7 +52,10 @@ const MAX_BATCH_SIZE = 500;
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly webhooks: WebhooksService
+  ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
     const writeKey = this.requiredString(input.writeKey, 'writeKey');
@@ -101,6 +105,13 @@ export class EventsService {
     const anonymousId = this.optionalString(input.anonymousId);
     const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId);
     const sessionId = await this.ensureSession(auth.project_id, input.sessionId, userId, anonymousId, input.context);
+
+    // Identity stitching: once a previously-anonymous visitor identifies, merge their
+    // earlier anonymous events onto the user so they count as one person everywhere.
+    if (userId && anonymousId) {
+      await this.linkIdentity(auth.project_id, anonymousId, userId);
+    }
+
     const networkInfo = this.buildNetworkInfo(input.networkInfo, meta);
     const eventId = `evt_${randomUUID()}`;
 
@@ -137,6 +148,18 @@ export class EventsService {
         occurredAt.toISOString()
       ]
     );
+
+    // Forward to outbound webhooks without blocking the ingest response — delivery
+    // is best-effort and must never fail or slow down an event write.
+    void this.webhooks.deliverForEvent(auth.project_id, {
+      id: eventId,
+      eventName,
+      userId,
+      anonymousId: anonymousId ?? null,
+      sessionId,
+      properties: input.properties ?? {},
+      occurredAt: occurredAt.toISOString()
+    });
 
     return {
       accepted: true,
@@ -301,6 +324,36 @@ export class EventsService {
     );
 
     return safeSessionId;
+  }
+
+  // Links an anonymous_id to a user the first time we see the pairing, then backfills
+  // the user's pre-identify anonymous events + sessions. Wrapped in a transaction so a
+  // failed backfill doesn't record the link (it retries on the next event).
+  private async linkIdentity(projectId: string, anonymousId: string, userId: string): Promise<void> {
+    await this.database.transaction(async (client) => {
+      const linked = await client.query(
+        `
+          INSERT INTO identity_links (project_id, anonymous_id, user_id)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (project_id, anonymous_id) DO NOTHING
+        `,
+        [projectId, anonymousId, userId]
+      );
+
+      // Already linked — nothing to backfill.
+      if (linked.rowCount === 0) {
+        return;
+      }
+
+      await client.query(
+        `UPDATE events SET user_id = $3 WHERE project_id = $1 AND anonymous_id = $2 AND user_id IS NULL`,
+        [projectId, anonymousId, userId]
+      );
+      await client.query(
+        `UPDATE sessions SET user_id = $3 WHERE project_id = $1 AND anonymous_id = $2 AND user_id IS NULL`,
+        [projectId, anonymousId, userId]
+      );
+    });
   }
 
   private buildNetworkInfo(clientNetworkInfo: JsonObject | undefined, meta: IngestMeta): JsonObject {

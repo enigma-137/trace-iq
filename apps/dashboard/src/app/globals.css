@@ -135,15 +135,40 @@ input {
   border-color: rgba(255, 255, 255, 0.7);
 }
 
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-link-ghost {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease;
+}
+
+.nav-link-ghost:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .hero-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.72fr);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
   align-items: center;
-  gap: clamp(28px, 6vw, 80px);
+  gap: clamp(28px, 6vw, 72px);
   max-width: 1180px;
-  min-height: calc(100vh - 92px);
+  min-height: calc(100vh - 96px);
   margin: 0 auto;
-  padding: 56px 0 28px;
+  padding: 40px 0 32px;
 }
 
 .hero-copy {
@@ -164,12 +189,12 @@ input {
 }
 
 .coming-soon-shell h1 {
-  max-width: 880px;
+  max-width: 12ch;
   margin: 0;
   color: #ffffff;
-  font-size: clamp(3.6rem, 10vw, 8.8rem);
-  line-height: 0.9;
-  letter-spacing: 0;
+  font-size: clamp(2.75rem, 6vw, 5.25rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .hero-lede {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-const signals = ['funnels', 'sessions', 'replay', 'retention', 'payments'];
+const signals = ['funnels', 'insights', 'user timelines', 'retention', 'revenue', 'error tracking', 'web analytics'];
 
 export default function DashboardHomePage() {
   const pageRef = useRef<HTMLElement>(null);
@@ -39,19 +39,24 @@ export default function DashboardHomePage() {
         <a className="brand-mark" href="/">
           TraceIQ
         </a>
-        <a className="nav-link" href="mailto:hello@traceiq.dev">
-          Join waitlist
-        </a>
+        <div className="nav-actions">
+          <a className="nav-link-ghost" href="/auth/login">
+            Sign in
+          </a>
+          <a className="nav-link" href="mailto:hello@traceiq.dev">
+            Join waitlist
+          </a>
+        </div>
       </nav>
 
       <section className="hero-stage" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <p className="eyebrow">Behavior intelligence is loading</p>
-          <h1 id="hero-title">See every product journey before it slips away.</h1>
+          <p className="eyebrow">Product analytics · private beta</p>
+          <h1 id="hero-title">See every product journey before it slips.</h1>
           <p className="hero-lede">
-            TraceIQ is a coming-soon analytics platform for teams that need clean event
-            tracking, funnel clarity, user timelines, replay context, and AI conversion
-            diagnosis without duct-taping five tools together.
+            TraceIQ unifies clean event tracking, funnels, user timelines, retention,
+            revenue, and error tracking in one fast, privacy-friendly dashboard — instead
+            of duct-taping five tools together.
           </p>
 
           <form className="waitlist-form" action="mailto:hello@traceiq.dev" method="post">
