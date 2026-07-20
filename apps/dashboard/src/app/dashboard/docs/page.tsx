@@ -39,6 +39,7 @@ export default async function DocsPage() {
     { id: 'kotlin', label: 'Kotlin SDK' },
     { id: 'ingestion', label: 'Server-side ingestion' },
     { id: 'flags', label: 'Feature flags' },
+    { id: 'api-performance', label: 'API performance' },
     { id: 'webhooks', label: 'Webhooks' },
     { id: 'export', label: 'Data export' },
     { id: 'events', label: 'Reserved events' },
@@ -287,6 +288,51 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
 }`}</Code>
           </Section>
 
+          <Section id="api-performance" title="API performance">
+            <P>
+              Track the latency, errors, and traffic of <strong>your own API endpoints</strong>. Each request becomes a
+              reserved <Mono>$api_request</Mono> event, and the{' '}
+              <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/api-performance">
+                API performance
+              </a>{' '}
+              page ranks your slowest (by p95), most error-prone, and busiest endpoints.
+            </P>
+            <P>
+              <strong>Backend (Node/Express)</strong> — one line of middleware times every request:
+            </P>
+            <Code>{`import { TraceIQ } from '@traceiq/node';
+
+const traceiq = new TraceIQ({
+  projectId: '${projectId}',
+  writeKey: process.env.TRACEIQ_WRITE_KEY,
+  endpoint: '${apiBaseUrl}',
+});
+
+// Emits $api_request { method, path, status, durationMs } per request.
+app.use(traceiq.middleware({
+  resolveUserId: (req) => req.user?.id,      // optional
+  ignore: (req) => req.path === '/health',   // optional
+}));`}</Code>
+            <P>
+              Paths use the matched route template (<Mono>/users/:id</Mono>), so requests group cleanly instead of
+              exploding per id.
+            </P>
+            <P>
+              <strong>Browser</strong> — opt in and the SDK wraps <Mono>fetch</Mono> to time each call (its own calls to
+              TraceIQ are skipped):
+            </P>
+            <Code>{`traceiq.initialize({
+  projectId: '${projectId}',
+  writeKey: 'YOUR_WRITE_KEY',
+  endpoint: '${apiBaseUrl}',
+  autoCaptureRequests: true, // capture outgoing fetch() as $api_request
+});`}</Code>
+            <P>
+              Anything else (gRPC, background jobs) can report directly by sending an <Mono>$api_request</Mono> event
+              with <Mono>method</Mono>, <Mono>path</Mono>, <Mono>status</Mono>, and <Mono>durationMs</Mono> properties.
+            </P>
+          </Section>
+
           <Section id="webhooks" title="Webhooks">
             <P>
               Forward events to another system the moment they land — a data-warehouse loader, an ops tool, a Slack
@@ -357,7 +403,8 @@ function verify(rawBody, header, secret) {
                 ['$identify', 'Emitted by identify().'],
                 ['$group', 'Emitted by group().'],
                 ['$exception', 'An error occurrence (powers Error tracking).'],
-                ['$rageclick', 'A rage click (powers Frustrating pages).']
+                ['$rageclick', 'A rage click (powers Frustrating pages).'],
+                ['$api_request', 'An API request — method, path, status, durationMs (powers API performance).']
               ]}
             />
           </Section>
@@ -373,6 +420,7 @@ function verify(rawBody, header, secret) {
                 ['Users', 'Identified people and their chronological timelines, device, and location.'],
                 ['Web analytics', 'Visitors, sessions, bounce rate, top paths, sources, devices, geography, active hours, and frustrating pages.'],
                 ['Errors', 'Grouped exceptions with occurrences, affected users, stack traces, and browser/OS breakdown.'],
+                ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
                 ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook.'],
                 ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, and JSON payloads (remote config) evaluated by the SDK.'],
                 ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],

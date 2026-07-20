@@ -50,8 +50,33 @@ export interface BatchIngestResponse {
 
 const MAX_BATCH_SIZE = 500;
 
+// Write keys change rarely, so caching the lookup removes a DB round-trip from the
+// ingest hot path. Kept short so a revoked key stops working within the window.
+const WRITE_KEY_TTL_MS = 60 * 1000;
+// Once an anonymous_id is stitched to a user we never need to redo it, so remember
+// the pairing and skip the (transactional) backfill on every later event.
+const MAX_LINK_CACHE = 100_000;
+
+// One prepared, validated event awaiting a bulk insert.
+interface PreparedEvent {
+  index: number;
+  eventName: string;
+  occurredAt: Date;
+  anonymousId?: string;
+  externalId?: string;
+  sessionId?: string;
+  properties?: JsonObject;
+  deviceInfo?: JsonObject;
+  networkInfo: JsonObject;
+  context: JsonObject;
+  userId: string | null;
+}
+
 @Injectable()
 export class EventsService {
+  private writeKeyCache = new Map<string, { record: WriteKeyRecord; expiresAt: number }>();
+  private linkedIdentities = new Set<string>();
+
   constructor(
     private readonly database: DatabaseService,
     private readonly webhooks: WebhooksService
@@ -82,17 +107,205 @@ export class EventsService {
     }
 
     const auth = await this.authenticateWriteKey(key, pid);
-    const results: BatchIngestResponse['results'] = [];
-    for (const item of batch) {
+    const results: BatchIngestResponse['results'] = new Array(batch.length);
+
+    // Validate + normalize each event up front. A bad event fails only itself; the
+    // rest are processed together in bulk below.
+    const prepared: PreparedEvent[] = [];
+    batch.forEach((item, index) => {
       try {
-        const res = await this.ingestWithAuth(auth, { ...item, projectId: pid }, meta);
-        results.push({ accepted: true, eventId: res.eventId });
+        prepared.push({
+          index,
+          eventName: this.requiredString(item.eventName, 'eventName'),
+          occurredAt: this.parseTimestamp(item.timestamp),
+          anonymousId: this.optionalString(item.anonymousId),
+          externalId: this.optionalString(item.userId),
+          sessionId: this.optionalString(item.sessionId),
+          properties: item.properties,
+          deviceInfo: item.deviceInfo,
+          networkInfo: this.buildNetworkInfo(item.networkInfo, meta),
+          context: item.context ?? {},
+          userId: null
+        });
       } catch (error) {
-        results.push({ accepted: false, error: error instanceof Error ? error.message : 'ingest failed' });
+        results[index] = { accepted: false, error: error instanceof Error ? error.message : 'ingest failed' };
+      }
+    });
+
+    if (prepared.length === 0) {
+      return { accepted: true, results };
+    }
+
+    // 1) Upsert every distinct identified user once, then map each event to its user id.
+    const userMap = await this.bulkEnsureUsers(
+      auth.project_id,
+      prepared.filter((p) => p.externalId).map((p) => ({ externalId: p.externalId as string, anonymousId: p.anonymousId }))
+    );
+    for (const p of prepared) {
+      p.userId = p.externalId ? userMap.get(p.externalId) ?? null : null;
+    }
+
+    // 2) Upsert every distinct session once.
+    await this.bulkEnsureSessions(
+      auth.project_id,
+      prepared
+        .filter((p) => p.sessionId)
+        .map((p) => ({ sessionId: p.sessionId as string, userId: p.userId, anonymousId: p.anonymousId, context: p.context }))
+    );
+
+    // 3) Stitch each distinct new anonymous→user pairing (cache-guarded, so repeats are free).
+    const seenPairs = new Set<string>();
+    for (const p of prepared) {
+      if (p.userId && p.anonymousId) {
+        const pairKey = `${p.anonymousId}=>${p.userId}`;
+        if (!seenPairs.has(pairKey)) {
+          seenPairs.add(pairKey);
+          await this.linkIdentity(auth.project_id, p.anonymousId, p.userId);
+        }
       }
     }
 
+    // 4) One multi-row insert for the whole batch.
+    const eventIds = await this.bulkInsertEvents(auth, prepared);
+    prepared.forEach((p, i) => {
+      const eventId = eventIds[i];
+      results[p.index] = { accepted: true, eventId };
+      void this.webhooks.deliverForEvent(auth.project_id, {
+        id: eventId,
+        eventName: p.eventName,
+        userId: p.userId,
+        anonymousId: p.anonymousId ?? null,
+        sessionId: p.sessionId ?? null,
+        properties: p.properties ?? {},
+        occurredAt: p.occurredAt.toISOString()
+      });
+    });
+
     return { accepted: true, results };
+  }
+
+  // Upsert distinct identified users in a single statement; returns external_id → user id.
+  private async bulkEnsureUsers(
+    projectId: string,
+    users: Array<{ externalId: string; anonymousId?: string }>
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    // Dedupe by external_id so one INSERT can't touch the same conflict row twice.
+    const distinct = new Map<string, string | undefined>();
+    for (const u of users) {
+      if (!distinct.has(u.externalId)) distinct.set(u.externalId, u.anonymousId);
+    }
+    if (distinct.size === 0) return map;
+
+    const values: unknown[] = [];
+    const groups: string[] = [];
+    let idx = 0;
+    for (const [externalId, anon] of distinct) {
+      const base = idx * 4;
+      groups.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+      values.push(`usr_${randomUUID()}`, projectId, externalId, anon ?? null);
+      idx += 1;
+    }
+
+    const result = await this.database.query<{ external_id: string; id: string }>(
+      `
+        INSERT INTO users (id, project_id, external_id, anonymous_id)
+        VALUES ${groups.join(', ')}
+        ON CONFLICT (project_id, external_id)
+        WHERE external_id IS NOT NULL
+        DO UPDATE
+        SET anonymous_id = COALESCE(users.anonymous_id, EXCLUDED.anonymous_id),
+            last_seen_at = now(),
+            updated_at = now()
+        RETURNING external_id, id
+      `,
+      values
+    );
+    for (const row of result.rows) map.set(row.external_id, row.id);
+    return map;
+  }
+
+  // Upsert distinct sessions in a single statement.
+  private async bulkEnsureSessions(
+    projectId: string,
+    sessions: Array<{ sessionId: string; userId: string | null; anonymousId?: string; context: JsonObject }>
+  ): Promise<void> {
+    const distinct = new Map<string, { userId: string | null; anonymousId?: string; context: JsonObject }>();
+    for (const s of sessions) {
+      const existing = distinct.get(s.sessionId);
+      distinct.set(s.sessionId, {
+        userId: s.userId ?? existing?.userId ?? null,
+        anonymousId: s.anonymousId ?? existing?.anonymousId,
+        context: s.context ?? existing?.context ?? {}
+      });
+    }
+    if (distinct.size === 0) return;
+
+    const values: unknown[] = [];
+    const groups: string[] = [];
+    let idx = 0;
+    for (const [sessionId, s] of distinct) {
+      const base = idx * 5;
+      groups.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::jsonb)`);
+      values.push(sessionId, projectId, s.userId, s.anonymousId ?? null, JSON.stringify(s.context ?? {}));
+      idx += 1;
+    }
+
+    await this.database.query(
+      `
+        INSERT INTO sessions (id, project_id, user_id, anonymous_id, context)
+        VALUES ${groups.join(', ')}
+        ON CONFLICT (id) DO UPDATE
+        SET user_id = COALESCE(EXCLUDED.user_id, sessions.user_id),
+            anonymous_id = COALESCE(EXCLUDED.anonymous_id, sessions.anonymous_id),
+            last_seen_at = now(),
+            context = sessions.context || EXCLUDED.context
+      `,
+      values
+    );
+  }
+
+  // Insert all prepared events in one multi-row statement; returns ids aligned to `prepared`.
+  private async bulkInsertEvents(auth: WriteKeyRecord, prepared: PreparedEvent[]): Promise<string[]> {
+    if (prepared.length === 0) return [];
+
+    const values: unknown[] = [];
+    const groups: string[] = [];
+    const ids: string[] = [];
+    prepared.forEach((p, i) => {
+      const eventId = `evt_${randomUUID()}`;
+      ids.push(eventId);
+      const base = i * 12;
+      groups.push(
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}::jsonb, $${base + 9}::jsonb, $${base + 10}::jsonb, $${base + 11}::jsonb, $${base + 12})`
+      );
+      values.push(
+        eventId,
+        auth.organization_id,
+        auth.project_id,
+        p.userId,
+        p.anonymousId ?? null,
+        p.sessionId ?? null,
+        p.eventName,
+        JSON.stringify(p.properties ?? {}),
+        JSON.stringify(p.deviceInfo ?? {}),
+        JSON.stringify(p.networkInfo),
+        JSON.stringify(p.context ?? {}),
+        p.occurredAt.toISOString()
+      );
+    });
+
+    await this.database.query(
+      `
+        INSERT INTO events (
+          id, organization_id, project_id, user_id, anonymous_id, session_id,
+          event_name, properties, device_info, network_info, context, occurred_at
+        )
+        VALUES ${groups.join(', ')}
+      `,
+      values
+    );
+    return ids;
   }
 
   private async ingestWithAuth(
@@ -246,6 +459,12 @@ export class EventsService {
 
   private async authenticateWriteKey(writeKey: string, projectId: string): Promise<WriteKeyRecord> {
     const keyHash = this.sha256(writeKey);
+    const cacheKey = `${projectId}:${keyHash}`;
+    const cached = this.writeKeyCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.record;
+    }
+
     const result = await this.database.query<WriteKeyRecord>(
       `
         SELECT
@@ -266,6 +485,7 @@ export class EventsService {
       throw new UnauthorizedException('Invalid projectId or write key.');
     }
 
+    this.writeKeyCache.set(cacheKey, { record, expiresAt: Date.now() + WRITE_KEY_TTL_MS });
     return record;
   }
 
@@ -330,6 +550,13 @@ export class EventsService {
   // the user's pre-identify anonymous events + sessions. Wrapped in a transaction so a
   // failed backfill doesn't record the link (it retries on the next event).
   private async linkIdentity(projectId: string, anonymousId: string, userId: string): Promise<void> {
+    // Fast path: we've already stitched this anonymous_id in this process — the DB
+    // work would be a no-op, so skip the whole transaction.
+    const cacheKey = `${projectId}:${anonymousId}`;
+    if (this.linkedIdentities.has(cacheKey)) {
+      return;
+    }
+
     await this.database.transaction(async (client) => {
       const linked = await client.query(
         `
@@ -354,6 +581,13 @@ export class EventsService {
         [projectId, anonymousId, userId]
       );
     });
+
+    // Remember the pairing so later events skip straight past this. Bounded so a
+    // long-lived process with many anonymous ids can't grow the set forever.
+    if (this.linkedIdentities.size >= MAX_LINK_CACHE) {
+      this.linkedIdentities.clear();
+    }
+    this.linkedIdentities.add(cacheKey);
   }
 
   private buildNetworkInfo(clientNetworkInfo: JsonObject | undefined, meta: IngestMeta): JsonObject {

@@ -25,6 +25,16 @@ export class AnalyticsController {
     return this.analyticsService.getWebAnalytics(user, days, projectId);
   }
 
+  @Get('api-performance')
+  async getApiPerformance(
+    @Headers('authorization') authorization?: string,
+    @Query('days') days?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.analyticsService.getApiPerformance(user, days, projectId);
+  }
+
   @Get('insights/event-names')
   async listEventNames(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);

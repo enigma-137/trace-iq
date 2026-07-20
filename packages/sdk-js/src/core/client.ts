@@ -12,6 +12,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private sessionId?: string;
   private errorHandlersInstalled = false;
   private clickHandlersInstalled = false;
+  private requestCaptureInstalled = false;
   private recentClicks: Array<{ t: number; x: number; y: number }> = [];
   private lastRageAt = 0;
   private featureFlags: Record<string, boolean> = {};
@@ -32,6 +33,10 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
     if (options.autoCaptureRageClicks !== false) {
       this.installClickHandlers();
+    }
+
+    if (options.autoCaptureRequests) {
+      this.installRequestCapture();
     }
 
     if (options.autoTrackPageViews) {
@@ -113,6 +118,77 @@ export class BrowserTraceIQClient implements TraceIQClient {
       },
       true
     );
+  }
+
+  // Wrap window.fetch to time each request and emit a `$api_request` event. Our own
+  // ingestion/flag calls are skipped so we never capture (or loop on) ourselves.
+  private installRequestCapture(): void {
+    if (typeof window === 'undefined' || this.requestCaptureInstalled) {
+      return;
+    }
+    const originalFetch = window.fetch;
+    if (typeof originalFetch !== 'function') {
+      return;
+    }
+    this.requestCaptureInstalled = true;
+    const self = this;
+
+    window.fetch = function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+      const url = self.requestUrl(input);
+      const method = self.requestMethod(input, init);
+
+      if (self.isInternalUrl(url)) {
+        return originalFetch.call(window, input as RequestInfo, init);
+      }
+
+      const start = self.nowMs();
+      return originalFetch.call(window, input as RequestInfo, init).then(
+        (response: Response) => {
+          self.recordRequest(method, url, response.status, self.nowMs() - start);
+          return response;
+        },
+        (error: unknown) => {
+          // Network error / abort — record as status 0 so it still shows as a failure.
+          self.recordRequest(method, url, 0, self.nowMs() - start);
+          throw error;
+        }
+      );
+    };
+  }
+
+  private recordRequest(method: string, url: string, status: number, durationMs: number): void {
+    this.track('$api_request', {
+      method,
+      path: normalizeApiPath(url, this.getLocation()?.origin),
+      url,
+      status,
+      durationMs: Math.round(durationMs),
+      ok: status >= 200 && status < 400
+    });
+  }
+
+  private requestUrl(input: RequestInfo | URL): string {
+    if (typeof input === 'string') return input;
+    if (input instanceof URL) return input.href;
+    return input.url;
+  }
+
+  private requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+    const fromInit = init?.method;
+    const fromRequest = typeof input !== 'string' && !(input instanceof URL) ? input.method : undefined;
+    return (fromInit ?? fromRequest ?? 'GET').toUpperCase();
+  }
+
+  private isInternalUrl(url: string): boolean {
+    const endpoint = this.options?.endpoint ?? DEFAULT_ENDPOINT;
+    return url.startsWith(endpoint);
+  }
+
+  private nowMs(): number {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+    return Date.now();
   }
 
   private normalizeError(error: unknown): { type: string; message: string; stack?: string } {
@@ -461,4 +537,29 @@ export class BrowserTraceIQClient implements TraceIQClient {
       console.warn(message, error ?? '');
     }
   }
+}
+
+// Turns a request URL into a groupable route: strips origin + query, then collapses
+// id-like segments so /users/123 and /users/abc-uuid both become /users/:id.
+export function normalizeApiPath(rawUrl: string, base?: string): string {
+  let pathname = rawUrl;
+  try {
+    pathname = new URL(rawUrl, base ?? 'http://localhost').pathname;
+  } catch {
+    pathname = rawUrl.split('?')[0];
+  }
+  const collapsed = pathname
+    .split('/')
+    .map((segment) => (isIdSegment(segment) ? ':id' : segment))
+    .join('/');
+  return collapsed || '/';
+}
+
+function isIdSegment(segment: string): boolean {
+  if (!segment) return false;
+  if (/^\d+$/.test(segment)) return true; // 123
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)) return true; // uuid
+  if (/^[0-9a-f]{16,}$/i.test(segment)) return true; // long hex id
+  if (/^\d/.test(segment) && /[a-z]/i.test(segment) && segment.length >= 12) return true; // mixed id like usr_...
+  return false;
 }

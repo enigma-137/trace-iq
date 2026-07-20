@@ -19,6 +19,33 @@ export interface TrendPoint {
   value: number;
 }
 
+type ApiGroupRow = {
+  [column: string]: unknown;
+  method: string;
+  path: string;
+  count: number;
+  avg: number;
+  p95: number;
+  status: number;
+  errors: number;
+};
+
+type ApiErrorRow = {
+  [column: string]: unknown;
+  method: string;
+  path: string;
+  status: number;
+  count: number;
+};
+
+type ApiSummaryRow = {
+  [column: string]: unknown;
+  total: number;
+  errors: number;
+  avg: number;
+  p95: number;
+};
+
 export interface TrendSeries {
   key: string;
   points: TrendPoint[];
@@ -792,6 +819,105 @@ export class AnalyticsService {
       return fallback;
     }
     return Math.min(Math.max(Math.trunc(parsed), 1), 365);
+  }
+
+  // API performance: aggregates `$api_request` events (emitted by the SDK middleware /
+  // browser fetch autocapture) into the endpoints that are slowest, erroring, and
+  // busiest. Latency is ranked by p95, which reflects real pain better than an average.
+  async getApiPerformance(user: DashboardUser, daysParam?: string, projectId?: string) {
+    const project = await this.projects.resolveActiveProject(user, projectId);
+    const days = this.clampApiDays(daysParam);
+
+    const emptySummary = { totalRequests: 0, errorCount: 0, errorRate: 0, p95: 0, avg: 0 };
+    if (!project) {
+      return {
+        project: null,
+        days,
+        summary: emptySummary,
+        highestLatency: [],
+        highestError: [],
+        mostRequests: [],
+        leastRequests: []
+      };
+    }
+
+    // Guard the numeric casts so a malformed event can't blow up the whole query.
+    const base = `
+      WITH base AS (
+        SELECT
+          properties->>'method' AS method,
+          properties->>'path' AS path,
+          (properties->>'durationMs')::numeric AS duration,
+          (properties->>'status')::int AS status
+        FROM events
+        WHERE project_id = $1 AND event_name = '$api_request'
+          AND occurred_at >= now() - make_interval(days => $2::int)
+          AND properties->>'path' IS NOT NULL
+          AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND properties->>'status' ~ '^[0-9]+$'
+      )
+    `;
+
+    const [grouped, errors, summary] = await Promise.all([
+      this.database.query<ApiGroupRow>(
+        `${base}
+         SELECT method, path,
+           count(*)::int AS count,
+           round(avg(duration), 1)::float AS avg,
+           round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p95,
+           mode() WITHIN GROUP (ORDER BY status) AS status,
+           count(*) FILTER (WHERE status >= 400)::int AS errors
+         FROM base GROUP BY method, path
+         ORDER BY count DESC LIMIT 500`,
+        [project.id, days]
+      ),
+      this.database.query<ApiErrorRow>(
+        `${base}
+         SELECT method, path, status, count(*)::int AS count
+         FROM base WHERE status >= 400
+         GROUP BY method, path, status
+         ORDER BY count DESC LIMIT 8`,
+        [project.id, days]
+      ),
+      this.database.query<ApiSummaryRow>(
+        `${base}
+         SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE status >= 400)::int AS errors,
+           round(avg(duration), 1)::float AS avg,
+           round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p95
+         FROM base`,
+        [project.id, days]
+      )
+    ]);
+
+    const rows = grouped.rows;
+    const s = summary.rows[0];
+    const total = s?.total ?? 0;
+    const errorCount = s?.errors ?? 0;
+
+    return {
+      project,
+      days,
+      summary: {
+        totalRequests: total,
+        errorCount,
+        errorRate: total > 0 ? Math.round((errorCount / total) * 1000) / 10 : 0,
+        p95: s?.p95 ?? 0,
+        avg: s?.avg ?? 0
+      },
+      highestLatency: [...rows].sort((a, b) => b.p95 - a.p95).slice(0, 8),
+      highestError: errors.rows,
+      mostRequests: [...rows].sort((a, b) => b.count - a.count).slice(0, 8),
+      leastRequests: [...rows].sort((a, b) => a.count - b.count).slice(0, 8)
+    };
+  }
+
+  private clampApiDays(value?: string): number {
+    const parsed = value ? Number(value) : undefined;
+    if (parsed === undefined || !Number.isFinite(parsed)) {
+      return 7;
+    }
+    return Math.min(Math.max(Math.trunc(parsed), 1), 90);
   }
 
   private requiredString(value: unknown, field: string): string {

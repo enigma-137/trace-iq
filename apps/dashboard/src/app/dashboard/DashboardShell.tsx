@@ -13,6 +13,7 @@ const navItems = [
   { label: 'Retention', href: '/dashboard/retention', key: 'retention' },
   { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' },
   { label: 'Users', href: '/dashboard/users', key: 'users' },
+  { label: 'API performance', href: '/dashboard/api-performance', key: 'api-performance' },
   { label: 'Errors', href: '/dashboard/errors', key: 'errors' },
   { label: 'Alerts', href: '/dashboard/alerts', key: 'alerts' },
   { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },

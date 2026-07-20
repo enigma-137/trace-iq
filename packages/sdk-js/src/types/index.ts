@@ -5,6 +5,12 @@ export interface TraceIQInitOptions {
   autoTrackPageViews?: boolean;
   autoCaptureExceptions?: boolean;
   autoCaptureRageClicks?: boolean;
+  /**
+   * Auto-capture outgoing fetch() calls as `$api_request` events (method, path,
+   * status, durationMs) to power the API performance view. Off by default —
+   * enabling it records every non-TraceIQ request the page makes.
+   */
+  autoCaptureRequests?: boolean;
   enableReplay?: boolean;
   debug?: boolean;
 }

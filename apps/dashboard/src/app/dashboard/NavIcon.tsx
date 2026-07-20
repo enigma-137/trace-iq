@@ -26,6 +26,8 @@ const PATHS: Record<string, string> = {
   users: 'M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM21 20v-1a4 4 0 0 0-3-3.87M16.5 4.13a4 4 0 0 1 0 7.75',
   // Errors — alert triangle
   errors: 'M12 3 2 20h20L12 3ZM12 9v5M12 17.5h.01',
+  // API performance — gauge / speedometer
+  'api-performance': 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM13.4 10.6 17 7M4 18a9 9 0 1 1 16 0',
   // Docs — book
   docs: 'M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5ZM18 3v18',
   // Settings — gear

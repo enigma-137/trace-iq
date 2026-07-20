@@ -1,3 +1,5 @@
+import { createRequestMiddleware, MiddlewareOptions } from './middleware';
+
 export interface TraceIQNodeOptions {
   /** Your project ID (from Settings). */
   projectId: string;
@@ -106,6 +108,16 @@ export class TraceIQ {
       (timer as unknown as { unref?: () => void }).unref?.();
       this.timer = timer;
     }
+  }
+
+  /**
+   * Express/connect middleware that emits a `$api_request` event per request
+   * (method, path, status, durationMs) to power the API performance view.
+   *
+   *   app.use(traceiq.middleware({ resolveUserId: (req) => req.user?.id }));
+   */
+  middleware(options: MiddlewareOptions = {}) {
+    return createRequestMiddleware(this, options);
   }
 
   /** Track a server-side event. */
