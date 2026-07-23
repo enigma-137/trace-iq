@@ -5,13 +5,24 @@ const protectedPrefixes = ['/dashboard'];
 const authPrefixes = ['/auth'];
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  if (process.env.NEXT_PUBLIC_WAITLIST_ONLY === 'true') {
+    // Avoid redirecting during Next.js build-time pre-rendering (which would cause build errors)
+    if (process.env.NEXT_PHASE !== 'phase-production-build') {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/';
+      redirectUrl.search = '';
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   let response = NextResponse.next({
     request,
   });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const pathname = request.nextUrl.pathname;
   const isProtectedRoute = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
   const isAuthRoute = authPrefixes.some((prefix) => pathname.startsWith(prefix));
 
@@ -69,6 +80,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/auth/:path*'],
+  matcher: ['/dashboard/:path*', '/auth/:path*', '/sdk-demo'],
 };
 
