@@ -67,9 +67,9 @@ export default function DashboardHomePage() {
           TraceIQ
         </a>
         <div className="nav-actions">
-          <a className="nav-link-ghost" href="/auth/login">
+          {/* <a className="nav-link-ghost" href="/auth/login">
             Sign in
-          </a>
+          </a> */}
           <a className="nav-link" href="mailto:hello@traceiq.dev">
             Join waitlist
           </a>
