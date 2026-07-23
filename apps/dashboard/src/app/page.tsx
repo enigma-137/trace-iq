@@ -1,11 +1,38 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { joinWaitlist } from './actions';
 
 const signals = ['funnels', 'insights', 'user timelines', 'retention', 'revenue', 'error tracking', 'web analytics'];
 
 export default function DashboardHomePage() {
   const pageRef = useRef<HTMLElement>(null);
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setMessage('');
+    setErrorMsg('');
+
+    try {
+      const res = await joinWaitlist(email);
+      if (res.success) {
+        setMessage(res.message || 'Thank you!');
+        setEmail('');
+      } else {
+        setErrorMsg(res.error || 'Failed to join waitlist.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const page = pageRef.current;
@@ -59,13 +86,26 @@ export default function DashboardHomePage() {
             of duct-taping five tools together.
           </p>
 
-          <form className="waitlist-form" action="mailto:hello@traceiq.dev" method="post">
+          <form className="waitlist-form" onSubmit={handleSubmit}>
             <label className="sr-only" htmlFor="email">
               Work email
             </label>
-            <input id="email" name="email" type="email" placeholder="work@email.com" />
-            <button type="submit">Request early access</button>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="work@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+              required
+            />
+            <button type="submit" disabled={loading}>
+              {loading ? 'Joining...' : 'Request early access'}
+            </button>
           </form>
+          {message && <p className="mt-4 text-zinc-300 text-sm font-medium">{message}</p>}
+          {errorMsg && <p className="mt-4 text-zinc-400 text-sm font-medium">{errorMsg}</p>}
         </div>
 
         <div className="signal-panel" aria-label="TraceIQ preview">

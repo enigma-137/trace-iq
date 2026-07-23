@@ -165,22 +165,17 @@ export default function MarketingHomePage() {
   ];
 
   return (
-    <div className="relative min-h-screen bg-zinc-950 text-zinc-50 overflow-hidden bg-grid-dots">
+    <div className="relative min-h-screen bg-[#050505] text-zinc-50 overflow-hidden bg-grid-dots">
       {/* Background Glowing Blobs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full glow-blob animate-pulse-slow pointer-events-none" />
-      <div className="absolute top-20 right-1/4 w-80 h-80 bg-rose-500/10 rounded-full glow-blob animate-float pointer-events-none" />
-      <div className="absolute top-1/3 left-1/3 w-[30rem] h-[30rem] bg-indigo-500/10 rounded-full glow-blob animate-pulse-slow pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-white/5 rounded-full glow-blob animate-pulse-slow pointer-events-none" />
+      <div className="absolute top-20 right-1/4 w-80 h-80 bg-zinc-200/5 rounded-full glow-blob animate-float pointer-events-none" />
+      <div className="absolute top-1/3 left-1/3 w-[30rem] h-[30rem] bg-white/5 rounded-full glow-blob animate-pulse-slow pointer-events-none" />
 
       {/* Header/Navbar */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md transition-all duration-200">
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-600 text-white shadow-lg">
-              {/* <TraceIcon className="size-5" /> */}
-            </div>
-            <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
-              TraceIQ
-            </span>
+            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-8 w-auto" />
           </div>
 
           <div className="hidden md:flex items-center gap-8">
@@ -208,11 +203,11 @@ export default function MarketingHomePage() {
       <section className="relative mx-auto max-w-7xl px-4 pt-32 pb-16 sm:px-6 lg:px-8 lg:pt-40 lg:pb-24">
         <div className="flex flex-col items-center text-center max-w-4xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-300 backdrop-blur">
-            <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+            <span className="flex h-2 w-2 rounded-full bg-zinc-400 animate-ping" />
             <span>Telemetry SDK under 25 KB</span>
           </div>
 
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl md:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-white via-zinc-100 to-zinc-400 leading-tight">
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl md:text-7xl text-zinc-50 leading-tight">
             See user journeys.<br />
             <span className="text-zinc-500">Solve conversion friction.</span>
           </h1>
@@ -224,7 +219,7 @@ export default function MarketingHomePage() {
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <a
               href="http://localhost:3000"
-              className="relative inline-flex h-11 items-center justify-center rounded-lg bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-600 px-6 text-sm font-semibold text-white shadow-lg hover:opacity-95 active:scale-[0.98] transition-all"
+              className="relative inline-flex h-11 items-center justify-center rounded-lg bg-zinc-50 px-6 text-sm font-semibold text-zinc-950 shadow hover:bg-zinc-950 hover:text-zinc-50 border border-transparent hover:border-zinc-50/70 active:scale-[0.98] transition-all"
             >
               Get Started Free
             </a>
@@ -241,7 +236,7 @@ export default function MarketingHomePage() {
       {/* Interactive SDK Sandbox Section */}
       <section id="sandbox" className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-900">
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-zinc-50">
             One Script. Real-time Telemetry.
           </h2>
           <p className="mt-4 text-zinc-400">
@@ -358,7 +353,7 @@ export default function MarketingHomePage() {
       {/* Bento Grid Features Section */}
       <section id="features" className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-900">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-zinc-50">
             Engineered for modern web telemetry.
           </h2>
           <p className="mt-4 text-zinc-400">
@@ -369,7 +364,7 @@ export default function MarketingHomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {/* Card 1: Event Ingestion */}
           <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-amber-500 mb-4 border border-zinc-800 group-hover:border-amber-500/50 transition-colors">
+            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
               <TraceIcon className="size-5" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-100">Custom Event Ingestion</h3>
@@ -380,7 +375,7 @@ export default function MarketingHomePage() {
 
           {/* Card 2: Funnel Dropoffs */}
           <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-rose-500 mb-4 border border-zinc-800 group-hover:border-rose-500/50 transition-colors">
+            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
               <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -393,7 +388,7 @@ export default function MarketingHomePage() {
 
           {/* Card 3: User Timelines */}
           <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-indigo-500 mb-4 border border-zinc-800 group-hover:border-indigo-500/50 transition-colors">
+            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
               <UserIcon className="size-5" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-100">High-Fidelity Timelines</h3>
@@ -404,7 +399,7 @@ export default function MarketingHomePage() {
 
           {/* Card 4: Session Replay */}
           <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-emerald-500 mb-4 border border-zinc-800 group-hover:border-emerald-500/50 transition-colors">
+            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
               <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
@@ -417,7 +412,7 @@ export default function MarketingHomePage() {
 
           {/* Card 5: Error Diagnostics */}
           <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-red-500 mb-4 border border-zinc-800 group-hover:border-red-500/50 transition-colors">
+            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
               <AlertIcon className="size-5" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-100">Error Tracking & Context</h3>
@@ -428,7 +423,7 @@ export default function MarketingHomePage() {
 
           {/* Card 6: AI Insights */}
           <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-cyan-500 mb-4 border border-zinc-800 group-hover:border-cyan-500/50 transition-colors">
+            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
               <CpuIcon className="size-5" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-100">AI Intelligence Core</h3>
@@ -442,7 +437,7 @@ export default function MarketingHomePage() {
       {/* FAQ Section */}
       <section id="faq" className="relative mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-900">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-50">
             Frequently Asked Questions
           </h2>
         </div>
@@ -476,7 +471,7 @@ export default function MarketingHomePage() {
       {/* Call to Action Section */}
       <section className="relative mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl border border-zinc-800 bg-zinc-900/20 backdrop-blur px-8 py-12 text-center overflow-hidden shadow-3xl">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-rose-500/5 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/5 pointer-events-none" />
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-zinc-100">
             Ready to trace client conversion behavior?
           </h2>
@@ -506,10 +501,7 @@ export default function MarketingHomePage() {
       <footer className="border-t border-zinc-900 bg-zinc-950/60 py-12 mt-16 text-xs text-zinc-500 font-mono">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <div className="flex size-6 items-center justify-center rounded bg-zinc-800 text-zinc-400">
-              <TraceIcon className="size-3.5" />
-            </div>
-            <span className="font-semibold text-zinc-300 text-sm">TraceIQ</span>
+            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-6 w-auto" />
           </div>
 
           <div className="flex flex-wrap gap-x-8 gap-y-2 justify-center">
