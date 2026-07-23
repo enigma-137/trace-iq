@@ -70,14 +70,9 @@ export default function DashboardHomePage() {
           {/* <a className="nav-link-ghost" href="/auth/login">
             Sign in
           </a> */}
-         <a
-  href="https://www.eniigma.dev/contact"
-  target="_blank"
-  rel="noopener noreferrer"
-  className="nav-link"
->
-  Contact
-</a>
+          <a className="nav-link" href="mailto:traceiq.run@gmail.com">
+            Contact
+          </a>
         </div>
       </nav>
 
