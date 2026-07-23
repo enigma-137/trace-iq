@@ -30,7 +30,7 @@ export function RankedList({ items, emptyLabel = 'No data yet.', mono = false }:
             <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400">{item.total.toLocaleString()}</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-            <div className="h-full rounded-full bg-neutral-900 dark:bg-white" style={{ width: `${(item.total / maxTotal) * 100}%` }} />
+            <div className="h-full rounded-full bg-blue-600 dark:bg-blue-500" style={{ width: `${(item.total / maxTotal) * 100}%` }} />
           </div>
         </li>
       ))}

@@ -25,7 +25,7 @@ export function MiniBars({ values, width = 120, height = 28 }: MiniBarsProps) {
             width={barWidth}
             height={h}
             rx={0.5}
-            className="fill-neutral-400 dark:fill-neutral-500"
+            className="fill-blue-500/70 dark:fill-blue-400/60"
           />
         );
       })}

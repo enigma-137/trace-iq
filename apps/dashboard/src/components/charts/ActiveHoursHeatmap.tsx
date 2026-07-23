@@ -24,7 +24,7 @@ export function ActiveHoursHeatmap({ matrix }: { matrix: number[][] }) {
                 <div
                   key={hour}
                   title={`${DAYS[dow]} ${hour}:00 — ${value}`}
-                  className="aspect-square rounded-sm bg-neutral-900 dark:bg-white"
+                  className="aspect-square rounded-sm bg-blue-600 dark:bg-blue-500"
                   style={{ opacity: value === 0 ? 0.06 : 0.15 + intensity * 0.85 }}
                 />
               );

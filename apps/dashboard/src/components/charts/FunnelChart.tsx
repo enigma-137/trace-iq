@@ -44,7 +44,7 @@ export function FunnelChart({ steps, drilldown }: FunnelChartProps) {
         const isActiveReached = drilldown?.activeStep === index && drilldown?.activeStatus === 'reached';
         const barInner = (
           <div className="relative flex h-56 items-end overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/50">
-            <div className="w-full bg-neutral-900 transition-all dark:bg-white" style={{ height: `${Math.min(pct, 100)}%` }} />
+            <div className="w-full bg-blue-600 transition-all dark:bg-blue-500" style={{ height: `${Math.min(pct, 100)}%` }} />
           </div>
         );
 
@@ -60,7 +60,7 @@ export function FunnelChart({ steps, drilldown }: FunnelChartProps) {
                 href={reachedHref}
                 title="See users who reached this step"
                 className={`rounded-md outline-none transition ${
-                  isActiveReached ? 'ring-2 ring-neutral-900 dark:ring-white' : 'hover:opacity-80'
+                  isActiveReached ? 'ring-2 ring-blue-600 dark:ring-blue-500' : 'hover:opacity-80'
                 }`}
               >
                 {barInner}

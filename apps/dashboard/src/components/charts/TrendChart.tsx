@@ -25,12 +25,12 @@ interface TrendChartProps {
 
 // Monochrome series styles: solid black/white first, then grays + dash patterns.
 const SERIES_STYLES = [
-  { stroke: 'stroke-neutral-900 dark:stroke-white', fill: 'fill-neutral-900 dark:fill-white', dash: '' },
-  { stroke: 'stroke-neutral-400', fill: 'fill-neutral-400', dash: '6 4' },
-  { stroke: 'stroke-neutral-600 dark:stroke-neutral-300', fill: 'fill-neutral-600 dark:fill-neutral-300', dash: '2 4' },
-  { stroke: 'stroke-neutral-500', fill: 'fill-neutral-500', dash: '10 4' },
-  { stroke: 'stroke-neutral-700 dark:stroke-neutral-400', fill: 'fill-neutral-700 dark:fill-neutral-400', dash: '1 5' },
-  { stroke: 'stroke-neutral-300 dark:stroke-neutral-600', fill: 'fill-neutral-300 dark:fill-neutral-600', dash: '' }
+  { stroke: 'stroke-blue-600 dark:stroke-blue-400', fill: 'fill-blue-600 dark:fill-blue-400', dash: '' },
+  { stroke: 'stroke-indigo-500 dark:stroke-indigo-400', fill: 'fill-indigo-500 dark:fill-indigo-400', dash: '' },
+  { stroke: 'stroke-sky-500 dark:stroke-sky-400', fill: 'fill-sky-500 dark:fill-sky-400', dash: '' },
+  { stroke: 'stroke-teal-500 dark:stroke-teal-400', fill: 'fill-teal-500 dark:fill-teal-400', dash: '' },
+  { stroke: 'stroke-violet-500 dark:stroke-violet-400', fill: 'fill-violet-500 dark:fill-violet-400', dash: '' },
+  { stroke: 'stroke-slate-400 dark:stroke-slate-500', fill: 'fill-slate-400 dark:fill-slate-500', dash: '4 4' }
 ];
 
 const WIDTH = 760;

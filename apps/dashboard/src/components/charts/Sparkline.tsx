@@ -23,7 +23,7 @@ export function Sparkline({ points, width = 220, height = 44 }: SparklineProps) 
       <path
         d={path}
         fill="none"
-        className="stroke-neutral-900 dark:stroke-white"
+        className="stroke-blue-600 dark:stroke-blue-500"
         strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
