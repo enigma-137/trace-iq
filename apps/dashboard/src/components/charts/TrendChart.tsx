@@ -23,14 +23,13 @@ interface TrendChartProps {
   legendTotals?: boolean;
 }
 
-// Monochrome series styles: solid black/white first, then grays + dash patterns.
 const SERIES_STYLES = [
-  { stroke: 'stroke-blue-600 dark:stroke-blue-400', fill: 'fill-blue-600 dark:fill-blue-400', dash: '' },
-  { stroke: 'stroke-indigo-500 dark:stroke-indigo-400', fill: 'fill-indigo-500 dark:fill-indigo-400', dash: '' },
-  { stroke: 'stroke-sky-500 dark:stroke-sky-400', fill: 'fill-sky-500 dark:fill-sky-400', dash: '' },
-  { stroke: 'stroke-teal-500 dark:stroke-teal-400', fill: 'fill-teal-500 dark:fill-teal-400', dash: '' },
-  { stroke: 'stroke-violet-500 dark:stroke-violet-400', fill: 'fill-violet-500 dark:fill-violet-400', dash: '' },
-  { stroke: 'stroke-slate-400 dark:stroke-slate-500', fill: 'fill-slate-400 dark:fill-slate-500', dash: '4 4' }
+  { stroke: 'stroke-blue-400', fill: 'fill-blue-400', color: 'rgb(96 165 250)', dash: '' },
+  { stroke: 'stroke-emerald-400', fill: 'fill-emerald-400', color: 'rgb(52 211 153)', dash: '' },
+  { stroke: 'stroke-sky-400', fill: 'fill-sky-400', color: 'rgb(56 189 248)', dash: '' },
+  { stroke: 'stroke-teal-400', fill: 'fill-teal-400', color: 'rgb(45 212 191)', dash: '' },
+  { stroke: 'stroke-violet-400', fill: 'fill-violet-400', color: 'rgb(167 139 250)', dash: '' },
+  { stroke: 'stroke-slate-500', fill: 'fill-slate-500', color: 'rgb(100 116 139)', dash: '4 4' }
 ];
 
 const WIDTH = 760;
@@ -61,7 +60,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
 
   if (total === 0) {
     return (
-      <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/40">
+      <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-500">
         No data in this window yet.
       </div>
     );
@@ -93,6 +92,19 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
           onMouseMove={handleMove}
           onMouseLeave={() => setHover(null)}
         >
+          <defs>
+            {series.map((s, seriesIndex) => {
+              const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
+              return (
+                <linearGradient key={s.key} id={`trend-fill-${seriesIndex}`} x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor={style.color} stopOpacity="0.34" />
+                  <stop offset="74%" stopColor={style.color} stopOpacity="0.06" />
+                  <stop offset="100%" stopColor={style.color} stopOpacity="0" />
+                </linearGradient>
+              );
+            })}
+          </defs>
+
           {gridValues.map((value) => (
             <g key={value}>
               <line
@@ -100,17 +112,17 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                 x2={WIDTH - PAD.right}
                 y1={yFor(value)}
                 y2={yFor(value)}
-                className="stroke-neutral-200 dark:stroke-neutral-800"
+                className="stroke-neutral-200 dark:stroke-slate-800"
                 strokeWidth={1}
               />
-              <text x={PAD.left - 8} y={yFor(value) + 4} textAnchor="end" className="fill-neutral-400 text-[10px] dark:fill-neutral-500">
+              <text x={PAD.left - 8} y={yFor(value) + 4} textAnchor="end" className="fill-neutral-400 text-[10px] dark:fill-slate-500">
                 {fmt(value)}
               </text>
             </g>
           ))}
 
           {labelIndexes.map((index) => (
-            <text key={index} x={xFor(index)} y={HEIGHT - 8} textAnchor="middle" className="fill-neutral-400 text-[10px] dark:fill-neutral-500">
+            <text key={index} x={xFor(index)} y={HEIGHT - 8} textAnchor="middle" className="fill-neutral-400 text-[10px] dark:fill-slate-500">
               {formatBucket(buckets[index], interval)}
             </text>
           ))}
@@ -141,7 +153,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                 x2={xFor(hover)}
                 y1={PAD.top}
                 y2={PAD.top + plotHeight}
-                className="stroke-neutral-400 dark:stroke-neutral-500"
+                className="stroke-neutral-400 dark:stroke-slate-500"
                 strokeWidth={1}
                 strokeDasharray="3 3"
               />
@@ -153,7 +165,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                     cx={xFor(hover)}
                     cy={yFor(s.points[hover].value)}
                     r={3.5}
-                    className={`${style.fill} stroke-white dark:stroke-neutral-950`}
+                    className={`${style.fill} stroke-white dark:stroke-slate-950`}
                     strokeWidth={1.5}
                   />
                 );
@@ -171,10 +183,10 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                       width={tipWidth}
                       height={tipHeight}
                       rx={6}
-                      className="fill-white stroke-neutral-200 dark:fill-neutral-900 dark:stroke-neutral-700"
+                      className="fill-white stroke-neutral-200 dark:fill-slate-950 dark:stroke-slate-700"
                       strokeWidth={1}
                     />
-                    <text x={boxX + 10} y={boxY + 15} className="fill-neutral-500 text-[10px] dark:fill-neutral-400">
+                    <text x={boxX + 10} y={boxY + 15} className="fill-neutral-500 text-[10px] dark:fill-slate-400">
                       {formatBucket(buckets[hover], interval, true)}
                     </text>
                     {series.map((s, seriesIndex) => (
@@ -184,7 +196,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                         y={boxY + 32 + seriesIndex * 16}
                         className="fill-neutral-900 text-[11px] dark:fill-white"
                       >
-                        <tspan className="fill-neutral-500 dark:fill-neutral-400">{truncate(s.key)}: </tspan>
+                        <tspan className="fill-neutral-500 dark:fill-slate-400">{truncate(s.key)}: </tspan>
                         {fmt(s.points[hover].value)}
                       </text>
                     ))}
@@ -218,7 +230,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
 }
 
 function truncate(value: string, max = 16): string {
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+  return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
 
 function pickLabelIndexes(count: number): number[] {
@@ -253,3 +265,4 @@ function formatBucket(bucket: string, interval: 'hour' | 'day' | 'week', detaile
     timeZone: 'UTC'
   }).format(date);
 }
+

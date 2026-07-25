@@ -2,9 +2,16 @@ interface MiniBarsProps {
   values: number[];
   width?: number;
   height?: number;
+  tone?: 'blue' | 'green' | 'red';
 }
 
-export function MiniBars({ values, width = 120, height = 28 }: MiniBarsProps) {
+const barClasses = {
+  blue: 'fill-blue-500/75 dark:fill-blue-400/70',
+  green: 'fill-emerald-400/75',
+  red: 'fill-red-400/75'
+};
+
+export function MiniBars({ values, width = 120, height = 28, tone = 'blue' }: MiniBarsProps) {
   if (values.length === 0) {
     return <div style={{ width, height }} />;
   }
@@ -25,10 +32,11 @@ export function MiniBars({ values, width = 120, height = 28 }: MiniBarsProps) {
             width={barWidth}
             height={h}
             rx={0.5}
-            className="fill-blue-500/70 dark:fill-blue-400/60"
+            className={barClasses[tone]}
           />
         );
       })}
     </svg>
   );
 }
+
