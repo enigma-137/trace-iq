@@ -126,11 +126,11 @@ export default async function InsightsPage({
 
   return (
     <DashboardShell active="insights" title="Insights" userEmail={user.email}>
-      <section className="mb-6 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
+      <section className="mb-6 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Event trends</h2>
-        <p className="mt-1 mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="mt-1 mb-4 text-sm text-neutral-500 dark:text-slate-400">
           Trend an event over time — count it, count unique users, or sum/average a numeric property like{' '}
-          <span className="font-mono text-neutral-700 dark:text-neutral-300">amount</span>. Optionally break it down by a property.
+          <span className="font-mono text-neutral-700 dark:text-slate-300">amount</span>. Optionally break it down by a property.
         </p>
         <TrendControls
           eventNames={eventNames}
@@ -144,14 +144,14 @@ export default async function InsightsPage({
       {eventNamesError ? <ErrorBanner message={eventNamesError} /> : null}
       {trendsError ? <ErrorBanner message={trendsError} /> : null}
 
-      <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
+      <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
         {!selectedEvent ? (
-          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/40">
+          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/40">
             No events captured yet. Install the SDK and send an event, then come back to chart it.
           </div>
         ) : missingProperty ? (
-          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/40">
-            Enter a numeric property (e.g. <span className="font-mono text-neutral-700 dark:text-neutral-300">amount</span>) to
+          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/40">
+            Enter a numeric property (e.g. <span className="font-mono text-neutral-700 dark:text-slate-300">amount</span>) to
             {measure === 'sum' ? ' sum' : ' average'} over time.
           </div>
         ) : trends ? (
@@ -164,14 +164,14 @@ export default async function InsightsPage({
               <>
                 <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
                       {metricLabel(trends)}
                     </p>
                     <div className="mt-1 flex items-baseline gap-3">
                       <span className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">{current}</span>
                       <span
                         className={`inline-flex items-center gap-1 text-sm font-medium ${
-                          delta.muted ? 'text-neutral-400 dark:text-neutral-500' : 'text-neutral-800 dark:text-neutral-200'
+                          delta.muted ? 'text-neutral-400 dark:text-slate-500' : 'text-neutral-800 dark:text-slate-200'
                         }`}
                         title={`vs ${previous} in the previous ${trends.summary.days} days`}
                       >
@@ -179,14 +179,14 @@ export default async function InsightsPage({
                         {delta.label}
                       </span>
                     </div>
-                    <p className="mt-1.5 max-w-xl text-sm text-neutral-500 dark:text-neutral-400">
+                    <p className="mt-1.5 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
                       {plainSummary(trends, current)}{' '}
-                      <span className="text-neutral-400 dark:text-neutral-500">
+                      <span className="text-neutral-400 dark:text-slate-500">
                         {comparisonText(trends.summary.days, trends.summary.previous, previous, delta)}
                       </span>
                     </p>
                   </div>
-                  <span className="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500">
+                  <span className="shrink-0 font-mono text-xs text-neutral-400 dark:text-slate-500">
                     {trends.breakdown ? `broken down by ${trends.breakdown}` : `${trends.interval} · last ${days}d`}
                   </span>
                 </div>
@@ -201,7 +201,7 @@ export default async function InsightsPage({
             );
           })()
         ) : (
-          <p className="text-sm text-neutral-500 dark:text-neutral-500">Loading…</p>
+          <p className="text-sm text-neutral-500 dark:text-slate-500">Loading…</p>
         )}
       </section>
     </DashboardShell>
@@ -210,7 +210,7 @@ export default async function InsightsPage({
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+    <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
       {message}
     </section>
   );

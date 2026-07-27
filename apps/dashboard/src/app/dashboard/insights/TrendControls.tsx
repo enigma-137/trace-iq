@@ -150,14 +150,14 @@ export function TrendControls({ eventNames, selected }: TrendControlsProps) {
         </datalist>
       </Field>
 
-      {isPending ? <p className="text-xs text-neutral-500 dark:text-neutral-500">Updating…</p> : null}
+      {isPending ? <p className="text-xs text-neutral-500 dark:text-slate-500">Updating…</p> : null}
     </div>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
       {label}
       {children}
     </label>
@@ -165,4 +165,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const selectClass =
-  'min-h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-white dark:focus:ring-white/10';
+  'min-h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-white dark:focus:ring-white/10';

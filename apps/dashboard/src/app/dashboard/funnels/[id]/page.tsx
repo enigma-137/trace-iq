@@ -90,7 +90,7 @@ export default async function FunnelResultsPage({
         {data ? (
           <Link
             href={`/dashboard/funnels/${params.id}/edit`}
-            className="inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Edit funnel
           </Link>
@@ -98,22 +98,22 @@ export default async function FunnelResultsPage({
       </div>
 
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}
 
       {data ? (
         <>
-          <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex-row sm:items-start">
+          <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-start">
             <div className="max-w-xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
                 Overall conversion
               </p>
               <p className="mt-1 text-3xl font-semibold tabular-nums text-neutral-900 dark:text-white">
                 {(overall * 100).toFixed(1)}%
               </p>
-              <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+              <p className="mt-1.5 text-sm text-neutral-500 dark:text-slate-400">
                 {startCount === 0
                   ? `No one entered this funnel in the last ${days} days.`
                   : `${formatCount(endCount)} of ${formatCount(startCount)} ${
@@ -123,9 +123,9 @@ export default async function FunnelResultsPage({
               {worstDrop ? (
                 <Link
                   href={`/dashboard/funnels/${params.id}?days=${days}&step=${worstDrop.index}&status=dropped`}
-                  className="mt-2 inline-block text-sm text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-300"
+                  className="mt-2 inline-block text-sm text-neutral-600 underline-offset-2 hover:underline dark:text-slate-300"
                 >
-                  <span className="text-neutral-400 dark:text-neutral-500">Biggest drop-off:</span> Step {worstDrop.index + 1} ·{' '}
+                  <span className="text-neutral-400 dark:text-slate-500">Biggest drop-off:</span> Step {worstDrop.index + 1} ·{' '}
                   {worstDrop.step.label ?? worstDrop.step.eventName} —{' '}
                   <span className="text-red-600 dark:text-red-400">
                     {formatPct(worstDrop.dropRate)} ({formatCount(worstDrop.dropCount)}{' '}
@@ -134,15 +134,15 @@ export default async function FunnelResultsPage({
                 </Link>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-neutral-800">
+            <div className="flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-slate-800">
               {RANGES.map((range) => (
                 <Link
                   key={range.value}
                   href={`/dashboard/funnels/${params.id}?days=${range.value}`}
                   className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
                     days === range.value
-                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-black'
-                      : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
+                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
+                      : 'text-neutral-500 hover:bg-neutral-100 dark:text-slate-400 dark:hover:bg-neutral-900'
                   }`}
                 >
                   {range.label}
@@ -151,8 +151,8 @@ export default async function FunnelResultsPage({
             </div>
           </section>
 
-          <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
-            <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
+          <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+            <p className="mb-4 text-xs text-neutral-500 dark:text-slate-400">
               Tap a bar to see who reached that step, or a “dropped” count to see who fell off.
             </p>
             <FunnelChart
@@ -181,26 +181,26 @@ function StepUsersPanel({ data, funnelId, days }: { data: StepUsersResponse; fun
       : `Reached “${stepName}”`;
 
   return (
-    <section className="mt-6 rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+    <section className="mt-6 rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
         <div>
           <h3 className="text-base font-semibold text-neutral-900 dark:text-white">{title}</h3>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
             {data.total.toLocaleString()} {data.total === 1 ? 'user' : 'users'} · last {days}d
           </p>
         </div>
         <Link
           href={`/dashboard/funnels/${funnelId}?days=${days}`}
-          className="text-sm font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+          className="text-sm font-semibold text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
         >
           Clear ✕
         </Link>
       </div>
 
       {data.users.length === 0 ? (
-        <p className="p-5 text-sm text-neutral-500 dark:text-neutral-500">No users in this set.</p>
+        <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No users in this set.</p>
       ) : (
-        <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+        <div className="divide-y divide-neutral-200 dark:divide-slate-800">
           {data.users.map((person) => {
             const meta = [person.os, person.country].filter(Boolean).join(' · ');
             const displayName = person.externalId ?? person.anonymousId ?? person.actor;
@@ -208,16 +208,16 @@ function StepUsersPanel({ data, funnelId, days }: { data: StepUsersResponse; fun
               <div className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="min-w-0">
                   <p className="truncate font-mono text-sm text-neutral-900 [overflow-wrap:anywhere] dark:text-white">{displayName}</p>
-                  <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                  <p className="text-xs text-neutral-400 dark:text-slate-500">
                     {person.identified ? 'identified' : 'anonymous'}
                     {meta ? ` · ${meta}` : ''}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400">{formatDate(person.lastSeenAt)}</span>
+                <span className="shrink-0 text-xs text-neutral-500 dark:text-slate-400">{formatDate(person.lastSeenAt)}</span>
               </div>
             );
             return person.identified && person.userId ? (
-              <Link key={person.actor} href={`/dashboard/users/${person.userId}`} className="block transition hover:bg-neutral-50 dark:hover:bg-neutral-900/40">
+              <Link key={person.actor} href={`/dashboard/users/${person.userId}`} className="block transition hover:bg-neutral-50 dark:hover:bg-slate-900/40">
                 {row}
               </Link>
             ) : (

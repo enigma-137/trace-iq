@@ -434,11 +434,11 @@ function verify(rawBody, header, secret) {
 
         <nav className="hidden xl:block">
           <div className="sticky top-24">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">On this page</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">On this page</p>
             <ul className="grid gap-1.5 text-sm">
               {sections.map((s) => (
                 <li key={s.id}>
-                  <a className="text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white" href={`#${s.id}`}>
+                  <a className="text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white" href={`#${s.id}`}>
                     {s.label}
                   </a>
                 </li>
@@ -453,7 +453,7 @@ function verify(rawBody, header, secret) {
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-24 border-b border-neutral-200 py-8 first:pt-0 last:border-0 dark:border-neutral-800">
+    <section id={id} className="scroll-mt-24 border-b border-neutral-200 py-8 first:pt-0 last:border-0 dark:border-slate-800">
       <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">{title}</h2>
       <div className="mt-3 grid gap-3">{children}</div>
     </section>
@@ -461,12 +461,12 @@ function Section({ id, title, children }: { id: string; title: string; children:
 }
 
 function P({ children }: { children: ReactNode }) {
-  return <p className="text-sm leading-6 text-neutral-600 dark:text-neutral-400">{children}</p>;
+  return <p className="text-sm leading-6 text-neutral-600 dark:text-slate-400">{children}</p>;
 }
 
 function Mono({ children }: { children: ReactNode }) {
   return (
-    <code className="rounded border border-neutral-200 bg-neutral-100 px-1 py-0.5 font-mono text-xs text-neutral-800 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
+    <code className="rounded border border-neutral-200 bg-neutral-100 px-1 py-0.5 font-mono text-xs text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
       {children}
     </code>
   );
@@ -474,7 +474,7 @@ function Mono({ children }: { children: ReactNode }) {
 
 function Code({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs leading-6 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
+    <pre className="overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs leading-6 text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
       <code>{children}</code>
     </pre>
   );
@@ -484,7 +484,7 @@ function Bullets({ items }: { items: Array<[string, string]> }) {
   return (
     <ul className="grid gap-2">
       {items.map(([term, desc]) => (
-        <li key={term} className="text-sm leading-6 text-neutral-600 dark:text-neutral-400">
+        <li key={term} className="text-sm leading-6 text-neutral-600 dark:text-slate-400">
           <Mono>{term}</Mono> — {desc}
         </li>
       ))}
@@ -494,18 +494,18 @@ function Bullets({ items }: { items: Array<[string, string]> }) {
 
 function OptionsTable({ rows }: { rows: Array<[string, string, string]> }) {
   return (
-    <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
-      <div className="hidden grid-cols-[180px_120px_1fr] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500 sm:grid">
+    <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
+      <div className="hidden grid-cols-[180px_120px_1fr] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500 sm:grid">
         <span>Option</span>
         <span>Default</span>
         <span>Description</span>
       </div>
-      <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+      <div className="divide-y divide-neutral-200 dark:divide-slate-800">
         {rows.map(([name, def, desc]) => (
           <div key={name} className="grid gap-1 px-4 py-2.5 sm:grid-cols-[180px_120px_1fr] sm:gap-4">
             <span className="font-mono text-xs text-neutral-900 dark:text-white">{name}</span>
-            <span className="font-mono text-xs text-neutral-500 dark:text-neutral-400">{def}</span>
-            <span className="text-sm text-neutral-600 dark:text-neutral-400">{desc}</span>
+            <span className="font-mono text-xs text-neutral-500 dark:text-slate-400">{def}</span>
+            <span className="text-sm text-neutral-600 dark:text-slate-400">{desc}</span>
           </div>
         ))}
       </div>
