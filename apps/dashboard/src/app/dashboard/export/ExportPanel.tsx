@@ -111,7 +111,7 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
   }
 
   return (
-    <div className="grid max-w-2xl gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="grid max-w-2xl gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="From">
           <input type="date" className={inputClass} value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -142,29 +142,29 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
       </div>
 
       {error ? (
-        <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </p>
       ) : null}
-      {status ? <p className="text-sm text-neutral-600 dark:text-neutral-300">{status}</p> : null}
+      {status ? <p className="text-sm text-neutral-600 dark:text-slate-300">{status}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => download('csv')}
           disabled={busy !== null}
-          className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+          className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
         >
           {busy === 'csv' ? 'Preparing…' : 'Download CSV'}
         </button>
         <button
           onClick={() => download('json')}
           disabled={busy !== null}
-          className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           {busy === 'json' ? 'Preparing…' : 'Download JSON'}
         </button>
       </div>
-      <p className="text-xs text-neutral-400 dark:text-neutral-500">
+      <p className="text-xs text-neutral-400 dark:text-slate-500">
         CSV flattens the top-level fields; the full <span className="font-mono">properties</span> object is included as a
         JSON column (and in full in the JSON export).
       </p>
@@ -174,7 +174,7 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
       {label}
       {children}
     </label>
@@ -242,4 +242,4 @@ async function readError(response: Response): Promise<string> {
 }
 
 const inputClass =
-  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white dark:focus:ring-white/10';
+  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';

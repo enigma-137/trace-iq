@@ -42,14 +42,14 @@ export default async function WebhooksPage() {
 
   return (
     <DashboardShell active="webhooks" title="Webhooks" userEmail={user.email}>
-      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Forward events to another system the moment they arrive — a data warehouse loader, an ops tool, a Slack relay.
         Each delivery is a <span className="font-mono text-xs">POST</span> and can be signed with a secret so the
         receiver can verify it came from TraceIQ.
       </p>
 
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}

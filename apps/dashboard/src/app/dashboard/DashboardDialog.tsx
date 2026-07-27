@@ -45,7 +45,7 @@ export function DashboardDialog({
       onMouseDown={onClose}
     >
       <section
-        className="w-full max-w-lg rounded-lg border border-neutral-200 bg-white p-5 shadow-2xl shadow-neutral-950/20 dark:border-neutral-800 dark:bg-neutral-950 dark:shadow-black/40"
+        className="w-full max-w-lg rounded-lg border border-neutral-200 bg-white p-5 shadow-2xl shadow-neutral-950/20 dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/40"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dashboard-dialog-title"
@@ -58,13 +58,13 @@ export function DashboardDialog({
               {title}
             </h2>
             {description ? (
-              <p id="dashboard-dialog-description" className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-400">
+              <p id="dashboard-dialog-description" className="mt-2 text-sm leading-6 text-neutral-600 dark:text-slate-400">
                 {description}
               </p>
             ) : null}
           </div>
           <button
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white text-lg leading-none text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-white"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white text-lg leading-none text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800 dark:hover:text-white"
             type="button"
             aria-label="Close dialog"
             onClick={onClose}

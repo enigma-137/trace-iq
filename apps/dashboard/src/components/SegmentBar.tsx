@@ -41,14 +41,14 @@ export function SegmentBar({ basePath, cohorts, initialFilters }: SegmentBarProp
   const activeCount = cleanFilters(filters).length;
 
   return (
-    <div className="grid gap-3 rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="grid gap-3 rounded-md border border-neutral-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
           Segment {activeCount > 0 ? `· ${activeCount} filter${activeCount === 1 ? '' : 's'} active` : ''}
         </span>
         {cohorts.length ? (
           <select
-            className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-white dark:focus:ring-white/10"
+            className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-white dark:focus:ring-white/10"
             defaultValue=""
             onChange={(event) => loadCohort(event.target.value)}
           >
@@ -68,7 +68,7 @@ export function SegmentBar({ basePath, cohorts, initialFilters }: SegmentBarProp
         <button
           type="button"
           onClick={() => pushFilters(filters)}
-          className="h-9 rounded-md bg-neutral-900 px-3.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+          className="h-9 rounded-md bg-neutral-900 px-3.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-slate-200"
         >
           Apply
         </button>
@@ -79,12 +79,12 @@ export function SegmentBar({ basePath, cohorts, initialFilters }: SegmentBarProp
               setFilters([{ field: '', operator: 'is', value: '' }]);
               pushFilters([]);
             }}
-            className="text-sm font-semibold text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+            className="text-sm font-semibold text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
           >
             Clear
           </button>
         ) : null}
-        {isPending ? <span className="text-xs text-neutral-500 dark:text-neutral-500">Updating…</span> : null}
+        {isPending ? <span className="text-xs text-neutral-500 dark:text-slate-500">Updating…</span> : null}
       </div>
     </div>
   );

@@ -64,32 +64,32 @@ export default async function RetentionPage({
   return (
     <DashboardShell active="retention" title="Retention" userEmail={user.email}>
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}
 
-      <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex-row sm:items-start">
+      <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-start">
         <div className="max-w-xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Week 1 retention
           </p>
           <p className="mt-1 text-3xl font-semibold tabular-nums text-neutral-900 dark:text-white">{week1}%</p>
-          <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="mt-1.5 text-sm text-neutral-500 dark:text-slate-400">
             On average, {week1}% of users come back the week after they first show up
             {week4 > 0 ? <>, and {week4}% are still active four weeks later</> : null}. Higher and flatter is better — a
             curve that keeps dropping means people try it once and leave.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-neutral-800">
+        <div className="flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-slate-800">
           {RANGES.map((range) => (
             <Link
               key={range.value}
               href={`/dashboard/retention?weeks=${range.value}`}
               className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
                 weeks === range.value
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-black'
-                  : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900'
+                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
+                  : 'text-neutral-500 hover:bg-neutral-100 dark:text-slate-400 dark:hover:bg-neutral-900'
               }`}
             >
               {range.label}
@@ -103,11 +103,11 @@ export default async function RetentionPage({
       </div>
 
       {data ? (
-        <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
+        <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
           <RetentionGrid weeks={data.weeks} cohorts={data.cohorts} averages={data.averages} />
         </section>
       ) : (
-        <p className="text-sm text-neutral-500 dark:text-neutral-500">Loading…</p>
+        <p className="text-sm text-neutral-500 dark:text-slate-500">Loading…</p>
       )}
     </DashboardShell>
   );

@@ -101,20 +101,20 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <form
-        className="grid h-fit gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950"
+        className="grid h-fit gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950"
         onSubmit={handleSubmit}
       >
         <div>
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">New cohort</h2>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
             A reusable group of users. Apply it to Insights and Retention to segment any view.
           </p>
         </div>
 
-        <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+        <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
           Cohort name
           <input
-            className="min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white dark:focus:ring-white/10"
+            className="min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Nigerian pro users"
@@ -122,14 +122,14 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
         </label>
 
         <div className="grid gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
             Match users where all of…
           </span>
           <SegmentFilters value={filters} onChange={setFilters} />
         </div>
 
         {error ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+          <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             {error}
           </p>
         ) : null}
@@ -137,7 +137,7 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
         <div>
           <button
             type="submit"
-            className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+            className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Saving…' : 'Create cohort'}
@@ -145,19 +145,19 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
         </div>
       </form>
 
-      <section className="rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-neutral-800 dark:text-neutral-500">
+      <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800 dark:text-slate-500">
           Saved cohorts
         </p>
         {cohorts.length === 0 ? (
-          <p className="p-5 text-sm text-neutral-500 dark:text-neutral-500">No cohorts yet. Create one to start segmenting.</p>
+          <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No cohorts yet. Create one to start segmenting.</p>
         ) : (
-          <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
+          <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
             {cohorts.map((cohort) => (
               <li key={cohort.id} className="flex items-start justify-between gap-3 px-5 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{cohort.name}</p>
-                  <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{describe(cohort.filters)}</p>
+                  <p className="mt-0.5 truncate font-mono text-xs text-neutral-500 dark:text-slate-400">{describe(cohort.filters)}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <Link

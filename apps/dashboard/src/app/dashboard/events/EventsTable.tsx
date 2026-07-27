@@ -23,9 +23,9 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
 
   if (events.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 dark:border-neutral-700 dark:bg-neutral-900/40">
+      <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 dark:border-slate-700 dark:bg-slate-900/40">
         <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Waiting for the first event</h3>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
           Once the SDK is installed and <code className="font-mono">track()</code> runs, the newest events show here. Click a
           row to inspect the full payload.
         </p>
@@ -34,8 +34,8 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
-      <div className="hidden grid-cols-[24px_1.4fr_1.2fr_1.2fr_1fr] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500 lg:grid">
+    <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
+      <div className="hidden grid-cols-[24px_1.4fr_1.2fr_1.2fr_1fr] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500 lg:grid">
         <span />
         <span>Event</span>
         <span>User</span>
@@ -43,7 +43,7 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
         <span>Received</span>
       </div>
 
-      <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+      <div className="divide-y divide-neutral-200 dark:divide-slate-800">
         {events.map((event) => {
           const isOpen = openId === event.id;
           return (
@@ -52,33 +52,33 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
                 type="button"
                 onClick={() => setOpenId(isOpen ? null : event.id)}
                 aria-expanded={isOpen}
-                className="grid w-full grid-cols-[24px_1fr] gap-3 px-4 py-3 text-left transition hover:bg-neutral-50 lg:grid-cols-[24px_1.4fr_1.2fr_1.2fr_1fr] lg:gap-4 dark:hover:bg-neutral-900/40"
+                className="grid w-full grid-cols-[24px_1fr] gap-3 px-4 py-3 text-left transition hover:bg-neutral-50 lg:grid-cols-[24px_1.4fr_1.2fr_1.2fr_1fr] lg:gap-4 dark:hover:bg-slate-900/40"
               >
-                <span className="pt-0.5 text-neutral-400 dark:text-neutral-500">
+                <span className="pt-0.5 text-neutral-400 dark:text-slate-500">
                   <Chevron open={isOpen} />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-white">{event.eventName}</span>
-                  <span className="mt-0.5 block truncate font-mono text-xs text-neutral-400 dark:text-neutral-500 lg:hidden">
+                  <span className="mt-0.5 block truncate font-mono text-xs text-neutral-400 dark:text-slate-500 lg:hidden">
                     {formatDate(event.receivedAt)}
                   </span>
                 </span>
                 <span className="hidden min-w-0 flex-col items-start lg:flex">
-                  <span className="block w-full truncate font-mono text-sm text-neutral-700 dark:text-neutral-300">
+                  <span className="block w-full truncate font-mono text-sm text-neutral-700 dark:text-slate-300">
                     {event.externalUserId ?? event.userId ?? event.anonymousId ?? 'anonymous'}
                   </span>
                   {deviceLocationSummary(event) ? (
-                    <span className="mt-0.5 block w-full truncate text-xs text-neutral-400 dark:text-neutral-500">
+                    <span className="mt-0.5 block w-full truncate text-xs text-neutral-400 dark:text-slate-500">
                       {deviceLocationSummary(event)}
                     </span>
                   ) : null}
                 </span>
                 <span className="hidden min-w-0 items-start lg:flex">
-                  <span className="w-full min-w-0 truncate font-mono text-sm text-neutral-500 dark:text-neutral-400">
+                  <span className="w-full min-w-0 truncate font-mono text-sm text-neutral-500 dark:text-slate-400">
                     {event.sessionId ?? 'none'}
                   </span>
                 </span>
-                <span className="hidden items-start text-sm text-neutral-500 dark:text-neutral-400 lg:flex">
+                <span className="hidden items-start text-sm text-neutral-500 dark:text-slate-400 lg:flex">
                   {formatDate(event.receivedAt)}
                 </span>
               </button>
@@ -105,7 +105,7 @@ function EventDetail({ event }: { event: RecentEvent }) {
   };
 
   return (
-    <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-4 dark:border-neutral-800 dark:bg-neutral-900/40">
+    <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/40">
       <div className="grid gap-5 lg:grid-cols-2">
         <KeyValueList title="Identity & timing" data={identity} />
         <KeyValueList title="Properties" data={event.properties} />
@@ -126,13 +126,13 @@ function KeyValueList({ title, data }: { title: string; data?: Record<string, un
 
   return (
     <div>
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">{title}</p>
-      <div className="divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-950">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">{title}</p>
+      <div className="divide-y divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
         {entries.map(([key, value]) => (
           <div key={key} className="flex items-start justify-between gap-4 px-3 py-2">
-            <span className="shrink-0 font-mono text-xs text-neutral-500 dark:text-neutral-400">{key}</span>
+            <span className="shrink-0 font-mono text-xs text-neutral-500 dark:text-slate-400">{key}</span>
             <span className="flex min-w-0 items-center gap-2">
-              <code className="break-all text-right font-mono text-xs text-neutral-900 dark:text-neutral-100">{formatValue(value)}</code>
+              <code className="break-all text-right font-mono text-xs text-neutral-900 dark:text-slate-100">{formatValue(value)}</code>
               <TypeBadge value={value} />
             </span>
           </div>
@@ -148,7 +148,7 @@ function TypeBadge({ value }: { value: unknown }) {
       ? 'OBJECT'
       : (typeof value).toUpperCase();
   return (
-    <span className="shrink-0 rounded border border-neutral-200 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-neutral-400 dark:border-neutral-700 dark:text-neutral-500">
+    <span className="shrink-0 rounded border border-neutral-200 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-neutral-400 dark:border-slate-700 dark:text-slate-500">
       {type}
     </span>
   );

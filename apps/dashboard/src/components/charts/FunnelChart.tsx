@@ -25,7 +25,7 @@ interface FunnelChartProps {
 export function FunnelChart({ steps, drilldown }: FunnelChartProps) {
   if (steps.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900/40">
+      <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/40">
         This funnel has no steps.
       </div>
     );
@@ -43,7 +43,7 @@ export function FunnelChart({ steps, drilldown }: FunnelChartProps) {
         const reachedHref = stepHref(index, 'reached');
         const isActiveReached = drilldown?.activeStep === index && drilldown?.activeStatus === 'reached';
         const barInner = (
-          <div className="relative flex h-56 items-end overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/50">
+          <div className="relative flex h-56 items-end overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 dark:border-slate-800 dark:bg-slate-900/50">
             <div className="w-full bg-blue-600 transition-all dark:bg-blue-500" style={{ height: `${Math.min(pct, 100)}%` }} />
           </div>
         );
@@ -52,7 +52,7 @@ export function FunnelChart({ steps, drilldown }: FunnelChartProps) {
           <div key={step.order} className="flex min-w-[128px] flex-1 flex-col">
             <div className="mb-2 text-center">
               <div className="text-xl font-semibold tabular-nums text-neutral-900 dark:text-white">{step.count.toLocaleString()}</div>
-              <div className="font-mono text-xs text-neutral-500 dark:text-neutral-400">{formatPct(step.conversionFromStart)} of start</div>
+              <div className="font-mono text-xs text-neutral-500 dark:text-slate-400">{formatPct(step.conversionFromStart)} of start</div>
             </div>
 
             {reachedHref ? (
@@ -70,17 +70,17 @@ export function FunnelChart({ steps, drilldown }: FunnelChartProps) {
             )}
 
             <div className="mt-3 px-1 text-center">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
                 Step {index + 1}
               </div>
               <div className="mt-0.5 truncate text-sm font-semibold text-neutral-900 dark:text-white" title={step.label ?? step.eventName}>
                 {step.label ?? step.eventName}
               </div>
-              <div className="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" title={step.eventName}>
+              <div className="truncate font-mono text-xs text-neutral-500 dark:text-slate-400" title={step.eventName}>
                 {step.eventName}
               </div>
               {index > 0 ? (
-                <div className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                <div className="mt-1.5 text-xs text-neutral-500 dark:text-slate-400">
                   <span className="font-medium text-neutral-700 dark:text-neutral-300">{formatPct(step.conversionFromPrevious)}</span> from
                   prev
                   {step.droppedFromPrevious > 0 ? (

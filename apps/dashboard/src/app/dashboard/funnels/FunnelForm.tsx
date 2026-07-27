@@ -120,17 +120,17 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
 
   return (
     <form
-      className="grid gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950"
+      className="grid gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950"
       onSubmit={handleSubmit}
     >
       <div>
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">{isEdit ? 'Edit funnel' : 'New funnel'}</h2>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
           Order the events a user must complete. Conversion is measured in sequence.
         </p>
       </div>
 
-      <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+      <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
         Funnel name
         <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Signup to purchase" />
       </label>
@@ -144,7 +144,7 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
       <div className="grid gap-2">
         {steps.map((step, index) => (
           <div key={index} className="flex items-center gap-2">
-            <span className="w-6 shrink-0 text-center font-mono text-xs text-neutral-400 dark:text-neutral-500">{index + 1}</span>
+            <span className="w-6 shrink-0 text-center font-mono text-xs text-neutral-400 dark:text-slate-500">{index + 1}</span>
             <input
               className={inputClass}
               list="funnel-event-names"
@@ -154,7 +154,7 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
             />
             <button
               type="button"
-              className="h-9 shrink-0 rounded-md border border-neutral-300 px-2 text-xs font-semibold text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-900"
+              className="h-9 shrink-0 rounded-md border border-neutral-300 px-2 text-xs font-semibold text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-900"
               onClick={() => removeStep(index)}
               disabled={steps.length <= 2}
             >
@@ -165,7 +165,7 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
       </div>
 
       {error ? (
-        <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </p>
       ) : null}
@@ -173,14 +173,14 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           onClick={addStep}
         >
           Add step
         </button>
         <button
           type="submit"
-          className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+          className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
           disabled={isSubmitting}
         >
           {isSubmitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create funnel'}
@@ -188,7 +188,7 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
         {isEdit ? (
           <button
             type="button"
-            className="ml-auto h-10 rounded-md border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:bg-neutral-950 dark:text-red-400 dark:hover:bg-red-950/30"
+            className="ml-auto h-10 rounded-md border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:bg-slate-950 dark:text-red-400 dark:hover:bg-red-950/30"
             onClick={() => setIsDeleteOpen(true)}
             disabled={isDeleting}
           >
@@ -209,7 +209,7 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
             <>
               <button
                 type="button"
-                className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                 onClick={() => setIsDeleteOpen(false)}
                 disabled={isDeleting}
               >
@@ -226,7 +226,7 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
             </>
           }
         >
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="text-sm text-neutral-600 dark:text-slate-400">
             The funnel <span className="font-semibold text-neutral-900 dark:text-white">{funnel?.name}</span> will be removed.
           </p>
         </DashboardDialog>
@@ -245,4 +245,4 @@ async function readError(response: Response): Promise<string> {
 }
 
 const inputClass =
-  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white dark:focus:ring-white/10';
+  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';

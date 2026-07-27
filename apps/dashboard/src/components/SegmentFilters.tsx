@@ -87,7 +87,7 @@ export function SegmentFilters({ value, onChange }: SegmentFiltersProps) {
               type="button"
               onClick={() => remove(index)}
               aria-label="Remove condition"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-400 transition hover:border-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:border-neutral-700 dark:text-neutral-500 dark:hover:bg-neutral-900 dark:hover:text-neutral-300"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-400 transition hover:border-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:border-slate-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                 <path d="M6 6l12 12M18 6 6 18" />
@@ -101,7 +101,7 @@ export function SegmentFilters({ value, onChange }: SegmentFiltersProps) {
         <button
           type="button"
           onClick={add}
-          className="h-9 rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          className="h-9 rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           + Add condition
         </button>
@@ -118,4 +118,4 @@ export function cleanFilters(filters: FilterCondition[]): FilterCondition[] {
 }
 
 const fieldClass =
-  'min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white dark:focus:ring-white/10';
+  'min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';
