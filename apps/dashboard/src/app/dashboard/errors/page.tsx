@@ -66,27 +66,27 @@ export default async function ErrorsPage({
   return (
     <DashboardShell active="errors" title="Error tracking" userEmail={user.email}>
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}
 
-      <section className="rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+      <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className="border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Issues</h2>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
             Grouped <code className="font-mono">$exception</code> events from the SDK · last {days}d
           </p>
         </div>
 
         {issues.length === 0 ? (
-          <div className="p-6 text-sm text-neutral-500 dark:text-neutral-500">
+          <div className="p-6 text-sm text-neutral-500 dark:text-slate-500">
             No errors captured. The SDK auto-captures uncaught exceptions, or call{' '}
             <code className="font-mono">traceiq.captureException(err)</code>.
           </div>
         ) : (
           <>
-            <div className="hidden grid-cols-[1fr_120px_90px_90px_90px_120px] gap-4 border-b border-neutral-200 bg-neutral-50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500 lg:grid">
+            <div className="hidden grid-cols-[180px_120px_90px_90px_90px_120px] gap-4 border-b border-neutral-200 bg-neutral-50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500 lg:grid">
               <span>Issue</span>
               <span>Volume</span>
               <span className="text-right">Events</span>
@@ -94,7 +94,7 @@ export default async function ErrorsPage({
               <span className="text-right">Users</span>
               <span className="text-right">Last seen</span>
             </div>
-            <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+            <div className="divide-y divide-neutral-200 dark:divide-slate-800">
               {issues.map((issue) => {
                 const active = issue.type === selType && issue.message === selMessage;
                 const q = new URLSearchParams({ type: issue.type, message: issue.message, days });
@@ -102,21 +102,21 @@ export default async function ErrorsPage({
                   <Link
                     key={`${issue.type}\n${issue.message}`}
                     href={`/dashboard/errors?${q.toString()}`}
-                    className={`grid gap-3 px-5 py-3.5 transition lg:grid-cols-[1fr_120px_90px_90px_90px_120px] lg:items-center lg:gap-4 ${
-                      active ? 'bg-neutral-100 dark:bg-neutral-900/60' : 'hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
+                    className={`grid gap-3 px-5 py-3.5 transition lg:grid-cols-[180px_120px_90px_90px_90px_120px] lg:items-center lg:gap-4 ${
+                      active ? 'bg-neutral-100 dark:bg-slate-900/60' : 'hover:bg-neutral-50 dark:hover:bg-slate-900/40'
                     }`}
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{issue.type}</p>
-                      <p className="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{issue.message}</p>
+                      <p className="truncate font-mono text-xs text-neutral-500 dark:text-slate-400">{issue.message}</p>
                     </div>
                     <div className="hidden lg:block">
                       <MiniBars values={issue.sparkline} />
                     </div>
-                    <span className="text-sm tabular-nums text-neutral-700 dark:text-neutral-300 lg:text-right">{issue.occurrences.toLocaleString()}</span>
-                    <span className="hidden text-sm tabular-nums text-neutral-500 dark:text-neutral-400 lg:block lg:text-right">{issue.sessions.toLocaleString()}</span>
-                    <span className="hidden text-sm tabular-nums text-neutral-500 dark:text-neutral-400 lg:block lg:text-right">{issue.users.toLocaleString()}</span>
-                    <span className="hidden text-xs text-neutral-500 dark:text-neutral-400 lg:block lg:text-right">{formatDate(issue.lastSeen)}</span>
+                    <span className="text-sm tabular-nums text-neutral-700 dark:text-slate-300 lg:text-right">{issue.occurrences.toLocaleString()}</span>
+                    <span className="hidden text-sm tabular-nums text-neutral-500 dark:text-slate-400 lg:block lg:text-right">{issue.sessions.toLocaleString()}</span>
+                    <span className="hidden text-sm tabular-nums text-neutral-500 dark:text-slate-400 lg:block lg:text-right">{issue.users.toLocaleString()}</span>
+                    <span className="hidden text-xs text-neutral-500 dark:text-slate-400 lg:block lg:text-right">{formatDate(issue.lastSeen)}</span>
                   </Link>
                 );
               })}
@@ -132,10 +132,10 @@ export default async function ErrorsPage({
 
 function IssueDetail({ detail }: { detail: IssueDetailResponse }) {
   return (
-    <section className="mt-6 rounded-md border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+    <section className="mt-6 rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
         <h3 className="text-base font-semibold text-neutral-900 dark:text-white">{detail.issue.type}</h3>
-        <p className="mt-0.5 font-mono text-sm text-neutral-500 dark:text-neutral-400">{detail.issue.message}</p>
+        <p className="mt-0.5 font-mono text-sm text-neutral-500 dark:text-slate-400">{detail.issue.message}</p>
         <div className="mt-3 flex flex-wrap gap-6 text-sm">
           <Stat label="Occurrences" value={detail.totals.occurrences} />
           <Stat label="Sessions" value={detail.totals.sessions} />
@@ -147,27 +147,27 @@ function IssueDetail({ detail }: { detail: IssueDetailResponse }) {
 
       <div className="grid gap-5 p-5 lg:grid-cols-2">
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Browsers</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Browsers</p>
           <RankedList items={detail.browsers.map((b) => ({ label: b.name, total: b.total }))} />
         </div>
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Operating systems</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Operating systems</p>
           <RankedList items={detail.operatingSystems.map((o) => ({ label: o.name, total: o.total }))} />
         </div>
       </div>
 
-      <div className="border-t border-neutral-200 p-5 dark:border-neutral-800">
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">
+      <div className="border-t border-neutral-200 p-5 dark:border-slate-800">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
           Recent occurrences
         </p>
         {detail.samples.length === 0 ? (
-          <p className="text-sm text-neutral-500 dark:text-neutral-500">No samples.</p>
+          <p className="text-sm text-neutral-500 dark:text-slate-500">No samples.</p>
         ) : (
           <ul className="grid gap-3">
             {detail.samples.slice(0, 10).map((sample) => (
-              <li key={sample.id} className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-                  <span className="font-mono text-neutral-700 dark:text-neutral-300">
+              <li key={sample.id} className="rounded-md border border-neutral-200 p-3 dark:border-slate-800">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500 dark:text-slate-400">
+                  <span className="font-mono text-neutral-700 dark:text-slate-300">
                     {sample.externalId ?? sample.actor ?? 'anonymous'}
                   </span>
                   <span>
@@ -175,7 +175,7 @@ function IssueDetail({ detail }: { detail: IssueDetailResponse }) {
                   </span>
                 </div>
                 {sample.stack ? (
-                  <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
                     <code>{sample.stack}</code>
                   </pre>
                 ) : null}
@@ -191,7 +191,7 @@ function IssueDetail({ detail }: { detail: IssueDetailResponse }) {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">{label}</p>
       <p className="mt-0.5 font-semibold text-neutral-900 dark:text-white">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </p>

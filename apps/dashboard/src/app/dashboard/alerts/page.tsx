@@ -41,13 +41,13 @@ export default async function AlertsPage() {
 
   return (
     <DashboardShell active="alerts" title="Alerts" userEmail={user.email}>
-      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Get told when something moves — a metric crossing a threshold or dropping/spiking versus the previous period —
         instead of watching dashboards. Firings show here and can POST to a webhook (e.g. Slack).
       </p>
 
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}

@@ -16,13 +16,13 @@ export default async function CohortsPage() {
 
   return (
     <DashboardShell active="cohorts" title="Cohorts" userEmail={user.email}>
-      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Save a group of users defined by their properties — country, device, plan, or any event property — then apply it to
         Insights and Retention to see how that segment behaves.
       </p>
 
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}

@@ -15,7 +15,7 @@ export default async function ExportPage() {
 
   return (
     <DashboardShell active="export" title="Export" userEmail={user.email}>
-      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Pull raw events out of TraceIQ as CSV or JSON — for a spreadsheet, a notebook, or loading into your own
         warehouse. Pick a date range and (optionally) a single event, then download.
       </p>

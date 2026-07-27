@@ -24,13 +24,13 @@ export default async function FlagsPage() {
 
   return (
     <DashboardShell active="flags" title="Feature flags" userEmail={user.email}>
-      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Turn features on or off for a chosen slice of users without an app release. Rollout is deterministic and sticky —
         a user who&apos;s in stays in as you raise the percentage.
       </p>
 
       {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
           {error}
         </section>
       ) : null}
