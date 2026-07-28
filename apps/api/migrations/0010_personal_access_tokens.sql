@@ -4,7 +4,7 @@
 -- across local Postgres, Neon, and Supabase-hosted Postgres.
 
 CREATE TABLE IF NOT EXISTS personal_access_tokens (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY,Added MCP docs to the dashboard docs page 
   user_id TEXT NOT NULL,
   name TEXT NOT NULL,
   token_prefix TEXT NOT NULL,

@@ -44,6 +44,7 @@ export default async function DocsPage({
     { id: 'kotlin', label: 'Kotlin SDK' },
     { id: 'ingestion', label: 'Server-side ingestion' },
     { id: 'flags', label: 'Feature flags' },
+    { id: 'mcp', label: 'MCP server' },
     { id: 'api-performance', label: 'API performance' },
     { id: 'webhooks', label: 'Webhooks' },
     { id: 'export', label: 'Data export' },
@@ -320,6 +321,66 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
             </Section>
           )}
 
+          {currentId === 'mcp' && (
+            <Section id="mcp" title="MCP server">
+              <P>
+                TraceIQ's MCP server lets AI clients query your projects and feature flags through a local stdio process.
+                The client talks to <Mono>@traceiq/mcp-server</Mono>, and the MCP server talks to your TraceIQ API using a
+                personal access token.
+              </P>
+              <P>Before connecting an AI client, create a personal access token with the scopes the server needs:</P>
+              <Code>{`curl -X POST ${apiBaseUrl}/v1/dashboard/personal-access-tokens \
+  -H 'content-type: application/json' \
+  -H 'Authorization: Bearer YOUR_DASHBOARD_TOKEN' \
+  -d '{
+    "name": "Claude Desktop",
+    "scopes": ["projects:read", "flags:read", "flags:write"]
+  }'`}</Code>
+              <P>
+                The response includes <Mono>token</Mono> once. Store it as <Mono>TRACEIQ_API_KEY</Mono>; TraceIQ only stores
+                a SHA-256 hash after creation.
+              </P>
+              <Code>{`{
+  "id": "pat_...",
+  "tokenPrefix": "tiq_pat_...",
+  "scopes": ["projects:read", "flags:read", "flags:write"],
+  "token": "tiq_pat_your_token_here"
+}`}</Code>
+              <P>Claude Desktop config:</P>
+              <Code>{`{
+  "mcpServers": {
+    "traceiq": {
+      "command": "npx",
+      "args": ["-y", "@traceiq/mcp-server"],
+      "env": {
+        "TRACEIQ_API_KEY": "tiq_pat_your_token_here",
+        "TRACEIQ_API_URL": "${apiBaseUrl}"
+      }
+    }
+  }
+}`}</Code>
+              <P>Cursor can use the same command as an MCP server:</P>
+              <Code>{`npx -y @traceiq/mcp-server`}</Code>
+              <OptionsTable
+                rows={[
+                  ['TRACEIQ_API_KEY', 'required', 'A personal access token that starts with tiq_pat_.'],
+                  ['TRACEIQ_API_URL', `'${apiBaseUrl}'`, 'TraceIQ API base URL.']
+                ]}
+              />
+              <P>The server currently exposes these tools:</P>
+              <Bullets
+                items={[
+                  ['list_projects', 'List projects available to the token. Requires projects:read.'],
+                  ['list_feature_flags', 'List feature flags for a project. Requires flags:read.'],
+                  ['toggle_feature_flag', 'Enable or disable a feature flag. Requires flags:write.']
+                ]}
+              />
+              <P>
+                If a token is only for read-only analysis, omit <Mono>flags:write</Mono>. Revoke a token at any time with
+                <Mono>DELETE /v1/dashboard/personal-access-tokens/:id</Mono>.
+              </P>
+            </Section>
+          )}
           {currentId === 'api-performance' && (
             <Section id="api-performance" title="API performance">
               <P>
@@ -464,6 +525,7 @@ function verify(rawBody, header, secret) {
                   ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
                   ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook.'],
                   ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, and JSON payloads (remote config) evaluated by the SDK.'],
+                  ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ projects and feature flags with a personal access token.'],
                   ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
                   ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
                   ['Identity stitching', 'When an anonymous visitor later identifies, their earlier anonymous events are merged onto the user automatically — one person everywhere.'],
@@ -599,3 +661,5 @@ function OptionsTable({ rows }: { rows: Array<[string, string, string]> }) {
     </div>
   );
 }
+
+
