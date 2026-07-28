@@ -48,6 +48,11 @@ export class AuthService {
     }
   }
 
+  requireSupabaseSession(user: DashboardUser): void {
+    if (user.authMethod === 'pat') {
+      throw new ForbiddenException('Personal access tokens cannot manage personal access tokens.');
+    }
+  }
   private getBearerToken(authorizationHeader?: string): string {
     if (!authorizationHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token.');
@@ -110,3 +115,5 @@ export class AuthService {
     };
   }
 }
+
+

@@ -12,18 +12,22 @@ export class PersonalAccessTokensController {
   @Get()
   async list(@Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireSupabaseSession(user);
     return this.tokensService.list(user);
   }
 
   @Post()
   async create(@Body() body: CreatePersonalAccessTokenRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireSupabaseSession(user);
     return this.tokensService.create(user, body);
   }
 
   @Delete(':id')
   async revoke(@Param('id') id: string, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireSupabaseSession(user);
     return this.tokensService.revoke(user, id);
   }
 }
+

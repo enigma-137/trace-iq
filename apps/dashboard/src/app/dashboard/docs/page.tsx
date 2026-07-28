@@ -324,28 +324,23 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
           {currentId === 'mcp' && (
             <Section id="mcp" title="MCP server">
               <P>
-                TraceIQ's MCP server lets AI clients query your projects and feature flags through a local stdio process.
+                TraceIQ's MCP server lets AI clients query your projects and manage feature flags through a local stdio process.
                 The client talks to <Mono>@traceiq/mcp-server</Mono>, and the MCP server talks to your TraceIQ API using a
                 personal access token.
               </P>
-              <P>Before connecting an AI client, create a personal access token with the scopes the server needs:</P>
-              <Code>{`curl -X POST ${apiBaseUrl}/v1/dashboard/personal-access-tokens \
-  -H 'content-type: application/json' \
-  -H 'Authorization: Bearer YOUR_DASHBOARD_TOKEN' \
-  -d '{
-    "name": "Claude Desktop",
-    "scopes": ["projects:read", "flags:read", "flags:write"]
-  }'`}</Code>
               <P>
-                The response includes <Mono>token</Mono> once. Store it as <Mono>TRACEIQ_API_KEY</Mono>; TraceIQ only stores
-                a SHA-256 hash after creation.
+                Create the token from{' '}
+                <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/settings">
+                  Settings
+                </a>
+                . In <Mono>Personal access tokens</Mono>, choose a name such as <Mono>Claude Desktop</Mono>, keep
+                <Mono>projects:read</Mono> and <Mono>flags:read</Mono> selected, and include <Mono>flags:write</Mono> if
+                the assistant should be allowed to toggle flags.
               </P>
-              <Code>{`{
-  "id": "pat_...",
-  "tokenPrefix": "tiq_pat_...",
-  "scopes": ["projects:read", "flags:read", "flags:write"],
-  "token": "tiq_pat_your_token_here"
-}`}</Code>
+              <P>
+                The dashboard shows the full <Mono>tiq_pat_...</Mono> value once and generates a ready-to-copy Claude
+                Desktop config. TraceIQ stores only a SHA-256 hash after creation.
+              </P>
               <P>Claude Desktop config:</P>
               <Code>{`{
   "mcpServers": {
@@ -376,8 +371,8 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
                 ]}
               />
               <P>
-                If a token is only for read-only analysis, omit <Mono>flags:write</Mono>. Revoke a token at any time with
-                <Mono>DELETE /v1/dashboard/personal-access-tokens/:id</Mono>.
+                Revoke a token from Settings at any time. For automation, the same dashboard endpoint is available at
+                <Mono>POST /v1/dashboard/personal-access-tokens</Mono>, but the Settings flow is the recommended path.
               </P>
             </Section>
           )}
@@ -661,5 +656,6 @@ function OptionsTable({ rows }: { rows: Array<[string, string, string]> }) {
     </div>
   );
 }
+
 
 
