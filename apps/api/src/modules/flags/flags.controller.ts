@@ -12,18 +12,21 @@ export class FlagsController {
   @Get()
   async list(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'flags:read');
     return this.flagsService.list(user, projectId);
   }
 
   @Post()
   async create(@Body() body: CreateFlagRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'flags:write');
     return this.flagsService.create(user, body);
   }
 
   @Put(':id')
   async update(@Param('id') id: string, @Body() body: UpdateFlagRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'flags:write');
     return this.flagsService.update(user, id, body);
   }
 
@@ -34,6 +37,8 @@ export class FlagsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'flags:write');
     return this.flagsService.remove(user, id, projectId);
   }
 }
+

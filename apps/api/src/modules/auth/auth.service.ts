@@ -1,8 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import { DatabaseService } from '../../database/database.service';
 
 export interface DashboardUser {
   id: string;
   email?: string;
+  authMethod?: 'supabase' | 'pat';
+  scopes?: string[];
 }
 
 interface SupabaseUserResponse {
@@ -12,8 +16,15 @@ interface SupabaseUserResponse {
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly database: DatabaseService) {}
+
   async getDashboardUser(authorizationHeader?: string): Promise<DashboardUser> {
     const token = this.getBearerToken(authorizationHeader);
+
+    if (token.startsWith('tiq_pat_')) {
+      return this.validatePersonalAccessToken(token);
+    }
+
     const user = await this.getSupabaseUser(token);
 
     if (!user.id) {
@@ -22,8 +33,19 @@ export class AuthService {
 
     return {
       id: user.id,
-      email: user.email
+      email: user.email,
+      authMethod: 'supabase'
     };
+  }
+
+  requireScope(user: DashboardUser, scope: string): void {
+    if (user.authMethod !== 'pat') {
+      return;
+    }
+
+    if (!user.scopes?.includes(scope)) {
+      throw new ForbiddenException(`Personal access token requires "${scope}" scope.`);
+    }
   }
 
   private getBearerToken(authorizationHeader?: string): string {
@@ -54,5 +76,37 @@ export class AuthService {
     }
 
     return (await response.json()) as SupabaseUserResponse;
+  }
+
+  private async validatePersonalAccessToken(token: string): Promise<DashboardUser> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const result = await this.database.query<{
+      id: string;
+      user_id: string;
+      scopes: string[];
+    }>(
+      `
+        SELECT id, user_id, scopes
+        FROM personal_access_tokens
+        WHERE token_hash = $1
+          AND revoked_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        LIMIT 1
+      `,
+      [tokenHash]
+    );
+
+    const record = result.rows[0];
+    if (!record) {
+      throw new UnauthorizedException('Invalid or expired personal access token.');
+    }
+
+    await this.database.query(`UPDATE personal_access_tokens SET last_used_at = now() WHERE id = $1`, [record.id]);
+
+    return {
+      id: record.user_id,
+      authMethod: 'pat',
+      scopes: record.scopes
+    };
   }
 }

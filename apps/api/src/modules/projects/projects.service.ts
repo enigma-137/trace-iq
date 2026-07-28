@@ -15,6 +15,28 @@ export type ResolvedProject = {
 export class ProjectsService {
   constructor(private readonly database: DatabaseService) {}
 
+  async listAccessibleProjects(user: DashboardUser) {
+    const result = await this.database.query<ResolvedProject>(
+      `
+        SELECT
+          p.id,
+          p.name,
+          p.slug,
+          o.id AS "organizationId",
+          o.name AS "organizationName",
+          om.role
+        FROM organization_members om
+        JOIN organizations o ON o.id = om.organization_id
+        JOIN projects p ON p.organization_id = o.id
+        WHERE om.user_id = $1
+        ORDER BY o.created_at ASC, p.created_at ASC
+      `,
+      [user.id]
+    );
+
+    return { projects: result.rows };
+  }
+
   /**
    * Resolve the project a dashboard user is allowed to read.
    * When `projectId` is supplied it is validated against the user's memberships;
@@ -76,3 +98,4 @@ export class ProjectsService {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 }
+

@@ -1,0 +1,29 @@
+{
+  "name": "@traceiq/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TraceIQ MCP server for querying projects and managing feature flags from AI clients.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "traceiq-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "typescript": "^5.5.4"
+  }
+}
