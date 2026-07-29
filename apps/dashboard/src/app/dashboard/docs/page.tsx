@@ -42,6 +42,7 @@ export default async function DocsPage({
     { id: 'python', label: 'Python SDK' },
     { id: 'swift', label: 'Swift SDK' },
     { id: 'kotlin', label: 'Kotlin SDK' },
+    { id: 'rust', label: 'Rust SDK' },
     { id: 'ingestion', label: 'Server-side ingestion' },
     { id: 'flags', label: 'Feature flags' },
     { id: 'mcp', label: 'MCP server' },
@@ -244,6 +245,27 @@ val traceiq = TraceIQ(TraceIQConfig(
 traceiq.identify("user_123", traits = mapOf("kyc_tier" to 2))
 traceiq.capture("transfer_started", userId = "user_123",
                 properties = mapOf("amount" to 5000, "currency" to "NGN"))`}</Code>
+            </Section>
+          )}
+
+          {currentId === 'rust' && (
+            <Section id="rust" title="Rust SDK">
+              <P>
+                <Mono>traceiq</Mono> for Rust — events are queued and flushed in batches by a background thread.
+                Uses <Mono>serde</Mono>, <Mono>ureq</Mono>, and <Mono>chrono</Mono>.
+              </P>
+              <Code>{`# Cargo.toml
+[dependencies]
+traceiq = "0.1.0"`}</Code>
+              <Code>{`use traceiq::Client;
+
+let mut traceiq = Client::new("${projectId}", "YOUR_WRITE_KEY");
+
+traceiq.capture("payout_succeeded", Some("user_123"), None,
+    Some(serde_json::json!({"amount": 50000, "currency": "NGN"})),
+    None, None);
+
+traceiq.shutdown(); // flush before exit`}</Code>
             </Section>
           )}
 

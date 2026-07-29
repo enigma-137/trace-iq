@@ -1,0 +1,17 @@
+[package]
+name = "traceiq"
+version = "0.1.0"
+description = "TraceIQ server-side SDK for Rust — capture backend events with trustworthy properties."
+edition = "2021"
+license = "MIT"
+authors = ["TraceIQ"]
+readme = "README.md"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", features = ["tls"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[dev-dependencies]
+serde_json = "1"
