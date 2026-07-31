@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm ci && npm run build --workspace=@traceiq/api
+    buildCommand: npm ci --include=dev && npm run build --workspace=@traceiq/api
     preDeployCommand: npm run migrate --workspace=@traceiq/api
     startCommand: npm run start --workspace=@traceiq/api
     healthCheckPath: /health
