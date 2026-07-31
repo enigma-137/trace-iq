@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: traceiq-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build --workspace=@traceiq/api
+    preDeployCommand: npm run migrate --workspace=@traceiq/api
+    startCommand: npm run start --workspace=@traceiq/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 10000
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          name: traceiq-redis
+          type: keyvalue
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+
+  - type: keyvalue
+    name: traceiq-redis
+    plan: free
+    region: oregon
+    maxmemoryPolicy: noeviction
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
