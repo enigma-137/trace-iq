@@ -26,10 +26,10 @@ interface TrendChartProps {
 const SERIES_STYLES = [
   { stroke: 'stroke-blue-400', fill: 'fill-blue-400', color: 'rgb(96 165 250)', dash: '' },
   { stroke: 'stroke-emerald-400', fill: 'fill-emerald-400', color: 'rgb(52 211 153)', dash: '' },
-  { stroke: 'stroke-sky-400', fill: 'fill-sky-400', color: 'rgb(56 189 248)', dash: '' },
-  { stroke: 'stroke-teal-400', fill: 'fill-teal-400', color: 'rgb(45 212 191)', dash: '' },
-  { stroke: 'stroke-violet-400', fill: 'fill-violet-400', color: 'rgb(167 139 250)', dash: '' },
-  { stroke: 'stroke-slate-500', fill: 'fill-slate-500', color: 'rgb(100 116 139)', dash: '4 4' }
+  { stroke: 'stroke-red-400', fill: 'fill-red-400', color: 'rgb(248 113 113)', dash: '' },
+  { stroke: 'stroke-amber-400', fill: 'fill-amber-400', color: 'rgb(251 191 36)', dash: '' },
+  { stroke: 'stroke-cyan-400', fill: 'fill-cyan-400', color: 'rgb(34 211 238)', dash: '' },
+  { stroke: 'stroke-neutral-400', fill: 'fill-neutral-400', color: 'rgb(163 163 163)', dash: '4 4' }
 ];
 
 const WIDTH = 760;

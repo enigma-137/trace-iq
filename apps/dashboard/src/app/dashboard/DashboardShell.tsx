@@ -31,7 +31,7 @@ const allNavItems = [...navItems, ...bottomNavItems];
 const navLinkClass = (isActive: boolean) =>
   `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition ${
     isActive
-      ? 'bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.16)] dark:bg-blue-500/15 dark:text-blue-100 dark:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.18)]'
+      ? 'bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.16)] dark:bg-neutral-800 dark:text-white dark:shadow-[inset_3px_0_0_0_rgba(255,255,255,0.92)]'
       : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
   }`;
 
@@ -104,7 +104,7 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
                   key={item.key}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ${
                     item.key === active
-                      ? 'bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.16)] dark:bg-blue-500/15 dark:text-blue-100 dark:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.18)]'
+                      ? 'bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.16)] dark:bg-neutral-800 dark:text-white dark:shadow-[inset_0_-2px_0_0_rgba(255,255,255,0.92)]'
                       : 'text-neutral-500 dark:text-slate-400'
                   }`}
                   href={withProjectId(item.href, projectId)}
