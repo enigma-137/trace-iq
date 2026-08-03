@@ -12,7 +12,7 @@ interface SetupResponse {
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-const FALLBACK_SNIPPET = `import { traceiq } from '@traceiq/sdk-js';
+const FALLBACK_SNIPPET = `import { traceiq } from 'traceiq-sdk-js';
 
 traceiq.initialize({
   projectId: 'YOUR_PROJECT_ID',
@@ -65,7 +65,7 @@ export default async function DocsPage({
           {currentId === 'quickstart' && (
             <Section id="quickstart" title="Quickstart">
               <P>Install the SDK and initialize it with your project credentials (from Settings).</P>
-              <Code>{`npm install @traceiq/sdk-js`}</Code>
+              <Code>{`npm install traceiq-sdk-js`}</Code>
               <Code>{snippet}</Code>
               <P>
                 That&apos;s it — events start flowing to <Mono>Events</Mono> within seconds. Grab your write key from{' '}
@@ -167,13 +167,13 @@ await traceiq.shutdown(); // flush before a short-lived process exits`}</Code>
           {currentId === 'react-native' && (
             <Section id="react-native" title="React Native / Expo SDK">
               <P>
-                <Mono>@traceiq/react-native</Mono> tracks screens and events with device info, persists the anonymous
+                <Mono>traceiq-react-native</Mono> tracks screens and events with device info, persists the anonymous
                 id across launches, and flushes when the app backgrounds.
               </P>
-              <Code>{`npm install @traceiq/react-native
+              <Code>{`npm install traceiq-react-native
 # optional, to persist the anonymous id across launches:
 npm install @react-native-async-storage/async-storage`}</Code>
-              <Code>{`import { traceiq } from '@traceiq/react-native';
+              <Code>{`import { traceiq } from 'traceiq-react-native';
 
 traceiq.initialize({
   projectId: '${projectId}',
@@ -193,7 +193,14 @@ traceiq.capture({ event: 'transfer_started', properties: { amount: 5000, currenc
               <P>
                 <Mono>traceiq</Mono> for Python (3.8+) — standard library only, with a background flush thread.
               </P>
-              <Code>{`pip install traceiq`}</Code>
+              <Code>{`pip install traceiq-py`}</Code>
+              <P>
+                Package links: <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://pypi.org/project/traceiq-py/0.1.0/" target="_blank" rel="noreferrer">PyPI</a>,{' '}
+                <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://crates.io/crates/traceiq" target="_blank" rel="noreferrer">crates.io</a>,{' '}
+                <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-sdk-js" target="_blank" rel="noreferrer">npm (JS SDK)</a>,{' '}
+                <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-react-native" target="_blank" rel="noreferrer">npm (React Native)</a>,{' '}
+                <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-mcp-server" target="_blank" rel="noreferrer">npm (MCP server)</a>.
+              </P>
               <Code>{`from traceiq import Client
 
 traceiq = Client(

@@ -1,7 +1,10 @@
 {
-  "name": "@traceiq/react-native",
+  "name": "traceiq-react-native",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "TraceIQ SDK for React Native / Expo — screen tracking, device info, offline-friendly batching.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,6 +12,10 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "peerDependencies": {
     "react": "*",
     "react-native": "*"

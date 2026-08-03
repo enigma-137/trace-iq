@@ -19,7 +19,15 @@ infrastructure/ Local and future production infrastructure assets
 scripts/        Developer automation
 ```
 
-Start with `docs/architecture.md` and `docs/architecture-diagrams.md` for the system overview.
+Start with `docs/architecture.md` and `docs/architecture-diagrams.md` for the system overview. For MCP server installation and usage details, see `docs/mcp-server.md`.
+
+## Published packages
+
+- JavaScript SDK: [traceiq-sdk-js on npm](https://www.npmjs.com/package/traceiq-sdk-js)
+- React Native SDK: [traceiq-react-native on npm](https://www.npmjs.com/package/traceiq-react-native)
+- Python SDK: [traceiq-py on PyPI](https://pypi.org/project/traceiq-py/0.1.0/)
+- Rust SDK: [traceiq on crates.io](https://crates.io/crates/traceiq)
+- MCP server: [traceiq-mcp-server on npm](https://www.npmjs.com/package/traceiq-mcp-server)
 
 ## Local Setup
 

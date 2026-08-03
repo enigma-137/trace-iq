@@ -1,4 +1,4 @@
-# @traceiq/react-native
+# traceiq-react-native
 
 TraceIQ SDK for React Native and Expo. Tracks screens and events with device info,
 persists the anonymous id across launches, batches events, and flushes when the app
@@ -7,7 +7,7 @@ backgrounds (so nothing is lost when users leave).
 ## Install
 
 ```bash
-npm install @traceiq/react-native
+npm install traceiq-react-native
 # optional, for anonymous-id persistence across launches:
 npm install @react-native-async-storage/async-storage
 ```
@@ -18,7 +18,7 @@ is optional — without it the SDK still works but the anonymous id resets each 
 ## Quickstart
 
 ```ts
-import { traceiq } from '@traceiq/react-native';
+import { traceiq } from 'traceiq-react-native';
 
 traceiq.initialize({
   projectId: 'YOUR_PROJECT_ID',

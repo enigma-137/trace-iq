@@ -43,6 +43,14 @@ Returns recent events for early dashboard/API verification.
 
 Accepts an array of events. The API should validate each event independently and return accepted and rejected counts.
 
+## SDK packages
+
+- JavaScript SDK: [traceiq-sdk-js on npm](https://www.npmjs.com/package/traceiq-sdk-js)
+- React Native SDK: [traceiq-react-native on npm](https://www.npmjs.com/package/traceiq-react-native)
+- Python SDK: [traceiq-py on PyPI](https://pypi.org/project/traceiq-py/0.1.0/)
+- Rust SDK: [traceiq on crates.io](https://crates.io/crates/traceiq)
+- MCP server: [traceiq-mcp-server on npm](https://www.npmjs.com/package/traceiq-mcp-server)
+
 ## Future Endpoints
 
 - `GET /v1/users/:id/timeline`

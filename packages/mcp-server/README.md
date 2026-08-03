@@ -1,6 +1,18 @@
-# @traceiq/mcp-server
+# traceiq-mcp-server
 
 TraceIQ MCP server for AI clients that support the Model Context Protocol.
+
+## Install
+
+```bash
+npm install -g traceiq-mcp-server
+```
+
+Or run it directly without installing:
+
+```bash
+npx traceiq-mcp-server
+```
 
 ## Configuration
 
@@ -13,6 +25,12 @@ TRACEIQ_API_KEY=tiq_pat_your_token_here traceiq-mcp
 Optional environment variables:
 
 ```bash
+TRACEIQ_API_URL=https://api.traceiq.dev
+```
+
+If you are running the API locally, you can also use the default:
+
+```bash
 TRACEIQ_API_URL=http://localhost:4000
 ```
 
@@ -23,7 +41,7 @@ TRACEIQ_API_URL=http://localhost:4000
   "mcpServers": {
     "traceiq": {
       "command": "npx",
-      "args": ["-y", "@traceiq/mcp-server"],
+      "args": ["-y", "traceiq-mcp-server"],
       "env": {
         "TRACEIQ_API_KEY": "tiq_pat_your_token_here",
         "TRACEIQ_API_URL": "https://api.traceiq.dev"

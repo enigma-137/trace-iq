@@ -275,7 +275,7 @@ export class OrganizationsService {
 
   private createSdkSnippet(projectId: string, writeKey: string) {
     return [
-      "import { traceiq } from '@traceiq/sdk-js';",
+      "import { traceiq } from 'traceiq-sdk-js';",
       '',
       'traceiq.initialize({',
       `  projectId: '${projectId}',`,

@@ -1,13 +1,16 @@
 {
-  "name": "@traceiq/mcp-server",
+  "name": "traceiq-mcp-server",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "TraceIQ MCP server for querying projects and managing feature flags from AI clients.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "traceiq-mcp": "./dist/index.js"
+    "traceiq-mcp": "dist/index.js"
   },
   "files": [
     "dist"

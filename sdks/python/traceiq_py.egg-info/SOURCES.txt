@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+traceiq/__init__.py
+traceiq/client.py
+traceiq_py.egg-info/PKG-INFO
+traceiq_py.egg-info/SOURCES.txt
+traceiq_py.egg-info/dependency_links.txt
+traceiq_py.egg-info/top_level.txt
