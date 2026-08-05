@@ -1,7 +1,7 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { DM_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { DM_Sans, IBM_Plex_Mono, Inter } from 'next/font/google';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -13,6 +13,13 @@ const ibmPlexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   variable: '--font-ibm-plex-mono',
+  display: 'swap'
+});
+
+// Used only by the marketing landing page (`/`) to preserve its original look.
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
   display: 'swap'
 });
 
@@ -41,7 +48,7 @@ const themeScript = `
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${ibmPlexMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${dmSans.variable} ${ibmPlexMono.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

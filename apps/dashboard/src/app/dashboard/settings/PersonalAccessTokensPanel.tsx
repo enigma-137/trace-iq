@@ -145,7 +145,7 @@ export function PersonalAccessTokensPanel() {
         </div>
         <Link
           className="h-9 rounded-md border border-neutral-300 bg-white px-3 py-2 text-center text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          href="/dashboard/docs?page=mcp"
+          href="/docs?page=mcp"
         >
           MCP docs
         </Link>

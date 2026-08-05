@@ -7,8 +7,8 @@ TraceIQ is a developer-first behavior intelligence platform for web and mobile a
 ```text
 apps/
   api/          NestJS API and ingestion foundation
-  dashboard/    Next.js analytics dashboard
-  marketing/    Public marketing site
+  dashboard/    Next.js app: public landing page (/), waitlist (/waitlist),
+                docs (/docs), and the authenticated analytics dashboard (/dashboard)
 packages/
   sdk-js/       Browser SDK foundation
   shared/       Shared domain models and utilities

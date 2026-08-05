@@ -23,7 +23,7 @@ const navItems = [
 
 const bottomNavItems = [
   { label: 'Settings', href: '/dashboard/settings', key: 'settings' },
-  { label: 'Docs', href: '/dashboard/docs', key: 'docs' }
+  { label: 'Docs', href: '/docs', key: 'docs' }
 ];
 
 const allNavItems = [...navItems, ...bottomNavItems];

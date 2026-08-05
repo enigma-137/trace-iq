@@ -90,7 +90,7 @@ export default async function ApiPerformancePage({
         <section className="rounded-md border border-neutral-200 bg-white p-6 text-sm text-neutral-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
           No API requests captured yet. Add <code className="font-mono">traceiq.middleware()</code> to your server, or
           enable <code className="font-mono">autoCaptureRequests</code> in the browser SDK. See{' '}
-          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/docs#api-performance">
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=api-performance">
             the docs
           </Link>
           .

@@ -16,6 +16,58 @@
   box-sizing: border-box;
 }
 
+.bg-grid-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.glow-blob {
+  filter: blur(100px);
+  opacity: 0.35;
+  mix-blend-mode: plus-lighter;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.02);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+/* Shiki syntax highlighting: light/dark colors are emitted as CSS variables
+   per-token, and we swap which one wins based on the `.dark` class that
+   already drives the rest of the dashboard's theme. */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg) !important;
+}
+
+:root.dark .shiki,
+:root.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg) !important;
+}
+
 body {
   margin: 0;
   background: #ffffff;

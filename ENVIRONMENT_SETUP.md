@@ -19,8 +19,7 @@ npm run typecheck
 ## Local Services
 
 - API: `http://localhost:4000`
-- Dashboard: `http://localhost:3000`
-- Marketing: `http://localhost:3001`
+- Dashboard app (landing page `/`, waitlist `/waitlist`, docs `/docs`, dashboard `/dashboard`): `http://localhost:3000`
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
 
