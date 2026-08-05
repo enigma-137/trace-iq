@@ -7,6 +7,7 @@ import { FunnelsService } from './funnels.service';
 @Module({
   imports: [AuthModule, ProjectsModule],
   controllers: [FunnelsController],
-  providers: [FunnelsService]
+  providers: [FunnelsService],
+  exports: [FunnelsService]
 })
 export class FunnelsModule {}

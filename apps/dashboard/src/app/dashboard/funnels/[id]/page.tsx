@@ -3,6 +3,7 @@ import { DashboardShell } from '../../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { formatCount } from '@/lib/metrics';
 import { FunnelChart } from '@/components/charts/FunnelChart';
+import { FunnelAiSummary } from './FunnelAiSummary';
 
 export const dynamic = 'force-dynamic';
 
@@ -165,6 +166,8 @@ export default async function FunnelResultsPage({
               }}
             />
           </section>
+
+          <FunnelAiSummary funnelId={params.id} days={days} />
 
           {stepUsers ? <StepUsersPanel data={stepUsers} funnelId={params.id} days={days} /> : null}
         </>
