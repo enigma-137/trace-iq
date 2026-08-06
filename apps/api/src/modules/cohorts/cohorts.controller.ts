@@ -12,12 +12,14 @@ export class CohortsController {
   @Get()
   async list(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'cohorts:read');
     return this.cohortsService.list(user, projectId);
   }
 
   @Post()
   async create(@Body() body: CreateCohortRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'cohorts:write');
     return this.cohortsService.create(user, body);
   }
 
@@ -28,6 +30,7 @@ export class CohortsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'cohorts:write');
     return this.cohortsService.remove(user, id, projectId);
   }
 }

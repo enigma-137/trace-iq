@@ -435,18 +435,21 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
     return (
       <Section id="mcp" title="MCP server">
         <P>
-          TraceIQ's MCP server lets AI clients query your projects and manage feature flags through a local stdio process.
-          The client talks to <Mono>@traceiq/mcp-server</Mono>, and the MCP server talks to your TraceIQ API using a
-          personal access token.
+          TraceIQ's MCP server is an analytics copilot for AI clients. Through a local stdio process it can read
+          analytics, funnels, retention, errors, users, API health, and feature flags — and, with a write-scoped token,
+          toggle flags and manage funnels and alerts. The client talks to the <Mono>traceiq-mcp-server</Mono> npm package,
+          and the MCP server talks to your TraceIQ API using a personal access token.
         </P>
         <P>
           Create the token from{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/settings">
             Settings
           </a>
-          . In <Mono>Personal access tokens</Mono>, choose a name such as <Mono>Claude Desktop</Mono>, keep
-          <Mono>projects:read</Mono> and <Mono>flags:read</Mono> selected, and include <Mono>flags:write</Mono> if
-          the assistant should be allowed to toggle flags.
+          . In <Mono>Personal access tokens</Mono>, choose a name such as <Mono>Claude Desktop</Mono>, then select the
+          scopes the assistant should have. For a read-only copilot use <Mono>projects:read</Mono>,{' '}
+          <Mono>analytics:read</Mono>, <Mono>insights:read</Mono>, <Mono>funnels:read</Mono>, <Mono>users:read</Mono>,
+          and <Mono>errors:read</Mono>. Add write scopes (<Mono>flags:write</Mono>, <Mono>funnels:write</Mono>,{' '}
+          <Mono>alerts:write</Mono>) only if the assistant may make changes. Read-only tokens cannot mutate anything.
         </P>
         <P>
           The dashboard shows the full <Mono>tiq_pat_...</Mono> value once and generates a ready-to-copy Claude
@@ -457,7 +460,7 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
   "mcpServers": {
     "traceiq": {
       "command": "npx",
-      "args": ["-y", "@traceiq/mcp-server"],
+      "args": ["-y", "traceiq-mcp-server"],
       "env": {
         "TRACEIQ_API_KEY": "tiq_pat_your_token_here",
         "TRACEIQ_API_URL": "${apiBaseUrl}"
@@ -466,19 +469,38 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
   }
 }`}</Code>
         <P>Cursor can use the same command as an MCP server:</P>
-        <Code lang="bash">{`npx -y @traceiq/mcp-server`}</Code>
+        <Code lang="bash">{`npx -y traceiq-mcp-server`}</Code>
         <OptionsTable
           rows={[
             ['TRACEIQ_API_KEY', 'required', 'A personal access token that starts with tiq_pat_.'],
-            ['TRACEIQ_API_URL', `'${apiBaseUrl}'`, 'TraceIQ API base URL.']
+            ['TRACEIQ_API_URL', `'${apiBaseUrl}'`, 'TraceIQ API base URL.'],
+            ['TRACEIQ_MCP_TIMEOUT_MS', '30000', 'Per-request timeout in milliseconds.'],
+            ['TRACEIQ_MCP_RETRIES', '2', 'Retries for 408/429/5xx responses (exponential backoff).']
           ]}
         />
         <P>The server currently exposes these tools:</P>
         <Bullets
           items={[
             ['list_projects', 'List projects available to the token. Requires projects:read.'],
-            ['list_feature_flags', 'List feature flags for a project. Requires flags:read.'],
-            ['toggle_feature_flag', 'Enable or disable a feature flag. Requires flags:write.']
+            ['get_analytics_overview', 'Headline totals, revenue, top events/devices/countries. Requires analytics:read.'],
+            ['get_web_analytics', 'Visitors, pageviews, sessions, bounce rate (current vs previous). Requires analytics:read.'],
+            ['get_api_performance', 'Endpoint p95/avg latency, error rate, busiest and slowest routes. Requires analytics:read.'],
+            ['list_event_names', 'Tracked events with counts. Requires insights:read.'],
+            ['get_trends', 'Event counts over time with period-over-period change. Requires insights:read.'],
+            ['get_retention', 'Weekly cohort retention table and averages. Requires insights:read.'],
+            ['list_funnels / get_funnel / get_funnel_results / get_funnel_step_users', 'Funnel definitions, conversion and drop-off, and the users behind each step. Requires funnels:read.'],
+            ['summarize_funnel_dropoff', 'A plain-language (LLM) explanation of why a funnel drops off. Requires funnels:read.'],
+            ['list_error_issues / get_error_issue', 'Aggregated error issues and deep-dive detail. Requires errors:read.'],
+            ['list_users / get_user / get_user_timeline', 'Users, full profiles, and a concise chronological timeline. Requires users:read.'],
+            ['list_feature_flags', 'List feature flags. Requires flags:read.'],
+            ['list_alerts', 'List alerts and recent fires. Requires alerts:read.'],
+            ['explain_conversion_drop', 'Funnel + traffic analysis with the biggest drop-off and a data-backed interpretation. Requires funnels:read and analytics:read.'],
+            ['summarize_api_health', 'API health verdict: error rate and slowest/error-prone/busiest endpoints. Requires analytics:read.'],
+            ['show_retention_changes', 'Retention cohorts with a plain-language note. Requires insights:read.'],
+            ['find_users_who_failed_checkout', 'Users who dropped at the final funnel step. Requires funnels:read and users:read.'],
+            ['toggle_feature_flag', 'Enable or disable a feature flag. Requires flags:write.'],
+            ['create_funnel / update_funnel / delete_funnel', 'Manage funnels. Requires funnels:write (delete is destructive).'],
+            ['create_alert / set_alert_enabled / delete_alert', 'Manage alerts. Requires alerts:write (delete is destructive).']
           ]}
         />
         <P>
@@ -642,7 +664,7 @@ function verify(rawBody, header, secret) {
             ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
             ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook.'],
             ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, and JSON payloads (remote config) evaluated by the SDK.'],
-            ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ projects and feature flags with a personal access token.'],
+            ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
             ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
             ['Identity stitching', 'When an anonymous visitor later identifies, their earlier anonymous events are merged onto the user automatically — one person everywhere.'],

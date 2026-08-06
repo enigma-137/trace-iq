@@ -281,7 +281,7 @@ function CreatedTokenCard({ token }: { token: CreateTokenResponse }) {
       mcpServers: {
         traceiq: {
           command: 'npx',
-          args: ['-y', '@traceiq/mcp-server'],
+          args: ['-y', 'traceiq-mcp-server'],
           env: {
             TRACEIQ_API_KEY: token.token,
             TRACEIQ_API_URL: apiBaseUrl

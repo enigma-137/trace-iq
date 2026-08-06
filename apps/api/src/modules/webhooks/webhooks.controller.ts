@@ -12,12 +12,14 @@ export class WebhooksController {
   @Get()
   async list(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'webhooks:read');
     return this.webhooksService.list(user, projectId);
   }
 
   @Post()
   async create(@Body() body: CreateWebhookRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'webhooks:write');
     return this.webhooksService.create(user, body);
   }
 
@@ -28,6 +30,7 @@ export class WebhooksController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'webhooks:write');
     return this.webhooksService.test(user, id, projectId);
   }
 
@@ -38,6 +41,7 @@ export class WebhooksController {
     @Headers('authorization') authorization?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'webhooks:write');
     return this.webhooksService.update(user, id, body);
   }
 
@@ -48,6 +52,7 @@ export class WebhooksController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'webhooks:write');
     return this.webhooksService.remove(user, id, projectId);
   }
 }

@@ -16,6 +16,7 @@ export class ErrorsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'errors:read');
     return this.errorsService.listIssues(user, days, projectId);
   }
 
@@ -28,6 +29,7 @@ export class ErrorsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'errors:read');
     return this.errorsService.getIssue(user, { type, message, days, projectId });
   }
 }

@@ -18,6 +18,7 @@ export class UsersController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'users:read');
     return this.usersService.listPersons(user, { search, limit, offset, projectId });
   }
 
@@ -28,6 +29,7 @@ export class UsersController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'users:read');
     return this.usersService.getPerson(user, id, projectId);
   }
 
@@ -40,6 +42,7 @@ export class UsersController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'users:read');
     return this.usersService.getTimeline(user, id, { limit, offset, projectId });
   }
 }

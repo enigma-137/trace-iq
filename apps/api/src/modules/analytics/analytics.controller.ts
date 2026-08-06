@@ -12,6 +12,7 @@ export class AnalyticsController {
   @Get('overview')
   async getOverview(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'analytics:read');
     return this.analyticsService.getOverview(user, projectId);
   }
 
@@ -22,6 +23,7 @@ export class AnalyticsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'analytics:read');
     return this.analyticsService.getWebAnalytics(user, days, projectId);
   }
 
@@ -32,12 +34,14 @@ export class AnalyticsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'analytics:read');
     return this.analyticsService.getApiPerformance(user, days, projectId);
   }
 
   @Get('insights/event-names')
   async listEventNames(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'insights:read');
     return this.analyticsService.listEventNames(user, projectId);
   }
 
@@ -49,6 +53,7 @@ export class AnalyticsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'insights:read');
     return this.analyticsService.getRetention(user, { weeks, filters, projectId });
   }
 
@@ -65,6 +70,7 @@ export class AnalyticsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'insights:read');
     return this.analyticsService.getTrends(user, {
       event,
       interval,

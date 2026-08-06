@@ -4,7 +4,24 @@ import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from './auth.service';
 
 const DEFAULT_SCOPES = ['projects:read', 'flags:read'];
-const ALLOWED_SCOPES = new Set(['projects:read', 'flags:read', 'flags:write']);
+const ALLOWED_SCOPES = new Set([
+  'projects:read',
+  'flags:read',
+  'flags:write',
+  'analytics:read',
+  'insights:read',
+  'funnels:read',
+  'funnels:write',
+  'users:read',
+  'cohorts:read',
+  'cohorts:write',
+  'errors:read',
+  'alerts:read',
+  'alerts:write',
+  'webhooks:read',
+  'webhooks:write',
+  'exports:read'
+]);
 
 export interface CreatePersonalAccessTokenRequest {
   name?: string;

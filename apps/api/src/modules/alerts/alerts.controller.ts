@@ -12,12 +12,14 @@ export class AlertsController {
   @Get()
   async list(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'alerts:read');
     return this.alertsService.list(user, projectId);
   }
 
   @Post()
   async create(@Body() body: CreateAlertRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'alerts:write');
     return this.alertsService.create(user, body);
   }
 
@@ -28,6 +30,7 @@ export class AlertsController {
     @Headers('authorization') authorization?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'alerts:write');
     return this.alertsService.setEnabled(user, id, Boolean(body.enabled), body.projectId);
   }
 
@@ -38,6 +41,7 @@ export class AlertsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'alerts:write');
     return this.alertsService.test(user, id, projectId);
   }
 
@@ -48,6 +52,7 @@ export class AlertsController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'alerts:write');
     return this.alertsService.remove(user, id, projectId);
   }
 }

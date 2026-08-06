@@ -17,6 +17,7 @@ export class AiController {
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'funnels:read');
     return this.aiService.summarizeFunnelDropOff(user, id, days, projectId);
   }
 }

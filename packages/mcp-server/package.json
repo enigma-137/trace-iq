@@ -1,11 +1,11 @@
 {
   "name": "traceiq-mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
-  "description": "TraceIQ MCP server for querying projects and managing feature flags from AI clients.",
+  "description": "TraceIQ MCP server — an analytics copilot for the TraceIQ dashboard (funnels, retention, errors, users, API health) with guarded mutations and scope-aware access.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

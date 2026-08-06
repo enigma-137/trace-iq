@@ -19,6 +19,7 @@ export class ExportController {
     @Query('limit') limit?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'exports:read');
     return this.exportService.exportEvents(user, { projectId, from, to, event, limit });
   }
 }
