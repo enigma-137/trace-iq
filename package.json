@@ -21,5 +21,8 @@
   "devDependencies": {
     "prettier": "^3.3.3",
     "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
   }
 }

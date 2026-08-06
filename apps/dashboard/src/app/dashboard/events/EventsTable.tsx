@@ -58,7 +58,7 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
                   <Chevron open={isOpen} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-white">{event.eventName}</span>
+                  <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-white">{formatEventName(event)}</span>
                   <span className="mt-0.5 block truncate font-mono text-xs text-neutral-400 dark:text-slate-500 lg:hidden">
                     {formatDate(event.receivedAt)}
                   </span>
@@ -90,6 +90,56 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
       </div>
     </div>
   );
+}
+
+const RESERVED_EVENT_LABELS: Record<string, string> = {
+  $page: 'Page view',
+  $api_request: 'API request',
+  $exception: 'Exception',
+  $rageclick: 'Rage click',
+  $identify: 'Identify',
+  $group: 'Group'
+};
+
+function formatEventName(event: RecentEvent): string {
+  const props = event.properties ?? {};
+  const label = RESERVED_EVENT_LABELS[event.eventName];
+  if (!label) return event.eventName;
+
+  let detail: string | undefined;
+  switch (event.eventName) {
+    case '$page':
+      detail = humanizePath(props.name ?? props.path);
+      break;
+    case '$api_request':
+      detail = humanizePath(props.path ?? props.url);
+      break;
+    case '$exception':
+      detail = truncate(String(props.message ?? props.type ?? ''), 48);
+      break;
+    default:
+      break;
+  }
+
+  return detail ? `${label} (${detail})` : label;
+}
+
+function humanizePath(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  let path = value.split('?')[0];
+  path = path.replace(/^https?:\/\/[^/]+/, '');
+  path = path.replace(/^\/+|\/+$/g, '');
+  if (!path) return undefined;
+  return path
+    .split('/')
+    .map((segment) => segment.replace(/[-_]+/g, ' ').trim())
+    .filter(Boolean)
+    .join(' / ');
+}
+
+function truncate(value: string, max: number): string {
+  const text = value.trim();
+  return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
 function EventDetail({ event }: { event: RecentEvent }) {

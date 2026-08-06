@@ -31,7 +31,7 @@ export function RankedList({ items, emptyLabel = 'No data yet.', mono = false }:
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-300 shadow-[0_0_12px_rgba(59,130,246,0.35)]"
+              className="h-full rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.35)]"
               style={{ width: `${(item.total / maxTotal) * 100}%` }}
             />
           </div>

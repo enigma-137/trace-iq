@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import GlobeHero from '@/components/globe-hero';
 
 // Custom icons as inline components for light weight and zero dependency friction
 function TraceIcon({ className }: { className?: string }) {
@@ -202,7 +203,17 @@ export default function MarketingHomePage() {
 
       {/* Hero Section */}
       <section className="relative mx-auto max-w-7xl px-4 pt-32 pb-16 sm:px-6 lg:px-8 lg:pt-40 lg:pb-24">
-        <div className="flex flex-col items-center text-center max-w-4xl mx-auto space-y-6">
+        <div className="absolute inset-x-0 top-0 -z-10 flex justify-center">
+          <div className="relative h-[460px] w-full max-w-5xl overflow-hidden rounded-[2rem] border border-zinc-800/70 bg-zinc-950/40 shadow-[0_0_120px_rgba(255,255,255,0.06)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.10),transparent_60%)]" />
+            <div className="absolute left-1/2 top-1/2 h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-3xl" />
+            <div className="absolute inset-0 opacity-80">
+              <GlobeHero />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-300 backdrop-blur">
             <span className="flex h-2 w-2 rounded-full bg-zinc-400 animate-ping" />
             <span>Telemetry SDK under 25 KB</span>
