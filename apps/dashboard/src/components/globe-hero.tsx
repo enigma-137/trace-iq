@@ -16,7 +16,7 @@ export default function GlobeHero() {
     const scene = new THREE.Scene();
     scene.background = null;
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 0, 6.2);
+    camera.position.set(0, 0, 5.6);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -42,6 +42,11 @@ export default function GlobeHero() {
 
     const globeGroup = new THREE.Group();
     globeGroup.rotation.x = 0.15;
+    // KEY CHANGE: shift the whole globe group down in 3D so only its upper
+    // cap is in frame — this replaces the div-clipping hack with the sphere's
+    // own curved, anti-aliased silhouette. Tune: more negative reveals less
+    // dome (e.g. -2.3), less negative reveals more (e.g. -1.5).
+    globeGroup.position.y = -1.9;
     scene.add(globeGroup);
 
     const updateSize = () => {
@@ -59,18 +64,18 @@ export default function GlobeHero() {
     updateSize();
 
     // Solid core — neutral zinc, not blue
-    const coreGeo = new THREE.SphereGeometry(1.94, 48, 48);
+    const coreGeo = new THREE.SphereGeometry(2.2, 48, 48);
     const coreMat = new THREE.MeshStandardMaterial({
-      color: 0x0c0c0e,
-      emissive: 0x18181b,
-      emissiveIntensity: 0.4,
+      color: 0x050505,
+      emissive: 0x0a0a0c,
+      emissiveIntensity: 0.25,
       roughness: 0.35,
       metalness: 0.1,
     });
     globeGroup.add(new THREE.Mesh(coreGeo, coreMat));
 
     // Wireframe shell
-    const wireGeo = new THREE.IcosahedronGeometry(2.02, 5);
+    const wireGeo = new THREE.IcosahedronGeometry(2.28, 5);
     const wireMat = new THREE.MeshBasicMaterial({
       color: 0x9a9aa5,
       wireframe: true,
@@ -85,7 +90,7 @@ export default function GlobeHero() {
     for (let i = 0; i < dotCount; i++) {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      const r = 2.01;
+      const r = 2.27;
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = r * Math.cos(phi);
@@ -142,8 +147,8 @@ export default function GlobeHero() {
       depthWrite: false,
     });
     const glow = new THREE.Sprite(glowMat);
-    glow.scale.set(7.5, 7.5, 1);
-    glow.position.z = -1;
+    glow.scale.set(8, 8, 1);
+    glow.position.set(0, -1.9, -1);
     scene.add(glow);
 
     // Drag rotation

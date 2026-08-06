@@ -203,20 +203,31 @@ export default function MarketingHomePage() {
 
       {/* Hero Section — full screen, globe bleeds off the bottom edge */}
       <section className="relative min-h-screen w-full overflow-hidden">
-        {/* Globe layer: pushed well below the text, so only a shallow arc
-            shows near the bottom of the viewport — this is the key change
-            from before. Increase the -bottom-[…] magnitude to reveal less
-            of the globe (push it further down); decrease to reveal more. */}
-        <div className="absolute inset-x-0 -bottom-[55%] h-[100%] sm:-bottom-[60%] sm:h-[105%] lg:-bottom-[68%] lg:h-[110%]">
+        {/* Globe layer: fills the whole hero. The sphere is pushed down in 3D
+            inside the canvas, so the soft "top" is the sphere's own curved
+            anti-aliased silhouette — not a clipped box edge. The section's
+            overflow-hidden keeps it from bleeding into the sandbox below. */}
+        <div className="absolute inset-0">
           <GlobeHero />
         </div>
+
+        {/* Soft atmospheric blend right where the dome's arc meets the text */}
+        <div
+          className="pointer-events-none absolute inset-x-0 z-[5] blur-2xl"
+          style={{
+            top: '38%',
+            height: '30%',
+            background:
+              'radial-gradient(ellipse 65% 100% at 50% 0%, rgba(5,5,5,0.9) 0%, rgba(5,5,5,0.5) 40%, rgba(5,5,5,0) 75%)'
+          }}
+        />
 
         {/* Bottom fade so the globe eases into the footer content below it
             instead of cutting off hard at the section boundary */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" />
 
         {/* Copy layer */}
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-6 px-6 pt-24 text-center pointer-events-none">
+        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center justify-start gap-6 px-6 pt-32 sm:pt-36 text-center pointer-events-none">
           <span className="pointer-events-auto rounded-full border border-zinc-700 bg-zinc-950/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-zinc-300 backdrop-blur-sm">
             Telemetry SDK under 25 KB
           </span>
