@@ -13,14 +13,23 @@ export default function GlobeHero() {
     let width = mount.clientWidth;
     let height = mount.clientHeight;
 
+    // Phones pay for every pixel and every point. Trim the detail budget there
+    // rather than shipping a desktop-weight scene to a mid-range handset.
+    const isSmallScreen = window.matchMedia('(max-width: 640px)').matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const scene = new THREE.Scene();
     scene.background = null;
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 0, 5.6);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({
+      antialias: !isSmallScreen,
+      alpha: true,
+      powerPreference: 'low-power'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isSmallScreen ? 1.5 : 2));
     renderer.setClearColor(0x000000, 0);
     renderer.domElement.style.position = 'absolute';
     renderer.domElement.style.top = '0';
@@ -75,7 +84,7 @@ export default function GlobeHero() {
     globeGroup.add(new THREE.Mesh(coreGeo, coreMat));
 
     // Wireframe shell
-    const wireGeo = new THREE.IcosahedronGeometry(2.28, 5);
+    const wireGeo = new THREE.IcosahedronGeometry(2.28, isSmallScreen ? 3 : 5);
     const wireMat = new THREE.MeshBasicMaterial({
       color: 0x9a9aa5,
       wireframe: true,
@@ -85,7 +94,7 @@ export default function GlobeHero() {
     globeGroup.add(new THREE.Mesh(wireGeo, wireMat));
 
     // Node dots
-    const dotCount = 1300;
+    const dotCount = isSmallScreen ? 550 : 1300;
     const positions = new Float32Array(dotCount * 3);
     for (let i = 0; i < dotCount; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -185,6 +194,10 @@ export default function GlobeHero() {
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointerleave', endDrag);
+    // On touch the browser claims vertical drags for scrolling and fires
+    // pointercancel; without this the globe would keep spinning after the
+    // gesture was handed off.
+    window.addEventListener('pointercancel', endDrag);
 
     let frameId = 0;
     let t = 0;
@@ -192,7 +205,9 @@ export default function GlobeHero() {
     const animate = () => {
       t += clock.getDelta();
 
-      if (!isDragging) {
+      // With reduced motion the globe holds still, but drag still works so the
+      // scene stays explorable rather than inert.
+      if (!isDragging && !prefersReducedMotion) {
         globeGroup.rotation.y += 0.0014 + velY;
         globeGroup.rotation.x += velX;
         velY *= 0.94;
@@ -200,30 +215,48 @@ export default function GlobeHero() {
         velY += (0.0014 - velY) * 0.001;
       }
 
-      const pulse = 0.04 + Math.sin(t * 2) * 0.012;
+      const pulse = prefersReducedMotion ? 0.04 : 0.04 + Math.sin(t * 2) * 0.012;
       activeMat.size = pulse;
 
       renderer.render(scene, camera);
       frameId = window.requestAnimationFrame(animate);
     };
-    animate();
 
-    const handleResize = () => {
-      width = mount.clientWidth;
-      height = mount.clientHeight;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
+    // Only burn frames while the hero is actually on screen. Scrolling down to
+    // the features grid on a phone should not keep a WebGL loop running.
+    let running = false;
+    const start = () => {
+      if (running) return;
+      running = true;
+      clock.getDelta(); // discard the gap accumulated while paused
+      frameId = window.requestAnimationFrame(animate);
     };
-    window.addEventListener('resize', handleResize);
+    const stop = () => {
+      if (!running) return;
+      running = false;
+      window.cancelAnimationFrame(frameId);
+    };
+
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => (entry.isIntersecting ? start() : stop()),
+      { threshold: 0 }
+    );
+    visibilityObserver.observe(mount);
+
+    const onDocumentVisibility = () => (document.hidden ? stop() : start());
+    document.addEventListener('visibilitychange', onDocumentVisibility);
+
+    start();
 
     return () => {
-      window.cancelAnimationFrame(frameId);
+      stop();
       mount.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', endDrag);
       window.removeEventListener('pointerleave', endDrag);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('pointercancel', endDrag);
+      document.removeEventListener('visibilitychange', onDocumentVisibility);
+      visibilityObserver.disconnect();
       resizeObserver.disconnect();
       renderer.dispose();
       coreGeo.dispose();
@@ -242,5 +275,7 @@ export default function GlobeHero() {
     };
   }, []);
 
-  return <div ref={mountRef} className="h-full w-full select-none" />;
+  // `touch-pan-y` keeps vertical scrolling with the page on phones — without it
+  // a swipe over the hero only spins the globe and the visitor feels stuck.
+  return <div ref={mountRef} className="h-full w-full touch-pan-y select-none" />;
 }

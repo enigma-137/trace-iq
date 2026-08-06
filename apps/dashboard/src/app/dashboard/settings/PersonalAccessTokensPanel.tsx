@@ -23,17 +23,84 @@ type CreateTokenResponse = TokenRecord & {
   token: string;
 };
 
-const scopeOptions = [
-  { value: 'projects:read', label: 'Projects read' },
-  { value: 'flags:read', label: 'Flags read' },
-  { value: 'flags:write', label: 'Flags write' }
+/**
+ * Mirrors ALLOWED_SCOPES in
+ * apps/api/src/modules/auth/personal-access-tokens.service.ts.
+ * Keep the two lists in sync — the API rejects anything it does not recognise.
+ *
+ * `mcp: false` marks scopes the API enforces but that no MCP tool consumes yet
+ * (cohort and webhook management were deferred; raw export is too large for
+ * model context). They remain valid for direct API clients.
+ */
+type ScopeGroup = {
+  key: string;
+  label: string;
+  read?: string;
+  write?: string;
+  mcp: boolean;
+};
+
+const SCOPE_GROUPS: ScopeGroup[] = [
+  { key: 'projects', label: 'Projects', read: 'projects:read', mcp: true },
+  { key: 'analytics', label: 'Analytics', read: 'analytics:read', mcp: true },
+  { key: 'insights', label: 'Insights', read: 'insights:read', mcp: true },
+  { key: 'funnels', label: 'Funnels', read: 'funnels:read', write: 'funnels:write', mcp: true },
+  { key: 'users', label: 'Users', read: 'users:read', mcp: true },
+  { key: 'errors', label: 'Errors', read: 'errors:read', mcp: true },
+  { key: 'flags', label: 'Feature flags', read: 'flags:read', write: 'flags:write', mcp: true },
+  { key: 'alerts', label: 'Alerts', read: 'alerts:read', write: 'alerts:write', mcp: true },
+  { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: false },
+  { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: false },
+  { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false }
 ];
+
+const ALL_SCOPES = SCOPE_GROUPS.flatMap((group) => [group.read, group.write].filter(Boolean) as string[]);
+
+const MCP_READ_SCOPES = [
+  'projects:read',
+  'analytics:read',
+  'insights:read',
+  'funnels:read',
+  'users:read',
+  'errors:read',
+  'flags:read',
+  'alerts:read'
+];
+
+const MCP_WRITE_SCOPES = ['funnels:write', 'flags:write', 'alerts:write'];
+
+const presets = [
+  {
+    id: 'mcp-read',
+    label: 'MCP read-only',
+    scopes: MCP_READ_SCOPES,
+    hint: 'Every read tool the MCP server exposes (23 of 30). No mutations.'
+  },
+  {
+    id: 'mcp-full',
+    label: 'MCP full',
+    scopes: [...MCP_READ_SCOPES, ...MCP_WRITE_SCOPES],
+    hint: 'All 30 MCP tools, including funnel, flag, and alert mutations.'
+  },
+  {
+    id: 'flags',
+    label: 'Flags only',
+    scopes: ['projects:read', 'flags:read', 'flags:write'],
+    hint: 'Feature-flag assistant only. Drives 3 of the 30 MCP tools.'
+  }
+];
+
+function sameScopeSet(a: string[], b: string[]) {
+  return a.length === b.length && [...a].sort().join() === [...b].sort().join();
+}
 
 export function PersonalAccessTokensPanel() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [tokens, setTokens] = useState<TokenRecord[]>([]);
   const [name, setName] = useState('Claude Desktop');
-  const [scopes, setScopes] = useState<string[]>(['projects:read', 'flags:read', 'flags:write']);
+  // Default to read-only MCP coverage: immediately useful for a Claude Desktop
+  // or Cursor client, with no write capability until it is chosen explicitly.
+  const [scopes, setScopes] = useState<string[]>(MCP_READ_SCOPES);
   const [expiresAt, setExpiresAt] = useState('');
   const [createdToken, setCreatedToken] = useState<CreateTokenResponse | null>(null);
   const [tokenToRevoke, setTokenToRevoke] = useState<TokenRecord | null>(null);
@@ -167,7 +234,9 @@ export function PersonalAccessTokensPanel() {
         <form className="grid h-fit gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950" onSubmit={handleCreate}>
           <div>
             <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Create token</h3>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">Use all three scopes for a feature-flag MCP assistant.</p>
+            <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
+              Grant only what the client needs. A token is rejected by every endpoint outside its scopes.
+            </p>
           </div>
 
           <label className={fieldClass} htmlFor="patName">
@@ -177,19 +246,80 @@ export function PersonalAccessTokensPanel() {
 
           <fieldset className="grid gap-2">
             <legend className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">Scopes</legend>
-            <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-              {scopeOptions.map((option) => (
-                <label key={option.value} className="flex min-h-10 items-center gap-2 rounded-md border border-neutral-200 px-3 text-sm text-neutral-700 dark:border-slate-800 dark:text-slate-300">
-                  <input
-                    className="h-4 w-4 accent-neutral-900 dark:accent-white"
-                    type="checkbox"
-                    checked={scopes.includes(option.value)}
-                    onChange={() => toggleScope(option.value)}
-                  />
-                  {option.label}
-                </label>
+
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((preset) => {
+                const isActive = sameScopeSet(scopes, preset.scopes);
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setScopes(preset.scopes)}
+                    aria-pressed={isActive}
+                    className={`h-7 rounded-full border px-3 text-xs font-semibold transition ${
+                      isActive
+                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                        : 'border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs font-normal normal-case leading-5 text-neutral-500 dark:text-slate-400">
+              {presets.find((preset) => sameScopeSet(scopes, preset.scopes))?.hint ?? 'Custom selection.'}
+            </p>
+
+            <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
+              <div className="grid grid-cols-[1fr_3rem_3rem] items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
+                <span>Resource</span>
+                <span className="text-center">Read</span>
+                <span className="text-center">Write</span>
+              </div>
+              {SCOPE_GROUPS.map((group) => (
+                <div
+                  key={group.key}
+                  className="grid grid-cols-[1fr_3rem_3rem] items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-b-0 dark:border-slate-800/60"
+                >
+                  <span className="text-sm font-normal normal-case text-neutral-700 dark:text-slate-300">
+                    {group.label}
+                    {!group.mcp ? (
+                      <span
+                        className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-slate-600"
+                        title="Enforced by the API, but no MCP tool uses this scope yet."
+                      >
+                        API only
+                      </span>
+                    ) : null}
+                  </span>
+                  {(['read', 'write'] as const).map((access) => {
+                    const scope = group[access];
+                    return (
+                      <div key={access} className="flex justify-center">
+                        {scope ? (
+                          <input
+                            className="h-4 w-4 accent-neutral-900 dark:accent-white"
+                            type="checkbox"
+                            aria-label={`${group.label} ${access}`}
+                            checked={scopes.includes(scope)}
+                            onChange={() => toggleScope(scope)}
+                          />
+                        ) : (
+                          <span className="text-neutral-300 dark:text-slate-700" aria-hidden="true">
+                            &mdash;
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               ))}
             </div>
+
+            <p className="text-xs font-normal normal-case text-neutral-500 dark:text-slate-400">
+              {scopes.length} of {ALL_SCOPES.length} scopes selected
+            </p>
           </fieldset>
 
           <label className={fieldClass} htmlFor="patExpires">

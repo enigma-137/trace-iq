@@ -16,6 +16,37 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  /* Stops the layout shifting sideways when a page grows past one viewport. */
+  scrollbar-gutter: stable;
+}
+
+/* Thin dark scrollbar for the marketing console pane and other inner panels.
+   This class was referenced by the landing page before it existed. */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(113, 113, 122, 0.4);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(161, 161, 170, 0.6);
+}
+
 .bg-grid-dots {
   background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -51,6 +82,25 @@
 
 .animate-pulse-slow {
   animation: pulse-slow 8s ease-in-out infinite;
+}
+
+/* Honour the OS "reduce motion" setting: the landing page runs several
+   long-running ambient animations plus a rotating WebGL globe. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-float,
+  .animate-pulse-slow {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Shiki syntax highlighting: light/dark colors are emitted as CSS variables
