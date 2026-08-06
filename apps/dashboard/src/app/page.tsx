@@ -203,16 +203,17 @@ export default function MarketingHomePage() {
 
       {/* Hero Section — full screen, globe bleeds off the bottom edge */}
       <section className="relative min-h-screen w-full overflow-hidden">
-        {/* Globe layer: oversized, anchored to the bottom so only its upper
-            curve is ever visible — this is what creates the "horizon" look.
-            Adjust -bottom-[…] and h-[…] to taste per breakpoint. */}
-        <div className="absolute inset-x-0 -bottom-[38%] h-[130%] sm:-bottom-[42%] sm:h-[135%] lg:-bottom-[48%] lg:h-[145%]">
+        {/* Globe layer: pushed well below the text, so only a shallow arc
+            shows near the bottom of the viewport — this is the key change
+            from before. Increase the -bottom-[…] magnitude to reveal less
+            of the globe (push it further down); decrease to reveal more. */}
+        <div className="absolute inset-x-0 -bottom-[55%] h-[100%] sm:-bottom-[60%] sm:h-[105%] lg:-bottom-[68%] lg:h-[110%]">
           <GlobeHero />
         </div>
 
-        {/* Optional top fade so the globe eases into the page bg instead of
-            cutting off hard at the header */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#050505] to-transparent" />
+        {/* Bottom fade so the globe eases into the footer content below it
+            instead of cutting off hard at the section boundary */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" />
 
         {/* Copy layer */}
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-6 px-6 pt-24 text-center pointer-events-none">
