@@ -14,28 +14,65 @@ export default function GlobeHero() {
     let height = mount.clientHeight;
 
     const scene = new THREE.Scene();
+    scene.background = null;
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.z = 6.2;
+    camera.position.set(0, 0, 6.2);
+    camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    mount.style.position = 'relative';
     mount.appendChild(renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+    scene.add(ambient);
+    const keyLight = new THREE.PointLight(0x8aa8ff, 1.2, 20);
+    keyLight.position.set(4, 3, 6);
+    scene.add(keyLight);
+    const fillLight = new THREE.PointLight(0x9ce8ff, 0.6, 20);
+    fillLight.position.set(-4, -2, 6);
+    scene.add(fillLight);
 
     const globeGroup = new THREE.Group();
     globeGroup.rotation.x = 0.3;
     scene.add(globeGroup);
 
+    const updateSize = () => {
+      const rect = mount.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      width = rect.width;
+      height = rect.height;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    };
+
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(mount);
+    updateSize();
+
     const coreGeo = new THREE.SphereGeometry(1.94, 48, 48);
-    const coreMat = new THREE.MeshBasicMaterial({ color: 0x08080a });
+    const coreMat = new THREE.MeshStandardMaterial({
+      color: 0x10131a,
+      emissive: 0x4364ff,
+      emissiveIntensity: 0.14,
+      roughness: 0.15,
+      metalness: 0.22,
+    });
     globeGroup.add(new THREE.Mesh(coreGeo, coreMat));
 
-    const wireGeo = new THREE.IcosahedronGeometry(2, 5);
+    const wireGeo = new THREE.IcosahedronGeometry(2.02, 5);
     const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x5b5f6b,
+      color: 0x7e97ff,
       wireframe: true,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.55,
     });
     globeGroup.add(new THREE.Mesh(wireGeo, wireMat));
 
@@ -54,10 +91,10 @@ export default function GlobeHero() {
     const dotGeo = new THREE.BufferGeometry();
     dotGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const dotMat = new THREE.PointsMaterial({
-      color: 0xf4f4f5,
-      size: 0.022,
+      color: 0xe8f1ff,
+      size: 0.032,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.72,
       sizeAttenuation: true,
     });
     globeGroup.add(new THREE.Points(dotGeo, dotMat));
@@ -76,9 +113,9 @@ export default function GlobeHero() {
     activeGeo.setAttribute('position', new THREE.BufferAttribute(activePositions, 3));
     const activeMat = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.05,
+      size: 0.11,
       transparent: true,
-      opacity: 0.9,
+      opacity: 1,
       sizeAttenuation: true,
     });
     const activePoints = new THREE.Points(activeGeo, activeMat);
@@ -179,6 +216,7 @@ export default function GlobeHero() {
       window.removeEventListener('pointerup', endDrag);
       window.removeEventListener('pointerleave', endDrag);
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       renderer.dispose();
       coreGeo.dispose();
       coreMat.dispose();

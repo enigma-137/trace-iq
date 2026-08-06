@@ -203,7 +203,7 @@ export default function MarketingHomePage() {
 
       {/* Hero Section */}
       <section className="relative mx-auto max-w-7xl px-4 pt-32 pb-16 sm:px-6 lg:px-8 lg:pt-40 lg:pb-24">
-        <div className="absolute inset-x-0 top-0 -z-10 flex justify-center">
+        <div className="absolute inset-0 -z-10 flex justify-center">
           <div className="relative h-[460px] w-full max-w-5xl overflow-hidden rounded-[2rem] border border-zinc-800/70 bg-zinc-950/40 shadow-[0_0_120px_rgba(255,255,255,0.06)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.10),transparent_60%)]" />
             <div className="absolute left-1/2 top-1/2 h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-3xl" />
