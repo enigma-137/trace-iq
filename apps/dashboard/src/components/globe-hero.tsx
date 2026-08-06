@@ -30,17 +30,18 @@ export default function GlobeHero() {
     mount.style.position = 'relative';
     mount.appendChild(renderer.domElement);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+    // Neutral, brand-matching lighting (no color tint)
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
     scene.add(ambient);
-    const keyLight = new THREE.PointLight(0x8aa8ff, 1.2, 20);
+    const keyLight = new THREE.PointLight(0xffffff, 1.1, 20);
     keyLight.position.set(4, 3, 6);
     scene.add(keyLight);
-    const fillLight = new THREE.PointLight(0x9ce8ff, 0.6, 20);
+    const fillLight = new THREE.PointLight(0xffffff, 0.4, 20);
     fillLight.position.set(-4, -2, 6);
     scene.add(fillLight);
 
     const globeGroup = new THREE.Group();
-    globeGroup.rotation.x = 0.3;
+    globeGroup.rotation.x = 0.15;
     scene.add(globeGroup);
 
     const updateSize = () => {
@@ -57,28 +58,30 @@ export default function GlobeHero() {
     resizeObserver.observe(mount);
     updateSize();
 
+    // Solid core — neutral zinc, not blue
     const coreGeo = new THREE.SphereGeometry(1.94, 48, 48);
     const coreMat = new THREE.MeshStandardMaterial({
-      color: 0x10131a,
-      emissive: 0x4364ff,
-      emissiveIntensity: 0.14,
-      roughness: 0.15,
-      metalness: 0.22,
+      color: 0x0c0c0e,
+      emissive: 0x18181b,
+      emissiveIntensity: 0.4,
+      roughness: 0.35,
+      metalness: 0.1,
     });
     globeGroup.add(new THREE.Mesh(coreGeo, coreMat));
 
+    // Wireframe shell
     const wireGeo = new THREE.IcosahedronGeometry(2.02, 5);
     const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x7e97ff,
+      color: 0x9a9aa5,
       wireframe: true,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.35,
     });
     globeGroup.add(new THREE.Mesh(wireGeo, wireMat));
 
-    const dotCount = 1100;
+    // Node dots
+    const dotCount = 1300;
     const positions = new Float32Array(dotCount * 3);
-    const sizes = new Float32Array(dotCount);
     for (let i = 0; i < dotCount; i++) {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
@@ -86,19 +89,19 @@ export default function GlobeHero() {
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = r * Math.cos(phi);
-      sizes[i] = Math.random() * 0.02 + 0.008;
     }
     const dotGeo = new THREE.BufferGeometry();
     dotGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const dotMat = new THREE.PointsMaterial({
-      color: 0xe8f1ff,
-      size: 0.032,
+      color: 0xf4f4f5,
+      size: 0.026,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.6,
       sizeAttenuation: true,
     });
     globeGroup.add(new THREE.Points(dotGeo, dotMat));
 
+    // Brighter "active" nodes
     const activeCount = 10;
     const activeIdx = Array.from({ length: activeCount }, () =>
       Math.floor(Math.random() * dotCount)
@@ -113,7 +116,7 @@ export default function GlobeHero() {
     activeGeo.setAttribute('position', new THREE.BufferAttribute(activePositions, 3));
     const activeMat = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.11,
+      size: 0.09,
       transparent: true,
       opacity: 1,
       sizeAttenuation: true,
@@ -121,15 +124,14 @@ export default function GlobeHero() {
     const activePoints = new THREE.Points(activeGeo, activeMat);
     globeGroup.add(activePoints);
 
+    // Soft glow behind
     const glowCanvas = document.createElement('canvas');
     glowCanvas.width = 256;
     glowCanvas.height = 256;
     const ctx = glowCanvas.getContext('2d');
-    if (!ctx) {
-      return undefined;
-    }
+    if (!ctx) return undefined;
     const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    grad.addColorStop(0, 'rgba(255,255,255,0.20)');
+    grad.addColorStop(0, 'rgba(255,255,255,0.18)');
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 256, 256);
@@ -140,15 +142,16 @@ export default function GlobeHero() {
       depthWrite: false,
     });
     const glow = new THREE.Sprite(glowMat);
-    glow.scale.set(7, 7, 1);
+    glow.scale.set(7.5, 7.5, 1);
     glow.position.z = -1;
     scene.add(glow);
 
+    // Drag rotation
     let isDragging = false;
     let prevX = 0;
     let prevY = 0;
     let velX = 0;
-    let velY = 0.0016;
+    let velY = 0.0014;
 
     const onPointerDown = (e: PointerEvent) => {
       isDragging = true;
@@ -185,14 +188,14 @@ export default function GlobeHero() {
       t += clock.getDelta();
 
       if (!isDragging) {
-        globeGroup.rotation.y += 0.0016 + velY;
+        globeGroup.rotation.y += 0.0014 + velY;
         globeGroup.rotation.x += velX;
         velY *= 0.94;
         velX *= 0.94;
-        velY += (0.0016 - velY) * 0.001;
+        velY += (0.0014 - velY) * 0.001;
       }
 
-      const pulse = 0.045 + Math.sin(t * 2) * 0.015;
+      const pulse = 0.04 + Math.sin(t * 2) * 0.012;
       activeMat.size = pulse;
 
       renderer.render(scene, camera);

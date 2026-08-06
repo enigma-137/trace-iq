@@ -201,43 +201,41 @@ export default function MarketingHomePage() {
         </nav>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative mx-auto max-w-7xl px-4 pt-32 pb-16 sm:px-6 lg:px-8 lg:pt-40 lg:pb-24">
-        <div className="absolute inset-0 -z-10 flex justify-center">
-          <div className="relative h-[460px] w-full max-w-5xl overflow-hidden rounded-[2rem] border border-zinc-800/70 bg-zinc-950/40 shadow-[0_0_120px_rgba(255,255,255,0.06)]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.10),transparent_60%)]" />
-            <div className="absolute left-1/2 top-1/2 h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-3xl" />
-            <div className="absolute inset-0 opacity-80">
-              <GlobeHero />
-            </div>
-          </div>
+      {/* Hero Section — full screen, globe bleeds off the bottom edge */}
+      <section className="relative min-h-screen w-full overflow-hidden">
+        {/* Globe layer: oversized, anchored to the bottom so only its upper
+            curve is ever visible — this is what creates the "horizon" look.
+            Adjust -bottom-[…] and h-[…] to taste per breakpoint. */}
+        <div className="absolute inset-x-0 -bottom-[38%] h-[130%] sm:-bottom-[42%] sm:h-[135%] lg:-bottom-[48%] lg:h-[145%]">
+          <GlobeHero />
         </div>
 
-        <div className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-300 backdrop-blur">
-            <span className="flex h-2 w-2 rounded-full bg-zinc-400 animate-ping" />
-            <span>Telemetry SDK under 25 KB</span>
-          </div>
+        {/* Optional top fade so the globe eases into the page bg instead of
+            cutting off hard at the header */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#050505] to-transparent" />
 
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl md:text-7xl text-zinc-50 leading-tight">
+        {/* Copy layer */}
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-6 px-6 pt-24 text-center pointer-events-none">
+          <span className="pointer-events-auto rounded-full border border-zinc-700 bg-zinc-950/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-zinc-300 backdrop-blur-sm">
+            Telemetry SDK under 25 KB
+          </span>
+          <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
             See user journeys.<br />
-            <span className="text-zinc-500">Solve conversion friction.</span>
+            <span className="text-zinc-400">Solve conversion friction.</span>
           </h1>
-
           <p className="max-w-2xl text-base text-zinc-400 sm:text-lg lg:text-xl leading-relaxed">
             TraceIQ logs clicks, API response rates, web vitals, and errors. It compiles them into interactive timelines and conversion paths, giving developers the precise signals needed to build seamless product flows.
           </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+          <div className="flex flex-wrap justify-center gap-4 pt-2">
             <a
               href="/waitlist"
-              className="relative inline-flex h-11 items-center justify-center rounded-lg bg-zinc-50 px-6 text-sm font-semibold text-zinc-950 shadow hover:bg-zinc-950 hover:text-zinc-50 border border-transparent hover:border-zinc-50/70 active:scale-[0.98] transition-all"
+              className="pointer-events-auto inline-flex h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-zinc-950 shadow-lg shadow-zinc-950/10 transition hover:bg-zinc-100 active:scale-95"
             >
               Get Started Free
             </a>
             <a
               href="#sandbox"
-              className="inline-flex h-11 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/40 backdrop-blur px-6 text-sm font-medium text-zinc-300 hover:bg-zinc-900/80 hover:text-zinc-100 transition-all"
+              className="pointer-events-auto inline-flex h-12 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/80 px-6 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-50"
             >
               Try SDK Live
             </a>
