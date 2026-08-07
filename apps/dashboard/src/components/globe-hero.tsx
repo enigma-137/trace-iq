@@ -16,7 +16,7 @@ export default function GlobeHero() {
     const scene = new THREE.Scene();
     scene.background = null;
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 0, 5.6);
+    camera.position.set(0, 0, 6.0);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -42,11 +42,9 @@ export default function GlobeHero() {
 
     const globeGroup = new THREE.Group();
     globeGroup.rotation.x = 0.15;
-    // KEY CHANGE: shift the whole globe group down in 3D so only its upper
-    // cap is in frame — this replaces the div-clipping hack with the sphere's
-    // own curved, anti-aliased silhouette. Tune: more negative reveals less
-    // dome (e.g. -2.3), less negative reveals more (e.g. -1.5).
-    globeGroup.position.y = -1.9;
+    // Full round globe — centered in the container so the whole sphere is
+    // visible (its own anti-aliased silhouette, no container clipping).
+    globeGroup.position.y = 0;
     scene.add(globeGroup);
 
     const updateSize = () => {
@@ -147,8 +145,8 @@ export default function GlobeHero() {
       depthWrite: false,
     });
     const glow = new THREE.Sprite(glowMat);
-    glow.scale.set(8, 8, 1);
-    glow.position.set(0, -1.9, -1);
+    glow.scale.set(9, 9, 1);
+    glow.position.set(0, 0, -1);
     scene.add(glow);
 
     // Drag rotation

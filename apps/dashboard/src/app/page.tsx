@@ -1,72 +1,55 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
+import {
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Copy,
+  Code,
+  Menu,
+  MoveUpRight,
+  Play,
+  Terminal,
+  X,
+  Zap
+} from 'lucide-react';
 import GlobeHero from '@/components/globe-hero';
 
-// Custom icons as inline components for light weight and zero dependency friction
-function TraceIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-  );
-}
+const navItems = ['Product', 'Solutions', 'Docs', 'Resources', 'Company'];
 
-function CodeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-    </svg>
-  );
-}
+const metrics = [
+  ['99.99%', 'signal fidelity'],
+  ['2.4M+', 'events modeled daily'],
+  ['< 45ms', 'average trace latency']
+];
 
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-  );
-}
+const faqs = [
+  ['What does TraceIQ observe?', 'TraceIQ maps the full path of every click, API call, web vital, and error across your product, and compiles them into one living behavioral timeline.'],
+  ['How quickly can we get started?', 'Add a few lines of our SDK to your app and see your first live events in minutes. No cookies, no heavy scripts — just one lightweight script under 25 KB.'],
+  ['Do we need cookie banners?', 'No. TraceIQ uses privacy-first, cookieless telemetry hashes that do not store PII, making it GDPR and CCPA compliant out of the box.'],
+  ['How does it compare to Google Analytics?', 'GA4 loads over 45 KB of heavy tracking scripts that can hurt your Core Web Vitals. TraceIQ ships a micro-optimized, asynchronous bundle that stays out of your render path.']
+];
 
-function FlagIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-  );
-}
+const codeExamples = {
+  JavaScript: `import { traceiq } from 'traceiq-sdk-js'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.track('checkout_started', {\n  cartValue: 4200,\n  currency: 'USD',\n})`,
+  'React Native': `import { traceiq } from 'traceiq-react-native'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.track('checkout_started', {\n  cartValue: 4200,\n  currency: 'USD',\n  platform: 'ios',\n})`,
+  Node: `import { TraceIQ } from '@traceiq/node'\n\nconst traceiq = new TraceIQ({\n  projectId: process.env.TRACEIQ_PROJECT_ID,\n  writeKey: process.env.TRACEIQ_WRITE_KEY,\n})\n\nawait traceiq.capture({\n  event: 'checkout_started',\n})`,
+  Python: `from traceiq import Client\n\ntraceiq = Client(\n    project_id="YOUR_PROJECT_ID",\n    write_key="YOUR_WRITE_KEY",\n)\n\ntraceiq.capture("checkout_started",\n    properties={"cart_value": 4200})`,
+  Rust: `use traceiq::Client;\nuse serde_json::json;\n\n#[tokio::main]\nasync fn main() -> Result<(), Box<dyn std::error::Error>> {\n    let traceiq = Client::new("YOUR_PROJECT_ID", "YOUR_WRITE_KEY");\n\n    traceiq\n        .capture("checkout_started", json!({ "cart_value": 4200 }))\n        .await?;\n\n    traceiq.shutdown().await?;\n    Ok(())\n}`
+} as const;
 
-function AlertIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-  );
-}
-
-function CpuIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-    </svg>
-  );
-}
-
-function TerminalIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ className, open }: { className?: string; open?: boolean }) {
-  return (
-    <svg className={`${className} transform transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}
+const mcpConfig = `{
+  "mcpServers": {
+    "traceiq": {
+      "command": "npx",
+      "args": ["-y", "traceiq-mcp-server"],
+      "env": {
+        "TRACEIQ_API_KEY": "tiq_pat_your_token"
+      }
+    }
+  }
+}`;
 
 interface LogEntry {
   id: string;
@@ -76,54 +59,39 @@ interface LogEntry {
   payload?: any;
 }
 
-export default function MarketingHomePage() {
-  // Sandbox State
+export default function Page() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [activeLanguage, setActiveLanguage] = useState<keyof typeof codeExamples>('JavaScript');
+  const [copied, setCopied] = useState(false);
+
+  // Interactive sandbox state
   const [activeTab, setActiveTab] = useState<'event' | 'user' | 'flags' | 'errors'>('event');
   const [logs, setLogs] = useState<LogEntry[]>([
     { id: '1', time: '22:54:08', type: 'sdk', message: 'TraceIQ SDK loaded successfully.' },
     { id: '2', time: '22:54:09', type: 'ingest', message: 'Established connection to telemetry endpoint http://localhost:4000' }
   ]);
-  const consoleEndRef = useRef<HTMLDivElement>(null);
 
-  // FAQ State
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-
-  useEffect(() => {
-    consoleEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
+  const copyCode = async () => {
+    await navigator.clipboard.writeText(codeExamples[activeLanguage]);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
 
   const addLog = (type: 'sdk' | 'ingest' | 'error' | 'flag', message: string, payload?: any) => {
     const time = new Date().toTimeString().split(' ')[0];
-    const newLog: LogEntry = {
-      id: Math.random().toString(),
-      time,
-      type,
-      message,
-      payload
-    };
-    setLogs((prev) => [...prev.slice(-14), newLog]); // Keep last 15 items
+    const newLog: LogEntry = { id: Math.random().toString(), time, type, message, payload };
+    setLogs((prev) => [...prev.slice(-14), newLog]);
   };
 
   const simulateSDKEvent = () => {
     if (activeTab === 'event') {
-      addLog('sdk', 'traceiq.track("purchase_completed")', {
-        amount: 89.00,
-        currency: 'USD',
-        items: 1,
-        gateway: 'stripe'
-      });
+      addLog('sdk', 'traceiq.track("purchase_completed")', { amount: 89.0, currency: 'USD', items: 1, gateway: 'stripe' });
       setTimeout(() => {
-        addLog('ingest', 'Event "purchase_completed" ingested successfully. Latency: 14ms.', {
-          status: 202,
-          eventId: `evt_${Math.floor(Math.random() * 900000 + 100000)}`
-        });
+        addLog('ingest', 'Event "purchase_completed" ingested successfully. Latency: 14ms.', { status: 202, eventId: `evt_${Math.floor(Math.random() * 900000 + 100000)}` });
       }, 300);
     } else if (activeTab === 'user') {
-      addLog('sdk', 'traceiq.identify("usr_9981")', {
-        email: 'developer@example.com',
-        tier: 'enterprise',
-        createdAt: '2026-07-06'
-      });
+      addLog('sdk', 'traceiq.identify("usr_9981")', { email: 'developer@example.com', tier: 'enterprise', createdAt: '2026-07-06' });
       setTimeout(() => {
         addLog('ingest', 'User profile associated. Properties synced with cohort engine.');
       }, 250);
@@ -146,398 +114,310 @@ export default function MarketingHomePage() {
     errors: `import { traceiq } from 'traceiq-sdk-js';\n\ntry {\n  initiatePayment();\n} catch (error) {\n  traceiq.trackError(error, {\n    context: 'Checkout page failure'\n  });\n}`
   };
 
-  const faqs = [
-    {
-      q: "What is TraceIQ?",
-      a: "TraceIQ is an open-source, developer-first behavior intelligence platform. It brings event tracking, conversion funnels, user timelines, and performance errors into one lightweight SDK (under 25 KB) and an easy-to-use analytics dashboard."
-    },
-    {
-      q: "Do I need standard cookie banners with TraceIQ?",
-      a: "No! By default, TraceIQ tracks user sessions using privacy-first, cookieless telemetry hashes that do not store personally identifiable information (PII) on the device. This makes it GDPR and CCPA compliant out of the box."
-    },
-    {
-      q: "How does the performance compare with Google Analytics?",
-      a: "Google Analytics (GA4) loads scripts over 45 KB, runs heavy tracking scripts, and blocks rendering. TraceIQ uses a micro-optimized JS bundle under 25 KB that runs asynchronously and won't affect your Core Web Vitals (LCP, INP, CLS)."
-    },
-    {
-      q: "Can I self-host TraceIQ?",
-      a: "Absolutely! TraceIQ is architected with Docker and PostgreSQL. You can use our managed Cloud version for quick starts or deploy it on your own infrastructure (AWS, Vercel, Fly.io, etc.) for absolute data sovereignty."
-    }
-  ];
-
   return (
-    <div className="relative min-h-screen bg-[#050505] text-zinc-50 overflow-hidden bg-grid-dots" style={{ fontFamily: 'var(--font-inter)' }}>
-      {/* Background Glowing Blobs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-white/5 rounded-full glow-blob animate-pulse-slow pointer-events-none" />
-      <div className="absolute top-20 right-1/4 w-80 h-80 bg-zinc-200/5 rounded-full glow-blob animate-float pointer-events-none" />
-      <div className="absolute top-1/3 left-1/3 w-[30rem] h-[30rem] bg-white/5 rounded-full glow-blob animate-pulse-slow pointer-events-none" />
+    <main className="traceiq-site min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="site-noise" aria-hidden="true" />
 
-      {/* Header/Navbar */}
-      <header className="fixed top-0 inset-x-0 z-50 border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md transition-all duration-200">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-8 w-auto" />
+      {/* Header */}
+      <header className="site-header">
+        <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-5 sm:px-8">
+          <a className="brand" href="#top" aria-label="TraceIQ home">
+            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-7 w-auto" />
+          </a>
+          <nav className={`desktop-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
+            {navItems.map((item) => (
+              <a href={`#${item.toLowerCase()}`} key={item}>{item}<ChevronDown size={13} /></a>
+            ))}
+          </nav>
+          <div className="header-actions">
+            <a className="button button-small" href="/waitlist">Get started <ArrowUpRight size={14} /></a>
+            <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'}>
+              {menuOpen ? <X /> : <Menu />}
+            </button>
           </div>
-
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors">Features</a>
-            <a href="#sandbox" className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors">Interactive Demo</a>
-            <a href="#faq" className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors">FAQ</a>
-            <a href="/docs" className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors">Docs</a>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors flex items-center gap-1.5">
-              GitHub
-              <span className="text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-full font-mono">v0.1.0</span>
-            </a>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a 
-              href="/waitlist" 
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-zinc-50 px-4 text-sm font-medium text-zinc-950 shadow hover:bg-zinc-200 active:scale-[0.98] transition-all"
-            >
-              Start Free
-            </a>
-          </div>
-        </nav>
+        </div>
       </header>
 
-      {/* Hero Section — full screen, globe bleeds off the bottom edge */}
-      <section className="relative min-h-screen w-full overflow-hidden">
-        {/* Globe layer: fills the whole hero. The sphere is pushed down in 3D
-            inside the canvas, so the soft "top" is the sphere's own curved
-            anti-aliased silhouette — not a clipped box edge. The section's
-            overflow-hidden keeps it from bleeding into the sandbox below. */}
-        <div className="absolute inset-0">
+      {/* Hero — new design copy + existing globe */}
+      <section className="hero mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:gap-8 lg:py-24" id="top">
+        <div className="hero-copy">
+          <div className="eyebrow"><span className="status-dot" /> Observe everything. Understand instantly.</div>
+          <h1>Clarity for<br /><em>complex systems.</em></h1>
+          <p>TraceIQ turns clicks, API response rates, web vitals, and errors into a clear, living map of how your software really works.</p>
+          <div className="hero-actions">
+            <a className="button" href="/waitlist">Start tracing <ArrowUpRight size={16} /></a>
+            <a className="quiet-link" href="#sandbox"><Play size={14} fill="currentColor" /> See how it works</a>
+          </div>
+          <div className="hero-note"><span>Trusted by teams building what&apos;s next</span><span className="note-line" /></div>
+        </div>
+        <div className="hero-globe">
           <GlobeHero />
         </div>
+      </section>
 
-        {/* Soft atmospheric blend right where the dome's arc meets the text */}
-        <div
-          className="pointer-events-none absolute inset-x-0 z-[5] blur-2xl"
-          style={{
-            top: '38%',
-            height: '30%',
-            background:
-              'radial-gradient(ellipse 65% 100% at 50% 0%, rgba(5,5,5,0.9) 0%, rgba(5,5,5,0.5) 40%, rgba(5,5,5,0) 75%)'
-          }}
-        />
+      {/* Metrics */}
+      <section className="metrics mx-auto grid max-w-[1060px] grid-cols-1 border-y border-border px-5 py-6 sm:grid-cols-3 sm:px-0 sm:py-7" aria-label="TraceIQ performance metrics">
+        {metrics.map(([value, label]) => <div className="metric" key={label}><strong>{value}</strong><span>{label}</span></div>)}
+      </section>
 
-        {/* Bottom fade so the globe eases into the footer content below it
-            instead of cutting off hard at the section boundary */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" />
-
-        {/* Copy layer */}
-        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center justify-start gap-6 px-6 pt-32 sm:pt-36 text-center pointer-events-none">
-          <span className="pointer-events-auto rounded-full border border-zinc-700 bg-zinc-950/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-zinc-300 backdrop-blur-sm">
-            Telemetry SDK under 25 KB
-          </span>
-          <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
-            See user journeys.<br />
-            <span className="text-zinc-400">Solve conversion friction.</span>
-          </h1>
-          <p className="max-w-2xl text-base text-zinc-400 sm:text-lg lg:text-xl leading-relaxed">
-            TraceIQ logs clicks, API response rates, web vitals, and errors. It compiles them into interactive timelines and conversion paths, giving developers the precise signals needed to build seamless product flows.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 pt-2">
-            <a
-              href="/waitlist"
-              className="pointer-events-auto inline-flex h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-zinc-950 shadow-lg shadow-zinc-950/10 transition hover:bg-zinc-100 active:scale-95"
-            >
-              Get Started Free
-            </a>
-            <a
-              href="#sandbox"
-              className="pointer-events-auto inline-flex h-12 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/80 px-6 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-50"
-            >
-              Try SDK Live
-            </a>
+      {/* Intro / signal layer */}
+      <section className="traceiq-frame mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-36" id="product">
+        <div className="section-kicker">01 / The signal layer</div>
+        <div className="intro-grid">
+          <h2>See the whole picture.<br /><em>Not just the symptoms.</em></h2>
+          <p>Modern software is a network of invisible relationships. TraceIQ makes those relationships visible, so teams can move from alert to answer without guesswork.</p>
+        </div>
+        <div className="signal-card">
+          <div className="signal-top">
+            <span className="mini-label">TRACE / LIVE</span>
+            <span className="signal-value"><span className="status-dot" /> All systems nominal</span>
+          </div>
+          <div className="trace-lines"><span /><span /><span /><span /><span /><span /></div>
+          <div className="signal-bottom">
+            <span>checkout-service</span><span>api-gateway</span><span>analytics-ingest</span><span>payments-db</span><span>queue-worker</span>
           </div>
         </div>
       </section>
 
-      {/* Interactive SDK Sandbox Section */}
-      <section id="sandbox" className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-900">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-zinc-50">
-            One Script. Real-time Telemetry.
-          </h2>
-          <p className="mt-4 text-zinc-400">
-            Switch between telemetry snippets, run them live, and view the raw payload streamed from your client directly to our trace ingestion pipeline.
-          </p>
+      {/* SDK quickstart */}
+      <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-28" id="docs">
+        <div className="section-kicker">02 / Meet your stack</div>
+        <div className="sdk-heading">
+          <h2>Instrument once.<br /><em>See everything.</em></h2>
+          <p>TraceIQ fits into the tools you already use. Add a few lines, ship with confidence, and keep the signal close to the code.</p>
+        </div>
+        <div className="code-window overflow-hidden rounded-xl shadow-2xl">
+          <div className="code-window-top">
+            <div className="window-dots"><i /><i /><i /></div>
+            <span className="window-title">traceiq / quickstart</span>
+            <button className="copy-button" onClick={copyCode} aria-label="Copy code">
+              {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <div className="code-window-body">
+            <div className="language-tabs" role="tablist" aria-label="Choose SDK language">
+              {(Object.keys(codeExamples) as Array<keyof typeof codeExamples>).map((language) => (
+                <button key={language} role="tab" aria-selected={activeLanguage === language} className={activeLanguage === language ? 'is-active' : ''} onClick={() => setActiveLanguage(language)}>
+                  {language}
+                </button>
+              ))}
+            </div>
+            <pre aria-label={`${activeLanguage} TraceIQ example`}><code>{codeExamples[activeLanguage]}</code></pre>
+          </div>
+          <div className="code-window-foot">
+            <span>traceiq-sdk</span>
+            <a href="/docs">Read the docs <ArrowUpRight size={13} /></a>
+          </div>
+        </div>
+        <div className="sdk-pills">
+          <span>Under 25 KB</span><span>Auto-capture exceptions</span><span>Timeline-driven</span><span>Server-side ready</span>
+        </div>
+      </section>
+
+      {/* MCP / AI copilot */}
+      <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-28" id="ai">
+        <div className="section-kicker">03 / Bring your AI copilot</div>
+        <div className="sdk-heading">
+          <h2>Point your AI at<br /><em>your real data.</em></h2>
+          <p>TraceIQ ships an MCP server, so Claude, Cursor, and other agents can read your funnels, retention, users, and API health — and even toggle feature flags — straight from your trace data.</p>
+        </div>
+        <div className="code-window overflow-hidden rounded-xl shadow-2xl">
+          <div className="code-window-top">
+            <div className="window-dots"><i /><i /><i /></div>
+            <span className="window-title">mcp / servers.json</span>
+          </div>
+          <div className="code-window-body">
+            <pre aria-label="TraceIQ MCP server configuration"><code>{mcpConfig}</code></pre>
+          </div>
+          <div className="code-window-foot">
+            <span>traceiq-mcp-server</span>
+            <a href="/docs#mcp">MCP docs <ArrowUpRight size={13} /></a>
+          </div>
+        </div>
+        <div className="sdk-pills">
+          <span>30+ tools</span><span>Funnels &amp; retention</span><span>User timelines</span><span>API health</span><span>Toggle flags</span>
+        </div>
+      </section>
+
+      {/* Interactive SDK sandbox */}
+      <section id="sandbox" className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-20 sm:px-8">
+        <div className="section-kicker">Live telemetry test-drive</div>
+        <div className="sdk-heading">
+          <h2>One script.<br /><em>Real-time telemetry.</em></h2>
+          <p>Switch between telemetry snippets, run them live, and watch the raw payload stream into our trace ingestion pipeline.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {/* Mock IDE Card */}
-          <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/30 backdrop-blur-md overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/60 border-b border-zinc-800/80">
+          <div className="flex flex-col rounded-xl border border-border bg-white/[0.02] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <span className="size-3 rounded-full bg-rose-500/80" />
                 <span className="size-3 rounded-full bg-amber-500/80" />
                 <span className="size-3 rounded-full bg-emerald-500/80" />
                 <span className="ml-2 text-xs font-mono text-zinc-500">app/trace-test.ts</span>
               </div>
-              <div className="flex items-center gap-1 bg-zinc-950 rounded px-2 py-0.5 border border-zinc-800/60">
-                <CodeIcon className="size-3.5 text-zinc-500" />
-                <span className="text-[10px] font-mono text-zinc-500">TypeScript</span>
-              </div>
+              <span className="inline-flex items-center gap-1.5 rounded bg-black/40 px-2 py-0.5 text-[10px] font-mono text-zinc-500"><Code size={12} /> TypeScript</span>
             </div>
 
-            {/* Tabs */}
-            <div className="grid grid-cols-4 border-b border-zinc-800/80 bg-zinc-950/40 text-xs font-mono text-zinc-400">
-              <button 
-                onClick={() => setActiveTab('event')}
-                className={`py-2 px-1 text-center border-r border-zinc-800/60 transition-all ${activeTab === 'event' ? 'bg-zinc-900/40 text-amber-400 border-b-2 border-b-amber-400' : 'hover:bg-zinc-900/20'}`}
-              >
-                Track Event
-              </button>
-              <button 
-                onClick={() => setActiveTab('user')}
-                className={`py-2 px-1 text-center border-r border-zinc-800/60 transition-all ${activeTab === 'user' ? 'bg-zinc-900/40 text-rose-400 border-b-2 border-b-rose-400' : 'hover:bg-zinc-900/20'}`}
-              >
-                Identify User
-              </button>
-              <button 
-                onClick={() => setActiveTab('flags')}
-                className={`py-2 px-1 text-center border-r border-zinc-800/60 transition-all ${activeTab === 'flags' ? 'bg-zinc-900/40 text-indigo-400 border-b-2 border-b-indigo-400' : 'hover:bg-zinc-900/20'}`}
-              >
-                Feature Flags
-              </button>
-              <button 
-                onClick={() => setActiveTab('errors')}
-                className={`py-2 px-1 text-center transition-all ${activeTab === 'errors' ? 'bg-zinc-900/40 text-red-400 border-b-2 border-b-red-400' : 'hover:bg-zinc-900/20'}`}
-              >
-                Error Capture
-              </button>
+            <div className="grid grid-cols-4 border-b border-border text-xs font-mono text-zinc-400">
+              {([
+                ['event', 'Track'],
+                ['user', 'User'],
+                ['flags', 'Flags'],
+                ['errors', 'Errors']
+              ] as const).map(([tab, label]) => (
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`py-2.5 px-1 text-center border-r border-border transition-colors ${activeTab === tab ? 'bg-white/[0.06] text-zinc-100' : 'hover:bg-white/[0.03]'}`}>
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {/* Code Snippet Box */}
-            <div className="flex-1 p-6 bg-zinc-950/60 font-mono text-sm text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre">
-              {codeSnippets[activeTab]}
-            </div>
+            <div className="flex-1 p-5 font-mono text-sm text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre">{codeSnippets[activeTab]}</div>
 
-            {/* Trigger Button */}
-            <div className="px-6 py-4 bg-zinc-900/40 border-t border-zinc-800/80 flex items-center justify-between">
+            <div className="flex items-center justify-between px-5 py-4 border-t border-border">
               <span className="text-xs text-zinc-500 font-mono">SDK simulation ready.</span>
-              <button 
-                onClick={simulateSDKEvent}
-                className="inline-flex h-9 items-center gap-2 rounded bg-zinc-50 px-4 text-xs font-semibold text-zinc-950 shadow hover:bg-zinc-200 transition-all active:scale-95"
-              >
-                <TraceIcon className="size-4" />
-                Fire Telemetry Event
+              <button onClick={simulateSDKEvent} className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-50 px-4 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-200 active:scale-95">
+                <Zap size={14} /> Fire event
               </button>
             </div>
           </div>
 
-          {/* Console Log Terminal */}
-          <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-950/90 overflow-hidden shadow-2xl min-h-[300px]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/40 border-b border-zinc-800/80">
+          {/* Console */}
+          <div className="flex flex-col rounded-xl border border-border overflow-hidden min-h-[320px]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <TerminalIcon className="size-4 text-zinc-400" />
-                <span className="text-xs font-mono text-zinc-300 font-medium">TraceIQ Ingest Engine Console</span>
+                <Terminal size={14} className="text-zinc-400" />
+                <span className="text-xs font-mono text-zinc-300">TraceIQ Ingest Console</span>
               </div>
-              <button 
-                onClick={() => setLogs([])}
-                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 bg-zinc-900/30 transition-all"
-              >
-                Clear Log
+              <button onClick={() => setLogs([])} className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded border border-border">
+                Clear
               </button>
             </div>
-
-            {/* Logs Area */}
-            <div className="flex-1 p-4 font-mono text-xs overflow-y-auto space-y-3 max-h-[360px] custom-scrollbar">
+            <div className="flex-1 p-4 font-mono text-xs overflow-y-auto space-y-3 max-h-[380px]">
               {logs.map((log) => (
-                <div key={log.id} className="border-b border-zinc-900/80 pb-2">
+                <div key={log.id} className="border-b border-white/5 pb-2">
                   <div className="flex items-start gap-2">
-                    <span className="text-zinc-600 font-medium shrink-0">[{log.time}]</span>
-                    
-                    {log.type === 'sdk' && <span className="text-amber-400 shrink-0">[SDK]</span>}
-                    {log.type === 'ingest' && <span className="text-emerald-400 shrink-0">[INGEST]</span>}
-                    {log.type === 'flag' && <span className="text-indigo-400 shrink-0">[FLAG]</span>}
+                    <span className="text-zinc-600 shrink-0">[{log.time}]</span>
+                    {log.type === 'sdk' && <span className="text-amber-400/90 shrink-0">[SDK]</span>}
+                    {log.type === 'ingest' && <span className="text-emerald-400/90 shrink-0">[INGEST]</span>}
+                    {log.type === 'flag' && <span className="text-indigo-400/90 shrink-0">[FLAG]</span>}
                     {log.type === 'error' && <span className="text-red-500 shrink-0 font-bold">[ERROR]</span>}
-
                     <span className="text-zinc-200">{log.message}</span>
                   </div>
                   {log.payload && (
-                    <pre className="mt-1 ml-10 p-2 rounded bg-zinc-900/50 text-[11px] text-zinc-400 border border-zinc-900 overflow-x-auto">
+                    <pre className="mt-1 ml-8 p-2 rounded bg-black/40 text-[11px] text-zinc-400 border border-white/5 overflow-x-auto">
                       {JSON.stringify(log.payload, null, 2)}
                     </pre>
                   )}
                 </div>
               ))}
-              <div ref={consoleEndRef} />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Bento Grid Features Section */}
-      <section id="features" className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-900">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-zinc-50">
-            Engineered for modern web telemetry.
-          </h2>
-          <p className="mt-4 text-zinc-400">
-            A comprehensive suite of analytics tools unified inside a single telemetry pipeline.
-          </p>
+      {/* Features */}
+      <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-32" id="solutions">
+        <div className="section-kicker">02 / Built for the edges</div>
+        <div className="feature-heading">
+          <h2>Every signal,<br /><em>in focus.</em></h2>
+          <p>One observability layer for every event, every handoff, every moment that matters — from first click to final conversion.</p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {/* Card 1: Event Ingestion */}
-          <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
-              <TraceIcon className="size-5" />
+        <div className="feature-grid">
+          <article className="feature-card feature-wide">
+            <div>
+              <span className="card-number">01</span>
+              <h3>Follow the thread.</h3>
+              <p>End-to-end user timelines that stay intelligible as your segments and funnels grow.</p>
             </div>
-            <h3 className="text-lg font-semibold text-zinc-100">Custom Event Ingestion</h3>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-              Track transactional processes, checkout workflows, and user engagement logs with custom metadata properties.
-            </p>
-          </div>
-
-          {/* Card 2: Funnel Dropoffs */}
-          <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
-              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100">Funnel Drop-off Analysis</h3>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-              Build custom multi-step funnels to map out step-by-step drop-offs, comparing success rates between device variants.
-            </p>
-          </div>
-
-          {/* Card 3: User Timelines */}
-          <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
-              <UserIcon className="size-5" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100">High-Fidelity Timelines</h3>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-              Drill down into individual user logs. Understand exactly what actions preceded a checkout failure or API timeout.
-            </p>
-          </div>
-
-          {/* Card 4: Session Replay */}
-          <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
-              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100">Session Replay Scaffolding</h3>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-              Ready-made layer abstraction for visual session replay pipelines (designed for future DOM snapshotting integrations).
-            </p>
-          </div>
-
-          {/* Card 5: Error Diagnostics */}
-          <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
-              <AlertIcon className="size-5" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100">Error Tracking & Context</h3>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-              Capture front-end exceptions immediately. Associate stack traces with active behavioral telemetry trails.
-            </p>
-          </div>
-
-          {/* Card 6: AI Insights */}
-          <div className="group rounded-xl border border-zinc-900 bg-zinc-900/10 backdrop-blur-sm p-6 hover:border-zinc-800 transition-all duration-300">
-            <div className="size-10 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-100 mb-4 border border-zinc-800 group-hover:border-zinc-500/50 transition-colors">
-              <CpuIcon className="size-5" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100">AI Intelligence Core</h3>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-              Scaffolded architecture ready for automatic anomaly scoring, UX friction reports, and design suggestion triggers.
-            </p>
-          </div>
+            <div className="orbit-graphic"><i /><i /><i /><b>→</b></div>
+          </article>
+          <article className="feature-card">
+            <span className="card-number">02</span>
+            <h3>Find the friction.</h3>
+            <p>Surface the exact step, event, or variant behind every funnel drop-off.</p>
+            <div className="fracture-graphic"><span /><span /><span /><span /><span /></div>
+          </article>
+          <article className="feature-card">
+            <span className="card-number">03</span>
+            <h3>Move with signal.</h3>
+            <p>Give every team the context to act before customers feel the impact.</p>
+            <div className="signal-bars"><span /><span /><span /><span /><span /><span /></div>
+          </article>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section id="faq" className="relative mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-900">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-50">
-            Frequently Asked Questions
-          </h2>
+      {/* Workflow */}
+      <section className="traceiq-frame section mx-auto grid max-w-[1060px] gap-12 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:gap-20 lg:py-36" id="resources">
+        <div>
+          <div className="section-kicker">03 / From event to insight</div>
+          <div className="workflow-copy">
+            <h2>Make every<br /><em>millisecond count.</em></h2>
+            <p style={{ marginTop: 20 }}>TraceIQ keeps your team in the flow by connecting the tiny details to the big picture.</p>
+            <a className="quiet-link" href="/docs">Explore the platform <MoveUpRight size={15} /></a>
+          </div>
         </div>
-
-        <div className="space-y-4 max-w-3xl mx-auto">
-          {faqs.map((faq, index) => {
-            const isOpen = expandedFaq === index;
-            return (
-              <div 
-                key={index} 
-                className="rounded-xl border border-zinc-900 bg-zinc-900/10 overflow-hidden transition-all duration-200"
-              >
-                <button
-                  onClick={() => setExpandedFaq(isOpen ? null : index)}
-                  className="w-full flex items-center justify-between p-5 text-left font-medium text-zinc-200 hover:text-white transition-colors"
-                >
-                  <span>{faq.q}</span>
-                  <ChevronIcon className="size-5 text-zinc-500" open={isOpen} />
-                </button>
-                {isOpen && (
-                  <div className="p-5 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-zinc-900/50 bg-zinc-950/20">
-                    {faq.a}
-                  </div>
-                )}
+        <div className="workflow-steps">
+          {['Instrument once', 'Connect every layer', 'Resolve with confidence'].map((step, i) => (
+            <div className="workflow-step" key={step}>
+              <span>0{i + 1}</span>
+              <div>
+                <h3>{step}</h3>
+                <p>{['Drop in our SDK and start collecting rich, structured telemetry.', 'See events, users, and performance errors as one connected system.', 'Turn context into action with answers your team can trust.'][i]}</p>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Call to Action Section */}
-      <section className="relative mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="relative rounded-2xl border border-zinc-800 bg-zinc-900/20 backdrop-blur px-8 py-12 text-center overflow-hidden shadow-3xl">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/5 pointer-events-none" />
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-zinc-100">
-            Ready to trace client conversion behavior?
-          </h2>
-          <p className="mt-4 text-zinc-400 max-w-xl mx-auto text-sm sm:text-base">
-            Integrate the TraceIQ script in under 5 minutes. Capture telemetry signals, diagnose conversion failures, and scale seamlessly.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <a
-              href="/waitlist"
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-50 px-6 text-sm font-semibold text-zinc-950 shadow hover:bg-zinc-200 transition-all active:scale-[0.98]"
-            >
-              Sign Up For Free
-            </a>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-800 px-6 text-sm font-medium text-zinc-300 hover:bg-zinc-900 transition-all"
-            >
-              Self-Host Node
-            </a>
+      {/* FAQ */}
+      <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-32" id="company">
+        <div className="section-kicker">04 / Clear by design</div>
+        <div className="faq-grid">
+          <h2>Questions,<br /><em>answered.</em></h2>
+          <div className="faq-list">
+            {faqs.map(([question, answer], i) => (
+              <div className={`faq-item ${openFaq === i ? 'active' : ''}`} key={question}>
+                <button onClick={() => setOpenFaq(openFaq === i ? null : i)}>
+                  <span>{question}</span><ChevronDown size={18} />
+                </button>
+                {openFaq === i && <p>{answer}</p>}
+              </div>
+            ))}
           </div>
         </div>
+      </section>
+
+      {/* CTA */}
+      <section className="cta-section border-t border-border" id="contact">
+        <div className="cta-glow" />
+        <span className="eyebrow"><span className="status-dot" /> Ready when you are</span>
+        <h2>See what your<br /><em>systems are saying.</em></h2>
+        <a className="button" href="/waitlist">Get started <ArrowUpRight size={16} /></a>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-900 bg-zinc-950/60 py-12 mt-16 text-xs text-zinc-500 font-mono">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-6 w-auto" />
+      <footer className="site-footer">
+        <div className="mx-auto max-w-[1200px] px-5 sm:px-8 grid grid-cols-1 gap-12 md:grid-cols-2">
+          <div className="footer-brand">
+            <a className="brand" href="#top"><img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-6 w-auto" /></a>
+            <p>Make complexity legible.</p>
+            <span className="footer-status"><span className="status-dot" /> All systems operational</span>
           </div>
-
-          <div className="flex flex-wrap gap-x-8 gap-y-2 justify-center">
-            <a href="#features" className="hover:text-zinc-300 transition-colors">Features</a>
-            <a href="#sandbox" className="hover:text-zinc-300 transition-colors">Developer Console</a>
-            <a href="#faq" className="hover:text-zinc-300 transition-colors">FAQ</a>
-            <a href="/docs" className="hover:text-zinc-300 transition-colors">Docs</a>
+          <div className="footer-links">
+            <div><strong>Product</strong><a href="#product">Overview</a><a href="#solutions">Solutions</a><a href="/docs">Resources</a></div>
+            <div><strong>Company</strong><a href="#company">About</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.dev">Contact</a></div>
+            <div><strong>Connect</strong><a href="/docs">Docs</a><span className="disabled-link">Status</span></div>
           </div>
-
-          <div>
-            &copy; {new Date().getFullYear()} TraceIQ Analytics, Inc. All rights reserved.
+        </div>
+        <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
+          <div className="footer-bottom">
+            <span>© 2026 TraceIQ</span>
+            <span>Built for the signal.</span>
           </div>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }
