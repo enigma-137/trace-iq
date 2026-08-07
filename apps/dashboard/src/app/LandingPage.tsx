@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import GlobeHero from '@/components/globe-hero';
 
@@ -505,17 +504,17 @@ export default function LandingPage() {
 
       <main id="main">
         {/* Hero Section — full screen, globe bleeds off the bottom edge */}
-        <section id="top" className="relative min-h-[100svh] w-full overflow-hidden">
+        {/* <section id="top" className="relative min-h-[100svh] w-full overflow-hidden"> */}
           {/* Globe layer: fills the whole hero. The sphere is pushed down in 3D
               inside the canvas, so the soft "top" is the sphere's own curved
               anti-aliased silhouette — not a clipped box edge. The section's
               overflow-hidden keeps it from bleeding into the sandbox below. */}
-          <div className="absolute inset-0">
+          {/* <div className="absolute inset-0">
             <GlobeHero />
-          </div>
+          </div> */}
 
           {/* Soft atmospheric blend right where the dome's arc meets the text */}
-          <div
+          {/* <div
             className="pointer-events-none absolute inset-x-0 z-[5] blur-2xl"
             style={{
               top: '38%',
@@ -523,14 +522,14 @@ export default function LandingPage() {
               background:
                 'radial-gradient(ellipse 65% 100% at 50% 0%, rgba(5,5,5,0.9) 0%, rgba(5,5,5,0.5) 40%, rgba(5,5,5,0) 75%)'
             }}
-          />
+          /> */}
 
           {/* Bottom fade so the globe eases into the content below it
               instead of cutting off hard at the section boundary */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" />
+          {/* <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" /> */}
 
           {/* Copy layer */}
-          <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center justify-start gap-5 px-5 pb-20 pt-28 text-center sm:gap-6 sm:px-6 sm:pt-36">
+          {/* <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center justify-start gap-5 px-5 pb-20 pt-28 text-center sm:gap-6 sm:px-6 sm:pt-36">
             <span className="pointer-events-auto rounded-full border border-zinc-700 bg-zinc-950/75 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-300 backdrop-blur-sm sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.24em]">
               Telemetry SDK under 25 KB
             </span>
@@ -564,10 +563,10 @@ export default function LandingPage() {
               <CopyButton value="npm i traceiq-sdk-js" label="install command" />
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* Interactive SDK Sandbox Section */}
-        <section
+        {/* <section
           id="sandbox"
           className="relative mx-auto max-w-7xl scroll-mt-20 border-t border-zinc-900 px-4 py-16 sm:px-6 sm:py-24 lg:px-8"
         >
@@ -575,11 +574,11 @@ export default function LandingPage() {
             eyebrow="Interactive demo"
             title="One script. Real-time telemetry."
             lede="Switch between telemetry snippets, run them live, and watch the raw payload stream from the client straight into the trace ingestion pipeline."
-          />
+          /> */}
 
-          <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-6 lg:grid-cols-2 lg:gap-8">
+          {/* <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-6 lg:grid-cols-2 lg:gap-8"> */}
             {/* Mock IDE Card */}
-            <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30 shadow-2xl backdrop-blur-md">
+            {/* <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30 shadow-2xl backdrop-blur-md">
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="size-3 shrink-0 rounded-full bg-rose-500/80" />
@@ -591,10 +590,10 @@ export default function LandingPage() {
                   <CodeIcon className="size-3.5 text-zinc-500" />
                   <span className="font-mono text-[10px] text-zinc-500">TypeScript</span>
                 </div>
-              </div>
+              </div> */}
 
               {/* Tabs — 2×2 on phones so the labels never crush */}
-              <div
+              {/* <div
                 role="tablist"
                 aria-label="SDK examples"
                 className="grid grid-cols-2 border-b border-zinc-800/80 bg-zinc-950/40 font-mono text-xs text-zinc-400 sm:grid-cols-4"
@@ -617,9 +616,9 @@ export default function LandingPage() {
                     </button>
                   );
                 })}
-              </div>
+              </div> */}
 
-              <div
+              {/* <div
                 id="sandbox-snippet"
                 className="flex-1 overflow-x-auto whitespace-pre bg-zinc-950/60 p-4 font-mono text-xs leading-relaxed text-zinc-300 sm:p-6 sm:text-sm"
               >
@@ -637,10 +636,10 @@ export default function LandingPage() {
                   Fire Telemetry Event
                 </button>
               </div>
-            </div>
+            </div> */}
 
             {/* Console Log Terminal */}
-            <div className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/90 shadow-2xl">
+            {/* <div className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/90 shadow-2xl">
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 bg-zinc-900/40 px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <TerminalIcon className="size-4 shrink-0 text-zinc-400" />
@@ -689,10 +688,10 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* SDKs Section */}
-        <section
+        {/* <section
           id="sdks"
           className="relative mx-auto max-w-7xl scroll-mt-20 border-t border-zinc-900 px-4 py-16 sm:px-6 sm:py-24 lg:px-8"
         >
@@ -730,7 +729,7 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </section>
+        </section> */}
 
         {/* Bento Grid Features Section */}
         <section
@@ -771,7 +770,7 @@ export default function LandingPage() {
         </section>
 
         {/* FAQ Section */}
-        <section
+        {/* <section
           id="faq"
           className="relative mx-auto max-w-4xl scroll-mt-20 border-t border-zinc-900 px-4 py-16 sm:px-6 sm:py-24 lg:px-8"
         >
@@ -806,10 +805,10 @@ export default function LandingPage() {
               );
             })}
           </div>
-        </section>
+        </section> */}
 
         {/* Call to Action Section */}
-        <section className="relative mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+        {/* <section className="relative mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
           <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/20 px-5 py-10 text-center shadow-2xl backdrop-blur sm:px-8 sm:py-14">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-white/5" />
             <div className="relative">
@@ -839,11 +838,11 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </section> */}
       </main>
 
       {/* Footer */}
-      <footer className="mt-8 border-t border-zinc-900 bg-zinc-950/60 py-12 sm:mt-16">
+      {/* <footer className="mt-8 border-t border-zinc-900 bg-zinc-950/60 py-12 sm:mt-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             <div className="col-span-2 sm:col-span-1">
@@ -889,7 +888,7 @@ export default function LandingPage() {
             <span>{VERSION}</span>
           </div>
         </div>
-      </footer>
+      </footer> */}
     </div>
   );
 }
