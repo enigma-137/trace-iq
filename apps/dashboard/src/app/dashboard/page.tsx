@@ -6,8 +6,9 @@ import { comparisonText, compactNumber, deltaInfo, formatCount } from '@/lib/met
 import { StatTile } from '@/components/charts/StatTile';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MiniBars } from '@/components/charts/MiniBars';
+import { BarChart } from '@/components/charts/BarChart';
+import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
-import { RankedList } from '@/components/charts/RankedList';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,7 +93,13 @@ export default async function DashboardPage({
             </a>
           </div>
           <div className="relative mt-4">
-            <Sparkline points={overview?.sparkline ?? []} height={140} filled className="h-64 w-full" />
+            <BarChart
+              items={(overview?.sparkline ?? []).map((point) => ({ label: shortBucket(point.bucket), value: point.total }))}
+              tone="blue"
+              showValues
+              height={220}
+              className="h-64 w-full"
+            />
           </div>
         </div>
 
@@ -109,8 +116,10 @@ export default async function DashboardPage({
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Devices (30 days)
           </p>
-          <RankedList
-            items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, total: d.total }))}
+          <DonutChart
+            items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total }))}
+            centerValue={compactNumber((overview?.topDevices ?? []).reduce((sum, d) => sum + d.total, 0))}
+            centerLabel="events"
             emptyLabel="No device data yet."
           />
         </div>
@@ -119,8 +128,10 @@ export default async function DashboardPage({
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Locations (30 days)
           </p>
-          <RankedList
-            items={(overview?.topCountries ?? []).map((c) => ({ label: c.name, total: c.total }))}
+          <DonutChart
+            items={(overview?.topCountries ?? []).map((c) => ({ label: c.name, value: c.total }))}
+            centerValue={compactNumber((overview?.topCountries ?? []).reduce((sum, c) => sum + c.total, 0))}
+            centerLabel="events"
             emptyLabel="No location data yet (needs public-IP traffic)."
           />
         </div>
@@ -230,6 +241,11 @@ function trendLabel(values: number[]) {
   const change = Math.round(((last - first) / first) * 100);
   if (change === 0) return 'flat';
   return `${change > 0 ? '+' : ''}${change}%`;
+}
+
+function shortBucket(bucket: string): string {
+  if (bucket.includes('T')) return bucket.split('T')[1].slice(0, 5);
+  return bucket.slice(5);
 }
 
 
