@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Select } from '@traceiq/ui';
 import { SegmentFilters, FilterCondition, cleanFilters } from './SegmentFilters';
 
 interface SegmentBarProps {
@@ -18,6 +19,7 @@ export function SegmentBar({ basePath, cohorts, initialFilters }: SegmentBarProp
   const [filters, setFilters] = useState<FilterCondition[]>(
     initialFilters.length ? initialFilters : [{ field: '', operator: 'is', value: '' }]
   );
+  const [cohortId, setCohortId] = useState('');
   const [isPending, startTransition] = useTransition();
 
   function pushFilters(next: FilterCondition[]) {
@@ -47,18 +49,17 @@ export function SegmentBar({ basePath, cohorts, initialFilters }: SegmentBarProp
           Segment {activeCount > 0 ? `· ${activeCount} filter${activeCount === 1 ? '' : 's'} active` : ''}
         </span>
         {cohorts.length ? (
-          <select
-            className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-white dark:focus:ring-white/10"
-            defaultValue=""
-            onChange={(event) => loadCohort(event.target.value)}
-          >
-            <option value="">Load a saved cohort…</option>
-            {cohorts.map((cohort) => (
-              <option key={cohort.id} value={cohort.id}>
-                {cohort.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={cohortId}
+            onValueChange={(id) => {
+              setCohortId(id);
+              loadCohort(id);
+            }}
+            items={cohorts.map((cohort) => ({ value: cohort.id, label: cohort.name }))}
+            placeholder="Load a saved cohort…"
+            className="w-auto min-w-56"
+            aria-label="Load a saved cohort"
+          />
         ) : null}
       </div>
 

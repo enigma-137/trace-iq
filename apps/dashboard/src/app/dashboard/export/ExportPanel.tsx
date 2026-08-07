@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { DateRangePicker, type DateRange } from '@traceiq/ui';
+import { Select } from '@traceiq/ui';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -48,8 +50,7 @@ const COLUMNS: Array<keyof ExportEvent> = [
 
 export function ExportPanel({ eventNames }: { eventNames: string[] }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [from, setFrom] = useState(defaultFrom);
-  const [to, setTo] = useState(defaultTo);
+  const [range, setRange] = useState<DateRange>(() => ({ from: defaultFrom(), to: defaultTo() }));
   const [event, setEvent] = useState('');
   const [limit, setLimit] = useState('10000');
   const [busy, setBusy] = useState<null | 'csv' | 'json'>(null);
@@ -67,8 +68,8 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
     }
 
     const params = new URLSearchParams();
-    if (from) params.set('from', new Date(`${from}T00:00:00`).toISOString());
-    if (to) params.set('to', new Date(`${to}T23:59:59.999`).toISOString());
+    if (range.from) params.set('from', new Date(`${range.from}T00:00:00`).toISOString());
+    if (range.to) params.set('to', new Date(`${range.to}T23:59:59.999`).toISOString());
     if (event) params.set('event', event);
     if (limit) params.set('limit', limit);
 
@@ -95,7 +96,7 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
         return;
       }
 
-      const stamp = `${from}_to_${to}`;
+      const stamp = `${range.from}_to_${range.to}`;
       if (format === 'csv') {
         triggerDownload(toCsv(data.events), `traceiq-events_${stamp}.csv`, 'text/csv;charset=utf-8');
       } else {
@@ -113,21 +114,16 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
   return (
     <div className="grid max-w-2xl gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="From">
-          <input type="date" className={inputClass} value={from} onChange={(e) => setFrom(e.target.value)} />
-        </Field>
-        <Field label="To">
-          <input type="date" className={inputClass} value={to} onChange={(e) => setTo(e.target.value)} />
+        <Field label="Date range">
+          <DateRangePicker value={range} onChange={setRange} />
         </Field>
         <Field label="Event (optional)">
-          <select className={inputClass} value={event} onChange={(e) => setEvent(e.target.value)}>
-            <option value="">All events</option>
-            {eventNames.map((ev) => (
-              <option key={ev} value={ev}>
-                {ev}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={event}
+            onValueChange={setEvent}
+            items={eventNames.map((eventName) => ({ value: eventName, label: eventName }))}
+            placeholder="All events"
+          />
         </Field>
         <Field label="Row cap (max 50,000)">
           <input

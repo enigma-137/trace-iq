@@ -18,11 +18,21 @@ interface AlertsResponse {
     condition: string;
     threshold: number;
     webhookUrl: string | null;
+    emailRecipients: string[];
+    notificationGroupIds: string[];
     enabled: boolean;
     lastStatus: string;
     lastValue: number | null;
     lastEvaluatedAt: string | null;
+    deliveries: Array<{
+      channel: string;
+      recipient: string | null;
+      status: string;
+      error: string | null;
+      sentAt: string;
+    }>;
   }>;
+  notificationGroups: Array<{ id: string; name: string; memberEmails: string[] }>;
   recentEvents: Array<{ id: string; alertName: string; value: number | null; message: string; triggeredAt: string }>;
 }
 
@@ -43,7 +53,8 @@ export default async function AlertsPage() {
     <DashboardShell active="alerts" title="Alerts" userEmail={user.email}>
       <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Get told when something moves — a metric crossing a threshold or dropping/spiking versus the previous period —
-        instead of watching dashboards. Firings show here and can POST to a webhook (e.g. Slack).
+        instead of watching dashboards. Firings show here and can POST to a webhook (e.g. Slack) or email recipients /
+        notification groups.
       </p>
 
       {error ? (
@@ -52,7 +63,12 @@ export default async function AlertsPage() {
         </section>
       ) : null}
 
-      <AlertManager alerts={data?.alerts ?? []} recentEvents={data?.recentEvents ?? []} eventNames={eventNames} />
+      <AlertManager
+        alerts={data?.alerts ?? []}
+        recentEvents={data?.recentEvents ?? []}
+        eventNames={eventNames}
+        notificationGroups={data?.notificationGroups ?? []}
+      />
     </DashboardShell>
   );
 }

@@ -291,6 +291,8 @@ export class AnalyticsService {
       event?: string;
       interval?: string;
       days?: string;
+      from?: string;
+      to?: string;
       breakdown?: string;
       measure?: string;
       property?: string;
@@ -307,12 +309,14 @@ export class AnalyticsService {
       measure === 'sum' || measure === 'avg'
         ? this.requiredString(params.property, 'property')
         : this.optionalString(params.property) ?? null;
-    const days = this.clampDays(params.days, interval);
+    const presetDays = this.clampDays(params.days, interval);
     const breakdown = this.optionalString(params.breakdown) ?? null;
     const project = await this.projects.requireActiveProject(user, params.projectId);
 
-    const to = new Date();
-    const from = new Date(to.getTime() - days * DAY_MS);
+    // Prefer an explicit free-form range; otherwise fall back to the preset window.
+    const range = this.resolveRange(params.from, params.to, presetDays);
+    const to = range.to;
+    const from = range.from;
     const buckets = this.generateBuckets(from, to, interval);
 
     let series: TrendSeries[];
@@ -386,11 +390,13 @@ export class AnalyticsService {
       series = [{ key: event, points: this.zeroFill(buckets, rows.rows) }];
     }
 
-    const previousFrom = new Date(from.getTime() - days * DAY_MS);
+    const previousFrom = new Date(from.getTime() - range.rangeMs);
     const [current, previous] = await Promise.all([
       this.computeMeasureTotal(project.id, event, from, to, measure, property, filters),
       this.computeMeasureTotal(project.id, event, previousFrom, from, measure, property, filters)
     ]);
+
+    const days = Math.max(1, Math.round(range.rangeMs / DAY_MS));
 
     return {
       project,
@@ -819,6 +825,48 @@ export class AnalyticsService {
       return fallback;
     }
     return Math.min(Math.max(Math.trunc(parsed), 1), 365);
+  }
+
+  // Resolves the trend window. Accepts an explicit free-form range ("from"/"to", either
+  // an ISO timestamp or a YYYY-MM-DD date) and otherwise derives the window from `days`.
+  private resolveRange(fromParam: string | undefined, toParam: string | undefined, days: number): { from: Date; to: Date; rangeMs: number } {
+    const to = new Date();
+    let from = new Date(to.getTime() - days * DAY_MS);
+
+    const customFromMs = this.parseWindowEdge(fromParam, 'start');
+    const customToMs = this.parseWindowEdge(toParam, 'end');
+
+    if (customFromMs !== null) {
+      from = new Date(customFromMs);
+    }
+    if (customToMs !== null) {
+      const customTo = new Date(customToMs);
+      to.setTime(customTo.getTime());
+      if (!customFromMs) {
+        from = new Date(customTo.getTime() - days * DAY_MS);
+      }
+    }
+    if (customFromMs !== null && customToMs !== null && customToMs <= customFromMs) {
+      throw new BadRequestException('"to" must be after "from".');
+    }
+
+    return { from, to, rangeMs: Math.max(to.getTime() - from.getTime(), DAY_MS) };
+  }
+
+  // Parses a window edge into epoch ms. "YYYY-MM-DD" is treated as a whole UTC day
+  // (start = 00:00, end = next 00:00); anything else is parsed as an ISO timestamp.
+  private parseWindowEdge(value: string | undefined, edge: 'start' | 'end'): number | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (match) {
+      const [, year, month, day] = match;
+      const start = Date.UTC(Number(year), Number(month) - 1, Number(day));
+      if (Number.isNaN(start)) return null;
+      return edge === 'start' ? start : start + DAY_MS;
+    }
+    const parsed = new Date(trimmed).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   // API performance: aggregates `$api_request` events (emitted by the SDK middleware /

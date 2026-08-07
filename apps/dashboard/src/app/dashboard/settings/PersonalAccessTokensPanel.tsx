@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { Checkbox } from '@traceiq/ui';
+import { DatePicker } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 
@@ -50,6 +52,7 @@ const SCOPE_GROUPS: ScopeGroup[] = [
   { key: 'flags', label: 'Feature flags', read: 'flags:read', write: 'flags:write', mcp: true },
   { key: 'alerts', label: 'Alerts', read: 'alerts:read', write: 'alerts:write', mcp: true },
   { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: false },
+  { key: 'dashboards', label: 'Dashboards', read: 'dashboards:read', write: 'dashboards:write', mcp: false },
   { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: false },
   { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false }
 ];
@@ -298,12 +301,10 @@ export function PersonalAccessTokensPanel() {
                     return (
                       <div key={access} className="flex justify-center">
                         {scope ? (
-                          <input
-                            className="h-4 w-4 accent-neutral-900 dark:accent-white"
-                            type="checkbox"
-                            aria-label={`${group.label} ${access}`}
+                          <Checkbox
                             checked={scopes.includes(scope)}
-                            onChange={() => toggleScope(scope)}
+                            onCheckedChange={() => toggleScope(scope)}
+                            aria-label={`${group.label} ${access}`}
                           />
                         ) : (
                           <span className="text-neutral-300 dark:text-slate-700" aria-hidden="true">
@@ -324,7 +325,12 @@ export function PersonalAccessTokensPanel() {
 
           <label className={fieldClass} htmlFor="patExpires">
             Expiry date (optional)
-            <input id="patExpires" className={inputClass} type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />
+            <DatePicker
+              value={expiresAt || undefined}
+              onChange={(value) => setExpiresAt(value)}
+              placeholder="No expiry"
+              id="patExpires"
+            />
           </label>
 
           <button

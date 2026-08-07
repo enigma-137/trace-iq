@@ -5,6 +5,8 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
 import { FilterCondition, buildFilterClause, sanitizeFilters } from '../../common/filters';
 import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
+import { EmailService, toUniqueEmails } from './email.service';
+import { NotificationGroupsService } from './notification-groups.service';
 
 type AlertCondition = 'above' | 'below' | 'drops_by' | 'spikes_by';
 const ALLOWED_CONDITIONS: AlertCondition[] = ['above', 'below', 'drops_by', 'spikes_by'];
@@ -27,8 +29,12 @@ type AlertRow = {
   condition: string;
   threshold: number;
   webhook_url: string | null;
+  email_recipients: string[] | null;
+  notification_group_ids: string[] | null;
   enabled: boolean;
   last_status: string;
+  last_value: number | null;
+  last_evaluated_at: string | null;
 };
 
 export interface CreateAlertRequest {
@@ -41,6 +47,8 @@ export interface CreateAlertRequest {
   condition?: string;
   threshold?: number;
   webhookUrl?: string;
+  emailRecipients?: string[];
+  notificationGroupIds?: string[];
   projectId?: string;
 }
 
@@ -59,7 +67,9 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly database: DatabaseService,
-    private readonly projects: ProjectsService
+    private readonly projects: ProjectsService,
+    private readonly groups: NotificationGroupsService,
+    private readonly email: EmailService
   ) {}
 
   onModuleInit(): void {
@@ -106,6 +116,36 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
       [project.id]
     );
 
+    const groups = await this.database.query<{ id: string; name: string; member_emails: string[] | null }>(
+      `SELECT id, name, member_emails FROM notification_groups WHERE project_id = $1 ORDER BY name ASC`,
+      [project.id]
+    );
+
+    const deliveries = await this.database.query<{
+      alertId: string;
+      channel: string;
+      recipient: string | null;
+      status: string;
+      error: string | null;
+      sentAt: string;
+    }>(
+      `
+        SELECT d.alert_id AS "alertId", d.channel, d.recipient, d.status, d.error, d.sent_at AS "sentAt"
+        FROM alert_deliveries d
+        JOIN alerts a ON a.id = d.alert_id
+        WHERE a.project_id = $1
+        ORDER BY d.sent_at DESC
+        LIMIT 150
+      `,
+      [project.id]
+    );
+    const deliveriesByAlert = new Map<string, typeof deliveries.rows>();
+    for (const row of deliveries.rows) {
+      const list = deliveriesByAlert.get(row.alertId) ?? [];
+      list.push(row);
+      deliveriesByAlert.set(row.alertId, list);
+    }
+
     return {
       project,
       alerts: alerts.rows.map((row) => ({
@@ -119,10 +159,18 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         condition: row.condition,
         threshold: row.threshold,
         webhookUrl: row.webhook_url,
+        emailRecipients: row.email_recipients ?? [],
+        notificationGroupIds: row.notification_group_ids ?? [],
         enabled: row.enabled,
         lastStatus: row.last_status,
         lastValue: row.last_value,
-        lastEvaluatedAt: row.last_evaluated_at
+        lastEvaluatedAt: row.last_evaluated_at,
+        deliveries: deliveriesByAlert.get(row.id) ?? []
+      })),
+      notificationGroups: groups.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        memberEmails: row.member_emails ?? []
       })),
       recentEvents: events.rows
     };
@@ -161,12 +209,27 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Webhook URL must start with http:// or https://');
     }
 
+    const emailRecipients = toUniqueEmails(Array.isArray(body.emailRecipients) ? body.emailRecipients : []);
+    const notificationGroupIds = Array.isArray(body.notificationGroupIds)
+      ? toUniqueGroupIds(body.notificationGroupIds)
+      : [];
+
+    if (webhookUrl && emailRecipients.length === 0 && notificationGroupIds.length === 0) {
+      throw new BadRequestException('Pick at least one notification channel (webhook and/or email recipients/groups).');
+    }
+
+    // Resolve the members of each chosen group now and persist the flat list so the alert
+    // keeps working even if a group is later deleted. At firing time we re-resolve to honour edits.
+    const groupEmails = await this.groups.resolveMembers(notificationGroupIds, project.id);
+    const resolvedRecipients = toUniqueEmails([...emailRecipients, ...groupEmails]);
+
     const id = `alt_${randomUUID()}`;
     await this.database.query(
       `
         INSERT INTO alerts
-          (id, project_id, name, event_name, measure, property, filters, window_hours, condition, threshold, webhook_url, created_by_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
+          (id, project_id, name, event_name, measure, property, filters, window_hours, condition, threshold,
+           webhook_url, email_recipients, notification_group_ids, created_by_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14)
       `,
       [
         id,
@@ -180,6 +243,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         condition,
         threshold,
         webhookUrl || null,
+        resolvedRecipients,
+        notificationGroupIds,
         user.id
       ]
     );
@@ -240,12 +305,13 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
 
       // Edge-triggered: only record + notify on the transition into "triggered".
       if (triggered && alert.last_status !== 'triggered') {
+        const eventId = `ale_${randomUUID()}`;
         await this.database.query(
           `INSERT INTO alert_events (id, alert_id, project_id, value, previous_value, message) VALUES ($1, $2, $3, $4, $5, $6)`,
-          [`ale_${randomUUID()}`, alert.id, alert.project_id, current, needsPrevious ? previous : null, message]
+          [eventId, alert.id, alert.project_id, current, needsPrevious ? previous : null, message]
         );
-        if (opts.notify && alert.webhook_url) {
-          await this.notifyWebhook(alert, current, needsPrevious ? previous : null, message);
+        if (opts.notify) {
+          await this.deliver(alert, eventId, current, needsPrevious ? previous : null, message);
         }
       }
     }
@@ -322,12 +388,70 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async notifyWebhook(alert: AlertRow, value: number, previous: number | null, message: string): Promise<void> {
+  private async deliver(
+    alert: AlertRow,
+    eventId: string,
+    value: number,
+    previous: number | null,
+    message: string
+  ): Promise<void> {
+    const subject = `TraceIQ alert fired: ${alert.name}`;
+    const html = buildAlertEmail(alert, value, previous, message);
+    const recipients = await this.resolveRecipients(alert);
+
+    // One event row per (channel, recipient) so the UI can show intended + result.
+    if (recipients.length > 0) {
+      const sent = await this.email.send({ to: recipients, subject, html });
+      for (const recipient of recipients) {
+        if (sent.ok) {
+          await this.recordDelivery(eventId, alert, 'email', recipient, 'sent', null);
+        } else {
+          // Whole send failed (e.g. missing API key / outbound error) — record per recipient.
+          await this.recordDelivery(eventId, alert, 'email', recipient, 'failed', sent.failure ?? null);
+        }
+      }
+    }
+
+    if (alert.webhook_url) {
+      await this.notifyWebhook(alert, eventId, value, previous, message);
+    }
+  }
+
+  private async resolveRecipients(alert: AlertRow): Promise<string[]> {
+    const fresh = await this.groups.resolveMembers(alert.notification_group_ids ?? [], alert.project_id);
+    // Explicit recipients saved on the alert, unioned with the current group members.
+    return toUniqueEmails([...(alert.email_recipients ?? []), ...fresh]);
+  }
+
+  private async recordDelivery(
+    eventId: string,
+    alert: AlertRow,
+    channel: string,
+    recipient: string,
+    status: string,
+    error: string | null
+  ): Promise<void> {
+    await this.database.query(
+      `INSERT INTO alert_deliveries (id, alert_id, alert_event_id, channel, recipient, status, error)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [`ald_${randomUUID()}`, alert.id, eventId, channel, recipient, status, error]
+    );
+  }
+
+  private async notifyWebhook(
+    alert: AlertRow,
+    eventId: string,
+    value: number,
+    previous: number | null,
+    message: string
+  ): Promise<void> {
     if (typeof fetch !== 'function' || !alert.webhook_url) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
+    let status = 'sent';
+    let error: string | null = null;
     try {
-      await fetch(alert.webhook_url, {
+      const res = await fetch(alert.webhook_url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -344,11 +468,17 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         }),
         signal: controller.signal
       });
-    } catch {
-      // Delivery is best-effort; the firing is still recorded in-app.
+      if (!res.ok) {
+        status = 'failed';
+        error = `HTTP ${res.status}`;
+      }
+    } catch (err) {
+      status = 'failed';
+      error = err instanceof Error ? err.message : String(err);
     } finally {
       clearTimeout(timeout);
     }
+    await this.recordDelivery(eventId, alert, 'webhook', alert.webhook_url, status, error);
   }
 }
 
@@ -367,4 +497,56 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   const parsed = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(Math.max(Math.trunc(parsed), min), max);
+}
+
+function toUniqueGroupIds(list: string[]): string[] {
+  return Array.from(new Set(list.map((id) => String(id).trim()).filter(Boolean)));
+}
+
+function buildAlertEmail(alert: AlertRow, value: number, previous: number | null, message: string): string {
+  const rows = [
+    ['Event', alert.event_name],
+    ['Condition', conditionLabel(alert.condition)],
+    ['Threshold', alert.condition === 'above' || alert.condition === 'below' ? fmt(alert.threshold) : `${fmt(alert.threshold)}%`],
+    ['Current value', fmt(value)],
+    ...(previous != null ? [['Previous period', fmt(previous)]] : [])
+  ]
+    .map(([label, val]) => `<tr><td style="padding:6px 0;width:160px;color:#64748b;">${label}</td><td style="padding:6px 0;font-weight:600;">${val}</td></tr>`)
+    .join('');
+
+  return `
+    <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0f172a;">
+      <div style="padding:20px 0;border-bottom:1px solid #e2e8f0;">
+        <div style="font-size:13px;color:#94a3b8;">TraceIQ alert</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px;">${escapeHtml(alert.name)}</div>
+      </div>
+      <p style="font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(message)}</p>
+      <table style="font-size:14px;border-collapse:collapse;">${rows}</table>
+      <p style="font-size:13px;color:#94a3b8;margin-top:20px;">
+        Fired at ${new Date().toLocaleString('en-US')}. Disable this alert from the TraceIQ dashboard.
+      </p>
+    </div>`;
+}
+
+function conditionLabel(condition: string): string {
+  switch (condition) {
+    case 'above':
+      return 'Above';
+    case 'below':
+      return 'Below';
+    case 'drops_by':
+      return 'Drops by';
+    case 'spikes_by':
+      return 'Spikes by';
+    default:
+      return condition;
+  }
+}
+
+function escapeHtml(value: string): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

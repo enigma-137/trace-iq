@@ -5,6 +5,7 @@ import { TrendChart } from '@/components/charts/TrendChart';
 import { SegmentBar } from '@/components/SegmentBar';
 import type { FilterCondition } from '@/components/SegmentFilters';
 import { TrendControls } from './TrendControls';
+import { SaveViewButton } from '../SaveViewButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,9 +95,12 @@ export default async function InsightsPage({
   ]);
 
   const eventNames = eventNamesData?.eventNames.map((item) => item.eventName) ?? [];
+  const project = eventNamesData?.project ?? null;
   const selectedEvent = firstParam(searchParams.event) ?? eventNames[0] ?? '';
   const interval = firstParam(searchParams.interval) ?? 'day';
   const days = firstParam(searchParams.days) ?? '30';
+  const from = firstParam(searchParams.from) ?? '';
+  const to = firstParam(searchParams.to) ?? '';
   const breakdown = firstParam(searchParams.breakdown) ?? '';
   const measure = normalizeMeasure(firstParam(searchParams.measure));
   const property = firstParam(searchParams.property)?.trim() ?? '';
@@ -109,7 +113,17 @@ export default async function InsightsPage({
   let trendsError: string | null = null;
 
   if (selectedEvent && !missingProperty) {
-    const query = new URLSearchParams({ event: selectedEvent, interval, days, measure });
+    const query = new URLSearchParams({ event: selectedEvent, interval, measure });
+    if (from || to) {
+      if (from) {
+        query.set('from', from);
+      }
+      if (to) {
+        query.set('to', to);
+      }
+    } else {
+      query.set('days', days);
+    }
     if (breakdown) {
       query.set('breakdown', breakdown);
     }
@@ -127,15 +141,36 @@ export default async function InsightsPage({
   return (
     <DashboardShell active="insights" title="Insights" userEmail={user.email}>
       <section className="mb-6 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Event trends</h2>
-        <p className="mt-1 mb-4 text-sm text-neutral-500 dark:text-slate-400">
-          Trend an event over time — count it, count unique users, or sum/average a numeric property like{' '}
-          <span className="font-mono text-neutral-700 dark:text-slate-300">amount</span>. Optionally break it down by a property.
-        </p>
-        <TrendControls
-          eventNames={eventNames}
-          selected={{ event: selectedEvent, interval, days, breakdown, measure, property }}
-        />
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Event trends</h2>
+            <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
+              Trend an event over time — count it, count unique users, or sum/average a numeric property like{' '}
+              <span className="font-mono text-neutral-700 dark:text-slate-300">amount</span>. Optionally break it down by a property.
+            </p>
+          </div>
+          <SaveViewButton
+            definition={{
+              source: 'trend',
+              event: selectedEvent,
+              interval,
+              from,
+              to,
+              days,
+              measure,
+              property,
+              breakdown,
+              filters: filtersParam
+            }}
+            projectId={project?.id}
+          />
+        </div>
+        <div className="mt-4">
+          <TrendControls
+            eventNames={eventNames}
+            selected={{ event: selectedEvent, interval, days, from, to, breakdown, measure, property }}
+          />
+        </div>
         <div className="mt-4">
           <SegmentBar basePath="/dashboard/insights" cohorts={cohortsData?.cohorts ?? []} initialFilters={filters} />
         </div>

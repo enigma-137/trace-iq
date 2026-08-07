@@ -1,5 +1,8 @@
 'use client';
 
+import { Combobox } from '@traceiq/ui';
+import { Select } from '@traceiq/ui';
+
 export interface FilterCondition {
   field: string;
   operator: string;
@@ -41,12 +44,6 @@ export function SegmentFilters({ value, onChange }: SegmentFiltersProps) {
 
   return (
     <div className="grid gap-2">
-      <datalist id="segment-fields">
-        {FIELD_SUGGESTIONS.map((field) => (
-          <option key={field} value={field} />
-        ))}
-      </datalist>
-
       {value.length === 0 ? (
         <p className="text-sm text-neutral-400 dark:text-neutral-500">No filters — showing all users.</p>
       ) : null}
@@ -55,24 +52,21 @@ export function SegmentFilters({ value, onChange }: SegmentFiltersProps) {
         const needsValue = operatorNeedsValue(condition.operator);
         return (
           <div key={index} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-            <input
-              className={`${fieldClass} min-w-0 flex-1 basis-40`}
-              list="segment-fields"
-              placeholder="e.g. country, plan"
+            <Combobox
+              items={FIELD_SUGGESTIONS.map((field) => ({ value: field, label: field }))}
               value={condition.field}
-              onChange={(event) => update(index, { field: event.target.value })}
+              onChange={(field) => update(index, { field })}
+              placeholder="e.g. country, plan"
+              aria-label="Filter field"
+              className="min-w-0 flex-1 basis-40"
             />
-            <select
-              className={`${fieldClass} w-32 shrink-0`}
+            <Select
               value={condition.operator}
-              onChange={(event) => update(index, { operator: event.target.value })}
-            >
-              {OPERATORS.map((operator) => (
-                <option key={operator.value} value={operator.value}>
-                  {operator.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(operator) => update(index, { operator })}
+              items={OPERATORS.map((operator) => ({ value: operator.value, label: operator.label }))}
+              className="w-32 shrink-0"
+              aria-label="Filter operator"
+            />
             {needsValue ? (
               <input
                 className={`${fieldClass} min-w-0 flex-1 basis-32`}

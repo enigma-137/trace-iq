@@ -5,6 +5,8 @@ const PATHS: Record<string, string> = {
   web: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3 12h18M12 3c2.5 2.5 3.5 6 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-6-3.5-9s1-6.5 3.5-9Z',
   // Insights — trending line
   insights: 'M4 19V5M4 19h16M7 15l3-4 3 2 4-6',
+  // Dashboards — columns / layout
+  dashboards: 'M4 4h7v7H4ZM13 4h7v3h-7ZM13 9h7v11h-7ZM4 13h7v7H4Z',
   // Events — activity list
   events: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
   // Funnels — funnel

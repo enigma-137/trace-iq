@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { Combobox } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -135,22 +136,16 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
         <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Signup to purchase" />
       </label>
 
-      <datalist id="funnel-event-names">
-        {eventNames.map((eventName) => (
-          <option key={eventName} value={eventName} />
-        ))}
-      </datalist>
-
       <div className="grid gap-2">
         {steps.map((step, index) => (
           <div key={index} className="flex items-center gap-2">
             <span className="w-6 shrink-0 text-center font-mono text-xs text-neutral-400 dark:text-slate-500">{index + 1}</span>
-            <input
-              className={inputClass}
-              list="funnel-event-names"
+            <Combobox
+              items={eventNames.map((eventName) => ({ value: eventName, label: eventName }))}
               value={step}
-              onChange={(event) => updateStep(index, event.target.value)}
+              onChange={(next) => updateStep(index, next)}
               placeholder="event_name"
+              className="w-full"
             />
             <button
               type="button"

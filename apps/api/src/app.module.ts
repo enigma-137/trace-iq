@@ -5,6 +5,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { EventsModule } from './modules/events/events.module';
 import { FunnelsModule } from './modules/funnels/funnels.module';
 import { CohortsModule } from './modules/cohorts/cohorts.module';
+import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { FlagsModule } from './modules/flags/flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
@@ -27,6 +28,7 @@ import { DatabaseModule } from './database/database.module';
     EventsModule,
     FunnelsModule,
     CohortsModule,
+    DashboardsModule,
     AlertsModule,
     FlagsModule,
     WebhooksModule,

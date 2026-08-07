@@ -15,6 +15,8 @@ const ALLOWED_SCOPES = new Set([
   'users:read',
   'cohorts:read',
   'cohorts:write',
+  'dashboards:read',
+  'dashboards:write',
   'errors:read',
   'alerts:read',
   'alerts:write',

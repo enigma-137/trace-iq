@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { Checkbox } from '@traceiq/ui';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -120,10 +121,7 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
         <Field label="Rollout %">
           <input className={inputClass} type="number" min={0} max={100} value={rollout} onChange={(e) => setRollout(e.target.value)} />
         </Field>
-        <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-slate-300">
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-neutral-900 dark:accent-white" />
-          Enabled
-        </label>
+        <Checkbox checked={enabled} onCheckedChange={setEnabled} label="Enabled" />
 
         <Field label="Payload — remote config (optional)">
           <textarea
