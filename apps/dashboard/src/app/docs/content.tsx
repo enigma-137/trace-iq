@@ -170,7 +170,7 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
           rows={[
             ['projectId', 'required', 'Your project ID.'],
             ['writeKey', 'required', 'SDK write key (safe to expose in the browser).'],
-            ['endpoint', `'${apiBaseUrl}'`, 'TraceIQ API base URL.'],
+            ['endpoint', '', 'TraceIQ API base URL.'],
             ['autoTrackPageViews', 'false', 'Send a $page event automatically on initialize.'],
             ['autoCaptureExceptions', 'true', 'Capture uncaught errors and unhandled promise rejections.'],
             ['autoCaptureRageClicks', 'true', 'Detect rage clicks (3+ rapid clicks in one spot).'],
