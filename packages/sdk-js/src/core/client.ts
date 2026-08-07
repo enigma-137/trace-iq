@@ -236,12 +236,20 @@ export class BrowserTraceIQClient implements TraceIQClient {
     });
   }
 
-  async loadFeatureFlags(): Promise<TraceIQFeatureFlags> {
+  async loadFeatureFlags(properties?: Record<string, string | number | boolean>): Promise<TraceIQFeatureFlags> {
     const options = this.options;
     if (!options) {
       this.debug('TraceIQ has not been initialized.');
       return { flags: {}, payloads: {} };
     }
+
+    // Unify the traits the host app has told us about with any explicit overrides,
+    // so a targeted flag (e.g. plan = pro) evaluates against the right values.
+    const traits = {
+      ...(this.identity?.traits ?? {}),
+      ...(this.groupContext?.traits ?? {}),
+      ...(properties ?? {})
+    };
 
     const endpoint = this.flagsEndpoint(options.endpoint ?? DEFAULT_ENDPOINT);
     try {
@@ -253,7 +261,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
         },
         body: JSON.stringify({
           projectId: options.projectId,
-          distinctId: this.distinctId()
+          distinctId: this.distinctId(),
+          properties: Object.keys(traits).length > 0 ? traits : undefined
         })
       });
 

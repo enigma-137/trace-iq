@@ -9,10 +9,10 @@ export class FlagsPublicController {
 
   @Post('evaluate')
   evaluate(
-    @Body() body: { projectId?: string; distinctId?: string; writeKey?: string },
+    @Body() body: { projectId?: string; distinctId?: string; properties?: Record<string, unknown>; writeKey?: string },
     @Headers() headers: Record<string, string | undefined>
   ) {
     const writeKey = headers['x-traceiq-write-key'] ?? body.writeKey;
-    return this.flagsService.evaluate(writeKey, body.projectId, body.distinctId);
+    return this.flagsService.evaluate(writeKey, body.projectId, body.distinctId, body.properties);
   }
 }

@@ -14,7 +14,8 @@ export const dynamic = 'force-dynamic';
 
 interface OverviewResponse {
   project: { id: string; name: string; organizationName: string } | null;
-  totals: { events: number; events24h: number; users: number; sessions: number };
+  totals: { events: number; events24h: number; events1h: number; users: number; sessions: number };
+  lastEventAt: string | null;
   revenue: { total: number; previous: number; transactions: number };
   topEvents: Array<{ eventName: string; total: number }>;
   topDevices: Array<{ name: string; total: number }>;
@@ -54,6 +55,8 @@ export default async function DashboardPage({
       ) : null}
 
       {overview?.project ? <RevenueHeadline revenue={overview.revenue} sparkline={overview.sparkline} projectId={canonicalProjectId} /> : null}
+
+      {overview?.project ? <AvailabilityStrip overview={overview} /> : null}
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Total events" value={overview?.totals.events ?? 0} hint="All time" delta={activityDelta} tone={activityTone}>
@@ -221,6 +224,67 @@ function RevenueHeadline({
       </div>
     </section>
   );
+}
+
+function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
+  const status = availabilityStatus(overview);
+  const tone =
+    status === 'healthy'
+      ? { dot: 'bg-emerald-500', chip: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300', label: 'Healthy' }
+      : status === 'quiet'
+        ? { dot: 'bg-amber-500', chip: 'border-amber-400/20 bg-amber-400/10 text-amber-700 dark:text-amber-300', label: 'Low volume' }
+        : { dot: 'bg-neutral-300 dark:bg-slate-600', chip: 'border-neutral-300 bg-neutral-100 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400', label: 'Idle' };
+
+  return (
+    <section className="mb-5 grid gap-3 rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
+      <div className="flex items-center gap-3">
+        <span className={`size-2.5 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Ingestion</p>
+          <p className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-xs font-bold ${tone.chip}`}>{tone.label}</p>
+        </div>
+        </div>
+        <div className="sm:border-l sm:border-neutral-200 sm:pl-5 dark:sm:border-slate-800">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Last event</p>
+        <p className="mt-0.5 truncate text-sm font-semibold text-neutral-900 dark:text-white">
+          {overview.lastEventAt ? lastEventAge(overview.lastEventAt) : 'No events yet'}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:border-l sm:border-neutral-200 sm:pl-5 dark:sm:border-slate-800">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Last hour</p>
+          <p className="mt-0.5 text-sm font-semibold tabular-nums text-neutral-900 dark:text-white">
+            {overview.totals.events1h.toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Last 24 hours</p>
+          <p className="mt-0.5 text-sm font-semibold tabular-nums text-neutral-900 dark:text-white">
+            {overview.totals.events24h.toLocaleString()}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type Availability = 'healthy' | 'quiet' | 'idle';
+
+function availabilityStatus(overview: OverviewResponse): Availability {
+  if (overview.totals.events24h > 0) return 'healthy';
+  if (overview.totals.events > 0) return 'quiet';
+  return 'idle';
+}
+
+function lastEventAge(lastEventAt: string): string {
+  const ageMs = Date.now() - new Date(lastEventAt).getTime();
+  const minutes = Math.floor(ageMs / 60_000);
+  if (minutes < 1) return 'moments ago';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${days === 1 ? 'day' : 'days'} ago`;
 }
 
 function trendTone(values: number[]): 'blue' | 'green' | 'red' {

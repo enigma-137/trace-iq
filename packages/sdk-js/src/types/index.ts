@@ -37,8 +37,12 @@ export interface TraceIQClient {
   page(name?: string, properties?: Record<string, unknown>): void;
   group(group: TraceIQGroup): void;
   captureException(error: unknown, properties?: Record<string, unknown>): void;
-  /** Fetches this user's flag evaluations from the server and caches them. */
-  loadFeatureFlags(): Promise<TraceIQFeatureFlags>;
+  /**
+   * Fetches this user's flag evaluations from the server and caches them.
+   * `properties` (the user's plan, country, plan tier, etc.) is merged over the
+   * identity/group traits and used to evaluate flag targeting rules.
+   */
+  loadFeatureFlags(properties?: Record<string, string | number | boolean>): Promise<TraceIQFeatureFlags>;
   /** True only when the flag was loaded and is on for this user. */
   isFeatureEnabled(key: string): boolean;
   /** Remote-config payload for a flag, or undefined when off / not loaded / no payload. */

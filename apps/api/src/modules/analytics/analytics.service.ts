@@ -76,9 +76,12 @@ export interface OverviewResponse {
   totals: {
     events: number;
     events24h: number;
+    events1h: number;
     users: number;
     sessions: number;
   };
+  // When the last event was received — drives the availability/freshness readout.
+  lastEventAt: string | null;
   // GTV = sum of the numeric `amount` property across events (last 30d vs the 30d before).
   revenue: {
     total: number;
@@ -140,7 +143,8 @@ export class AnalyticsService {
     if (!project) {
       return {
         project: null,
-        totals: { events: 0, events24h: 0, users: 0, sessions: 0 },
+        totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0 },
+        lastEventAt: null,
         revenue: { total: 0, previous: 0, transactions: 0 },
         topEvents: [],
         topDevices: [],
@@ -152,15 +156,19 @@ export class AnalyticsService {
     const totalsResult = await this.database.query<{
       total_events: number;
       events_24h: number;
+      events_1h: number;
       total_users: number;
       total_sessions: number;
+      last_event_at: string | null;
     }>(
       `
         SELECT
           (SELECT count(*) FROM events WHERE project_id = $1)::int AS total_events,
           (SELECT count(*) FROM events WHERE project_id = $1 AND occurred_at >= now() - interval '24 hours')::int AS events_24h,
+          (SELECT count(*) FROM events WHERE project_id = $1 AND occurred_at >= now() - interval '1 hour')::int AS events_1h,
           (SELECT count(*) FROM users WHERE project_id = $1)::int AS total_users,
-          (SELECT count(*) FROM sessions WHERE project_id = $1)::int AS total_sessions
+          (SELECT count(*) FROM sessions WHERE project_id = $1)::int AS total_sessions,
+          (SELECT max(occurred_at) FROM events WHERE project_id = $1) AS last_event_at
       `,
       [project.id]
     );
@@ -248,9 +256,11 @@ export class AnalyticsService {
       totals: {
         events: totals?.total_events ?? 0,
         events24h: totals?.events_24h ?? 0,
+        events1h: totals?.events_1h ?? 0,
         users: totals?.total_users ?? 0,
         sessions: totals?.total_sessions ?? 0
       },
+      lastEventAt: totals?.last_event_at ?? null,
       revenue: {
         total: revenue?.current_revenue ?? 0,
         previous: revenue?.previous_revenue ?? 0,

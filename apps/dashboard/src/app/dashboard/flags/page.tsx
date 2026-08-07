@@ -14,7 +14,7 @@ interface FlagsResponse {
     enabled: boolean;
     rolloutPercentage: number;
     overrides: Record<string, boolean>;
-    payload: unknown;
+    targeting: Array<{ property: string; operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte'; value: string | number | boolean }>;    payload: unknown;
   }>;
 }
 

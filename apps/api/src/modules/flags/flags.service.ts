@@ -13,8 +13,19 @@ type FlagRow = {
   enabled: boolean;
   rollout_percentage: number;
   overrides: Record<string, boolean> | null;
+  targeting: FlagTarget[] | null;
   payload: unknown;
 };
+
+export type FlagTarget = {
+  property: string;
+  operator: FlagOperator;
+  value: string | number | boolean;
+};
+
+export type FlagOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+const ALLOWED_OPERATORS: readonly FlagOperator[] = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'];
+const MAX_TARGETS = 20;
 
 export interface CreateFlagRequest {
   key?: string;
@@ -23,6 +34,7 @@ export interface CreateFlagRequest {
   enabled?: boolean;
   rolloutPercentage?: number;
   overrides?: unknown;
+  targeting?: unknown;
   payload?: unknown;
   projectId?: string;
 }
@@ -33,6 +45,7 @@ export interface UpdateFlagRequest {
   enabled?: boolean;
   rolloutPercentage?: number;
   overrides?: unknown;
+  targeting?: unknown;
   payload?: unknown;
   projectId?: string;
 }
@@ -80,12 +93,13 @@ export class FlagsService {
     }
 
     const payload = sanitizePayload(body.payload);
+    const targeting = sanitizeTargeting(body.targeting);
 
     const id = `flg_${randomUUID()}`;
     await this.database.query(
       `
-        INSERT INTO feature_flags (id, project_id, key, name, description, enabled, rollout_percentage, overrides, payload, created_by_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10)
+        INSERT INTO feature_flags (id, project_id, key, name, description, enabled, rollout_percentage, overrides, targeting, payload, created_by_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11)
       `,
       [
         id,
@@ -96,6 +110,7 @@ export class FlagsService {
         Boolean(body.enabled),
         clampPercent(body.rolloutPercentage),
         JSON.stringify(sanitizeOverrides(body.overrides)),
+        JSON.stringify(targeting),
         payload == null ? null : JSON.stringify(payload),
         user.id
       ]
@@ -121,14 +136,15 @@ export class FlagsService {
     // undefined = leave as-is, null = clear the payload, any value = replace it.
     const payload = body.payload === undefined ? flag.payload : sanitizePayload(body.payload);
     const payloadJson = payload == null ? null : JSON.stringify(payload);
+    const targeting = body.targeting === undefined ? flag.targeting ?? [] : sanitizeTargeting(body.targeting);
 
     await this.database.query(
       `
         UPDATE feature_flags
-        SET name = $3, description = $4, enabled = $5, rollout_percentage = $6, overrides = $7::jsonb, payload = $8::jsonb, updated_at = now()
+        SET name = $3, description = $4, enabled = $5, rollout_percentage = $6, overrides = $7::jsonb, targeting = $8::jsonb, payload = $9::jsonb, updated_at = now()
         WHERE id = $1 AND project_id = $2
       `,
-      [id, project.id, name, description, enabled, rollout, JSON.stringify(overrides), payloadJson]
+      [id, project.id, name, description, enabled, rollout, JSON.stringify(overrides), JSON.stringify(targeting), payloadJson]
     );
     return { id };
   }
@@ -142,7 +158,12 @@ export class FlagsService {
 
   // -- Public evaluation (write-key auth) --------------------------------
 
-  async evaluate(writeKey: string | undefined, projectId: string | undefined, distinctId: string | undefined) {
+  async evaluate(
+    writeKey: string | undefined,
+    projectId: string | undefined,
+    distinctId: string | undefined,
+    properties?: Record<string, unknown>
+  ) {
     const key = requiredString(writeKey, 'writeKey');
     const pid = requiredString(projectId, 'projectId');
     const distinct = requiredString(distinctId, 'distinctId');
@@ -155,7 +176,7 @@ export class FlagsService {
     const flags: Record<string, boolean> = {};
     const payloads: Record<string, unknown> = {};
     for (const flag of result.rows) {
-      const on = evaluateFlag(flag, distinct);
+      const on = evaluateFlag(flag, distinct, properties ?? {});
       flags[flag.key] = on;
       // Only ship a payload for a flag the user actually has on — a payload
       // behind an off flag should never leak to the client.
@@ -193,6 +214,7 @@ export class FlagsService {
       enabled: row.enabled,
       rolloutPercentage: row.rollout_percentage,
       overrides: row.overrides ?? {},
+      targeting: row.targeting ?? [],
       payload: row.payload ?? null,
       updatedAt: row.updated_at ?? null
     };
@@ -201,16 +223,76 @@ export class FlagsService {
 
 // Deterministic + sticky: the same (key, distinctId) always lands in the same 0–99 bucket,
 // so a user never flickers in and out as long as the rollout % only grows.
+// Precedence: master switch → per-user override → targeting rules → % rollout.
 export function evaluateFlag(
-  flag: Pick<FlagRow, 'enabled' | 'rollout_percentage' | 'overrides' | 'key'>,
-  distinctId: string
+  flag: Pick<FlagRow, 'enabled' | 'rollout_percentage' | 'overrides' | 'targeting' | 'key'>,
+  distinctId: string,
+  properties: Record<string, unknown> = {}
 ): boolean {
   if (!flag.enabled) return false;
   const override = flag.overrides?.[distinctId];
   if (typeof override === 'boolean') return override;
+  if (flag.targeting && flag.targeting.length > 0 && !matchesTargeting(flag.targeting, properties)) {
+    return false;
+  }
   if (flag.rollout_percentage >= 100) return true;
   if (flag.rollout_percentage <= 0) return false;
   return bucketOf(flag.key, distinctId) < flag.rollout_percentage;
+}
+
+// AND-only: every rule must match, and a referenced property must actually be present.
+export function matchesTargeting(targeting: FlagTarget[], properties: Record<string, unknown>): boolean {
+  for (const rule of targeting) {
+    if (!(rule.property in properties)) {
+      return false;
+    }
+    if (!compareOperator(properties[rule.property], rule.operator, rule.value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function compareOperator(actual: unknown, operator: FlagOperator, expected: FlagTarget['value']): boolean {
+  switch (operator) {
+    case 'eq':
+      return valuesEqual(actual, expected);
+    case 'ne':
+      return !valuesEqual(actual, expected);
+    case 'gt':
+      return numericCmp(actual, expected) > 0;
+    case 'gte':
+      return numericCmp(actual, expected) >= 0;
+    case 'lt':
+      return numericCmp(actual, expected) < 0;
+    case 'lte':
+      return numericCmp(actual, expected) <= 0;
+    default:
+      return false;
+  }
+}
+
+function valuesEqual(actual: unknown, expected: unknown): boolean {
+  const left = typeof actual === 'number' || typeof expected === 'number' ? normalizeNumber(actual) : String(actual);
+  const right = typeof actual === 'number' || typeof expected === 'number' ? normalizeNumber(expected) : String(expected);
+  if (typeof left === 'number' && typeof right === 'number' && Number.isFinite(left) && Number.isFinite(right)) {
+    return left === right;
+  }
+  return String(actual) === String(expected);
+}
+
+// NaN (or null/undefined/mismatched) means the comparison is inconclusive → no match,
+// so missing/wrong-type values never satisfy a numeric rule by accident.
+function numericCmp(actual: unknown, expected: unknown): number {
+  const left = Number(actual);
+  const right = Number(expected);
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return NaN;
+  return left - right;
+}
+
+function normalizeNumber(value: unknown): number | string {
+  const asNumber = Number(value);
+  return Number.isFinite(asNumber) ? asNumber : String(value);
 }
 
 export function bucketOf(key: string, distinctId: string): number {
@@ -235,6 +317,32 @@ function sanitizeOverrides(input: unknown): Record<string, boolean> {
       out[id] = value;
       count += 1;
     }
+  }
+  return out;
+}
+
+// Normalizes a flag's AND-combined targeting rules. undefined/null → []. Invalid entries
+// are rejected so the dashboard never stores a rule that silently matches nothing.
+function sanitizeTargeting(input: unknown): FlagTarget[] {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input)) {
+    throw new BadRequestException('targeting must be an array of { property, operator, value } rules.');
+  }
+  const out: FlagTarget[] = [];
+  for (const item of input) {
+    if (out.length >= MAX_TARGETS) break;
+    const source = (item ?? {}) as Record<string, unknown>;
+    const property = typeof source.property === 'string' ? source.property.trim() : '';
+    const operator = typeof source.operator === 'string' ? source.operator : '';
+    if (!property) throw new BadRequestException('Each targeting rule needs a property.');
+    if (!ALLOWED_OPERATORS.includes(operator as FlagOperator)) {
+      throw new BadRequestException(`Unsupported targeting operator: "${operator}".`);
+    }
+    const value = source.value;
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+      throw new BadRequestException(`Targeting value for "${property}" must be a string, number or boolean.`);
+    }
+    out.push({ property, operator: operator as FlagOperator, value });
   }
   return out;
 }

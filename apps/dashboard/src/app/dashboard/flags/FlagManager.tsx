@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { Checkbox } from '@traceiq/ui';
+import { Checkbox, Select } from '@traceiq/ui';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -15,7 +15,43 @@ interface Flag {
   enabled: boolean;
   rolloutPercentage: number;
   overrides: Record<string, boolean>;
+  targeting: FlagTarget[];
   payload: unknown;
+}
+
+type FlagTarget = {
+  property: string;
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  value: string | number | boolean;
+};
+
+const OPERATORS: Array<{ value: FlagTarget['operator']; label: string }> = [
+  { value: 'eq', label: '=' },
+  { value: 'ne', label: '≠' },
+  { value: 'gt', label: '>' },
+  { value: 'gte', label: '≥' },
+  { value: 'lt', label: '<' },
+  { value: 'lte', label: '≤' }
+];
+
+function parseTargetValue(raw: string): string | number | boolean {
+  const trimmed = raw.trim();
+  if (trimmed === '') return trimmed;
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  const num = Number(trimmed);
+  if (trimmed !== '' && Number.isFinite(num)) return num;
+  return trimmed;
+}
+
+function targetingSummary(targeting: FlagTarget[]): string {
+  if (targeting.length === 0) return 'Everyone';
+  return targeting
+    .map((rule) => {
+      const op = OPERATORS.find((o) => o.value === rule.operator)?.label ?? rule.operator;
+      return `${rule.property} ${op} ${rule.value}`;
+    })
+    .join(' AND ');
 }
 
 export function FlagManager({ flags }: { flags: Flag[] }) {
@@ -27,6 +63,7 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
   const [rollout, setRollout] = useState('0');
   const [enabled, setEnabled] = useState(true);
   const [payload, setPayload] = useState('');
+  const [targeting, setTargeting] = useState<FlagTarget[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +109,7 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
         description: description.trim() || undefined,
         enabled,
         rolloutPercentage: Number(rollout) || 0,
+        targeting,
         payload: parsedPayload
       })
     });
@@ -87,6 +125,7 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
     setRollout('0');
     setEnabled(true);
     setPayload('');
+    setTargeting([]);
     setIsSubmitting(false);
     router.refresh();
   }
@@ -100,7 +139,8 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
         <div>
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">New flag</h2>
           <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
-            Ship behind a flag, roll out to a % of users, then flip it to 100% — or off in one click.
+            Ship behind a flag, target a segment by property, roll out to a % of that segment, then flip to 100% — or off in
+            one click.
           </p>
         </div>
 
@@ -122,6 +162,17 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
           <input className={inputClass} type="number" min={0} max={100} value={rollout} onChange={(e) => setRollout(e.target.value)} />
         </Field>
         <Checkbox checked={enabled} onCheckedChange={setEnabled} label="Enabled" />
+
+        <div className="grid gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
+            Target (optional)
+          </span>
+          <TargetingEditor value={targeting} onChange={setTargeting} />
+          <p className="text-[11px] font-normal normal-case tracking-normal text-neutral-400 dark:text-slate-500">
+            All rules must match (AND). The SDK passes the user&apos;s traits / properties with each evaluation. Leave empty
+            to target everyone.
+          </p>
+        </div>
 
         <Field label="Payload — remote config (optional)">
           <textarea
@@ -171,6 +222,70 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
   );
 }
 
+function TargetingEditor({ value, onChange }: { value: FlagTarget[]; onChange: (next: FlagTarget[]) => void }) {
+  function updateRule(index: number, patch: Partial<FlagTarget>) {
+    const next = value.map((rule, i) => (i === index ? { ...rule, ...patch } : rule));
+    onChange(next);
+  }
+
+  function removeRule(index: number) {
+    onChange(value.filter((_, i) => i !== index));
+  }
+
+  function addRule() {
+    onChange([...value, { property: '', operator: 'eq', value: '' }]);
+  }
+
+  return (
+    <div className="grid gap-2">
+      {value.length === 0 ? (
+        <p className="text-sm text-neutral-400 dark:text-slate-600">No rules — this flag targets everyone.</p>
+      ) : (
+        value.map((rule, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              className={`${inputClass} min-w-0 flex-1 font-mono text-xs`}
+              value={rule.property}
+              onChange={(e) => updateRule(index, { property: e.target.value })}
+              placeholder="plan"
+              aria-label={`Rule ${index + 1} property`}
+            />
+            <Select
+              value={rule.operator}
+              onValueChange={(operator) => updateRule(index, { operator: operator as FlagTarget['operator'] })}
+              items={OPERATORS.map((op) => ({ value: op.value, label: op.label }))}
+            />
+            <input
+              className={`${inputClass} min-w-0 flex-1 font-mono text-xs`}
+              value={String(rule.value)}
+              onChange={(e) => updateRule(index, { value: parseTargetValue(e.target.value) })}
+              placeholder="pro"
+              aria-label={`Rule ${index + 1} value`}
+            />
+            <button
+              type="button"
+              className={deleteBtn}
+              onClick={() => removeRule(index)}
+              aria-label={`Remove rule ${index + 1}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        ))
+      )}
+      <button
+        type="button"
+        className="h-8 w-fit rounded-md border border-dashed border-neutral-300 px-3 text-xs font-semibold text-neutral-600 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+        onClick={addRule}
+      >
+        + Add rule
+      </button>
+    </div>
+  );
+}
+
 function FlagRow({
   flag,
   authFetch,
@@ -185,14 +300,21 @@ function FlagRow({
   const dirty = Number(rollout) !== flag.rolloutPercentage;
 
   const hasPayload = flag.payload != null;
+  const hasTargeting = flag.targeting.length > 0;
   const [payloadText, setPayloadText] = useState(hasPayload ? JSON.stringify(flag.payload, null, 2) : '');
   const [payloadError, setPayloadError] = useState<string | null>(null);
+  const [targeting, setTargeting] = useState<FlagTarget[]>(flag.targeting);
+  const [targetingError, setTargetingError] = useState<string | null>(null);
+  const [targetingDirty, setTargetingDirty] = useState(false);
 
   async function update(patch: Record<string, unknown>) {
     setBusy(true);
     const response = await authFetch(`/v1/dashboard/flags/${flag.id}`, { method: 'PUT', body: JSON.stringify(patch) });
     setBusy(false);
-    if (response?.ok) onChanged();
+    if (response?.ok) {
+      setTargetingDirty(false);
+      onChanged();
+    }
     return response;
   }
 
@@ -212,6 +334,23 @@ function FlagRow({
     }
     const response = await update({ payload: parsed });
     if (response && !response.ok) setPayloadError(await readError(response));
+  }
+
+  async function saveTargeting() {
+    setTargetingError(null);
+    const complete = targeting.every((rule) => rule.property.trim().length > 0);
+    if (!complete) {
+      setTargetingError('Every rule needs a property.');
+      return;
+    }
+    const response = await update({ targeting });
+    if (response && !response.ok) setTargetingError(await readError(response));
+  }
+
+  function clearTargeting() {
+    setTargeting([]);
+    setTargetingError(null);
+    void update({ targeting: [] });
   }
 
   async function remove() {
@@ -244,11 +383,19 @@ function FlagRow({
                 Config
               </span>
             ) : null}
+            {hasTargeting ? (
+              <span className="shrink-0 rounded border border-sky-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 dark:border-sky-900 dark:text-sky-300">
+                Targeted
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            {flag.enabled
-              ? `Rolled out to ${flag.rolloutPercentage}% of users`
-              : 'Off for everyone (master switch)'}
+            {hasTargeting ? (
+              <span className="text-sky-600 dark:text-sky-300">{targetingSummary(flag.targeting)}</span>
+            ) : flag.enabled ? (
+              'All users'
+            ) : null}{' '}
+            {flag.enabled ? `· rolled out to ${flag.rolloutPercentage}%` : '· off for everyone (master switch)'}
             {flag.description ? ` · ${flag.description}` : ''}
           </p>
         </div>
@@ -282,6 +429,45 @@ function FlagRow({
           </button>
         </div>
       </div>
+
+      <details
+        className="group mt-3"
+        open={targetingDirty}
+        onToggle={(event) => {
+          const open = (event.target as HTMLDetailsElement).open;
+          if (!open) setTargetingError(null);
+        }}
+      >
+        <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition group-open:rotate-90" aria-hidden>
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+          {hasTargeting ? 'Edit targeting (segment)' : 'Add targeting (segment)'}
+        </summary>
+        <div className="mt-2 grid gap-2">
+          <TargetingEditor
+            value={targeting}
+            onChange={(next) => {
+              setTargeting(next);
+              setTargetingDirty(true);
+            }}
+          />
+          {targetingError ? <p className="text-xs text-red-600 dark:text-red-400">{targetingError}</p> : null}
+          <div className="flex items-center gap-2">
+            <button className={toolbarBtn} disabled={busy} onClick={saveTargeting}>
+              Save targeting
+            </button>
+            {hasTargeting ? (
+              <button className={toolbarBtn} disabled={busy} onClick={clearTargeting}>
+                Clear
+              </button>
+            ) : null}
+            <span className="text-[11px] text-neutral-400 dark:text-slate-500">
+              Rules must ALL match. The user&apos;s traits are sent with each evaluation.
+            </span>
+          </div>
+        </div>
+      </details>
 
       <details className="group mt-3">
         <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
