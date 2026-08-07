@@ -407,12 +407,12 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-[#050505] font-sans text-zinc-50 bg-grid-dots">
-      <a
+      {/* <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-zinc-50 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-zinc-950"
       >
         Skip to content
-      </a>
+      </a> */}
 
       {/* Background Glowing Blobs */}
       <div className="pointer-events-none absolute left-1/4 top-0 size-72 animate-pulse-slow rounded-full bg-white/5 glow-blob sm:size-96" />
@@ -420,8 +420,8 @@ export default function LandingPage() {
       <div className="pointer-events-none absolute left-1/3 top-1/3 size-80 animate-pulse-slow rounded-full bg-white/5 glow-blob sm:size-[30rem]" />
 
       {/* Header/Navbar */}
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      {/* <header className="fixed inset-x-0 top-0 z-50 border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md"> */}
+        {/* <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <a href="#top" className={`flex shrink-0 items-center gap-3 rounded ${FOCUS_RING}`}>
             <img src="/brand/logo-white-no-bg.png" alt="TraceIQ" className="h-8 w-auto" />
           </a>
@@ -468,10 +468,10 @@ export default function LandingPage() {
               {menuOpen ? <CloseIcon className="size-5" /> : <MenuIcon className="size-5" />}
             </button>
           </div>
-        </nav>
+        </nav> */}
 
         {/* Mobile menu — the nav links were previously unreachable below `md`. */}
-        {menuOpen && (
+        {/* {menuOpen && (
           <div id="mobile-menu" className="border-t border-zinc-900 bg-zinc-950/95 backdrop-blur-md lg:hidden">
             <div className="mx-auto flex max-w-7xl flex-col px-4 py-3 sm:px-6">
               {NAV_LINKS.map((link) => (
@@ -500,7 +500,7 @@ export default function LandingPage() {
             </div>
           </div>
         )}
-      </header>
+      </header> */}
 
       <main id="main">
         {/* Hero Section — full screen, globe bleeds off the bottom edge */}
