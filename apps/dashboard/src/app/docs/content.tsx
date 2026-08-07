@@ -3,24 +3,26 @@ import Link from 'next/link';
 import { codeToHtml } from 'shiki';
 
 export const docsSections = [
-  { id: 'quickstart', label: 'Quickstart' },
-  { id: 'methods', label: 'SDK methods' },
-  { id: 'config', label: 'Configuration' },
-  { id: 'autocapture', label: 'Autocapture' },
-  { id: 'node', label: 'Node.js SDK' },
-  { id: 'react-native', label: 'React Native SDK' },
-  { id: 'python', label: 'Python SDK' },
-  { id: 'swift', label: 'Swift SDK' },
-  { id: 'kotlin', label: 'Kotlin SDK' },
-  { id: 'rust', label: 'Rust SDK' },
-  { id: 'ingestion', label: 'Server-side ingestion' },
-  { id: 'flags', label: 'Feature flags' },
-  { id: 'mcp', label: 'MCP server' },
-  { id: 'api-performance', label: 'API performance' },
-  { id: 'webhooks', label: 'Webhooks' },
-  { id: 'export', label: 'Data export' },
-  { id: 'events', label: 'Reserved events' },
-  { id: 'features', label: 'Feature guide' }
+  { id: 'quickstart', label: 'Quickstart', category: 'Getting started' },
+  { id: 'methods', label: 'SDK methods', category: 'Getting started' },
+  { id: 'config', label: 'Configuration', category: 'Getting started' },
+  { id: 'autocapture', label: 'Autocapture', category: 'Getting started' },
+  { id: 'node', label: 'Node.js SDK', category: 'Server & mobile SDKs' },
+  { id: 'react-native', label: 'React Native SDK', category: 'Server & mobile SDKs' },
+  { id: 'python', label: 'Python SDK', category: 'Server & mobile SDKs' },
+  { id: 'swift', label: 'Swift SDK', category: 'Server & mobile SDKs' },
+  { id: 'kotlin', label: 'Kotlin SDK', category: 'Server & mobile SDKs' },
+  { id: 'rust', label: 'Rust SDK', category: 'Server & mobile SDKs' },
+  { id: 'flags', label: 'Feature flags', category: 'Features' },
+  { id: 'alerts', label: 'Alerts', category: 'Features' },
+  { id: 'dashboards', label: 'Dashboards', category: 'Features' },
+  { id: 'api-performance', label: 'API performance', category: 'Features' },
+  { id: 'webhooks', label: 'Webhooks', category: 'Features' },
+  { id: 'export', label: 'Data export', category: 'Features' },
+  { id: 'events', label: 'Reserved events', category: 'Features' },
+  { id: 'features', label: 'Feature guide', category: 'Features' },
+  { id: 'ingestion', label: 'Server-side ingestion', category: 'Reference' },
+  { id: 'mcp', label: 'MCP server', category: 'Reference' }
 ];
 
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -427,6 +429,92 @@ const max = cfg?.maxAmount ?? 100000;`}</Code>
   "flags": { "new-checkout": true, "legacy-flow": false },
   "payloads": { "new-checkout": { "maxAmount": 50000 } }
 }`}</Code>
+        <P>
+          <strong>Target a segment before rolling out.</strong> A flag can require that a user&apos;s properties match
+          one or more rules (all must match — AND). The SDK sends the user&apos;s traits automatically, and you can pass
+          any other property (e.g. <Mono>plan</Mono>, <Mono>country</Mono>) at load time. Rules evaluate before the
+          rollout %, so only matching users are ever in the bucket.
+        </P>
+        <Code lang="ts">{`// Must match ALL rules, then the % rollout applies within that set.
+await traceiq.loadFeatureFlags({ plan: 'pro', country: 'US' });
+
+// Behind the scenes the dashboard stored:
+// targeting: [{ property: 'plan', operator: 'eq', value: 'pro' },
+//             { property: 'country', operator: 'eq', value: 'US' }]`}</Code>
+        <P>Supported operators on property values:</P>
+        <Bullets
+          items={[
+            ['eq / ne', 'Equal to / not equal to a string, number, or boolean.'],
+            ['gt / gte / lt / lte', 'Numeric comparison — the property must be a number to match.'],
+            ['Overrides', 'A per-user on/off override always wins, before targeting and rollout.']
+          ]}
+        />
+        <P>
+          Full evaluation order per user: master switch → per-user override → targeting rules → % rollout. A flag that
+          targets everyone behaves exactly as before.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'alerts') {
+    return (
+      <Section id="alerts" title="Alerts">
+        <P>
+          Watch a metric on a rolling window and get told the moment it crosses a line — instead of staring at a chart.
+          Create alerts under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/alerts">
+            Alerts
+          </a>
+          .
+        </P>
+        <P>A alert watches one event with a measure (count, unique users, sum/avg of a numeric property):</P>
+        <Bullets
+          items={[
+            ['above / below', 'Fire when the metric crosses a fixed threshold (e.g. "checkout_started count above 500").'],
+            ['drops_by / spikes_by', 'Fire when the metric changes by ≥ N% versus the previous window of the same length.'],
+            ['Rolling window', 'The metric is computed over a rolling 1h–7d window, checked automatically in the background.'],
+            ['Edge-triggered', 'A firing is recorded once when the alert transitions into the triggered state, so you are not paged every check while it stays fired.']
+          ]}
+        />
+        <P>When an alert fires you can be reached through one or both channels:</P>
+        <Bullets
+          items={[
+            ['Webhook', 'A POST with the alert details to any URL (Slack, ops tools, …).'],
+            ['Email', 'A formatted email to any list of recipients, or to the members of a saved notification group. Groups live under Alerts, so you can attach an on-call list to many alerts and edit it once.']
+          ]}
+        />
+        <P>
+          Every firing records a per-recipient delivery row — the Alerts page shows who was emailed / webhook-posted and
+          whether each delivery succeeded. Use <Mono>Test</Mono> on an alert to evaluate it once without firing.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'dashboards') {
+    return (
+      <Section id="dashboards" title="Dashboards">
+        <P>
+          Save any Insights view as a dashboard and pin the views your team looks at daily, without building a custom
+          chart grid. Create them from the{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/dashboards">
+            Dashboards
+          </a>{' '}
+          page or the <Mono>Save view</Mono> button on Insights.
+        </P>
+        <Bullets
+          items={[
+            ['One view per dashboard', 'A dashboard captures a metric, measure, interval, and segment — the URL of an Insights view.'],
+            ['Mine / Shared', 'Dashboards are private unless you mark them shared, which makes them visible to your team.'],
+            ['Compare side-by-side', 'Open two dashboards at once to eyeball this period versus the previous one, or one metric versus another.'],
+            ['Custom date ranges', 'Insights accepts free-form from / to dates (or a preset like last 7/30/90 days) instead of only fixed presets — the comparison window follows the exact range you pick.']
+          ]}
+        />
+        <P>
+          Dashboards are per-user and intentionally simple: one saved query each, surfaced everywhere a saved metric
+          should be. If you need tiles, Export the raw view and build it in your own BI tool.
+        </P>
       </Section>
     );
   }
@@ -655,6 +743,7 @@ function verify(rawBody, header, secret) {
           items={[
             ['Events', 'Live stream of raw events; expand a row for the full payload (properties, device, network, context).'],
             ['Insights', 'Trend any event over time (hourly/daily/weekly), broken down by a property or dimension (os, country, …). Supports measures — count, unique users, sum/avg of a numeric property like amount.'],
+            ['Dashboards', 'Saved Insights views you pin and open side-by-side — mine/shared, with free-form date ranges that drive the comparison window.'],
             ['Funnels', 'Ordered-event conversion with per-step drop-off; click a step to see who reached it or dropped off.'],
             ['Retention', 'Weekly cohort × week-offset grid — of the people who did something in a week, how many came back in later weeks. The core "is it sticky?" view.'],
             ['Cohorts', 'Saved groups of users defined by the events they did (or didn’t) do, reusable as filters across the product.'],
@@ -662,8 +751,8 @@ function verify(rawBody, header, secret) {
             ['Web analytics', 'Visitors, sessions, bounce rate, top paths, sources, devices, geography, active hours, and frustrating pages.'],
             ['Errors', 'Grouped exceptions with occurrences, affected users, stack traces, and browser/OS breakdown.'],
             ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
-            ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook.'],
-            ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, and JSON payloads (remote config) evaluated by the SDK.'],
+            ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook and/or email recipients or notification groups, with per-recipient delivery status.'],
+            ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, property-targeting segments, and JSON payloads (remote config) evaluated by the SDK.'],
             ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
             ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
@@ -733,27 +822,35 @@ export function DocsExplorer({ activeId, basePath, projectId, apiBaseUrl, snippe
       </div>
 
       <nav className="hidden xl:block">
-        <div className="sticky top-24">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500 pl-3">Docs Sections</p>
-          <ul className="grid gap-1 text-sm">
-            {docsSections.map((s) => {
-              const isActive = s.id === currentId;
-              return (
-                <li key={s.id}>
-                  <Link
-                    className={`block border-l-2 py-1 pl-3 transition ${
-                      isActive
-                        ? 'font-semibold text-neutral-900 dark:text-white border-slate-900 dark:border-white'
-                        : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                    }`}
-                    href={`${basePath}?page=${s.id}`}
-                  >
-                    {s.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="sticky top-24 grid gap-5">
+          {Array.from(new Set(docsSections.map((s) => s.category))).map((category) => (
+            <div key={category}>
+              <p className="mb-1 pl-3 text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+                {category}
+              </p>
+              <ul className="grid gap-1 text-sm">
+                {docsSections
+                  .filter((s) => s.category === category)
+                  .map((s) => {
+                    const isActive = s.id === currentId;
+                    return (
+                      <li key={s.id}>
+                        <Link
+                          className={`block border-l-2 py-1 pl-3 transition ${
+                            isActive
+                              ? 'font-semibold text-neutral-900 dark:text-white border-slate-900 dark:border-white'
+                              : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                          }`}
+                          href={`${basePath}?page=${s.id}`}
+                        >
+                          {s.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </div>
+          ))}
         </div>
       </nav>
     </div>

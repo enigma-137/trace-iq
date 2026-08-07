@@ -54,7 +54,7 @@ export default async function DashboardPage({
         </section>
       ) : null}
 
-      {overview?.project ? <RevenueHeadline revenue={overview.revenue} sparkline={overview.sparkline} projectId={canonicalProjectId} /> : null}
+      {/* {overview?.project ? <RevenueHeadline revenue={overview.revenue} sparkline={overview.sparkline} projectId={canonicalProjectId} /> : null} */}
 
       {overview?.project ? <AvailabilityStrip overview={overview} /> : null}
 
@@ -158,73 +158,73 @@ export default async function DashboardPage({
   );
 }
 
-function RevenueHeadline({
-  revenue,
-  sparkline,
-  projectId
-}: {
-  revenue: OverviewResponse['revenue'];
-  sparkline: OverviewResponse['sparkline'];
-  projectId?: string | null;
-}) {
-  const hasData = revenue.transactions > 0 || revenue.total !== 0;
-  const current = compactNumber(revenue.total);
-  const previous = compactNumber(revenue.previous);
-  const delta = deltaInfo(revenue.total, revenue.previous);
-  const isPositive = revenue.total >= revenue.previous;
-  const tone = delta.muted ? 'blue' : isPositive ? 'green' : 'red';
+// function RevenueHeadline({
+//   revenue,
+//   sparkline,
+//   projectId
+// }: {
+//   revenue: OverviewResponse['revenue'];
+//   sparkline: OverviewResponse['sparkline'];
+//   projectId?: string | null;
+// }) {
+//   const hasData = revenue.transactions > 0 || revenue.total !== 0;
+//   const current = compactNumber(revenue.total);
+//   const previous = compactNumber(revenue.previous);
+//   const delta = deltaInfo(revenue.total, revenue.previous);
+//   const isPositive = revenue.total >= revenue.previous;
+//   const tone = delta.muted ? 'blue' : isPositive ? 'green' : 'red';
 
-  return (
-    <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_36%,rgba(59,130,246,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_78%_36%,rgba(59,130,246,0.24),transparent_32%)]" />
-      <div className="relative grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] lg:items-end">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Revenue (GTV) - last 30 days
-          </p>
-          {hasData ? (
-            <>
-              <div className="mt-1 flex items-baseline gap-3">
-                <span className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">{current}</span>
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold ${
-                    tone === 'green'
-                      ? 'border-emerald-400/15 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300'
-                      : tone === 'red'
-                        ? 'border-red-400/15 bg-red-400/10 text-red-600 dark:text-red-300'
-                        : 'border-blue-500/10 bg-blue-500/5 text-blue-700 dark:text-blue-300'
-                  }`}
-                  title={`vs ${previous} the previous 30 days`}
-                >
-                  {delta.label}
-                </span>
-              </div>
-              <p className="mt-1.5 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
-                Summed from the <span className="font-mono text-neutral-700 dark:text-slate-200">amount</span> on{' '}
-                {formatCount(revenue.transactions)} {revenue.transactions === 1 ? 'event' : 'events'} in the last 30 days.{' '}
-                <span className="text-neutral-400 dark:text-slate-500">{comparisonText(30, revenue.previous, previous, delta)}</span>
-              </p>
-            </>
-          ) : (
-            <p className="mt-2 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
-              No revenue tracked yet. Send an event with a numeric{' '}
-              <span className="font-mono text-neutral-700 dark:text-slate-200">amount</span> property and it&apos;ll add up here.
-            </p>
-          )}
-        </div>
-        <div className="min-h-28">
-          <Sparkline points={sparkline} height={92} tone={tone} filled className="h-28 w-full" />
-        </div>
-        <Link
-          className="justify-self-start text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white lg:col-start-2 lg:justify-self-end"
-          href={withProjectId("/dashboard/insights?event=purchase&measure=sum&property=amount", projectId)}
-        >
-          Break down revenue &rarr;
-        </Link>
-      </div>
-    </section>
-  );
-}
+//   return (
+//     <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+//       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_36%,rgba(59,130,246,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_78%_36%,rgba(59,130,246,0.24),transparent_32%)]" />
+//       <div className="relative grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] lg:items-end">
+//         <div className="min-w-0">
+//           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+//             Revenue (GTV) - last 30 days
+//           </p>
+//           {hasData ? (
+//             <>
+//               <div className="mt-1 flex items-baseline gap-3">
+//                 <span className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">{current}</span>
+//                 <span
+//                   className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold ${
+//                     tone === 'green'
+//                       ? 'border-emerald-400/15 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300'
+//                       : tone === 'red'
+//                         ? 'border-red-400/15 bg-red-400/10 text-red-600 dark:text-red-300'
+//                         : 'border-blue-500/10 bg-blue-500/5 text-blue-700 dark:text-blue-300'
+//                   }`}
+//                   title={`vs ${previous} the previous 30 days`}
+//                 >
+//                   {delta.label}
+//                 </span>
+//               </div>
+//               <p className="mt-1.5 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
+//                 Summed from the <span className="font-mono text-neutral-700 dark:text-slate-200">amount</span> on{' '}
+//                 {formatCount(revenue.transactions)} {revenue.transactions === 1 ? 'event' : 'events'} in the last 30 days.{' '}
+//                 <span className="text-neutral-400 dark:text-slate-500">{comparisonText(30, revenue.previous, previous, delta)}</span>
+//               </p>
+//             </>
+//           ) : (
+//             <p className="mt-2 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
+//               No revenue tracked yet. Send an event with a numeric{' '}
+//               <span className="font-mono text-neutral-700 dark:text-slate-200">amount</span> property and it&apos;ll add up here.
+//             </p>
+//           )}
+//         </div>
+//         <div className="min-h-28">
+//           <Sparkline points={sparkline} height={92} tone={tone} filled className="h-28 w-full" />
+//         </div>
+//         <Link
+//           className="justify-self-start text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white lg:col-start-2 lg:justify-self-end"
+//           href={withProjectId("/dashboard/insights?event=purchase&measure=sum&property=amount", projectId)}
+//         >
+//           Break down revenue &rarr;
+//         </Link>
+//       </div>
+//     </section>
+//   );
+// }
 
 function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
   const status = availabilityStatus(overview);
