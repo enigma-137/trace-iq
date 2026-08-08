@@ -9,6 +9,8 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "migrate": "node scripts/migrate.js",
     "migrate:help": "node scripts/migrate.js --help",
     "migrate:status": "node scripts/migrate.js status",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@nestjs/cli": "^10.4.2",
     "@types/node": "^20.14.12",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.7"
   }
 }
