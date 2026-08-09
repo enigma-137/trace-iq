@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { codeToHtml } from 'shiki';
+import { DocsLayout } from './DocsLayout';
 
 export const docsSections = [
   { id: 'quickstart', label: 'Quickstart', category: 'Getting started' },
@@ -781,7 +782,7 @@ export function DocsExplorer({ activeId, basePath, projectId, apiBaseUrl, snippe
   const currentId = currentSection.id;
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[1fr_200px]">
+    <DocsLayout sections={docsSections} currentId={currentId} basePath={basePath}>
       <div className="min-w-0 max-w-3xl">
         <DocsSectionBody id={currentId} projectId={projectId} apiBaseUrl={apiBaseUrl} snippet={snippet} />
 
@@ -820,39 +821,6 @@ export function DocsExplorer({ activeId, basePath, projectId, apiBaseUrl, snippe
           )}
         </div>
       </div>
-
-      <nav className="hidden xl:block">
-        <div className="sticky top-24 grid gap-5">
-          {Array.from(new Set(docsSections.map((s) => s.category))).map((category) => (
-            <div key={category}>
-              <p className="mb-1 pl-3 text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-                {category}
-              </p>
-              <ul className="grid gap-1 text-sm">
-                {docsSections
-                  .filter((s) => s.category === category)
-                  .map((s) => {
-                    const isActive = s.id === currentId;
-                    return (
-                      <li key={s.id}>
-                        <Link
-                          className={`block border-l-2 py-1 pl-3 transition ${
-                            isActive
-                              ? 'font-semibold text-neutral-900 dark:text-white border-slate-900 dark:border-white'
-                              : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                          }`}
-                          href={`${basePath}?page=${s.id}`}
-                        >
-                          {s.label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </nav>
-    </div>
+    </DocsLayout>
   );
 }
