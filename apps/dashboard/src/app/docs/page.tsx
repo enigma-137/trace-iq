@@ -1,6 +1,6 @@
-import { DocsExplorer, FALLBACK_PROJECT_ID, FALLBACK_SNIPPET, apiBaseUrl, resolveActiveId } from './content';
-// import { PublicDocsHeader } from './PublicDocsHeader';
+import { DocsExplorer, docsSections, FALLBACK_PROJECT_ID, FALLBACK_SNIPPET, apiBaseUrl, resolveActiveId } from './content';
 import { DocsAiAssistant } from './DocsAiAssistant';
+import { MobileToc } from './MobileToc';
 
 export default function PublicDocsPage({
   searchParams
@@ -9,11 +9,12 @@ export default function PublicDocsPage({
 }) {
   const activeId = resolveActiveId(searchParams);
   const isWelcome = activeId === 'welcome';
+  const currentId = docsSections.some((s) => s.id === activeId) ? activeId : docsSections[0].id;
 
   return (
     <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
-      {/* {isWelcome && <PublicDocsHeader />} */}
       <div className="mx-auto max-w-6xl px-5 py-10 md:px-8">
+        <MobileToc sections={docsSections} currentId={currentId} basePath="/docs" />
         {isWelcome && (
           <div className="mb-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-slate-500">Documentation</p>
