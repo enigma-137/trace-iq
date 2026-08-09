@@ -3,38 +3,8 @@ import type { ReactNode } from 'react';
 import { SignOutButton } from './SignOutButton';
 import { ThemeToggle } from './ThemeToggle';
 import { NavIcon } from './NavIcon';
-
-const navItems = [
-  { label: 'Overview', href: '/dashboard', key: 'overview' },
-  { label: 'Web analytics', href: '/dashboard/web', key: 'web' },
-  { label: 'Insights', href: '/dashboard/insights', key: 'insights' },
-  { label: 'Dashboards', href: '/dashboard/dashboards', key: 'dashboards' },
-  { label: 'Events', href: '/dashboard/events', key: 'events' },
-  { label: 'Funnels', href: '/dashboard/funnels', key: 'funnels' },
-  { label: 'Retention', href: '/dashboard/retention', key: 'retention' },
-  { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' },
-  { label: 'Users', href: '/dashboard/users', key: 'users' },
-  { label: 'API performance', href: '/dashboard/api-performance', key: 'api-performance' },
-  { label: 'Errors', href: '/dashboard/errors', key: 'errors' },
-  { label: 'Alerts', href: '/dashboard/alerts', key: 'alerts' },
-  { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },
-  { label: 'Webhooks', href: '/dashboard/webhooks', key: 'webhooks' },
-  { label: 'Export', href: '/dashboard/export', key: 'export' }
-];
-
-const bottomNavItems = [
-  { label: 'Settings', href: '/dashboard/settings', key: 'settings' },
-  { label: 'Docs', href: '/docs', key: 'docs' }
-];
-
-const allNavItems = [...navItems, ...bottomNavItems];
-
-const navLinkClass = (isActive: boolean) =>
-  `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition ${
-    isActive
-      ? 'bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.16)] dark:bg-neutral-800 dark:text-white dark:shadow-[inset_3px_0_0_0_rgba(255,255,255,0.92)]'
-      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
-  }`;
+import { MobileNav } from './MobileNav';
+import { bottomNavItems, navItems, navLinkClass, withProjectId } from './nav';
 
 interface DashboardShellProps {
   active: string;
@@ -90,6 +60,7 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <MobileNav active={active} projectId={projectId} />
                 <div className="hidden min-w-0 text-right sm:block">
                   <p className="truncate text-sm font-medium text-neutral-800 dark:text-slate-200">{userEmail ?? 'Account'}</p>
                   <p className="text-xs text-neutral-400 dark:text-slate-500">Owner workspace</p>
@@ -98,23 +69,6 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
                 <SignOutButton />
               </div>
             </div>
-
-            <nav className="mt-4 flex gap-1.5 overflow-x-auto lg:hidden" aria-label="Mobile dashboard navigation">
-              {allNavItems.map((item) => (
-                <Link
-                  key={item.key}
-                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ${
-                    item.key === active
-                      ? 'bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.16)] dark:bg-neutral-800 dark:text-white dark:shadow-[inset_0_-2px_0_0_rgba(255,255,255,0.92)]'
-                      : 'text-neutral-500 dark:text-slate-400'
-                  }`}
-                  href={withProjectId(item.href, projectId)}
-                >
-                  <NavIcon name={item.key} />
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
           </header>
 
           <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">{children}</div>
@@ -122,13 +76,4 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
       </div>
     </main>
   );
-}
-function withProjectId(href: string, projectId?: string | null): string {
-  if (!projectId) return href;
-  const [path, hash = ''] = href.split('#');
-  const [pathname, query = ''] = path.split('?');
-  const params = new URLSearchParams(query);
-  params.set('projectId', projectId);
-  const nextQuery = params.toString();
-  return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${hash ? `#${hash}` : ''}`;
 }
