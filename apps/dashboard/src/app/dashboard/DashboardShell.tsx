@@ -42,6 +42,15 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
               </Link>
             ))}
           </nav>
+
+          <div className="mt-3 border-t border-neutral-200 pt-3 dark:border-slate-800">
+            <p className="truncate text-sm font-medium text-neutral-800 dark:text-slate-200">{userEmail ?? 'Account'}</p>
+            <p className="text-xs text-neutral-400 dark:text-slate-500">Owner workspace</p>
+            <div className="mt-3 flex items-center gap-2">
+              <ThemeToggle />
+              <SignOutButton />
+            </div>
+          </div>
         </aside>
 
         <section className="min-w-0 flex-1">
@@ -60,13 +69,7 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <MobileNav active={active} projectId={projectId} />
-                <div className="hidden min-w-0 text-right sm:block">
-                  <p className="truncate text-sm font-medium text-neutral-800 dark:text-slate-200">{userEmail ?? 'Account'}</p>
-                  <p className="text-xs text-neutral-400 dark:text-slate-500">Owner workspace</p>
-                </div>
-                <ThemeToggle />
-                <SignOutButton />
+                <MobileNav active={active} projectId={projectId} userEmail={userEmail} />
               </div>
             </div>
           </header>
