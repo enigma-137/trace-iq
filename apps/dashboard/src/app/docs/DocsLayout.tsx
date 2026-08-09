@@ -83,18 +83,9 @@ export function DocsLayout({
   }, [open]);
 
   return (
-    <div className="gap-10 lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
-      {/* Desktop sidebar — always visible on lg+ */}
-      <aside className="hidden lg:block">
-        <nav className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-1">
-          <p className="mb-1 pl-3 text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Contents
-          </p>
-          <TocNav sections={sections} currentId={currentId} basePath={basePath} />
-        </nav>
-      </aside>
-
-      {/* Mobile toggle + drawer */}
+    <>
+      {/* Mobile toggle — first thing on the page, so the contents are reachable
+          above any page heading. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -111,36 +102,44 @@ export function DocsLayout({
         </span>
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Table of contents">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-neutral-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-                Contents
-              </span>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close table of contents"
-                className="inline-flex size-8 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <nav className="flex-1 overflow-y-auto px-3 py-5">
-              <TocNav
-                sections={sections}
-                currentId={currentId}
-                basePath={basePath}
-              />
-            </nav>
-          </div>
-        </div>
-      )}
+      <div className="gap-10 lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
+        {/* Desktop sidebar — always visible on lg+ */}
+        <aside className="hidden lg:block">
+          <nav className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-1">
+            <p className="mb-1 pl-3 text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+              Contents
+            </p>
+            <TocNav sections={sections} currentId={currentId} basePath={basePath} />
+          </nav>
+        </aside>
 
-      {/* Content column */}
-      <div className="min-w-0">{children}</div>
-    </div>
+        {open && (
+          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Table of contents">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden="true" />
+            <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-neutral-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+              <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
+                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+                  Contents
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close table of contents"
+                  className="inline-flex size-8 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <nav className="flex-1 overflow-y-auto px-3 py-5">
+                <TocNav sections={sections} currentId={currentId} basePath={basePath} />
+              </nav>
+            </div>
+          </div>
+        )}
+
+        {/* Content column */}
+        <div className="min-w-0">{children}</div>
+      </div>
+    </>
   );
 }

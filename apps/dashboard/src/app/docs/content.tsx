@@ -4,6 +4,7 @@ import { codeToHtml } from 'shiki';
 import { DocsLayout } from './DocsLayout';
 
 export const docsSections = [
+  { id: 'welcome', label: 'Welcome', category: 'Getting started' },
   { id: 'quickstart', label: 'Quickstart', category: 'Getting started' },
   { id: 'methods', label: 'SDK methods', category: 'Getting started' },
   { id: 'config', label: 'Configuration', category: 'Getting started' },
@@ -42,7 +43,7 @@ traceiq.track('signup_completed', { plan: 'pro' });`;
 
 export function resolveActiveId(searchParams: { [key: string]: string | string[] | undefined } | undefined): string {
   const raw = Array.isArray(searchParams?.page) ? searchParams?.page[0] : searchParams?.page;
-  return raw || 'quickstart';
+  return raw || 'welcome';
 }
 
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -122,6 +123,42 @@ interface DocsSectionBodyProps {
 }
 
 export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSectionBodyProps) {
+  if (id === 'welcome') {
+    return (
+      <Section id="welcome" title="Welcome to the TraceIQ docs">
+        <P>
+          TraceIQ is a developer-first behavior intelligence platform. These docs cover the full SDK and API
+          reference — everything you need to instrument events, understand conversion, and act on the signal.
+        </P>
+        <P>
+          <strong>How to use these docs.</strong> Browse with the contents on the left — or tap{' '}
+          <Mono>Table of contents</Mono> on mobile — and follow the pages in order. Every page has{' '}
+          <Mono>Previous</Mono> / <Mono>Next</Mono> links at the bottom.
+        </P>
+        <P>The docs are organised into three parts:</P>
+        <Bullets
+          items={[
+            ['Getting started', 'Quickstart, SDK methods, configuration, and what the SDK captures automatically.'],
+            ['Server & mobile SDKs', 'Node.js, React Native, Python, Swift, Kotlin, and Rust.'],
+            ['Features', 'Feature flags, alerts, dashboards, webhooks, data export, and the rest of the platform.'],
+            ['Reference', 'Raw server-side ingestion over HTTP and the MCP server.']
+          ]}
+        />
+        <P>
+          Ready to send real events?{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/waitlist">
+            Request early access
+          </a>{' '}
+          to get a project and write key, then start with{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=quickstart">
+            Quickstart
+          </a>
+          .
+        </P>
+      </Section>
+    );
+  }
+
   if (id === 'quickstart') {
     return (
       <Section id="quickstart" title="Quickstart">
