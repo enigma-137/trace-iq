@@ -13,8 +13,8 @@ export default function PublicDocsPage({
   return (
     <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
       {/* {isWelcome && <PublicDocsHeader />} */}
-              <DocsExplorer activeId={activeId} basePath="/docs" projectId={FALLBACK_PROJECT_ID} apiBaseUrl={apiBaseUrl} snippet={FALLBACK_SNIPPET} />
       <div className="mx-auto max-w-6xl px-5 py-10 md:px-8">
+         <DocsExplorer activeId={activeId} basePath="/docs" projectId={FALLBACK_PROJECT_ID} apiBaseUrl={apiBaseUrl} snippet={FALLBACK_SNIPPET} />
         {isWelcome && (
           <div className="mb-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-slate-500">Documentation</p>
@@ -30,7 +30,7 @@ export default function PublicDocsPage({
             </p>
           </div>
         )}
-
+       
       </div>
 
       <DocsAiAssistant apiBaseUrl={apiBaseUrl} />
