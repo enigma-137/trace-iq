@@ -78,7 +78,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
         className="fixed bottom-5 right-5 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-neutral-900 px-5 text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:bg-neutral-700 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
       >
         <Wand2 className="size-4" />
-        Ask AI
+        Copy prompt for AI
       </button>
 
       {open && (
@@ -89,7 +89,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-blue-500" />
+                {/* <Sparkles className="size-4 text-blue-500" /> */}
                 <div>
                   <p className="text-sm font-semibold text-neutral-900 dark:text-white">TraceIQ AI setup prompt</p>
                   <p className="text-xs text-neutral-400 dark:text-slate-500">
