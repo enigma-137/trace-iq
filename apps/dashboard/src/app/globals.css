@@ -1686,6 +1686,29 @@ input {
   .traceiq-site .menu-button { display: inline-flex; }
   .traceiq-site .site-header { position: relative; }
   .traceiq-site .footer-links { grid-template-columns: repeat(2, 1fr); }
+
+  /* Dropdown panel revealed by the hamburger toggle (nav is display:none above,
+     and only this .is-open state ever brings it back on small screens). */
+  .traceiq-site .desktop-nav.is-open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    border-bottom: 1px solid var(--traceiq-line);
+    background: rgba(5, 5, 5, 0.97);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 24px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  .traceiq-site .desktop-nav.is-open a {
+    padding: 12px;
+    border-radius: 8px;
+  }
 }
 
 @media (max-width: 560px) {
