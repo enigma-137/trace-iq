@@ -413,12 +413,12 @@ export default function Page() {
           <div className="footer-links">
             <div><strong>Product</strong><a href="#product">Overview</a><a href="#solutions">Solutions</a><a href="/docs">Resources</a></div>
             <div><strong>Company</strong><a href="#company">About</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.dev">Contact</a></div>
-            <div><strong>Connect</strong><a href="/docs">Docs</a><span className="disabled-link">Status</span></div>
+            <div><strong>Connect</strong><a href="/docs">Docs</a><a className="" href="/status">Status</a></div>
           </div>
         </div>
         <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
           <div className="footer-bottom">
-            <span>© 2026 TraceIQ</span>
+            <span>© {new Date().getFullYear()} TraceIQ</span>
             <span>Built for the signal.</span>
           </div>
         </div>

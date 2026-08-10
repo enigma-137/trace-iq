@@ -16,30 +16,26 @@ interface CheckState {
   latency: number | null;
 }
 
-const STATUS_META: Record<OverallStatus, { title: string; subtitle: string; image: string; dot: string }> = {
+const STATUS_META: Record<OverallStatus, { title: string; subtitle: string; image: string }> = {
   checking: {
     title: 'CHECKING SYSTEMS',
     subtitle: 'Probing our services from your region\u2026',
-    image: '',
-    dot: ''
+    image: ''
   },
   operational: {
     title: 'ALL SYSTEMS OPERATIONAL',
     subtitle: 'LGTM \u2014 every check is passing.',
-    image: '/brand/status-good.png',
-    dot: ''
+    image: '/brand/status-good.png'
   },
   degraded: {
     title: 'PARTIAL OUTAGE',
     subtitle: 'Core ingestion is up, but the data layer is not responding.',
-    image: '/brand/status-bad.png',
-    dot: ''
+    image: '/brand/status-bad.png'
   },
   down: {
     title: 'SERVICE DOWN',
     subtitle: `We couldn\u2019t reach the API at ${apiBaseUrl}.`,
-    image: '/brand/status-bad.png',
-    dot: ''
+    image: '/brand/status-bad.png'
   }
 };
 
@@ -138,7 +134,7 @@ export default function StatusPage() {
                 )}
           </div>
 
-          <h1 className="status-title">{overall === 'checking' ? 'CHECKING SYSTEMS' : meta.title}</h1>
+          <h1 className="status-title">{meta.title}</h1>
           <p className="status-subtitle">{meta.subtitle}</p>
 
           <div className="status-checks">
