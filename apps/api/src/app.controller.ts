@@ -1,6 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
 import { appConfig } from './config/app.config';
-import { databaseConfig } from './database/database.config';
 import { DatabaseService } from './database/database.service';
 
 interface HealthResponse {
@@ -12,11 +11,6 @@ interface HealthResponse {
 
 interface DatabaseHealthResponse {
   status: 'ok';
-  database: {
-    host: string;
-    database: string;
-    ssl: boolean;
-  };
   timestamp: string;
 }
 
@@ -40,11 +34,6 @@ export class AppController {
 
     return {
       status: 'ok',
-      database: {
-        host: databaseConfig.safeHost,
-        database: databaseConfig.safeDatabaseName,
-        ssl: databaseConfig.ssl
-      },
       timestamp: new Date().toISOString()
     };
   }
