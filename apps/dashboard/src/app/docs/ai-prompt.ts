@@ -1,7 +1,7 @@
 // Static data for the docs "Ask AI" prompt builder. Everything here is pure data
 // so the modal can compose a detailed prompt entirely on the client — no API call.
 
-export type AiLanguageId = 'javascript' | 'python' | 'rust' | 'react-native' | 'swift' | 'mcp' | 'other';
+export type AiLanguageId = 'javascript' | 'python' | 'rust' | 'php' | 'react-native' | 'swift' | 'mcp' | 'other';
 
 export type AiFeatureId =
   | 'general'
@@ -143,6 +143,41 @@ let mut traceiq = Client::new("YOUR_PROJECT_ID", "YOUR_WRITE_KEY");`,
     docs: [
       { label: 'Rust SDK', href: '/docs?page=rust' },
       { label: 'Server-side ingestion', href: '/docs?page=ingestion' }
+    ]
+  },
+  {
+    id: 'php',
+    label: 'PHP',
+    blurb: 'Zero-dependency Composer package for servers (Laravel-ready)',
+    install: 'composer require traceiq/traceiq-php',
+    init: `use TraceIQ\\Client;
+
+$traceiq = new Client(
+    projectId: "YOUR_PROJECT_ID",
+    writeKey: "YOUR_WRITE_KEY",
+    endpoint: "__API_BASE_URL__",
+);`,
+    steps: [
+      'Install the Composer package and create a `Client` with your project id and write key.',
+      'Keep the write key in an environment variable on the server.',
+      'Call `capture(...)` for events and `identify(...)` to associate a user profile.',
+      'The client flushes at `flush_at` and on request shutdown — call `flush()` early if you need delivery before responding.'
+    ],
+    featureSnippets: {
+      'event-tracking': `$traceiq->capture(
+    event: "payout_succeeded",
+    userId: "user_123",
+    properties: ["amount" => 50000, "currency" => "NGN"],
+);`,
+      'user-identity': `$traceiq->identify(
+    userId: "user_123",
+    traits: ["kyc_tier" => 2, "email" => "a@b.com"],
+);`
+    },
+    docs: [
+      { label: 'PHP SDK', href: '/docs?page=php' },
+      { label: 'Server-side ingestion', href: '/docs?page=ingestion' },
+      { label: 'Reserved events', href: '/docs?page=events' }
     ]
   },
   {

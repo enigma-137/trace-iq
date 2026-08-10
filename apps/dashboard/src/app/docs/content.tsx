@@ -15,6 +15,7 @@ export const docsSections = [
   { id: 'swift', label: 'Swift SDK', category: 'Server & mobile SDKs' },
   { id: 'kotlin', label: 'Kotlin SDK', category: 'Server & mobile SDKs' },
   { id: 'rust', label: 'Rust SDK', category: 'Server & mobile SDKs' },
+  { id: 'php', label: 'PHP SDK', category: 'Server & mobile SDKs' },
   { id: 'flags', label: 'Feature flags', category: 'Features' },
   { id: 'alerts', label: 'Alerts', category: 'Features' },
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
@@ -389,6 +390,34 @@ traceiq.capture("payout_succeeded", Some("user_123"), None,
     None, None);
 
 traceiq.shutdown(); // flush before exit`}</Code>
+      </Section>
+    );
+  }
+
+  if (id === 'php') {
+    return (
+      <Section id="php" title="PHP SDK">
+        <P>
+          <Mono>traceiq/traceiq-php</Mono> for PHP 8.1+ — a zero-dependency Composer package. Events are queued
+          and flushed in batches; PHP has no background threads, so flushing is synchronous at <Mono>flush_at</Mono>{' '}
+          and on request shutdown.
+        </P>
+        <Code lang="bash">{`composer require traceiq/traceiq-php`}</Code>
+        <Code lang="php">{`use TraceIQ\\Client;
+
+$traceiq = new Client(
+    projectId: "${projectId}",
+    writeKey: "YOUR_WRITE_KEY",
+    endpoint: "${apiBaseUrl}",
+);
+
+$traceiq->capture(
+    event: "payout_succeeded",
+    userId: "user_123",
+    properties: ["amount" => 50000, "currency" => "NGN"],
+);
+
+$traceiq->shutdown(); // flush before a short-lived process exits`}</Code>
       </Section>
     );
   }

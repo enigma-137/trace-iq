@@ -8,3 +8,6 @@ coverage/
 *.tsbuildinfo
 Dockerfile.local
 **/target/
+vendor/
+composer.lock
+.phpunit.result.cache

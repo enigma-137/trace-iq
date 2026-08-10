@@ -1,0 +1,24 @@
+# Keep the Composer dist archive (git archive for tag downloads) limited to
+# the traceiq/traceiq-php package files. Everything else in this monorepo is
+# excluded from the published zip.
+.npmrc export-ignore
+.codebase-memory export-ignore
+.env export-ignore
+.env.example export-ignore
+apps/ export-ignore
+CONTRIBUTING.md export-ignore
+docs/ export-ignore
+docker-compose.yml export-ignore
+ENVIRONMENT_SETUP.md export-ignore
+favicon* export-ignore
+infrastructure/ export-ignore
+package.json export-ignore
+package-lock.json export-ignore
+packages/ export-ignore
+render.yaml export-ignore
+scripts/ export-ignore
+sdks/ export-ignore
+starter.md export-ignore
+traceiq*.tgz export-ignore
+tsconfig.base.json export-ignore
+phpunit.xml.dist export-ignore
