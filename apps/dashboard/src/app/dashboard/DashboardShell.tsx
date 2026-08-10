@@ -58,7 +58,7 @@ export function DashboardShell({ active, title, userEmail, projectId, children }
             <div className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <img className="h-7 w-auto dark:hidden lg:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
-                <img className="hidden h-7 w-auto dark:block lg:hidden" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
+                {/* <img className="hidden h-7 w-auto dark:block lg:hidden" src="/brand/logo-white-no-bg.png" alt="TraceIQ" /> */}
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-slate-500">
                     Dashboard
