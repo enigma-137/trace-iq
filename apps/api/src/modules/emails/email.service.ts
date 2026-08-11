@@ -5,7 +5,7 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class EmailService {
   private readonly apiKey = process.env.RESEND_API_KEY ?? '';
-  private readonly from = process.env.RESEND_FROM ?? 'TraceIQ Alerts <alerts@traceiq.dev>';
+  private readonly from = process.env.RESEND_FROM ?? 'TraceIQ Alerts <alerts@traceiq.run>';
 
   get configured(): boolean {
     return this.apiKey.length > 0;

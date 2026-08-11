@@ -13,6 +13,7 @@ export const navItems = [
   { label: 'Alerts', href: '/dashboard/alerts', key: 'alerts' },
   { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },
   { label: 'Webhooks', href: '/dashboard/webhooks', key: 'webhooks' },
+  { label: 'Achievements', href: '/dashboard/achievements', key: 'achievements' },
   { label: 'Export', href: '/dashboard/export', key: 'export' }
 ];
 

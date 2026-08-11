@@ -5,7 +5,7 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
 import { FilterCondition, buildFilterClause, sanitizeFilters } from '../../common/filters';
 import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
-import { EmailService, toUniqueEmails } from './email.service';
+import { EmailService, toUniqueEmails } from '../emails/email.service';
 import { NotificationGroupsService } from './notification-groups.service';
 
 type AlertCondition = 'above' | 'below' | 'drops_by' | 'spikes_by';

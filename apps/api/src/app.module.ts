@@ -16,6 +16,7 @@ import { ReplayModule } from './modules/replay/replay.module';
 import { UsersModule } from './modules/users/users.module';
 import { AiModule } from './modules/ai/ai.module';
 import { ErrorsModule } from './modules/errors/errors.module';
+import { AchievementsModule } from './modules/achievements/achievements.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 
@@ -38,6 +39,7 @@ import { DatabaseModule } from './database/database.module';
     ReplayModule,
     AiModule,
     ErrorsModule,
+    AchievementsModule,
     BillingModule
   ],
   controllers: [AppController]

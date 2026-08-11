@@ -4,6 +4,7 @@ import { DashboardUser } from '../auth/auth.service';
 import { DatabaseService } from '../../database/database.service';
 import { extractClientIp, resolveGeo } from '../../common/geo';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { AchievementsService } from '../achievements/achievements.service';
 
 type JsonObject = Record<string, unknown>;
 
@@ -79,7 +80,8 @@ export class EventsService {
 
   constructor(
     private readonly database: DatabaseService,
-    private readonly webhooks: WebhooksService
+    private readonly webhooks: WebhooksService,
+    private readonly achievements: AchievementsService
   ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
@@ -180,6 +182,9 @@ export class EventsService {
         occurredAt: p.occurredAt.toISOString()
       });
     });
+
+    // Re-evaluate workspace achievements without blocking the ingest response.
+    void this.achievements.afterProjectIngest(auth.project_id);
 
     return { accepted: true, results };
   }
@@ -373,6 +378,9 @@ export class EventsService {
       properties: input.properties ?? {},
       occurredAt: occurredAt.toISOString()
     });
+
+    // Re-evaluate workspace achievements without blocking the ingest response.
+    void this.achievements.afterProjectIngest(auth.project_id);
 
     return {
       accepted: true,

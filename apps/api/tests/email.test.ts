@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { EmailService, isValidEmail, toUniqueEmails } from '../src/modules/alerts/email.service';
+import { EmailService, isValidEmail, toUniqueEmails } from '../src/modules/emails/email.service';
 
 describe('isValidEmail', () => {
   it('accepts well-formed addresses', () => {

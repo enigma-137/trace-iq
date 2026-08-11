@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
-import { toUniqueEmails } from './email.service';
+import { toUniqueEmails } from '../emails/email.service';
 
 type GroupRow = {
   [column: string]: unknown;

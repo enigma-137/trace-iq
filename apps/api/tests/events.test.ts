@@ -10,8 +10,9 @@ function makeService(onQuery: (text: string, values: unknown[]) => unknown) {
     return result;
   });
   const webhooks = { deliverForEvent: vi.fn().mockResolvedValue(undefined) };
-  const service = new EventsService(db as never, webhooks as never);
-  return { db, webhooks, service };
+  const achievements = { afterProjectIngest: vi.fn().mockResolvedValue(undefined) };
+  const service = new EventsService(db as never, webhooks as never, achievements as never);
+  return { db, webhooks, achievements, service };
 }
 
 // A DB that accepts a valid write key and lets every insert succeed.
