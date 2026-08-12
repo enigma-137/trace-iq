@@ -25,6 +25,8 @@ export function SetupPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false);
+  const [setupOrgName, setSetupOrgName] = useState('');
+  const [isRenamingOrg, setIsRenamingOrg] = useState(false);
   const hasProject = Boolean(setup?.project);
 
   useEffect(() => {
@@ -53,7 +55,38 @@ export function SetupPanel() {
       setStatus({ tone: 'error', message: await readError(response) });
       return;
     }
-    setSetup((await response.json()) as SetupResponse);
+    const nextSetup = (await response.json()) as SetupResponse;
+    setSetup(nextSetup);
+    setSetupOrgName(nextSetup.organization?.name ?? '');
+  }
+
+  async function handleRenameOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = setupOrgName.trim();
+    if (!trimmed || trimmed === setup?.organization?.name) {
+      return;
+    }
+    setIsRenamingOrg(true);
+    setStatus(null);
+    const token = await getAccessToken();
+    if (!token) {
+      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+      setIsRenamingOrg(false);
+      return;
+    }
+    const response = await fetch(`${apiBaseUrl}/v1/setup/organization`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationName: trimmed })
+    });
+    setIsRenamingOrg(false);
+    if (!response.ok) {
+      setStatus({ tone: 'error', message: await readError(response) });
+      return;
+    }
+    setSetup((current) => (current ? { ...current, organization: { ...current.organization!, name: trimmed } } : current));
+    setSetupOrgName(trimmed);
+    setStatus({ tone: 'success', message: 'Organization name updated.' });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -185,6 +218,30 @@ export function SetupPanel() {
               mono
             />
           </div>
+
+          <form
+            className="grid items-end gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_auto]"
+            onSubmit={handleRenameOrganization}
+          >
+            <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="organizationName">
+              Organization name
+              <input
+                className={inputClass}
+                id="organizationName"
+                value={setupOrgName}
+                onChange={(event) => setSetupOrgName(event.target.value)}
+                required
+                maxLength={80}
+              />
+            </label>
+            <button
+              className="min-h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+              type="submit"
+              disabled={isRenamingOrg || !setupOrgName.trim() || setupOrgName.trim() === setup?.organization?.name}
+            >
+              {isRenamingOrg ? 'Saving…' : 'Save name'}
+            </button>
+          </form>
 
           {setup?.sdkSnippet ? (
             <div className="grid gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">

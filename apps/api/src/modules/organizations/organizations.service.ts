@@ -142,6 +142,42 @@ export class OrganizationsService {
     });
   }
 
+  async renameOrganization(user: DashboardUser, input: BootstrapSetupRequest) {
+    const organizationName = this.cleanName(input.organizationName, '');
+
+    if (!organizationName) {
+      throw new BadRequestException('Organization name is required.');
+    }
+
+    return this.database.transaction(async (client) => {
+      const existing = await this.getExistingSetup(client, user);
+
+      if (!existing.organization) {
+        throw new BadRequestException('Create an organization before renaming it.');
+      }
+
+      if (!['owner', 'admin'].includes(existing.organization.role)) {
+        throw new ForbiddenException('Only owners and admins can rename the organization.');
+      }
+
+      await client.query(
+        `
+          UPDATE organizations
+          SET name = $2, updated_at = now()
+          WHERE id = $1;
+        `,
+        [existing.organization.id, organizationName]
+      );
+
+      return {
+        organization: {
+          ...existing.organization,
+          name: organizationName
+        }
+      };
+    });
+  }
+
   private async getExistingSetup(client: QueryExecutor, user: DashboardUser) {
     const result = await client.query<
       QueryResultRow & {

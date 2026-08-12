@@ -57,7 +57,7 @@ export async function dashboardGet<T>(
   }
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
+export async function readErrorMessage(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { message?: string };
     return body.message ?? `Request failed with ${response.status}`;

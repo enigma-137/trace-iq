@@ -40,6 +40,10 @@ export function AchievementDialog({ achievement, onClose }: AchievementDialogPro
     setDownloading(true);
     setError(null);
     try {
+      // Make sure the WebP artwork is fetched and decoded before html-to-image
+      // clones the node, so the exported PNG shows the artwork (not a blank/missing
+      // image placeholder).
+      await ensureImageLoaded(active.badge);
       const dataUrl = await toPng(node, {
         pixelRatio: 2,
         backgroundColor: '#0b0d12',
@@ -119,4 +123,23 @@ function triggerDownload(dataUrl: string, filename: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+/**
+ * Fetches and decodes the badge WebP so html-to-image can paint it in the
+ * exported PNG. Resolves regardless of outcome (download should still proceed
+ * if the artwork is unavailable), but rejects if the image fails catastrophically.
+ */
+async function ensureImageLoaded(src: string): Promise<void> {
+  if (!src) {
+    return;
+  }
+
+  const image = new Image();
+  await new Promise<void>((resolve) => {
+    const done = () => resolve();
+    image.onload = done;
+    image.onerror = done;
+    image.src = src;
+  });
 }

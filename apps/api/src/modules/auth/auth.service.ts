@@ -2,17 +2,40 @@ import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/c
 import { createHash } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 
+export interface AmrEntry {
+  method: string;
+  timestamp: number;
+}
+
+export interface MfaFactor {
+  id: string;
+  friendly_name?: string;
+  factor_type: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface DashboardUser {
   id: string;
   email?: string;
   authMethod?: 'supabase' | 'pat';
   scopes?: string[];
+  amr?: AmrEntry[];
+  factors?: MfaFactor[];
 }
 
 interface SupabaseUserResponse {
   id?: string;
   email?: string;
+  factors?: MfaFactor[];
 }
+
+/**
+ * Supabase `amr` method names that count as a completed second factor.
+ * `password`/`oauth`/`otp` are primary sign-in methods and do not count.
+ */
+const MFA_METHODS = ['totp', 'webauthn', 'phone', 'sms'];
 
 @Injectable()
 export class AuthService {
@@ -34,7 +57,9 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      authMethod: 'supabase'
+      authMethod: 'supabase',
+      amr: this.decodeAmr(token),
+      factors: user.factors
     };
   }
 
@@ -53,6 +78,60 @@ export class AuthService {
       throw new ForbiddenException('Personal access tokens cannot manage personal access tokens.');
     }
   }
+
+  /**
+   * Enforces step-up (MFA) for sensitive actions. The Supabase access token's
+   * `amr` claim records the verification methods used in this session; a
+   * session is considered MFA-verified when it carries a non-password method
+   * (totp, webauthn, ...) confirmed within the configured freshness window.
+   */
+  requireStepUp(user: DashboardUser, maxAgeMinutes = 15): void {
+    if (user.authMethod === 'pat') {
+      throw new ForbiddenException('Personal access tokens cannot be used for actions that require step-up authentication.');
+    }
+
+    const amr = user.amr ?? [];
+    const mfaMethod = MFA_METHODS.find((method) => amr.some((entry) => entry.method === method));
+
+    if (!mfaMethod) {
+      throw new ForbiddenException('Step-up authentication is required. Please complete a second factor before continuing.', 'STEP_UP_REQUIRED');
+    }
+
+    const mfaEntry = amr.find((entry) => entry.method === mfaMethod);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const stale = mfaEntry?.timestamp != null && nowSeconds - mfaEntry.timestamp > maxAgeMinutes * 60;
+
+    if (stale) {
+      throw new ForbiddenException('Step-up authentication expired. Please complete a second factor again.', 'STEP_UP_EXPIRED');
+    }
+  }
+
+  /**
+   * Decodes the `amr` (authentication method reference) claim from the token's
+   * payload. The token is already validated by Supabase's /auth/v1/user above,
+   * so this only parses the JWT payload (no signature needed). Returns empty
+   * array for malformed/non-JWT tokens (e.g. legacy opaque tokens).
+   */
+  private decodeAmr(token: string): AmrEntry[] {
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) {
+        return [];
+      }
+
+      const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+      const claims = JSON.parse(json) as { amr?: unknown };
+
+      if (!Array.isArray(claims.amr)) {
+        return [];
+      }
+
+      return claims.amr as AmrEntry[];
+    } catch {
+      return [];
+    }
+  }
+
   private getBearerToken(authorizationHeader?: string): string {
     if (!authorizationHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token.');

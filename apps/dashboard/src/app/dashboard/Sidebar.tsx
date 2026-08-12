@@ -6,6 +6,9 @@ import { NavIcon } from './NavIcon';
 import { ThemeToggle } from './ThemeToggle';
 import { SignOutButton } from './SignOutButton';
 import { navItems, bottomNavItems, navLinkClass, withProjectId } from './nav';
+import { useMfaStatus } from '@/lib/mfa';
+import { useOrganization } from '@/lib/organization';
+
 
 interface SidebarProps {
   active: string;
@@ -16,6 +19,10 @@ interface SidebarProps {
 export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { enrolled } = useMfaStatus();
+  const { organization } = useOrganization();
+  const showMfaWarning = mounted && enrolled === false;
+  const organizationName = organization?.name || 'Your Organization';
 
   useEffect(() => {
     setMounted(true);
@@ -37,9 +44,8 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
 
   return (
     <aside
-      className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-neutral-200 bg-white transition-[width] duration-200 ease-in-out dark:border-slate-800/90 dark:bg-slate-950 lg:flex ${
-        collapsed ? 'w-16 px-2 py-5' : 'w-60 px-4 py-5'
-      }`}
+      className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-neutral-200 bg-white transition-[width] duration-200 ease-in-out dark:border-slate-800/90 dark:bg-slate-950 lg:flex ${collapsed ? 'w-16 px-2 py-5' : 'w-60 px-4 py-5'
+        }`}
     >
       {/* Brand Header */}
       <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} min-h-8`}>
@@ -95,15 +101,22 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
       >
         {bottomNavItems.map((item) => {
           const isActive = item.key === active;
+          const showWarning = item.key === 'settings' && showMfaWarning;
           return (
             <Link
               key={item.key}
-              className={`${navLinkClass(isActive)} ${collapsed ? 'justify-center px-0' : ''}`}
+              className={`${navLinkClass(isActive)} relative ${collapsed ? 'justify-center px-0' : ''}`}
               href={withProjectId(item.href, projectId)}
               title={collapsed ? item.label : undefined}
             >
               <NavIcon name={item.key} />
               {!collapsed && <span className="truncate">{item.label}</span>}
+              {showWarning && (
+                <WarningIcon
+                  collapsed={collapsed}
+                  title="Two-factor authentication is not enabled yet"
+                />
+              )}
             </Link>
           );
         })}
@@ -138,16 +151,16 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
         ) : (
           <div className="grid gap-2.5">
             <div className="flex items-center gap-2.5 rounded-lg border border-neutral-200/80 bg-neutral-50/80 p-2 dark:border-slate-800/80 dark:bg-slate-900/60">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white text-xs shadow-sm">
+              {/* <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white text-xs shadow-sm">
                 {initial}
-              </div>
+              </div> */}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-neutral-800 dark:text-slate-200" title={userEmail || 'Account'}>
-                  {userEmail || 'Account'}
+                <p className="truncate text-xs font-semibold text-neutral-800 dark:text-slate-200" title={organizationName}>
+                  {organizationName}
                 </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="size-1.5 rounded-full bg-emerald-500" />
-                  <p className="text-[10px] text-neutral-400 dark:text-slate-400">Owner workspace</p>
+                  <p className="text-[10px] text-neutral-400 dark:text-slate-400"> {userEmail || 'Account'}</p>
                 </div>
               </div>
             </div>
@@ -162,5 +175,27 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
         )}
       </div>
     </aside>
+  );
+}
+
+function WarningIcon({ collapsed, title }: { collapsed: boolean; title: string }) {
+  if (collapsed) {
+    return (
+      <span className="absolute right-1 top-1 size-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-slate-950" title={title} aria-label={title} />
+    );
+  }
+
+  return (
+    <span
+      className="ml-auto inline-flex text-amber-500"
+      title={title}
+      role="img"
+      aria-label={title}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m10.3 3.9-8.2 14a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0Z" />
+        <path d="M12 9v4M12 17h.01" />
+      </svg>
+    </span>
   );
 }

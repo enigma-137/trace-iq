@@ -8,6 +8,8 @@ import { NavIcon } from './NavIcon';
 import { SignOutButton } from './SignOutButton';
 import { ThemeToggle } from './ThemeToggle';
 import { bottomNavItems, navItems, navLinkClass, withProjectId } from './nav';
+import { useMfaStatus } from '@/lib/mfa';
+import { useOrganization } from '@/lib/organization';
 
 export function MobileNav({
   active,
@@ -19,6 +21,10 @@ export function MobileNav({
   userEmail?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const { enrolled } = useMfaStatus();
+  const { organization } = useOrganization();
+  const showMfaWarning = enrolled === false;
+  const organizationName = organization?.name || 'Your organization';
 
   // Lock the page behind the drawer and let Escape dismiss it.
   useEffect(() => {
@@ -108,6 +114,14 @@ export function MobileNav({
                     >
                       <NavIcon name={item.key} />
                       {item.label}
+                      {item.key === 'settings' && showMfaWarning ? (
+                        <span className="ml-auto inline-flex text-amber-500" title="Two-factor authentication is not enabled yet">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="m10.3 3.9-8.2 14a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0Z" />
+                            <path d="M12 9v4M12 17h.01" />
+                          </svg>
+                        </span>
+                      ) : null}
                     </Link>
                   ))}
                 </div>
@@ -115,9 +129,9 @@ export function MobileNav({
 
               <div className="border-t border-neutral-200 px-4 py-4 dark:border-slate-800">
                 <p className="truncate text-sm font-medium text-neutral-800 dark:text-slate-200">
-                  {userEmail ?? 'Account'}
+                  {organizationName}
                 </p>
-                <p className="text-xs text-neutral-400 dark:text-slate-500">Owner workspace</p>
+                <p className="text-xs text-neutral-400 dark:text-slate-500"> {userEmail ?? 'Account'}</p>
                 <div className="mt-3 flex items-center gap-2">
                   <ThemeToggle />
                   <SignOutButton />
