@@ -1,0 +1,42 @@
+const SLUG_TO_BADGE: Record<string, string> = {
+  'first-project': '/achievements/first-project.webp',
+  'multi-project': '/achievements/multi-project-founder.webp',
+  'ten-projects': '/achievements/portfolio.webp',
+  'fifty-projects': '/achievements/studio.webp',
+  'hundred-projects': '/achievements/mega-builder.webp',
+  'first-signal': '/achievements/first-signal.webp',
+  'event-machine': '/achievements/event-machine.webp',
+  'one-hundred-k-events': '/achievements/data-firehose.webp',
+  'one-million-events': '/achievements/event-atlas.webp',
+  'ten-million-events': '/achievements/terabyte-club.webp',
+  'first-user': '/achievements/first-contact.webp',
+  'hundred-users': '/achievements/getting-noticed.webp',
+  'thousand-users': '/achievements/on-the-map.webp',
+  'ten-thousand-users': '/achievements/small-city.webp',
+  'one-month': '/achievements/one-month.webp',
+  'six-months': '/achievements/half-a-year.webp',
+  'one-year': '/achievements/one-year.webp',
+  'two-years': '/achievements/veteran.webp',
+  'first-flag': '/achievements/flag-bearer.webp',
+  'ten-flags': '/achievements/feature-fleet.webp',
+  'first-alert': '/achievements/night-watch.webp',
+  'ten-alerts': '/achievements/sentry-post.webp',
+  'first-webhook': '/achievements/webhook-weaver.webp',
+  'ten-webhooks': '/achievements/webhook-mesh.webp',
+  'first-funnel': '/achievements/funnel-visionary.webp',
+  'ten-funnels': '/achievements/funnel-master.webp',
+  'first-dashboard': '/achievements/dashboard-creator.webp',
+  'dashboard-architect': '/achievements/dashboard-achitect.webp',
+  'first-cohort': '/achievements/cohort-curator.webp',
+  'ten-cohorts': '/achievements/cohort-collector.webp'
+};
+
+export function getBadgeImage(achievement: { slug: string; badge?: string }): string {
+  return SLUG_TO_BADGE[achievement.slug] ?? achievement.badge ?? '';
+}
+
+export function hasBadgeImage(slug: string): boolean {
+  return slug in SLUG_TO_BADGE;
+}
+
+export const ACHIEVEMENT_SLUGS = Object.keys(SLUG_TO_BADGE);

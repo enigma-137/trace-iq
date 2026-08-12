@@ -32,6 +32,7 @@ export interface AchievementView {
   title: string;
   description: string;
   badge: string;
+  badgeImage?: string;
   category: string;
   kind: string;
   metric: string;
@@ -150,6 +151,7 @@ export class AchievementsService {
         title: row.title,
         description: row.description,
         badge: row.badge,
+        badgeImage: row.badge,
         category: row.category,
         kind: row.kind,
         metric: row.metric,

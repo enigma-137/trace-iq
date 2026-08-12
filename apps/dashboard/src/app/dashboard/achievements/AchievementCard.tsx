@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { AchievementView } from './types';
 import { formatDate, metricCopy, progressPercent } from './metrics';
+import { getBadgeImage } from './assets';
 
 interface AchievementCardProps {
   achievement: AchievementView;
@@ -12,19 +14,29 @@ export function AchievementCard({ achievement, onSelect }: AchievementCardProps)
   const pct = progressPercent(achievement.progress, achievement.threshold);
   const remaining = Math.max(0, achievement.threshold - achievement.progress);
 
+  const [imgError, setImgError] = useState(false);
+  const badgeSrc = !imgError ? (achievement.badgeImage ?? getBadgeImage(achievement)) : '';
+
   const badgeImage =
     'h-16 w-16 shrink-0 object-contain' +
-    (unlocked ? '' : ' [filter:grayscale(1)_brightness(0.45)_contrast(0.85)] opacity-[0.6]');
+    (unlocked ? '' : ' [filter:grayscale(1)_brightness(0.22)_contrast(0.8)] opacity-[0.4]');
 
   const content = (
     <>
       <div className="flex items-start gap-4">
-        <img
-          className={badgeImage}
-          src={achievement.badge}
-          alt={`${achievement.title} achievement badge`}
-          draggable={false}
-        />
+        {badgeSrc ? (
+          <img
+            className={badgeImage}
+            src={badgeSrc}
+            alt={`${achievement.title} achievement badge`}
+            draggable={false}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-slate-800">
+            <span className="text-lg font-bold text-neutral-400 dark:text-slate-500">?</span>
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">

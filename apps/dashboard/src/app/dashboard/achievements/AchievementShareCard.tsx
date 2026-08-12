@@ -1,7 +1,10 @@
 import { AchievementView } from './types';
 import { formatDate } from './metrics';
+import { getBadgeImage } from './assets';
 
-export function AchievementShareCard({ achievement }: { achievement: AchievementView }) {
+export function AchievementShareCard({ achievement, onLoad }: { achievement: AchievementView; onLoad?: () => void }) {
+  const badgeSrc = achievement.badgeImage ?? getBadgeImage(achievement);
+
   return (
     <div className="relative w-[360px] max-w-full select-none overflow-hidden rounded-2xl border border-slate-700/60 bg-[#0b0d12] p-6 text-left shadow-2xl">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.16),transparent_55%)]" />
@@ -20,9 +23,10 @@ export function AchievementShareCard({ achievement }: { achievement: Achievement
           />
           <img
             className="relative h-56 w-56 object-contain"
-            src={achievement.badge}
+            src={badgeSrc}
             alt={`${achievement.title} achievement badge`}
             draggable={false}
+            onLoad={onLoad}
           />
         </div>
 

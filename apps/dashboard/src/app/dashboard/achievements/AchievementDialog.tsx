@@ -14,10 +14,13 @@ interface AchievementDialogProps {
 export function AchievementDialog({ achievement, onClose }: AchievementDialogProps) {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!achievement) return;
+    setImageLoaded(false);
+    setError(null);
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
     }
@@ -81,7 +84,7 @@ export function AchievementDialog({ achievement, onClose }: AchievementDialogPro
         </div>
 
         <div ref={cardRef} className="mt-5">
-          <AchievementShareCard achievement={achievement} />
+          <AchievementShareCard achievement={achievement} onLoad={() => setImageLoaded(true)} />
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-3">
@@ -96,7 +99,7 @@ export function AchievementDialog({ achievement, onClose }: AchievementDialogPro
             type="button"
             className="inline-flex h-9 items-center justify-center rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
             onClick={download}
-            disabled={downloading}
+            disabled={downloading || !imageLoaded}
           >
             {downloading ? 'Rendering…' : 'Download PNG'}
           </button>

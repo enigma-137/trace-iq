@@ -4,6 +4,7 @@ export interface AchievementView {
   title: string;
   description: string;
   badge: string;
+  badgeImage?: string;
   category: string;
   kind: string;
   metric: string;
