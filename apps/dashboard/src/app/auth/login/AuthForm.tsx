@@ -139,6 +139,29 @@ export function AuthForm() {
     router.refresh();
   }
 
+  async function handleOAuth(provider: 'github' | 'gitlab') {
+    if (!supabase) {
+      setStatus('Add Supabase env vars, then restart the dashboard.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatus(null);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+      }
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setStatus(error.message);
+    }
+  }
+
   const inputClass =
     'h-11 rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-950 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:placeholder:text-neutral-600 dark:focus:border-white dark:focus:ring-white/10';
 
@@ -227,11 +250,10 @@ export function AuthForm() {
                     type="button"
                     role="tab"
                     aria-selected={mode === value}
-                    className={`min-h-9 rounded-md text-sm font-semibold transition ${
-                      mode === value
-                        ? 'bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white'
-                        : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
-                    }`}
+                    className={`min-h-9 rounded-md text-sm font-semibold transition ${mode === value
+                      ? 'bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
+                      }`}
                     onClick={() => setMode(value)}
                   >
                     {value === 'signin' ? 'Sign in' : 'Sign up'}
@@ -239,7 +261,7 @@ export function AuthForm() {
                 ))}
               </div>
 
-              <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
+              <form className="mt-7 grid gap-4" onSubmit={handleSubmit}>
                 <div className="grid gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="email">
                     Email
@@ -286,6 +308,36 @@ export function AuthForm() {
                   {isSubmitting ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
                 </button>
               </form>
+
+              <div className="mt-6 flex items-center gap-3" aria-hidden>
+                <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+                <span className="text-xs font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  or
+                </span>
+                <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-2.5">
+                <button
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  type="button"
+                  disabled={isSubmitting || missingConfig}
+                  onClick={() => void handleOAuth('github')}
+                >
+                  <GitHubIcon className="size-[18px] shrink-0" />
+                  GitHub
+                </button>
+
+                <button
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  type="button"
+                  disabled={isSubmitting || missingConfig}
+                  onClick={() => void handleOAuth('gitlab')}
+                >
+                  <GitLabIcon className="size-[18px] shrink-0" />
+                  GitLab
+                </button>
+              </div>
 
               {status ? (
                 <p className="mt-5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-2.5 text-sm text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
@@ -376,5 +428,34 @@ export function AuthForm() {
         </section>
       </div>
     </main>
+  );
+}
+
+/**
+ * GitHub's mark has no brand color — it's shown solid black on light
+ * surfaces and solid white on dark surfaces (per github.com/logos).
+ * These buttons keep a light background in both themes, so the icon
+ * stays black.
+ */
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="#181717" aria-hidden>
+      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.15c0 .3.21.67.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+    </svg>
+  );
+}
+
+/** GitLab's official tanuki mark — three brand oranges, per about.gitlab.com/press. */
+function GitLabIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path fill="#E24329" d="m12 21.94-3.36-10.34H15.36Z" />
+      <path fill="#FC6D26" d="M12 21.94 8.64 11.6H3.05Z" />
+      <path fill="#FCA326" d="M3.05 11.6 1.9 15.1a.79.79 0 0 0 .29.88l9.81 5.96Z" />
+      <path fill="#E24329" d="M3.05 11.6h5.59L6.29 3.98a.4.4 0 0 0-.76 0Z" />
+      <path fill="#FC6D26" d="M12 21.94 15.36 11.6h5.59Z" />
+      <path fill="#FCA326" d="m20.95 11.6 1.15 3.5a.79.79 0 0 1-.29.88l-9.81 5.96Z" />
+      <path fill="#E24329" d="M20.95 11.6h-5.59l2.35-7.62a.4.4 0 0 1 .76 0Z" />
+    </svg>
   );
 }
