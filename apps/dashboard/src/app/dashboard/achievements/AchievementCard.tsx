@@ -12,24 +12,19 @@ export function AchievementCard({ achievement, onSelect }: AchievementCardProps)
   const pct = progressPercent(achievement.progress, achievement.threshold);
   const remaining = Math.max(0, achievement.threshold - achievement.progress);
 
-  const badge =
-    unlocked
-      ? 'h-16 w-16 shrink-0 rounded-full ring-2 ring-emerald-400/40 ring-offset-2 ring-offset-white dark:ring-offset-slate-950'
-      : 'relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-dashed border-slate-500 dark:border-slate-700';
   const badgeImage =
-    unlocked
-      ? 'h-full w-full object-cover'
-      : 'h-full w-full object-cover [filter:grayscale(0.9)_brightness(0.55)_contrast(0.9)]';
+    'h-16 w-16 shrink-0 object-contain' +
+    (unlocked ? '' : ' [filter:grayscale(1)_brightness(0.45)_contrast(0.85)] opacity-[0.6]');
 
   const content = (
     <>
       <div className="flex items-start gap-4">
-        <div className={badge}>
-          <img className={badgeImage} src={achievement.badge} alt="" draggable={false} />
-          {!unlocked ? (
-            <span className="pointer-events-none absolute inset-0 rounded-full bg-slate-950/40" aria-hidden />
-          ) : null}
-        </div>
+        <img
+          className={badgeImage}
+          src={achievement.badge}
+          alt={`${achievement.title} achievement badge`}
+          draggable={false}
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">

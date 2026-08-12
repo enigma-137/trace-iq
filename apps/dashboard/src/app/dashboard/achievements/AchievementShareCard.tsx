@@ -13,8 +13,17 @@ export function AchievementShareCard({ achievement }: { achievement: Achievement
           </span>
         </div>
 
-        <div className="mt-8 flex justify-center">
-          <img className="h-36 w-36" src={achievement.badge} alt={achievement.title} />
+        <div className="relative mt-8 flex justify-center">
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(16,185,129,0.22),transparent_65%)]"
+            aria-hidden
+          />
+          <img
+            className="relative h-56 w-56 object-contain"
+            src={achievement.badge}
+            alt={`${achievement.title} achievement badge`}
+            draggable={false}
+          />
         </div>
 
         <p className="mt-6 text-center text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">{achievement.category}</p>
