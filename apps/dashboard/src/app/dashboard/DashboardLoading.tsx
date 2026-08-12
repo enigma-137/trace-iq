@@ -10,9 +10,9 @@ interface DashboardLoadingProps {
 }
 
 const cardClass =
-  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 const tableClass =
-  'overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 /** Route-level loading fallback: keeps the shell visible and shows skeletons in the content. */
 export function DashboardLoading({ active, title, variant = 'stats' }: DashboardLoadingProps) {
@@ -135,7 +135,5 @@ function ListBlock() {
 }
 
 function Glow() {
-  return (
-    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_0%,rgba(59,130,246,0.08),transparent_34%)] dark:bg-[radial-gradient(circle_at_24%_0%,rgba(59,130,246,0.14),transparent_36%)]" />
-  );
+  return null;
 }

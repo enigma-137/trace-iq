@@ -7,6 +7,7 @@ import { RankedList } from '@/components/charts/RankedList';
 import { ActiveHoursHeatmap } from '@/components/charts/ActiveHoursHeatmap';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MiniBars } from '@/components/charts/MiniBars';
+// import { GeographyGlobe } from '@/components/GeographyGlobe';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,8 +41,8 @@ const RANGES = [
 ];
 
 const cardClass =
-  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
-const tableClass = 'mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+const tableClass = 'mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -171,7 +172,20 @@ export default async function WebAnalyticsPage({
           <RankedList items={(data?.devices ?? []).map((d) => ({ label: d.name, total: d.total }))} emptyLabel="No device data yet." />
         </Card>
         <Card title="Geography">
-          <RankedList items={(data?.countries ?? []).map((c) => ({ label: c.name, total: c.total }))} emptyLabel="No location data yet." />
+          <div className="grid gap-4]">
+            {/* <div className="h-[360px] w-full">
+              <GeographyGlobe
+                data={(data?.countries ?? []).map((c) => ({ name: c.name, total: c.total }))}
+                metric="visitors"
+              />
+            </div> */}
+            <div>
+              <RankedList
+                items={(data?.countries ?? []).map((c) => ({ label: c.name, total: c.total }))}
+                emptyLabel="No location data yet."
+              />
+            </div>
+          </div>
         </Card>
       </section>
 

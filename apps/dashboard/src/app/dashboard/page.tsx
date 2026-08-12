@@ -24,7 +24,7 @@ interface OverviewResponse {
 }
 
 const cardClass =
-  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 export default async function DashboardPage({
   searchParams
@@ -81,7 +81,6 @@ export default async function DashboardPage({
 
       <section className="mb-5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
         <div className={cardClass}>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_18%,rgba(59,130,246,0.08),transparent_34%)] dark:bg-[radial-gradient(circle_at_74%_18%,rgba(59,130,246,0.16),transparent_34%)]" />
           <div className="relative flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
@@ -236,7 +235,7 @@ function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
         : { dot: 'bg-neutral-300 dark:bg-slate-600', chip: 'border-neutral-300 bg-neutral-100 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400', label: 'Idle' };
 
   return (
-    <section className="mb-5 grid gap-3 rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
+    <section className="mb-5 grid gap-3 rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
       <div className="flex items-center gap-3">
         <span className={`size-2.5 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
         <div className="min-w-0">

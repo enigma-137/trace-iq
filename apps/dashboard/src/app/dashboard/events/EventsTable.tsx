@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatEventName as formatRawEventName } from '@/lib/metrics';
 
 export interface RecentEvent {
   id: string;
@@ -94,7 +95,7 @@ export function EventsTable({ events }: { events: RecentEvent[] }) {
 
 const RESERVED_EVENT_LABELS: Record<string, string> = {
   $page: 'Page view',
-  $api_request: 'API request',
+  $api_request: 'Api request',
   $exception: 'Exception',
   $rageclick: 'Rage click',
   $identify: 'Identify',
@@ -103,8 +104,8 @@ const RESERVED_EVENT_LABELS: Record<string, string> = {
 
 function formatEventName(event: RecentEvent): string {
   const props = event.properties ?? {};
-  const label = RESERVED_EVENT_LABELS[event.eventName];
-  if (!label) return event.eventName;
+  const reservedLabel = RESERVED_EVENT_LABELS[event.eventName];
+  const label = reservedLabel ?? formatRawEventName(event.eventName);
 
   let detail: string | undefined;
   switch (event.eventName) {

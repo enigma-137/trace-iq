@@ -39,3 +39,19 @@ export function comparisonText(days: number, previous: number, formattedPrevious
   }
   return `That's ${delta.arrow === '↑' ? 'up from' : 'down from'} ${formattedPrevious} the ${days} days before.`;
 }
+
+/**
+ * Formats raw event names (e.g. "$api_request", "page_exited", "$identify")
+ * into clean, human-readable labels (e.g. "Api request", "Page exited", "Identify").
+ */
+export function formatEventName(name: string): string {
+  if (!name) return name;
+  // 1. Strip leading system dollar sign '$'
+  let cleaned = name.replace(/^\$/, '');
+  // 2. Replace underscores and hyphens with spaces
+  cleaned = cleaned.replace(/[_-]+/g, ' ').trim();
+  if (!cleaned) return name;
+  // 3. Capitalize first letter (Sentence case formatting)
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+

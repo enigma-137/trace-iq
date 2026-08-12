@@ -1,3 +1,5 @@
+import { formatEventName } from '@/lib/metrics';
+
 interface TopEvent {
   eventName: string;
   total: number;
@@ -19,12 +21,17 @@ export function TopEventsList({ events }: TopEventsListProps) {
       {events.map((event) => (
         <li key={event.eventName} className="grid gap-1">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="truncate font-mono text-sm text-neutral-800 dark:text-neutral-200">{event.eventName}</span>
+            <span
+              className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-200"
+              title={event.eventName}
+            >
+              {formatEventName(event.eventName)}
+            </span>
             <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400">{event.total.toLocaleString()}</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.45)]"
+              className="h-full rounded-full bg-blue-500"
               style={{ width: `${(event.total / maxTotal) * 100}%` }}
             />
           </div>

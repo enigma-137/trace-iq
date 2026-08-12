@@ -61,7 +61,7 @@ export function Sparkline({
       <path
         d={path}
         fill="none"
-        className={`drop-shadow-[0_0_10px_rgba(59,130,246,0.45)] ${toneClass.stroke}`}
+        className={toneClass.stroke}
         strokeWidth={filled ? 2.4 : 2}
         strokeLinejoin="round"
         strokeLinecap="round"

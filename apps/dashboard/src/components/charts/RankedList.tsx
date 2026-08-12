@@ -1,3 +1,5 @@
+import { formatEventName } from '@/lib/metrics';
+
 interface RankedItem {
   label: string;
   total: number;
@@ -24,14 +26,17 @@ export function RankedList({ items, emptyLabel = 'No data yet.', mono = false }:
       {list.map((item) => (
         <li key={item.label} className="grid gap-1">
           <div className="flex items-baseline justify-between gap-3">
-            <span className={`truncate text-sm text-neutral-800 dark:text-neutral-200 ${mono ? 'font-mono' : ''}`}>
-              {item.label}
+            <span
+              className={`truncate text-sm text-neutral-800 dark:text-neutral-200 ${mono ? 'font-mono' : ''}`}
+              title={item.label}
+            >
+              {formatEventName(item.label)}
             </span>
             <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400">{item.total.toLocaleString()}</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
             <div
-              className="h-full rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.35)]"
+              className="h-full rounded-full bg-blue-500"
               style={{ width: `${(item.total / maxTotal) * 100}%` }}
             />
           </div>
