@@ -19,6 +19,7 @@ function setSecurityHeaders(_req: Request, res: Response, next: NextFunction) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('X-Download-Options', 'noopen');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
 }
 
