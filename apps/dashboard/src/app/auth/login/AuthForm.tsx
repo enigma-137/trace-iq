@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { safeRedirectPath } from '@/lib/utils';
+import { clearPendingInvite, peekPendingInvite } from '@/lib/pending-invite';
 
 type AuthMode = 'signin' | 'signup';
 type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
@@ -13,6 +14,10 @@ export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = safeRedirectPath(searchParams.get('next'), '/dashboard');
+  // A pending invite always wins over the generic next path, so context survives
+  // sign-up confirmation, OAuth return and MFA alike.
+  const pendingInvite = useMemo(() => peekPendingInvite(), []);
+  const effectiveNext = pendingInvite ? `/invite/${encodeURIComponent(pendingInvite)}` : nextPath;
   const missingConfig = searchParams.get('missingConfig') === '1';
   const [mode, setMode] = useState<AuthMode>('signin');
   const [stage, setStage] = useState<AuthStage>('credentials');
@@ -38,6 +43,17 @@ export function AuthForm() {
 
     let cancelled = false;
 
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled || !session?.access_token || !pendingInvite) {
+        return;
+      }
+      clearPendingInvite();
+      router.push(`/invite/${encodeURIComponent(pendingInvite)}`);
+      router.refresh();
+    });
+
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (cancelled || !data.session) {
@@ -48,6 +64,7 @@ export function AuthForm() {
 
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, stage]);
@@ -66,7 +83,13 @@ export function AuthForm() {
     const authResult =
       mode === 'signin'
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/login?next=${encodeURIComponent(effectiveNext)}`
+            }
+          });
 
     setIsSubmitting(false);
 
@@ -91,7 +114,7 @@ export function AuthForm() {
    */
   async function decideNextStep(skipSetupPrompt = false) {
     if (!supabase) {
-      router.push(nextPath);
+      router.push(effectiveNext);
       router.refresh();
       return;
     }
@@ -104,7 +127,7 @@ export function AuthForm() {
         setStage('setup-prompt');
         return;
       }
-      router.push(nextPath);
+      router.push(effectiveNext);
       router.refresh();
       return;
     }
@@ -156,7 +179,7 @@ export function AuthForm() {
       return;
     }
 
-    router.push(nextPath);
+    router.push(effectiveNext);
     router.refresh();
   }
 
@@ -172,7 +195,7 @@ export function AuthForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(effectiveNext)}`
       }
     });
 
@@ -411,7 +434,7 @@ export function AuthForm() {
                 className="min-h-11 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
                 type="button"
                 onClick={() => {
-                  router.push(nextPath);
+                  router.push(effectiveNext);
                   router.refresh();
                 }}
               >

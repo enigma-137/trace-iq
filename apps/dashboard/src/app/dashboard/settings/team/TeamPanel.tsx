@@ -31,12 +31,21 @@ type InviteRecord = {
   createdAt: string;
 };
 
+type PendingForMe = {
+  id: string;
+  organizationName: string | null;
+  role: Role;
+  expiresAt: string;
+  createdAt: string;
+};
+
 export function TeamPanel() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const { organization, loading: orgLoading, refresh: refreshOrganization } = useOrganization();
 
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [invites, setInvites] = useState<InviteRecord[]>([]);
+  const [pendingForMe, setPendingForMe] = useState<PendingForMe[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('member');
@@ -59,6 +68,7 @@ export function TeamPanel() {
     }
     void loadSession();
     void loadMembers();
+    void loadPendingForMe();
   }, [supabase]);
 
   useEffect(() => {
@@ -111,6 +121,35 @@ export function TeamPanel() {
     }
     const body = (await response.json()) as { invites: InviteRecord[] };
     setInvites(body.invites);
+  }
+
+  async function loadPendingForMe() {
+    const response = await authFetch('/v1/organization/invites/pending');
+    if (!response || !response.ok) return;
+    const body = (await response.json()) as { invites: PendingForMe[] };
+    setPendingForMe(body.invites);
+  }
+
+  async function handleAcceptPending(invite: PendingForMe) {
+    setBusy(`pending:${invite.id}`);
+    setStatus(null);
+    const response = await authFetch('/v1/organization/invites/accept-pending', {
+      method: 'POST',
+      body: JSON.stringify({ inviteId: invite.id })
+    });
+    setBusy(null);
+    if (!response) return;
+    if (!response.ok) {
+      setStatus({ tone: 'error', message: await readError(response) });
+      return;
+    }
+    setPendingForMe((current) => current.filter((item) => item.id !== invite.id));
+    setStatus({
+      tone: 'success',
+      message: `You joined ${invite.organizationName ?? 'the organization'} as ${invite.role}.`
+    });
+    void loadMembers();
+    void refreshOrganization();
   }
 
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
@@ -237,6 +276,41 @@ export function TeamPanel() {
         >
           {status.message}
         </p>
+      ) : null}
+
+      {pendingForMe.length > 0 ? (
+        <section className="rounded-md border border-blue-200 bg-blue-50/40 dark:border-blue-900 dark:bg-blue-950/20" aria-label="Invitations for you">
+          <div className="border-b border-blue-200 px-5 py-3 dark:border-blue-900">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-blue-600 dark:text-blue-300">
+              Invites awaiting your acceptance ({pendingForMe.length})
+            </p>
+          </div>
+          <ul className="divide-y divide-blue-200 dark:divide-blue-900">
+            {pendingForMe.map((invite) => (
+              <li key={invite.id} className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate font-semibold text-neutral-900 dark:text-white">
+                      {invite.organizationName ?? 'An organization'}
+                    </p>
+                    <RoleBadge role={invite.role} />
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-slate-400">
+                    Invited as {invite.role} · Expires {formatDate(invite.expiresAt)}
+                  </p>
+                </div>
+                <button
+                  className={secondaryButtonClass}
+                  type="button"
+                  disabled={busy === `pending:${invite.id}`}
+                  onClick={() => void handleAcceptPending(invite)}
+                >
+                  {busy === `pending:${invite.id}` ? 'Accepting…' : 'Accept invite'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {orgLoading || (isLoading && members.length === 0) ? (

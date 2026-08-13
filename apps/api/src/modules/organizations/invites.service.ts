@@ -15,7 +15,17 @@ import { AuditService } from './audit.service';
 import { MemberRole, OrganizationsService } from './organizations.service';
 
 const INVITE_TTL_DAYS = 7;
-const DASHBOARD_BASE_URL = process.env.DASHBOARD_URL ?? 'https://traceiq.run';
+
+/**
+ * The dashboard origin used to build invite links. Tolerates a misconfigured
+ * DASHBOARD_URL that includes the dashboard's route prefix (e.g. a trailing
+ * "/dashboard"), so the link always points at the public /invite/:token page
+ * instead of the protected /dashboard/* section.
+ */
+const DASHBOARD_BASE_URL = (process.env.DASHBOARD_URL ?? 'https://traceiq.run')
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/dashboard$/, '');
 
 export interface CreateInviteRequestBody {
   email?: string;
@@ -24,6 +34,10 @@ export interface CreateInviteRequestBody {
 
 export interface AcceptInviteRequestBody {
   token?: string;
+}
+
+export interface AcceptPendingInviteRequestBody {
+  inviteId?: string;
 }
 
 interface InviteRow extends QueryResultRow {
@@ -49,6 +63,15 @@ interface RawInviteRow extends QueryResultRow {
   status: string;
   expires_at: string;
   created_at: string;
+}
+
+interface InviteAcceptRow extends QueryResultRow {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: MemberRole;
+  status: string;
+  expires_at: string;
 }
 
 @Injectable()
@@ -292,14 +315,7 @@ export class InvitesService {
       throw new BadRequestException('An invite token is required.');
     }
 
-    const result = await this.database.query<{
-      id: string;
-      organization_id: string;
-      email: string;
-      role: MemberRole;
-      status: string;
-      expires_at: string;
-    }>(
+    const result = await this.database.query<InviteAcceptRow>(
       `
         SELECT id, organization_id, email, role, status, expires_at
         FROM organization_invites
@@ -313,6 +329,88 @@ export class InvitesService {
     if (!invite) {
       throw new NotFoundException('That invite was not found.');
     }
+
+    return this.finalizeAccept(user, invite);
+  }
+
+  /**
+   * Self-service fallback: lets a signed-in user accept any pending invite sent
+   * to their email without the original link. Identity is proven by Supabase
+   * auth (same email), so this is no more privileged than following the emailed
+   * link — the org membership and the invite row are only touched for the
+   * email-verified user.
+   */
+  async acceptPendingInvite(user: DashboardUser, inviteId: string) {
+    const normalizedId = inviteId?.trim() ?? '';
+    if (!normalizedId) {
+      throw new BadRequestException('An invite id is required.');
+    }
+
+    const result = await this.database.query<InviteAcceptRow>(
+      `
+        SELECT id, organization_id, email, role, status, expires_at
+        FROM organization_invites
+        WHERE id = $1
+        LIMIT 1;
+      `,
+      [normalizedId]
+    );
+
+    const invite = result.rows[0];
+    if (!invite) {
+      throw new NotFoundException('That invite was not found.');
+    }
+
+    return this.finalizeAccept(user, invite);
+  }
+
+  /**
+   * Lists pending, unexpired invites addressed to the signed-in user's email —
+   * surfaced in the dashboard Team settings so an invite can be accepted even
+   * when the pre-auth accept was missed. No token is exposed.
+   */
+  async listPendingInvites(user: DashboardUser) {
+    const email = user.email?.trim().toLowerCase() ?? '';
+    if (!email) {
+      return { invites: [] };
+    }
+
+    const result = await this.database.query<{
+      id: string;
+      organization_name: string;
+      role: MemberRole;
+      expires_at: string;
+      created_at: string;
+    }>(
+      `
+        SELECT i.id, o.name AS organization_name, i.role, i.expires_at, i.created_at
+        FROM organization_invites i
+        JOIN organizations o ON o.id = i.organization_id
+        WHERE i.email = $1 AND i.status = 'pending' AND i.expires_at > now()
+        ORDER BY i.created_at;
+      `,
+      [email]
+    );
+
+    return {
+      invites: result.rows.map((row) => ({
+        id: row.id,
+        organizationName: row.organization_name,
+        role: row.role,
+        expiresAt: row.expires_at,
+        createdAt: row.created_at
+      }))
+    };
+  }
+
+  /**
+   * Shared tail of acceptInvite / acceptPendingInvite: validates the invite is
+   * still open and matches the caller's email, then records the membership.
+   */
+  private async finalizeAccept(
+    user: DashboardUser,
+    invite: InviteAcceptRow
+  ) {
     if (invite.status !== 'pending') {
       throw new GoneException('That invite has already been used or revoked.');
     }

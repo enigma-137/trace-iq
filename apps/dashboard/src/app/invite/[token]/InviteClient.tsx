@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
+import { clearPendingInvite, rememberPendingInvite } from '@/lib/pending-invite';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -61,6 +62,9 @@ export function InviteClient({ token }: { token: string }) {
           data: { session }
         } = await supabase.auth.getSession();
         if (!session?.access_token) {
+          if (!cancelled) {
+            rememberPendingInvite(token);
+          }
           setSignedOut(true);
           return;
         }
@@ -83,6 +87,7 @@ export function InviteClient({ token }: { token: string }) {
         }
 
         setAccepted(true);
+        clearPendingInvite();
       } catch {
         if (!cancelled) {
           setInvalidReason(INVALID_LABELS['not-found']);

@@ -32,6 +32,7 @@ function makeInvitesService(
     duplicatePending?: boolean;
     alreadyMember?: boolean;
     invite?: Partial<InviteRow> | null;
+    inviteById?: Partial<InviteRow> | null;
     list?: InviteRow[];
     cancelAffected?: number;
   } = {}
@@ -42,6 +43,7 @@ function makeInvitesService(
     duplicatePending = false,
     alreadyMember = false,
     invite = null,
+    inviteById = null,
     list = [],
     cancelAffected = 1
   } = opts;
@@ -69,7 +71,7 @@ function makeInvitesService(
     ...invite
   };
 
-  const lookupRow = { ...inviteRow, organization_name: 'Acme' };
+  const lookupRow = { ...inviteRow, organization_name: 'Acme', ...(inviteById ?? {}) };
 
   const db: MockDb = mockDatabase((text, values) => {
     if (/JOIN organizations o ON o.id = om.organization_id/.test(text)) {
@@ -125,6 +127,9 @@ function makeInvitesService(
     }
     if (/SELECT id, organization_id, email, role, token_prefix/.test(text)) {
       return invite ? rows([lookupRow]) : rows([]);
+    }
+    if (/WHERE id = \$1/.test(text)) {
+      return inviteById ? rows([lookupRow]) : rows([]);
     }
     if (/FROM organization_invites i/.test(text)) {
       return rows(list);
@@ -206,6 +211,17 @@ describe('InvitesService.createInvite', () => {
     const { service } = makeInvitesService();
 
     await expect(service.createInvite(user, { email: 'OWNER@example.com' })).rejects.toThrow(BadRequestException);
+  });
+
+  it('links invites to /invite/:token even when DASHBOARD_URL carries a /dashboard suffix', async () => {
+    process.env.DASHBOARD_URL = 'https://traceiq.run/dashboard/';
+    const { service, email } = makeInvitesService();
+
+    await service.createInvite(user, { email: 'teammate@example.com' });
+
+    const [args] = vi.mocked(email.send).mock.calls[0];
+    expect(args.html).toContain('https://traceiq.run/invite/');
+    expect(args.html).not.toContain('/dashboard/invite/');
   });
 
   it('rejects a duplicate pending invite for the same email', async () => {
@@ -370,6 +386,116 @@ describe('InvitesService.acceptInvite', () => {
     const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
 
     await expect(service.acceptInvite(invitee, 'trq_inv_validtoken')).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('InvitesService.listPendingInvites', () => {
+  it('lists pending, unexpired invites addressed to the caller email', async () => {
+    const { service } = makeInvitesService({
+      role: 'member',
+      list: [
+        {
+          id: 'inv_1',
+          organization_id: 'org_1',
+          organization_name: 'Acme',
+          email: 'teammate@example.com',
+          role: 'admin',
+          token_prefix: 'trq_inv_ab12cd',
+          invited_by_user_id: 'user_1',
+          status: 'pending',
+          expires_at: FUTURE,
+          created_at: FUTURE
+        }
+      ]
+    });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    const result = await service.listPendingInvites(invitee);
+
+    expect(result.invites).toHaveLength(1);
+    expect(result.invites[0]).toEqual({
+      id: 'inv_1',
+      organizationName: 'Acme',
+      role: 'admin',
+      expiresAt: FUTURE,
+      createdAt: FUTURE
+    });
+  });
+
+  it('returns an empty list when no invites are pending', async () => {
+    const { service } = makeInvitesService({ role: 'member' });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    const result = await service.listPendingInvites(invitee);
+
+    expect(result.invites).toEqual([]);
+  });
+});
+
+describe('InvitesService.acceptPendingInvite', () => {
+  it('adds a pending invitee to the org and marks the invite accepted', async () => {
+    const { db, service } = makeInvitesService({
+      role: 'member',
+      inviteById: { status: 'pending', role: 'admin', email: 'teammate@example.com', expires_at: FUTURE }
+    });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    const result = await service.acceptPendingInvite(invitee, 'inv_1');
+
+    expect(result).toEqual({ accepted: true, organizationId: 'org_1', role: 'admin' });
+    const memberInsert = db.queryCalls(/INSERT INTO organization_members/);
+    expect(memberInsert[0].values).toEqual(['org_1', 'user_9', 'admin', 'teammate@example.com']);
+    expect(db.queryCalls(/SET status = 'accepted'/).length).toBeGreaterThan(0);
+  });
+
+  it('is idempotent when the user is already a member', async () => {
+    const { service } = makeInvitesService({
+      role: 'member',
+      inviteById: { status: 'pending', email: 'teammate@example.com', expires_at: FUTURE },
+      alreadyMember: true
+    });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    const result = await service.acceptPendingInvite(invitee, 'inv_1');
+
+    expect(result).toMatchObject({ accepted: true, alreadyMember: true });
+  });
+
+  it('rejects accepting an invite sent to a different email', async () => {
+    const { service } = makeInvitesService({
+      role: 'member',
+      inviteById: { status: 'pending', email: 'other@example.com', expires_at: FUTURE }
+    });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    await expect(service.acceptPendingInvite(invitee, 'inv_1')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects an invite that is no longer pending', async () => {
+    const { service } = makeInvitesService({
+      role: 'member',
+      inviteById: { status: 'revoked', email: 'teammate@example.com', expires_at: FUTURE }
+    });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    await expect(service.acceptPendingInvite(invitee, 'inv_1')).rejects.toThrow(GoneException);
+  });
+
+  it('rejects an expired invite', async () => {
+    const { service } = makeInvitesService({
+      role: 'member',
+      inviteById: { status: 'pending', email: 'teammate@example.com', expires_at: PAST }
+    });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    await expect(service.acceptPendingInvite(invitee, 'inv_1')).rejects.toThrow(GoneException);
+  });
+
+  it('throws when the invite does not exist', async () => {
+    const { service } = makeInvitesService({ role: 'member' });
+    const invitee = { id: 'user_9', email: 'teammate@example.com', authMethod: 'supabase' } as const;
+
+    await expect(service.acceptPendingInvite(invitee, 'inv_unknown')).rejects.toThrow(NotFoundException);
   });
 });
 

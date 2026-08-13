@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.redirect(`${origin}${next}`);
     }
+  } else if (searchParams.has('access_token')) {
+    // OAuth/confirmation flows using the implicit grant may return the token in
+    // the URL fragment, which the server never sees. Preserve the return path so
+    // the client-side session pick-up (PendingInviteRestorer / login page) re-
+    // establishes invite context instead of dropping it on the dashboard.
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
   return NextResponse.redirect(`${origin}/auth/auth-code-error`);

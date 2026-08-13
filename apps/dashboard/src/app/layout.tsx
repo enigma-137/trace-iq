@@ -2,6 +2,7 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { DM_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { PendingInviteRestorer } from '@/components/PendingInviteRestorer';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -76,7 +77,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PendingInviteRestorer />
+      </body>
     </html>
   );
 }
