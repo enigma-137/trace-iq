@@ -4,7 +4,6 @@ import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { safeRedirectPath } from '@/lib/utils';
 
 type AuthMode = 'signin' | 'signup';
 type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
@@ -12,7 +11,7 @@ type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
 export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = safeRedirectPath(searchParams.get('next'), '/dashboard');
+  const nextPath = searchParams.get('next') ?? '/dashboard';
   const missingConfig = searchParams.get('missingConfig') === '1';
   const [mode, setMode] = useState<AuthMode>('signin');
   const [stage, setStage] = useState<AuthStage>('credentials');
@@ -169,10 +168,18 @@ export function AuthForm() {
   return (
     <main className="grid min-h-screen bg-white text-neutral-950 dark:bg-black dark:text-neutral-50 lg:grid-cols-2">
       {/* Brand panel — fills the space, hidden on small screens */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-neutral-950 p-12 text-white lg:flex">
+      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-neutral-200 bg-white p-12 text-neutral-950 dark:border-transparent dark:bg-neutral-950 dark:text-white lg:flex">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.14]"
+          className="pointer-events-none absolute inset-0 opacity-[0.14] dark:hidden"
+          style={{
+            backgroundImage: 'radial-gradient(rgba(0,0,0,0.9) 1px, transparent 1px)',
+            backgroundSize: '22px 22px'
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 hidden opacity-[0.14] dark:block"
           style={{
             backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)',
             backgroundSize: '22px 22px'
@@ -180,24 +187,25 @@ export function AuthForm() {
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/5 blur-3xl"
+          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-neutral-900/5 blur-3xl dark:bg-white/5"
         />
         <Link className="relative inline-flex" href="/" aria-label="TraceIQ home">
-          <img className="h-9 w-auto" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
+          <img className="h-9 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
+          <img className="hidden h-9 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
         </Link>
 
         <div className="relative max-w-md">
           <h2 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
             Product analytics built for how your users actually behave.
           </h2>
-          <p className="mt-4 text-sm leading-7 text-neutral-400">
+          <p className="mt-4 text-sm leading-7 text-neutral-500 dark:text-neutral-400">
             Trends, funnels, retention, revenue, and error tracking — in one fast, privacy-friendly dashboard.
           </p>
-          <ul className="mt-8 grid gap-3 text-sm text-neutral-300">
+          <ul className="mt-8 grid gap-3 text-sm text-neutral-700 dark:text-neutral-300">
             {['Revenue & GTV as a first-class metric', 'Funnels with per-step drop-off', 'SDKs for web, server & mobile'].map(
               (item) => (
                 <li key={item} className="flex items-center gap-2.5">
-                  <span aria-hidden className="text-white">✓</span>
+                  <span aria-hidden className="text-neutral-900 dark:text-white">✓</span>
                   {item}
                 </li>
               )
@@ -205,7 +213,7 @@ export function AuthForm() {
           </ul>
         </div>
 
-        <p className="relative font-mono text-xs text-neutral-500">TraceIQ · product analytics</p>
+        <p className="relative font-mono text-xs text-neutral-400 dark:text-neutral-500">TraceIQ · product analytics</p>
       </aside>
 
       {/* Form panel */}
