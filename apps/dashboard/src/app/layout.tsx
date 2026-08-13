@@ -17,10 +17,41 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TraceIQ Dashboard',
-  description: 'Behavior intelligence dashboard for product teams.',
+  metadataBase: new URL('https://traceiq.run'),
+
+  title: {
+    default: 'TraceIQ — Product Analytics That Drives Real Growth',
+    template: '%s | TraceIQ'
+  },
+
+  description:
+    'Privacy-first product analytics for events, funnels, users, retention, revenue, and errors.',
+
   icons: {
     icon: '/favicon.ico'
+  },
+
+  openGraph: {
+    title: 'TraceIQ — Data That Drives Real Growth',
+    description: 'Simple, powerful, privacy-first product analytics.',
+    url: 'https://traceiq.run',
+    siteName: 'TraceIQ',
+    type: 'website',
+    images: [
+      {
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'TraceIQ — Data that drives real growth'
+      }
+    ]
+  },
+
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TraceIQ — Data That Drives Real Growth',
+    description: 'Simple, powerful, privacy-first product analytics.',
+    images: ['/og.png']
   }
 };
 
