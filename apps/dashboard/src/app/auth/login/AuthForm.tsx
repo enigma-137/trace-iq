@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -30,6 +30,27 @@ export function AuthForm() {
 
     return createSupabaseBrowserClient();
   }, [missingConfig]);
+
+  useEffect(() => {
+    if (!supabase || stage !== 'credentials') {
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled || !data.session) {
+        return;
+      }
+      await decideNextStep(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, stage]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,12 +84,12 @@ export function AuthForm() {
   }
 
   /**
-   * After a successful sign-in, route through the optional 2FA flow:
-   * - User already has a verified authenticator factor → require a code here.
-   * - User has no factor → recommend enabling 2FA (they can say no and proceed).
-   * - Everything else (incl. freshly-signed-up users) → straight to the dashboard.
+   * Route through the 2FA flow for the current session:
+   * - User has a verified authenticator factor and is only at AAL1 → require a code here.
+   * - User has no factor and this is a fresh sign-in → recommend enabling 2FA (can decline).
+   * - Revisits with an existing session (skipSetupPrompt) or already at AAL2 → dashboard.
    */
-  async function decideNextStep() {
+  async function decideNextStep(skipSetupPrompt = false) {
     if (!supabase) {
       router.push(nextPath);
       router.refresh();
@@ -76,10 +97,10 @@ export function AuthForm() {
     }
 
     const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsChallenge = !aalError && aal?.nextLevel === 'aal2';
+    const needsChallenge = !aalError && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
 
     if (!needsChallenge) {
-      if (!aalError && aal?.currentLevel === 'aal1') {
+      if (!aalError && aal?.currentLevel === 'aal1' && !skipSetupPrompt) {
         setStage('setup-prompt');
         return;
       }
@@ -92,8 +113,7 @@ export function AuthForm() {
     const factor = !factorsError ? factors?.all.find((item) => item.status === 'verified') : undefined;
 
     if (!factor) {
-      router.push(nextPath);
-      router.refresh();
+      setStatus('Could not load your 2FA method. Please try again.');
       return;
     }
 
