@@ -6,8 +6,7 @@ import { Select } from '@traceiq/ui';
 import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 import { useOrganization } from '@/lib/organization';
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { dashboardFetch, useMfaStepUp } from '../../MfaStepUp';
 
 type Role = 'owner' | 'admin' | 'member';
 
@@ -41,6 +40,7 @@ type PendingForMe = {
 
 export function TeamPanel() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { requestStepUp } = useMfaStepUp();
   const { organization, loading: orgLoading, refresh: refreshOrganization } = useOrganization();
 
   const [members, setMembers] = useState<MemberRecord[]>([]);
@@ -77,24 +77,12 @@ export function TeamPanel() {
     }
   }, [canManage]);
 
-  async function getAccessToken() {
-    const {
-      data: { session }
-    } = await supabase.auth.getSession();
-    return session?.access_token;
-  }
-
   async function authFetch(path: string, init: RequestInit = {}) {
-    const token = await getAccessToken();
-    if (!token) {
+    const response = await dashboardFetch(supabase, requestStepUp, path, init);
+    if (!response) {
       setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
-      return null;
     }
-
-    return fetch(`${apiBaseUrl}${path}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
-    });
+    return response;
   }
 
   async function loadMembers() {
