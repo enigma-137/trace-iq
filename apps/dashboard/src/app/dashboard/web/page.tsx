@@ -81,9 +81,8 @@ export default async function WebAnalyticsPage({
             <Link
               key={range.value}
               href={withProjectId(`/dashboard/web?days=${range.value}`, canonicalProjectId)}
-              className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
-                days === range.value ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
-              }`}
+              className={`rounded px-3 py-1.5 text-sm font-semibold transition ${days === range.value ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
+                }`}
             >
               {range.label}
             </Link>
@@ -265,20 +264,20 @@ function StatWithDelta({
   const deltaTone = flat ? 'blue' : good ? 'green' : 'red';
 
   return (
-    <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(59,130,246,0.08),transparent_34%)] dark:bg-[radial-gradient(circle_at_18%_0%,rgba(59,130,246,0.12),transparent_34%)]" />
+    <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="pointer-events-none absolute inset-0 " />
+      {/* Shine shine, incase you want to add it back  bg-[radial-gradient(circle_at_18%_0%,rgba(59,130,246,0.08),transparent_34%)] dark:bg-[radial-gradient(circle_at_18%_0%,rgba(59,130,246,0.12),transparent_34%)] */}
       <div className="relative">
         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">{label}</p>
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <p className="text-2xl font-semibold tabular-nums tracking-tight text-neutral-900 dark:text-white">{formatValue(value, format)}</p>
           <span
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums ${
-              deltaTone === 'green'
-                ? 'border-emerald-400/15 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300'
-                : deltaTone === 'red'
-                  ? 'border-red-400/15 bg-red-400/10 text-red-600 dark:text-red-300'
-                  : 'border-blue-500/10 bg-blue-500/5 text-blue-700 dark:text-blue-300'
-            }`}
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums ${deltaTone === 'green'
+              ? 'border-emerald-400/15 text-emerald-700 dark:text-emerald-300'
+              : deltaTone === 'red'
+                ? 'border-red-400/15 text-red-600 dark:text-red-300'
+                : 'border-blue-500/10 text-blue-700 dark:text-blue-300'
+              }`}
           >
             {flat ? 'flat' : `${up ? '+' : '-'}${Math.abs(delta).toFixed(1)}%`}
           </span>
