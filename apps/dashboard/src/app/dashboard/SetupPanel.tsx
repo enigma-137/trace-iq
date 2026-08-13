@@ -138,8 +138,8 @@ export function SetupPanel() {
 
   return (
     <section className="grid gap-5" aria-labelledby="setup-title">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Project setup</p>
+      <div className='pt-4'>
+        {/* <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Project setup</p> */}
         <h2 id="setup-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
           {hasProject ? 'Project settings' : 'Create your tracking workspace'}
         </h2>
@@ -152,11 +152,10 @@ export function SetupPanel() {
 
       {status ? (
         <p
-          className={`rounded-md border px-3 py-2 text-sm ${
-            status.tone === 'success'
-              ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-              : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-          }`}
+          className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
+            ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+            : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+            }`}
         >
           {status.message}
         </p>
@@ -382,9 +381,8 @@ function CopyButton({ value, label, compact = false }: { value: string; label: s
 
   return (
     <button
-      className={`rounded-md border border-neutral-300 bg-white font-semibold text-neutral-700 transition hover:border-neutral-500 hover:text-neutral-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-white dark:hover:text-white ${
-        compact ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm'
-      }`}
+      className={`rounded-md border border-neutral-300 bg-white font-semibold text-neutral-700 transition hover:border-neutral-500 hover:text-neutral-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-white dark:hover:text-white ${compact ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm'
+        }`}
       type="button"
       onClick={handleCopy}
     >

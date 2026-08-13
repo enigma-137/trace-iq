@@ -130,6 +130,11 @@ export function MobileNav({
               <div className="border-t border-neutral-200 px-4 py-4 dark:border-slate-800">
                 <p className="truncate text-sm font-medium text-neutral-800 dark:text-slate-200">
                   {organizationName}
+                  {organization?.memberCount !== undefined && (
+                    <span className="text-xs font-normal text-neutral-400 dark:text-slate-500">
+                      {' '}· {organization.memberCount} member{organization.memberCount === 1 ? '' : 's'}
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-neutral-400 dark:text-slate-500"> {userEmail ?? 'Account'}</p>
                 <div className="mt-3 flex items-center gap-2">

@@ -157,6 +157,11 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-semibold text-neutral-800 dark:text-slate-200" title={organizationName}>
                   {organizationName}
+                  {organization?.memberCount !== undefined && (
+                    <span className="font-normal text-neutral-400 dark:text-slate-500">
+                      {' '}· {organization.memberCount} member{organization.memberCount === 1 ? '' : 's'}
+                    </span>
+                  )}
                 </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="size-1.5 rounded-full bg-emerald-500" />

@@ -23,6 +23,7 @@ export class PersonalAccessTokensController {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireSupabaseSession(user);
     this.authService.requireStepUpIfEnrolled(user);
+    await this.authService.requireRole(user, ['owner', 'admin']);
     return this.tokensService.create(user, body);
   }
 
@@ -31,6 +32,7 @@ export class PersonalAccessTokensController {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireSupabaseSession(user);
     this.authService.requireStepUpIfEnrolled(user);
+    await this.authService.requireRole(user, ['owner', 'admin']);
     return this.tokensService.revoke(user, id);
   }
 }

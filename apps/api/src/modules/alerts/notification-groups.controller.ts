@@ -20,6 +20,7 @@ export class NotificationGroupsController {
   async create(@Body() body: CreateGroupRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'alerts:write');
+    this.authService.requireStepUpIfEnrolled(user);
     return this.groupsService.create(user, body);
   }
 
@@ -31,6 +32,7 @@ export class NotificationGroupsController {
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'alerts:write');
+    this.authService.requireStepUpIfEnrolled(user);
     return this.groupsService.update(user, id, body);
   }
 

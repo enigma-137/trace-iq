@@ -10,6 +10,7 @@ export interface OrganizationInfo {
   name: string;
   slug: string;
   role: string;
+  memberCount?: number;
 }
 
 /**

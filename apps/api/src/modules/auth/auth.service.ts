@@ -63,6 +63,79 @@ export class AuthService {
     };
   }
 
+  /**
+   * Resolves a user's Supabase Auth account from their email via the Admin API.
+   * Uses the service-role key (server-side only) so team members can be added by
+   * email without exposing admin credentials to the dashboard client.
+   *
+   * Returns `null` when no account exists for the email. Throws when the
+   * service-role key is not configured or the Admin API is unreachable.
+   */
+  async resolveUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new UnauthorizedException(
+        'SUPABASE_SERVICE_ROLE_KEY is not configured. Add it to invite team members by email.'
+      );
+    }
+
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Failed to look up the team member.');
+    }
+
+    const data = (await response.json()) as { users?: Array<{ id?: string; email?: string }> };
+    const user = data.users?.[0];
+
+    if (!user?.id) {
+      return null;
+    }
+
+    return { id: user.id, email: user.email ?? email };
+  }
+
+  /**
+   * Requires the user to hold one of the given roles in their primary
+   * organization. Roles come from `organization_members`. PATs are always
+   * rejected — role is a session concept and PAT access is enforced separately
+   * via {@link requireScope}. Throws ForbiddenException when the user is not an
+   * organization member or their role is not in the allowed set.
+   */
+  async requireRole(
+    user: DashboardUser,
+    roles: Array<'owner' | 'admin' | 'member'>
+  ): Promise<void> {
+    if (user.authMethod === 'pat') {
+      throw new ForbiddenException('Personal access tokens cannot be used for role-gated actions.');
+    }
+
+    const result = await this.database.query<{ role: string }>(
+      `
+        SELECT om.role
+        FROM organization_members om
+        JOIN organizations o ON o.id = om.organization_id
+        WHERE om.user_id = $1
+        ORDER BY o.created_at ASC
+        LIMIT 1;
+      `,
+      [user.id]
+    );
+
+    const role = result.rows[0]?.role;
+
+    if (!role || !roles.includes(role as 'owner' | 'admin' | 'member')) {
+      throw new ForbiddenException('You do not have permission to perform this action.');
+    }
+  }
+
   requireScope(user: DashboardUser, scope: string): void {
     if (user.authMethod !== 'pat') {
       return;
