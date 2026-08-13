@@ -1,10 +1,10 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import GlobeHero from '@/components/globe-hero';
+// import GlobeHero from '@/components/globe-hero';
 
 // TODO: point these at the real repo once it is public.
-const GITHUB_URL = 'https://github.com';
-const VERSION = 'v0.1.0';
+// const GITHUB_URL = 'https://github.com';
+// const VERSION = 'v0.1.0';
 
 // Shared focus treatment. The page is near-black, so the ring needs an offset
 // in the same colour to read as a ring rather than a smear.
@@ -68,13 +68,13 @@ function CpuIcon({ className }: { className?: string }) {
   );
 }
 
-function TerminalIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  );
-}
+// function TerminalIcon({ className }: { className?: string }) {
+//   return (
+//     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+//       <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+//     </svg>
+//   );
+// }
 
 function FunnelIcon({ className }: { className?: string }) {
   return (
@@ -108,36 +108,36 @@ function BellIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronIcon({ className, open }: { className?: string; open?: boolean }) {
-  return (
-    <svg
-      className={`${className} transform transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}
+// function ChevronIcon({ className, open }: { className?: string; open?: boolean }) {
+//   return (
+//     <svg
+//       className={`${className} transform transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+//       fill="none"
+//       viewBox="0 0 24 24"
+//       stroke="currentColor"
+//       strokeWidth={2}
+//       aria-hidden="true"
+//     >
+//       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+//     </svg>
+//   );
+// }
 
-function MenuIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
-  );
-}
+// function MenuIcon({ className }: { className?: string }) {
+//   return (
+//     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+//       <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
+//     </svg>
+//   );
+// }
 
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
+// function CloseIcon({ className }: { className?: string }) {
+//   return (
+//     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+//       <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+//     </svg>
+//   );
+// }
 
 function CopyIcon({ className }: { className?: string }) {
   return (
@@ -155,21 +155,21 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
-function GithubIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
-    </svg>
-  );
-}
+// function GithubIcon({ className }: { className?: string }) {
+//   return (
+//     <svg className={className} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+//       <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+//     </svg>
+//   );
+// }
 
 // Feature status is grounded in what the API actually exposes today, so the
 // page never promises a route that isn't mapped.
 type FeatureStatus = 'live' | 'beta' | 'planned';
 
 const STATUS_STYLES: Record<FeatureStatus, { label: string; className: string }> = {
-  live: { label: 'Live', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
-  beta: { label: 'Beta', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
+  live: { label: 'Live', className: 'border-emerald-500/30 text-emerald-300' },
+  beta: { label: 'Beta', className: 'border-amber-500/30 text-amber-300' },
   planned: { label: 'Planned', className: 'border-zinc-700 bg-zinc-800/40 text-zinc-400' }
 };
 
@@ -179,61 +179,61 @@ const FEATURES: Array<{
   body: string;
   status: FeatureStatus;
 }> = [
-  {
-    icon: TraceIcon,
-    title: 'Custom Event Ingestion',
-    body: 'Track checkout workflows, transactional processes, and engagement logs with arbitrary metadata. Single or batched.',
-    status: 'live'
-  },
-  {
-    icon: FunnelIcon,
-    title: 'Funnel Drop-off Analysis',
-    body: 'Build multi-step funnels, see exactly which step bleeds users, and compare conversion across device variants.',
-    status: 'live'
-  },
-  {
-    icon: UserIcon,
-    title: 'High-Fidelity Timelines',
-    body: 'Drill into a single user and read the exact sequence of actions that preceded a failed checkout or API timeout.',
-    status: 'live'
-  },
-  {
-    icon: RetentionIcon,
-    title: 'Retention & Cohorts',
-    body: 'Group users by behaviour or property, then watch how each cohort retains week over week.',
-    status: 'live'
-  },
-  {
-    icon: FlagIcon,
-    title: 'Feature Flags',
-    body: 'Evaluate flags from the SDK and tie every rollout directly to the conversion metrics it moved.',
-    status: 'live'
-  },
-  {
-    icon: BellIcon,
-    title: 'Alerts & Webhooks',
-    body: 'Fire a webhook the moment a metric crosses a threshold. Test the delivery before you depend on it.',
-    status: 'live'
-  },
-  {
-    icon: AlertIcon,
-    title: 'Error Tracking & Context',
-    body: 'Capture front-end exceptions with stack traces attached to the behavioural trail that produced them.',
-    status: 'live'
-  },
-  {
-    icon: CpuIcon,
-    title: 'AI Funnel Summaries',
-    body: 'Turn a funnel into a written diagnosis of where friction is coming from, in plain language.',
-    status: 'beta'
-  },
-  {
-    icon: ReplayIcon,
-    title: 'Session Replay',
-    body: 'The pipeline abstraction is in place, with DOM snapshotting and playback landing next.',
-    status: 'planned'
-  }
-];
+    {
+      icon: TraceIcon,
+      title: 'Custom Event Ingestion',
+      body: 'Track checkout workflows, transactional processes, and engagement logs with arbitrary metadata. Single or batched.',
+      status: 'live'
+    },
+    {
+      icon: FunnelIcon,
+      title: 'Funnel Drop-off Analysis',
+      body: 'Build multi-step funnels, see exactly which step bleeds users, and compare conversion across device variants.',
+      status: 'live'
+    },
+    {
+      icon: UserIcon,
+      title: 'High-Fidelity Timelines',
+      body: 'Drill into a single user and read the exact sequence of actions that preceded a failed checkout or API timeout.',
+      status: 'live'
+    },
+    {
+      icon: RetentionIcon,
+      title: 'Retention & Cohorts',
+      body: 'Group users by behaviour or property, then watch how each cohort retains week over week.',
+      status: 'live'
+    },
+    {
+      icon: FlagIcon,
+      title: 'Feature Flags',
+      body: 'Evaluate flags from the SDK and tie every rollout directly to the conversion metrics it moved.',
+      status: 'live'
+    },
+    {
+      icon: BellIcon,
+      title: 'Alerts & Webhooks',
+      body: 'Fire a webhook the moment a metric crosses a threshold. Test the delivery before you depend on it.',
+      status: 'live'
+    },
+    {
+      icon: AlertIcon,
+      title: 'Error Tracking & Context',
+      body: 'Capture front-end exceptions with stack traces attached to the behavioural trail that produced them.',
+      status: 'live'
+    },
+    {
+      icon: CpuIcon,
+      title: 'AI Funnel Summaries',
+      body: 'Turn a funnel into a written diagnosis of where friction is coming from, in plain language.',
+      status: 'beta'
+    },
+    {
+      icon: ReplayIcon,
+      title: 'Session Replay',
+      body: 'The pipeline abstraction is in place, with DOM snapshotting and playback landing next.',
+      status: 'planned'
+    }
+  ];
 
 const SDKS = [
   { name: 'JavaScript', install: 'npm i traceiq-sdk-js', href: 'https://www.npmjs.com/package/traceiq-sdk-js', registry: 'npm' },
@@ -261,36 +261,36 @@ const TABS: Array<{ id: SandboxTab; label: string; accent: string }> = [
 ];
 
 /** Small inline "copy to clipboard" control used by the install snippets. */
-function CopyButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
+// function CopyButton({ value, label }: { value: string; label: string }) {
+//   const [copied, setCopied] = useState(false);
 
-  const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-    } catch {
-      // Clipboard is unavailable over plain http or when permission is denied.
-      // Silently no-op: the command is already visible and selectable.
-    }
-  }, [value]);
+//   const copy = useCallback(async () => {
+//     try {
+//       await navigator.clipboard.writeText(value);
+//       setCopied(true);
+//     } catch {
+//       // Clipboard is unavailable over plain http or when permission is denied.
+//       // Silently no-op: the command is already visible and selectable.
+//     }
+//   }, [value]);
 
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1600);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+//   useEffect(() => {
+//     if (!copied) return;
+//     const timer = window.setTimeout(() => setCopied(false), 1600);
+//     return () => window.clearTimeout(timer);
+//   }, [copied]);
 
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      aria-label={copied ? `${label} copied` : `Copy ${label}`}
-      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-100 ${FOCUS_RING}`}
-    >
-      {copied ? <CheckIcon className="size-4 text-emerald-400" /> : <CopyIcon className="size-4" />}
-    </button>
-  );
-}
+//   return (
+//     <button
+//       type="button"
+//       onClick={copy}
+//       aria-label={copied ? `${label} copied` : `Copy ${label}`}
+//       className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-100 ${FOCUS_RING}`}
+//     >
+//       {copied ? <CheckIcon className="size-4 text-emerald-400" /> : <CopyIcon className="size-4" />}
+//     </button>
+//   );
+// }
 
 function SectionHeading({ eyebrow, title, lede }: { eyebrow: string; title: string; lede?: string }) {
   return (
@@ -379,31 +379,31 @@ export default function LandingPage() {
     }
   };
 
-  const codeSnippets: Record<SandboxTab, string> = {
-    event: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.track('purchase_completed', {\n  amount: 89.00,\n  currency: 'USD',\n  gateway: 'stripe'\n});`,
-    user: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.identify('usr_9981', {\n  email: 'developer@example.com',\n  tier: 'enterprise'\n});`,
-    flags: `import { traceiq } from 'traceiq-sdk-js';\n\nconst checkoutVariant = traceiq.getFeatureFlag(\n  'checkout-redesign'\n);\n\nif (checkoutVariant === 'v2-sleek-checkout') {\n  renderSleekCheckout();\n}`,
-    errors: `import { traceiq } from 'traceiq-sdk-js';\n\ntry {\n  initiatePayment();\n} catch (error) {\n  traceiq.trackError(error, {\n    context: 'Checkout page failure'\n  });\n}`
-  };
+  // const codeSnippets: Record<SandboxTab, string> = {
+  //   event: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.track('purchase_completed', {\n  amount: 89.00,\n  currency: 'USD',\n  gateway: 'stripe'\n});`,
+  //   user: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.identify('usr_9981', {\n  email: 'developer@example.com',\n  tier: 'enterprise'\n});`,
+  //   flags: `import { traceiq } from 'traceiq-sdk-js';\n\nconst checkoutVariant = traceiq.getFeatureFlag(\n  'checkout-redesign'\n);\n\nif (checkoutVariant === 'v2-sleek-checkout') {\n  renderSleekCheckout();\n}`,
+  //   errors: `import { traceiq } from 'traceiq-sdk-js';\n\ntry {\n  initiatePayment();\n} catch (error) {\n  traceiq.trackError(error, {\n    context: 'Checkout page failure'\n  });\n}`
+  // };
 
-  const faqs = [
-    {
-      q: 'What is TraceIQ?',
-      a: 'TraceIQ is an open-source, developer-first behavior intelligence platform. It brings event tracking, conversion funnels, user timelines, and performance errors into one lightweight SDK (under 25 KB) and an easy-to-use analytics dashboard.'
-    },
-    {
-      q: 'Do I need standard cookie banners with TraceIQ?',
-      a: 'No! By default, TraceIQ tracks user sessions using privacy-first, cookieless telemetry hashes that do not store personally identifiable information (PII) on the device. This makes it GDPR and CCPA compliant out of the box.'
-    },
-    {
-      q: 'How does the performance compare with Google Analytics?',
-      a: 'Google Analytics (GA4) loads scripts over 45 KB, runs heavy tracking scripts, and blocks rendering. TraceIQ uses a micro-optimized JS bundle under 25 KB that runs asynchronously and won’t affect your Core Web Vitals (LCP, INP, CLS).'
-    },
-    {
-      q: 'Can I self-host TraceIQ?',
-      a: 'Absolutely! TraceIQ is architected with Docker and PostgreSQL. You can use our managed Cloud version for quick starts or deploy it on your own infrastructure (AWS, Vercel, Fly.io, etc.) for absolute data sovereignty.'
-    }
-  ];
+  // const faqs = [
+  //   {
+  //     q: 'What is TraceIQ?',
+  //     a: 'TraceIQ is an open-source, developer-first behavior intelligence platform. It brings event tracking, conversion funnels, user timelines, and performance errors into one lightweight SDK (under 25 KB) and an easy-to-use analytics dashboard.'
+  //   },
+  //   {
+  //     q: 'Do I need standard cookie banners with TraceIQ?',
+  //     a: 'No! By default, TraceIQ tracks user sessions using privacy-first, cookieless telemetry hashes that do not store personally identifiable information (PII) on the device. This makes it GDPR and CCPA compliant out of the box.'
+  //   },
+  //   {
+  //     q: 'How does the performance compare with Google Analytics?',
+  //     a: 'Google Analytics (GA4) loads scripts over 45 KB, runs heavy tracking scripts, and blocks rendering. TraceIQ uses a micro-optimized JS bundle under 25 KB that runs asynchronously and won’t affect your Core Web Vitals (LCP, INP, CLS).'
+  //   },
+  //   {
+  //     q: 'Can I self-host TraceIQ?',
+  //     a: 'Absolutely! TraceIQ is architected with Docker and PostgreSQL. You can use our managed Cloud version for quick starts or deploy it on your own infrastructure (AWS, Vercel, Fly.io, etc.) for absolute data sovereignty.'
+  //   }
+  // ];
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-[#050505] font-sans text-zinc-50 bg-grid-dots">
@@ -421,7 +421,7 @@ export default function LandingPage() {
 
       {/* Header/Navbar */}
       {/* <header className="fixed inset-x-0 top-0 z-50 border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-md"> */}
-        {/* <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      {/* <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <a href="#top" className={`flex shrink-0 items-center gap-3 rounded ${FOCUS_RING}`}>
             <img src="/brand/logo-white-no-bg.png" alt="TraceIQ" className="h-8 w-auto" />
           </a>
@@ -470,8 +470,8 @@ export default function LandingPage() {
           </div>
         </nav> */}
 
-        {/* Mobile menu — the nav links were previously unreachable below `md`. */}
-        {/* {menuOpen && (
+      {/* Mobile menu — the nav links were previously unreachable below `md`. */}
+      {/* {menuOpen && (
           <div id="mobile-menu" className="border-t border-zinc-900 bg-zinc-950/95 backdrop-blur-md lg:hidden">
             <div className="mx-auto flex max-w-7xl flex-col px-4 py-3 sm:px-6">
               {NAV_LINKS.map((link) => (
@@ -505,16 +505,16 @@ export default function LandingPage() {
       <main id="main">
         {/* Hero Section — full screen, globe bleeds off the bottom edge */}
         {/* <section id="top" className="relative min-h-[100svh] w-full overflow-hidden"> */}
-          {/* Globe layer: fills the whole hero. The sphere is pushed down in 3D
+        {/* Globe layer: fills the whole hero. The sphere is pushed down in 3D
               inside the canvas, so the soft "top" is the sphere's own curved
               anti-aliased silhouette — not a clipped box edge. The section's
               overflow-hidden keeps it from bleeding into the sandbox below. */}
-          {/* <div className="absolute inset-0">
+        {/* <div className="absolute inset-0">
             <GlobeHero />
           </div> */}
 
-          {/* Soft atmospheric blend right where the dome's arc meets the text */}
-          {/* <div
+        {/* Soft atmospheric blend right where the dome's arc meets the text */}
+        {/* <div
             className="pointer-events-none absolute inset-x-0 z-[5] blur-2xl"
             style={{
               top: '38%',
@@ -524,12 +524,12 @@ export default function LandingPage() {
             }}
           /> */}
 
-          {/* Bottom fade so the globe eases into the content below it
+        {/* Bottom fade so the globe eases into the content below it
               instead of cutting off hard at the section boundary */}
-          {/* <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" /> */}
+        {/* <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] to-transparent" /> */}
 
-          {/* Copy layer */}
-          {/* <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center justify-start gap-5 px-5 pb-20 pt-28 text-center sm:gap-6 sm:px-6 sm:pt-36">
+        {/* Copy layer */}
+        {/* <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center justify-start gap-5 px-5 pb-20 pt-28 text-center sm:gap-6 sm:px-6 sm:pt-36">
             <span className="pointer-events-auto rounded-full border border-zinc-700 bg-zinc-950/75 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-zinc-300 backdrop-blur-sm sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.24em]">
               Telemetry SDK under 25 KB
             </span>
@@ -576,9 +576,9 @@ export default function LandingPage() {
             lede="Switch between telemetry snippets, run them live, and watch the raw payload stream from the client straight into the trace ingestion pipeline."
           /> */}
 
-          {/* <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-6 lg:grid-cols-2 lg:gap-8"> */}
-            {/* Mock IDE Card */}
-            {/* <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30 shadow-2xl backdrop-blur-md">
+        {/* <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-6 lg:grid-cols-2 lg:gap-8"> */}
+        {/* Mock IDE Card */}
+        {/* <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30 shadow-2xl backdrop-blur-md">
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="size-3 shrink-0 rounded-full bg-rose-500/80" />
@@ -592,8 +592,8 @@ export default function LandingPage() {
                 </div>
               </div> */}
 
-              {/* Tabs — 2×2 on phones so the labels never crush */}
-              {/* <div
+        {/* Tabs — 2×2 on phones so the labels never crush */}
+        {/* <div
                 role="tablist"
                 aria-label="SDK examples"
                 className="grid grid-cols-2 border-b border-zinc-800/80 bg-zinc-950/40 font-mono text-xs text-zinc-400 sm:grid-cols-4"
@@ -618,7 +618,7 @@ export default function LandingPage() {
                 })}
               </div> */}
 
-              {/* <div
+        {/* <div
                 id="sandbox-snippet"
                 className="flex-1 overflow-x-auto whitespace-pre bg-zinc-950/60 p-4 font-mono text-xs leading-relaxed text-zinc-300 sm:p-6 sm:text-sm"
               >
@@ -638,8 +638,8 @@ export default function LandingPage() {
               </div>
             </div> */}
 
-            {/* Console Log Terminal */}
-            {/* <div className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/90 shadow-2xl">
+        {/* Console Log Terminal */}
+        {/* <div className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/90 shadow-2xl">
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 bg-zinc-900/40 px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <TerminalIcon className="size-4 shrink-0 text-zinc-400" />
