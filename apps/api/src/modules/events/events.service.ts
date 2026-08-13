@@ -52,8 +52,8 @@ export interface BatchIngestResponse {
 const MAX_BATCH_SIZE = 500;
 
 // Write keys change rarely, so caching the lookup removes a DB round-trip from the
-// ingest hot path. Kept short so a revoked key stops working within the window.
-const WRITE_KEY_TTL_MS = 60 * 1000;
+// ingest hot path. Kept short so a revoked key stops working within seconds.
+const WRITE_KEY_TTL_MS = 10 * 1000;
 // Once an anonymous_id is stitched to a user we never need to redo it, so remember
 // the pairing and skip the (transactional) backfill on every later event.
 const MAX_LINK_CACHE = 100_000;
@@ -465,7 +465,7 @@ export class EventsService {
     return result.rows;
   }
 
-  private async authenticateWriteKey(writeKey: string, projectId: string): Promise<WriteKeyRecord> {
+  async authenticateWriteKey(writeKey: string, projectId: string): Promise<WriteKeyRecord> {
     const keyHash = this.sha256(writeKey);
     const cacheKey = `${projectId}:${keyHash}`;
     const cached = this.writeKeyCache.get(cacheKey);

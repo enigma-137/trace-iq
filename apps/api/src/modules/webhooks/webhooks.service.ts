@@ -3,6 +3,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
+import { assertSafeFetchUrl } from '../../common/url';
 
 type WebhookRow = {
   [column: string]: unknown;
@@ -50,7 +51,7 @@ const DELIVERY_TIMEOUT_MS = 8000;
 // How long the per-project webhook list is cached on the ingestion hot path, so we
 // don't hit the DB for every event. Changes propagate within this window (and
 // immediately for the project whose webhooks were just edited).
-const CACHE_TTL_MS = 30 * 1000;
+const CACHE_TTL_MS = 10 * 1000;
 // Keep the delivery log small — only the most recent attempts per webhook.
 const DELIVERY_LOG_KEEP = 20;
 
@@ -311,11 +312,7 @@ export class WebhooksService {
 }
 
 function normalizeUrl(input: unknown): string {
-  const url = typeof input === 'string' ? input.trim() : '';
-  if (!/^https?:\/\//i.test(url)) {
-    throw new BadRequestException('URL must start with http:// or https://');
-  }
-  return url;
+  return assertSafeFetchUrl(input);
 }
 
 function sanitizeEventNames(input: unknown): string[] {

@@ -12,16 +12,22 @@ interface GeoLookupRecord {
 }
 
 /**
- * Pick the client IP from the request: the first hop of X-Forwarded-For (added by
- * proxies/CDNs) if present, otherwise the socket remote address.
+ * Pick the client IP from the request. X-Forwarded-For is only trusted when the
+ * deployment explicitly opts in via TRUST_PROXY_HEADERS=true (meaning the API
+ * sits behind a proxy/CDN that overwrites the header). Otherwise an attacker
+ * could spoof it to fake geolocation — and, if the IP is ever used for abuse
+ * detection, to bypass blocking entirely.
  */
 export function extractClientIp(forwardedFor?: string, remoteIp?: string): string | undefined {
-  if (forwardedFor) {
+  const trustProxyHeaders = process.env.TRUST_PROXY_HEADERS === 'true';
+
+  if (trustProxyHeaders && forwardedFor) {
     const first = forwardedFor.split(',')[0]?.trim();
     if (first) {
       return normalizeIp(first);
     }
   }
+
   return remoteIp ? normalizeIp(remoteIp) : undefined;
 }
 

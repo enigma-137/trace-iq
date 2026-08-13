@@ -107,6 +107,27 @@ export class AuthService {
   }
 
   /**
+   * Conditional step-up: enforces {@link requireStepUp} only when the account has
+   * at least one verified MFA factor. Users who never enrolled a second factor
+   * are not locked out of otherwise-available actions — there is nothing to step
+   * up to. PATs are always rejected, since these actions need an interactive
+   * session.
+   */
+  requireStepUpIfEnrolled(user: DashboardUser, maxAgeMinutes = 15): void {
+    if (user.authMethod === 'pat') {
+      throw new ForbiddenException('Personal access tokens cannot be used for actions that require step-up authentication.');
+    }
+
+    const hasEnrolledMfa = (user.factors ?? []).some((factor) => factor.status === 'verified');
+
+    if (!hasEnrolledMfa) {
+      return;
+    }
+
+    this.requireStepUp(user, maxAgeMinutes);
+  }
+
+  /**
    * Decodes the `amr` (authentication method reference) claim from the token's
    * payload. The token is already validated by Supabase's /auth/v1/user above,
    * so this only parses the JWT payload (no signature needed). Returns empty

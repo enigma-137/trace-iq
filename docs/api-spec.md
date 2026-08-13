@@ -37,6 +37,8 @@ Current MVP response:
 
 Returns recent events for early dashboard/API verification.
 
+Requires the project write key in the `x-traceiq-write-key` header (or as a `Bearer` token), exactly like `POST /v1/events`. Unauthenticated requests are rejected.
+
 ## Batch Ingestion
 
 `POST /v1/events/batch`

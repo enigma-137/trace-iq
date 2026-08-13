@@ -20,6 +20,7 @@ export class AlertsController {
   async create(@Body() body: CreateAlertRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'alerts:write');
+    this.authService.requireStepUpIfEnrolled(user);
     return this.alertsService.create(user, body);
   }
 

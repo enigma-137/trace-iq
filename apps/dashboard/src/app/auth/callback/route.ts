@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { safeRedirectPath } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const next = safeRedirectPath(searchParams.get('next'), '/dashboard');
 
   if (code) {
     const supabase = createSupabaseServerClient();

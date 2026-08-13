@@ -14,7 +14,9 @@ export class DatabaseService implements OnApplicationShutdown {
   private readonly pool = new Pool({
     connectionString: databaseConfig.url,
     max: databaseConfig.poolSize,
-    ssl: databaseConfig.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: databaseConfig.ssl
+      ? { rejectUnauthorized: databaseConfig.sslRejectUnauthorized }
+      : undefined
   });
 
   query<T extends QueryResultRow = QueryResultRow>(

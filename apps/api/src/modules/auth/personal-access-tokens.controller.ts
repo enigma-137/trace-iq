@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Headers, Param, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { CreatePersonalAccessTokenRequest, PersonalAccessTokensService } from './personal-access-tokens.service';
 
@@ -16,10 +17,12 @@ export class PersonalAccessTokensController {
     return this.tokensService.list(user);
   }
 
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post()
   async create(@Body() body: CreatePersonalAccessTokenRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireSupabaseSession(user);
+    this.authService.requireStepUpIfEnrolled(user);
     return this.tokensService.create(user, body);
   }
 
@@ -27,6 +30,7 @@ export class PersonalAccessTokensController {
   async revoke(@Param('id') id: string, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireSupabaseSession(user);
+    this.authService.requireStepUpIfEnrolled(user);
     return this.tokensService.revoke(user, id);
   }
 }

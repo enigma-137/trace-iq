@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { safeRedirectPath } from '@/lib/utils';
 
 type AuthMode = 'signin' | 'signup';
 type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
@@ -11,7 +12,7 @@ type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
 export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get('next') ?? '/dashboard';
+  const nextPath = safeRedirectPath(searchParams.get('next'), '/dashboard');
   const missingConfig = searchParams.get('missingConfig') === '1';
   const [mode, setMode] = useState<AuthMode>('signin');
   const [stage, setStage] = useState<AuthStage>('credentials');

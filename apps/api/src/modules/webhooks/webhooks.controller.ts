@@ -20,6 +20,7 @@ export class WebhooksController {
   async create(@Body() body: CreateWebhookRequest, @Headers('authorization') authorization?: string) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'webhooks:write');
+    this.authService.requireStepUpIfEnrolled(user);
     return this.webhooksService.create(user, body);
   }
 
@@ -42,6 +43,7 @@ export class WebhooksController {
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'webhooks:write');
+    this.authService.requireStepUpIfEnrolled(user);
     return this.webhooksService.update(user, id, body);
   }
 

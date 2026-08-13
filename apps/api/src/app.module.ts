@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -23,6 +25,14 @@ import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
+    // Baseline per-IP request cap; individual controllers override with @Throttle.
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 120
+      }
+    ]),
     DatabaseModule,
     AuthModule,
     OrganizationsModule,
@@ -44,6 +54,12 @@ import { DatabaseModule } from './database/database.module';
     AchievementsModule,
     BillingModule
   ],
-  controllers: [AppController]
+  controllers: [AppController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard
+    }
+  ]
 })
 export class AppModule {}

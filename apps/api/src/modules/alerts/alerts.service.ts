@@ -7,6 +7,7 @@ import { FilterCondition, buildFilterClause, sanitizeFilters } from '../../commo
 import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
 import { EmailService, toUniqueEmails } from '../emails/email.service';
 import { NotificationGroupsService } from './notification-groups.service';
+import { assertSafeFetchUrl } from '../../common/url';
 
 type AlertCondition = 'above' | 'below' | 'drops_by' | 'spikes_by';
 const ALLOWED_CONDITIONS: AlertCondition[] = ['above', 'below', 'drops_by', 'spikes_by'];
@@ -205,8 +206,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     const filters = sanitizeFilters(body.filters);
 
     const webhookUrl = typeof body.webhookUrl === 'string' ? body.webhookUrl.trim() : '';
-    if (webhookUrl && !/^https?:\/\//i.test(webhookUrl)) {
-      throw new BadRequestException('Webhook URL must start with http:// or https://');
+    if (webhookUrl) {
+      assertSafeFetchUrl(webhookUrl, 'Webhook URL');
     }
 
     const emailRecipients = toUniqueEmails(Array.isArray(body.emailRecipients) ? body.emailRecipients : []);
