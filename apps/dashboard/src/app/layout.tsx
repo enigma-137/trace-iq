@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://traceiq.run'),
 
   title: {
-    default: 'TraceIQ — Product Analytics That Drives Real Growth',
+    default: 'TraceIQ | Best Product Analytics Platform That Drives Real Growth',
     template: '%s | TraceIQ'
   },
 
