@@ -18,11 +18,16 @@ interface SidebarProps {
 
 export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { enrolled } = useMfaStatus();
   const { organization } = useOrganization();
   const showMfaWarning = mounted && enrolled === false;
   const organizationName = organization?.name || 'Your Organization';
+
+  // When collapsed, hovering previews the full sidebar without changing the
+  // persisted preference. Clicking the toggle button pins/unpins it open.
+  const expanded = !collapsed || isHovering;
 
   useEffect(() => {
     setMounted(true);
@@ -38,42 +43,51 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
       localStorage.setItem('traceiq-sidebar-collapsed', String(next));
       return next;
     });
+    setIsHovering(false);
   };
 
   const initial = (userEmail?.[0] || 'A').toUpperCase();
 
   return (
     <aside
-      className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-neutral-200 bg-white transition-[width] duration-200 ease-in-out dark:border-slate-800/90 dark:bg-slate-950 lg:flex ${collapsed ? 'w-16 px-2 py-5' : 'w-60 px-4 py-5'
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-neutral-200 bg-white transition-[width] duration-200 ease-in-out dark:border-slate-800/90 dark:bg-slate-950 lg:flex ${expanded ? 'w-60 px-4 py-5' : 'w-16 px-2 py-5'
         }`}
     >
       {/* Brand Header */}
-      <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} min-h-8`}>
+      <div className={`flex min-h-8 ${expanded ? 'items-center justify-between' : 'flex-col items-center gap-2'}`}>
         <Link className="flex items-center gap-2.5 overflow-hidden" href="/" aria-label="TraceIQ home">
           <img className="h-7 w-7 shrink-0 dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
           <img className="hidden h-7 w-7 shrink-0 dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
-          {!collapsed && (
+          {expanded && (
             <span className="truncate text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
               TraceIQ
             </span>
           )}
         </Link>
 
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={toggleCollapse}
-            className="flex size-7 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
-          >
+        <button
+          type="button"
+          onClick={toggleCollapse}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+              <path d="m12 9 3 3-3 3" />
+            </svg>
+          ) : (
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <line x1="9" y1="3" x2="9" y2="21" />
               <path d="m14 15-3-3 3-3" />
             </svg>
-          </button>
-        )}
+          )}
+        </button>
       </div>
 
       {/* Main Navigation */}
@@ -83,12 +97,12 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
           return (
             <Link
               key={item.key}
-              className={`${navLinkClass(isActive)} ${collapsed ? 'justify-center px-0' : ''}`}
+              className={`${navLinkClass(isActive)} ${expanded ? '' : 'justify-center px-0'}`}
               href={withProjectId(item.href, projectId)}
-              title={collapsed ? item.label : undefined}
+              title={expanded ? undefined : item.label}
             >
               <NavIcon name={item.key} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {expanded && <span className="truncate">{item.label}</span>}
             </Link>
           );
         })}
@@ -105,15 +119,15 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
           return (
             <Link
               key={item.key}
-              className={`${navLinkClass(isActive)} relative ${collapsed ? 'justify-center px-0' : ''}`}
+              className={`${navLinkClass(isActive)} relative ${expanded ? '' : 'justify-center px-0'}`}
               href={withProjectId(item.href, projectId)}
-              title={collapsed ? item.label : undefined}
+              title={expanded ? undefined : item.label}
             >
               <NavIcon name={item.key} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {expanded && <span className="truncate">{item.label}</span>}
               {showWarning && (
                 <WarningIcon
-                  collapsed={collapsed}
+                  collapsed={!expanded}
                   title="Two-factor authentication is not enabled yet"
                 />
               )}
@@ -124,31 +138,7 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
 
       {/* Footer Profile & Actions */}
       <div className="mt-3 border-t border-neutral-200 pt-3 dark:border-slate-800/90">
-        {collapsed ? (
-          <div className="flex flex-col items-center gap-2">
-            <div
-              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white shadow-sm text-xs"
-              title={userEmail || 'Account'}
-            >
-              {initial}
-            </div>
-            <ThemeToggle />
-            <SignOutButton iconOnly />
-            <button
-              type="button"
-              onClick={toggleCollapse}
-              className="mt-1 flex size-8 items-center justify-center rounded-md border border-neutral-200 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:border-slate-800 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="9" y1="3" x2="9" y2="21" />
-                <path d="m12 9 3 3-3 3" />
-              </svg>
-            </button>
-          </div>
-        ) : (
+        {expanded ? (
           <div className="grid gap-2.5">
             <div className="flex items-center gap-2.5 rounded-lg border border-neutral-200/80 bg-neutral-50/80 p-2 dark:border-slate-800/80 dark:bg-slate-900/60">
               {/* <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white text-xs shadow-sm">
@@ -176,6 +166,17 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
                 <SignOutButton />
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white shadow-sm text-xs"
+              title={userEmail || 'Account'}
+            >
+              {initial}
+            </div>
+            <ThemeToggle />
+            <SignOutButton iconOnly />
           </div>
         )}
       </div>
