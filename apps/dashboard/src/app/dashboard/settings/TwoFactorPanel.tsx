@@ -54,7 +54,7 @@ export function TwoFactorPanel() {
             </p>
           </div>
           <Link
-            className="h-9 shrink-0 rounded-md border border-amber-300 bg-white px-3 text-center text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            className="h-9 shrink-0 rounded-md border border-amber-300 bg-white px-3 py-2 text-center text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-900/40"
             href="/dashboard/settings/2fa"
           >
             Set up
