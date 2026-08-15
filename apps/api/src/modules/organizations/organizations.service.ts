@@ -893,7 +893,7 @@ export class OrganizationsService {
       'traceiq.initialize({',
       `  projectId: '${projectId}',`,
       `  writeKey: '${writeKey}',`,
-      `  endpoint: '${process.env.PUBLIC_API_URL ?? 'http://localhost:4000'}',`,
+      `  endpoint: '${process.env.PUBLIC_API_URL ?? 'https://api.traceiq.run'}',`,
       '});',
       '',
       "traceiq.track('signup_completed', { plan: 'demo' });"
