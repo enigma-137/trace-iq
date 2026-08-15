@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Select, Combobox, Checkbox } from '@traceiq/ui';
 import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/SegmentFilters';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface Alert {
   id: string;

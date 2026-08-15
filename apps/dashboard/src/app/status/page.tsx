@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const REFRESH_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 6_000;
 

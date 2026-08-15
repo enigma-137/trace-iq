@@ -8,7 +8,7 @@ import { DatePicker } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type TokenRecord = {
   id: string;

@@ -8,7 +8,7 @@ import { Checkbox } from '@traceiq/ui';
 import { dashboardToUrl, dashboardSummary, type DashboardDefinition, type DashboardView } from './types';
 import { TrendChart } from '@/components/charts/TrendChart';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface TrendsPoint {
   bucket: string;

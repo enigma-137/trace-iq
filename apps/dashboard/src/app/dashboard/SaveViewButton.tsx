@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from './DashboardDialog';
 import type { DashboardDefinition } from './dashboards/types';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export function SaveViewButton({
   definition,

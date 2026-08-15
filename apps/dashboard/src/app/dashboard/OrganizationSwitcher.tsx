@@ -7,7 +7,7 @@ import { Box, Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { OrganizationSummary, setActiveOrganizationId, useOrganization, useOrganizations } from '@/lib/organization';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const PANEL_WIDTH = 288;
 
 interface OrganizationSwitcherProps {

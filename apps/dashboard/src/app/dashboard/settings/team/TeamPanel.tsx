@@ -7,7 +7,7 @@ import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 import { useOrganization } from '@/lib/organization';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type Role = 'owner' | 'admin' | 'member';
 

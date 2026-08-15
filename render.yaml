@@ -26,7 +26,7 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: PUBLIC_API_URL
+      - key: NEXT_PUBLIC_API_URL
         sync: false
       - key: GROQ_API_KEY
         sync: false

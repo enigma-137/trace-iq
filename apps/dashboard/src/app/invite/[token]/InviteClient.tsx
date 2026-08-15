@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { clearPendingInvite, rememberPendingInvite } from '@/lib/pending-invite';
 import { setActiveOrganizationId } from '@/lib/organization';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type ValidInvite = {
   valid: true;
