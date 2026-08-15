@@ -40,11 +40,17 @@ export class ProjectsService {
   /**
    * Resolve the project a dashboard user is allowed to read.
    * When `projectId` is supplied it is validated against the user's memberships;
-   * otherwise the user's first project (oldest org, oldest project) is returned.
-   * Returns `null` only when the user has no projects at all.
+   * otherwise the user's first project in `organizationId` (or overall, when no
+   * organization is given) is returned. Returns `null` only when no project
+   * matches.
    */
-  async resolveActiveProject(user: DashboardUser, projectId?: string): Promise<ResolvedProject | null> {
+  async resolveActiveProject(
+    user: DashboardUser,
+    projectId?: string,
+    organizationId?: string
+  ): Promise<ResolvedProject | null> {
     const requestedProjectId = this.optionalString(projectId);
+    const requestedOrganizationId = this.optionalString(organizationId);
 
     const result = await this.database.query<ResolvedProject>(
       `
@@ -60,10 +66,11 @@ export class ProjectsService {
         JOIN projects p ON p.organization_id = o.id
         WHERE om.user_id = $1
           AND ($2::text IS NULL OR p.id = $2)
+          AND ($3::text IS NULL OR o.id = $3)
         ORDER BY o.created_at ASC, p.created_at ASC
         LIMIT 1
       `,
-      [user.id, requestedProjectId ?? null]
+      [user.id, requestedProjectId ?? null, requestedOrganizationId ?? null]
     );
 
     const project = result.rows[0] ?? null;

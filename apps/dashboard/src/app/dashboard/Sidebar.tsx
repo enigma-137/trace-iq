@@ -5,25 +5,24 @@ import Link from 'next/link';
 import { NavIcon } from './NavIcon';
 import { ThemeToggle } from './ThemeToggle';
 import { SignOutButton } from './SignOutButton';
+import { OrganizationSwitcher } from './OrganizationSwitcher';
 import { navItems, bottomNavItems, navLinkClass, withProjectId } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
-import { useOrganization } from '@/lib/organization';
 
 
 interface SidebarProps {
   active: string;
   userEmail?: string | null;
   projectId?: string | null;
+  organizationId?: string | null;
 }
 
-export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
+export function Sidebar({ active, userEmail, projectId, organizationId }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { enrolled } = useMfaStatus();
-  const { organization } = useOrganization();
   const showMfaWarning = mounted && enrolled === false;
-  const organizationName = organization?.name || 'Your Organization';
 
   // When collapsed, hovering previews the full sidebar without changing the
   // persisted preference. Clicking the toggle button pins/unpins it open.
@@ -45,8 +44,6 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
     });
     setIsHovering(false);
   };
-
-  const initial = (userEmail?.[0] || 'A').toUpperCase();
 
   return (
     <aside
@@ -140,25 +137,10 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
       <div className="mt-3 border-t border-neutral-200 pt-3 dark:border-slate-800/90">
         {expanded ? (
           <div className="grid gap-2.5">
-            <div className="flex items-center gap-2.5 rounded-lg border border-neutral-200/80 bg-neutral-50/80 p-2 dark:border-slate-800/80 dark:bg-slate-900/60">
-              {/* <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white text-xs shadow-sm">
-                {initial}
-              </div> */}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-neutral-800 dark:text-slate-200" title={organizationName}>
-                  {organizationName}
-                  {organization?.memberCount !== undefined && (
-                    <span className="font-normal text-neutral-400 dark:text-slate-500">
-                      {' '}· {organization.memberCount} member{organization.memberCount === 1 ? '' : 's'}
-                    </span>
-                  )}
-                </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
-                  <p className="text-[10px] text-neutral-400 dark:text-slate-400"> {userEmail || 'Account'}</p>
-                </div>
-              </div>
-            </div>
+            <OrganizationSwitcher projectId={projectId} organizationId={organizationId} />
+            <p className="truncate px-1 text-[10px] text-neutral-400 dark:text-slate-500" title={userEmail ?? undefined}>
+              {userEmail || 'Account'}
+            </p>
 
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
@@ -169,12 +151,7 @@ export function Sidebar({ active, userEmail, projectId }: SidebarProps) {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div
-              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white shadow-sm text-xs"
-              title={userEmail || 'Account'}
-            >
-              {initial}
-            </div>
+            <OrganizationSwitcher collapsed projectId={projectId} organizationId={organizationId} />
             <ThemeToggle />
             <SignOutButton iconOnly />
           </div>

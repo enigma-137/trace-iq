@@ -7,7 +7,6 @@ import { Checkbox } from '@traceiq/ui';
 import { DatePicker } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
-import { dashboardFetch, useMfaStepUp } from '../MfaStepUp';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -100,7 +99,6 @@ function sameScopeSet(a: string[], b: string[]) {
 
 export function PersonalAccessTokensPanel() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const { requestStepUp } = useMfaStepUp();
   const [tokens, setTokens] = useState<TokenRecord[]>([]);
   const [name, setName] = useState('Claude Desktop');
   // Default to read-only MCP coverage: immediately useful for a Claude Desktop
@@ -118,12 +116,24 @@ export function PersonalAccessTokensPanel() {
     void loadTokens();
   }, []);
 
+  async function getAccessToken() {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+    return session?.access_token;
+  }
+
   async function authFetch(path: string, init: RequestInit = {}) {
-    const response = await dashboardFetch(supabase, requestStepUp, path, init);
-    if (!response) {
+    const token = await getAccessToken();
+    if (!token) {
       setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+      return null;
     }
-    return response;
+
+    return fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
+    });
   }
 
   async function loadTokens() {

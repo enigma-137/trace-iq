@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { DashboardShell } from './DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { comparisonText, compactNumber, deltaInfo, formatCount } from '@/lib/metrics';
@@ -33,7 +34,8 @@ export default async function DashboardPage({
 }) {
   const projectId = firstParam(searchParams.projectId);
   const { user, token } = await requireDashboardSession('/dashboard');
-  const overviewPath = withProjectId('/v1/dashboard/overview', projectId);
+  const activeOrganizationId = cookies().get('traceiq_active_org')?.value;
+  const overviewPath = withParams('/v1/dashboard/overview', { projectId, organizationId: activeOrganizationId });
   const { data: overview, error } = await dashboardGet<OverviewResponse>(overviewPath, token);
 
   if (!projectId && overview?.project?.id) {
@@ -47,7 +49,13 @@ export default async function DashboardPage({
   const activityDelta = trendLabel(sparkValues);
 
   return (
-    <DashboardShell active="overview" title="Overview" userEmail={user.email} projectId={canonicalProjectId}>
+    <DashboardShell
+      active="overview"
+      title="Overview"
+      userEmail={user.email}
+      projectId={canonicalProjectId}
+      organizationId={activeOrganizationId}
+    >
       {error ? (
         <section className="mb-4 rounded-md border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-100">
           {error}
@@ -323,6 +331,19 @@ function withProjectId(href: string, projectId?: string | null): string {
   const [pathname, query = ''] = path.split('?');
   const params = new URLSearchParams(query);
   params.set('projectId', projectId);
+  const nextQuery = params.toString();
+  return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${hash ? `#${hash}` : ''}`;
+}
+
+function withParams(
+  href: string,
+  opts: { projectId?: string | null; organizationId?: string | null }
+): string {
+  const [path, hash = ''] = href.split('#');
+  const [pathname, query = ''] = path.split('?');
+  const params = new URLSearchParams(query);
+  if (opts.projectId) params.set('projectId', opts.projectId);
+  if (opts.organizationId) params.set('organizationId', opts.organizationId);
   const nextQuery = params.toString();
   return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${hash ? `#${hash}` : ''}`;
 }

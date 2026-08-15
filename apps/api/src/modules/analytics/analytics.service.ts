@@ -137,8 +137,8 @@ export class AnalyticsService {
     private readonly projects: ProjectsService
   ) {}
 
-  async getOverview(user: DashboardUser, projectId?: string): Promise<OverviewResponse> {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+  async getOverview(user: DashboardUser, projectId?: string, organizationId?: string): Promise<OverviewResponse> {
+    const project = await this.projects.resolveActiveProject(user, projectId, organizationId);
 
     if (!project) {
       return {

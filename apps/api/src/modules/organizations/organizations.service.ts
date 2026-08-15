@@ -17,6 +17,11 @@ export interface BootstrapSetupRequest {
   projectName?: string;
 }
 
+export interface CreateProjectRequest {
+  organizationId?: string;
+  projectName?: string;
+}
+
 export type MemberRole = 'owner' | 'admin' | 'member';
 
 export interface AddMemberRequestBody {
@@ -54,7 +59,10 @@ export class OrganizationsService {
     private readonly audit?: AuditService
   ) {}
 
-  async getSetup(user: DashboardUser) {
+  async getSetup(user: DashboardUser, organizationId?: string, projectId?: string) {
+    const orgId = this.optionalString(organizationId);
+    const projId = this.optionalString(projectId);
+
     const result = await this.database.query<SetupRow>(
       `
         SELECT
@@ -70,13 +78,19 @@ export class OrganizationsService {
         JOIN organizations o ON o.id = om.organization_id
         LEFT JOIN projects p ON p.organization_id = o.id
         WHERE om.user_id = $1
+          AND ($2::text IS NULL OR o.id = $2)
+          AND ($3::text IS NULL OR p.id = $3)
         ORDER BY o.created_at ASC, p.created_at ASC
         LIMIT 1;
       `,
-      [user.id]
+      [user.id, orgId ?? null, projId ?? null]
     );
 
     const row = result.rows[0];
+
+    if ((orgId || projId) && !row) {
+      throw new NotFoundException('Organization not found or not accessible.');
+    }
 
     if (!row) {
       return {
@@ -88,10 +102,10 @@ export class OrganizationsService {
       };
     }
 
-    const projectId = row.project_id as string | null;
+    const resolvedProjectId = row.project_id as string | null;
 
     return {
-      hasSetup: Boolean(projectId),
+      hasSetup: Boolean(resolvedProjectId),
       organization: {
         id: row.id,
         name: row.name,
@@ -99,9 +113,9 @@ export class OrganizationsService {
         role: row.role,
         memberCount: row.member_count
       },
-      project: projectId
+      project: resolvedProjectId
         ? {
-            id: projectId,
+            id: resolvedProjectId,
             organizationId: row.id,
             name: row.project_name ?? '',
             slug: row.project_slug ?? ''
@@ -122,12 +136,126 @@ export class OrganizationsService {
     return existing.organization;
   }
 
-  async bootstrapSetup(user: DashboardUser, input: BootstrapSetupRequest) {
+  /**
+   * Lists every organization the user belongs to, including their role, the
+   * member count, and every project in each organization (the first one is also
+   * exposed as `project` so the dashboard can jump straight into it). Used by
+   * the sidebar organization switcher.
+   */
+  async listOrganizations(user: DashboardUser) {
+    const result = await this.database.query<
+      QueryResultRow & {
+        id: string;
+        name: string;
+        slug: string;
+        role: MemberRole;
+        member_count: string;
+        projects: Array<{ id: string; name: string; slug: string }>;
+      }
+    >(
+      `
+        SELECT
+          o.id,
+          o.name,
+          o.slug,
+          om.role,
+          (SELECT COUNT(*) FROM organization_members om2 WHERE om2.organization_id = o.id) AS member_count,
+          COALESCE(
+            json_agg(
+              json_build_object('id', p.id, 'name', p.name, 'slug', p.slug)
+              ORDER BY p.created_at ASC
+            ) FILTER (WHERE p.id IS NOT NULL),
+            '[]'
+          ) AS projects
+        FROM organization_members om
+        JOIN organizations o ON o.id = om.organization_id
+        LEFT JOIN projects p ON p.organization_id = o.id
+        WHERE om.user_id = $1
+        GROUP BY o.id, o.name, o.slug, om.role
+        ORDER BY o.created_at ASC;
+      `,
+      [user.id]
+    );
+
+    return {
+      organizations: result.rows.map((row) => {
+        const projects = row.projects ?? [];
+        return {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          role: row.role,
+          memberCount: Number(row.member_count),
+          projects,
+          project: projects[0] ?? null
+        };
+      })
+    };
+  }
+
+  /**
+   * Creates an additional organization for the user together with a fresh
+   * project and write key, so the new organization is immediately usable. The
+   * user is recorded as owner. Used by the "Add organization" action.
+   */
+  async createOrganizationForUser(user: DashboardUser, input: BootstrapSetupRequest) {
     const organizationName = this.cleanName(input.organizationName, 'My Organization');
     const projectName = this.cleanName(input.projectName, 'Web App');
 
     return this.database.transaction(async (client) => {
-      const existing = await this.getExistingSetup(client, user);
+      const organization = await this.createOrganization(client, user, organizationName);
+      const project = await this.createProject(client, user, organization.id, projectName);
+      const writeKey = await this.createWriteKey(client, user, project.id);
+
+      return {
+        hasSetup: true,
+        organization,
+        project,
+        writeKey,
+        sdkSnippet: this.createSdkSnippet(project.id, writeKey.value)
+      };
+    });
+  }
+
+  /**
+   * Creates an additional project inside an existing organization the user
+   * belongs to, together with a fresh write key so the project is immediately
+   * usable. Owners and admins can create projects; used by the "Add project"
+   * action in the dashboard.
+   */
+  async createProjectForUser(user: DashboardUser, input: CreateProjectRequest) {
+    const projectName = this.cleanName(input.projectName, 'Web App');
+    const organizationId = this.optionalString(input.organizationId);
+
+    return this.database.transaction(async (client) => {
+      const existing = await this.getExistingSetup(client, user, organizationId);
+
+      if (!existing.organization) {
+        throw new BadRequestException('Create an organization before creating a project.');
+      }
+
+      if (!['owner', 'admin'].includes(existing.organization.role)) {
+        throw new ForbiddenException('Only owners and admins can create projects.');
+      }
+
+      const project = await this.createProject(client, user, existing.organization.id, projectName);
+      const writeKey = await this.createWriteKey(client, user, project.id);
+
+      return {
+        organization: existing.organization,
+        project,
+        writeKey,
+        sdkSnippet: this.createSdkSnippet(project.id, writeKey.value)
+      };
+    });
+  }
+
+  async bootstrapSetup(user: DashboardUser, input: BootstrapSetupRequest, organizationId?: string) {
+    const organizationName = this.cleanName(input.organizationName, 'My Organization');
+    const projectName = this.cleanName(input.projectName, 'Web App');
+
+    return this.database.transaction(async (client) => {
+      const existing = await this.getExistingSetup(client, user, organizationId);
 
       if (existing.project) {
         return {
@@ -625,7 +753,8 @@ export class OrganizationsService {
       .catch(() => undefined);
   }
 
-  private async getExistingSetup(client: QueryExecutor, user: DashboardUser) {
+  private async getExistingSetup(client: QueryExecutor, user: DashboardUser, organizationId?: string) {
+    const orgId = this.optionalString(organizationId);
     const result = await client.query<
       QueryResultRow & {
         organization_id: string;
@@ -650,10 +779,11 @@ export class OrganizationsService {
         JOIN organizations o ON o.id = om.organization_id
         LEFT JOIN projects p ON p.organization_id = o.id
         WHERE om.user_id = $1
+          AND ($2::text IS NULL OR o.id = $2)
         ORDER BY o.created_at ASC, p.created_at ASC
         LIMIT 1;
       `,
-      [user.id]
+      [user.id, orgId ?? null]
     );
 
     const row = result.rows[0];
@@ -778,6 +908,15 @@ export class OrganizationsService {
     }
 
     return name;
+  }
+
+  private optionalString(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private slugify(value: string) {

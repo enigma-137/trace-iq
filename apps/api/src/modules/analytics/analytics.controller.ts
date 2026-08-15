@@ -10,10 +10,14 @@ export class AnalyticsController {
   ) {}
 
   @Get('overview')
-  async getOverview(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
+  async getOverview(
+    @Headers('authorization') authorization?: string,
+    @Query('projectId') projectId?: string,
+    @Query('organizationId') organizationId?: string
+  ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'analytics:read');
-    return this.analyticsService.getOverview(user, projectId);
+    return this.analyticsService.getOverview(user, projectId, organizationId);
   }
 
   @Get('web')

@@ -3,7 +3,8 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { dashboardFetch, useMfaStepUp } from '../MfaStepUp';
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface Webhook {
   id: string;
@@ -36,7 +37,6 @@ export function WebhookManager({
   eventNames: string[];
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const { requestStepUp } = useMfaStepUp();
   const router = useRouter();
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -45,12 +45,23 @@ export function WebhookManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function getToken(): Promise<string | null> {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  }
+
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
-    const response = await dashboardFetch(supabase, requestStepUp, path, init);
-    if (!response) {
+    const token = await getToken();
+    if (!token) {
       setError('Your dashboard session expired. Sign in again.');
+      return null;
     }
-    return response;
+    return fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
+    });
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {

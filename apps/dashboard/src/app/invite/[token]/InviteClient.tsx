@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
 import { clearPendingInvite, rememberPendingInvite } from '@/lib/pending-invite';
+import { setActiveOrganizationId } from '@/lib/organization';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -84,6 +85,11 @@ export function InviteClient({ token }: { token: string }) {
         if (!response.ok) {
           setError(await readError(response));
           return;
+        }
+
+        const body = (await response.json()) as { accepted?: boolean; organizationId?: string };
+        if (body.organizationId) {
+          setActiveOrganizationId(body.organizationId);
         }
 
         setAccepted(true);

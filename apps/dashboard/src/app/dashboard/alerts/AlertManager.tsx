@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Select, Combobox, Checkbox } from '@traceiq/ui';
 import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/SegmentFilters';
-import { dashboardFetch, useMfaStepUp } from '../MfaStepUp';
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface Alert {
   id: string;
@@ -98,7 +99,6 @@ export function AlertManager({
   notificationGroups: NotificationGroup[];
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const { requestStepUp } = useMfaStepUp();
   const router = useRouter();
 
   const [name, setName] = useState('');
@@ -120,12 +120,23 @@ export function AlertManager({
   const needsProperty = measure === 'sum' || measure === 'avg';
   const isPercent = CONDITIONS.find((c) => c.value === condition)?.percent ?? false;
 
+  async function getToken(): Promise<string | null> {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  }
+
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
-    const response = await dashboardFetch(supabase, requestStepUp, path, init);
-    if (!response) {
+    const token = await getToken();
+    if (!token) {
       setError('Your dashboard session expired. Sign in again.');
+      return null;
     }
-    return response;
+    return fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

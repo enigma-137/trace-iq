@@ -7,16 +7,33 @@ import { requireDashboardSession } from '@/lib/dashboard';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const { user } = await requireDashboardSession('/dashboard/settings');
+  const projectId = firstParam(searchParams.projectId);
+  const organizationId = firstParam(searchParams.organizationId);
+  const newProject = firstParam(searchParams.newProject) === '1';
 
   return (
-    <DashboardShell active="settings" title="Settings" userEmail={user.email}>
+    <DashboardShell
+      active="settings"
+      title="Settings"
+      userEmail={user.email}
+      projectId={projectId}
+      organizationId={organizationId}
+    >
       <SettingsTabs />
-      <SetupPanel />
+      <SetupPanel organizationId={organizationId} newProject={newProject} />
       <TwoFactorPanel />
       <PersonalAccessTokensPanel />
     </DashboardShell>
   );
+}
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 

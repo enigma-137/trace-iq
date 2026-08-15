@@ -7,24 +7,24 @@ import { Menu, X } from 'lucide-react';
 import { NavIcon } from './NavIcon';
 import { SignOutButton } from './SignOutButton';
 import { ThemeToggle } from './ThemeToggle';
+import { OrganizationSwitcher } from './OrganizationSwitcher';
 import { bottomNavItems, navItems, navLinkClass, withProjectId } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
-import { useOrganization } from '@/lib/organization';
 
 export function MobileNav({
   active,
   projectId,
-  userEmail
+  userEmail,
+  organizationId
 }: {
   active: string;
   projectId?: string | null;
   userEmail?: string | null;
+  organizationId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const { enrolled } = useMfaStatus();
-  const { organization } = useOrganization();
   const showMfaWarning = enrolled === false;
-  const organizationName = organization?.name || 'Your organization';
 
   // Lock the page behind the drawer and let Escape dismiss it.
   useEffect(() => {
@@ -128,15 +128,10 @@ export function MobileNav({
               </nav>
 
               <div className="border-t border-neutral-200 px-4 py-4 dark:border-slate-800">
-                <p className="truncate text-sm font-medium text-neutral-800 dark:text-slate-200">
-                  {organizationName}
-                  {organization?.memberCount !== undefined && (
-                    <span className="text-xs font-normal text-neutral-400 dark:text-slate-500">
-                      {' '}· {organization.memberCount} member{organization.memberCount === 1 ? '' : 's'}
-                    </span>
-                  )}
+                <OrganizationSwitcher projectId={projectId} organizationId={organizationId} />
+                <p className="mt-2 truncate text-xs text-neutral-400 dark:text-slate-500" title={userEmail ?? undefined}>
+                  {userEmail ?? 'Account'}
                 </p>
-                <p className="text-xs text-neutral-400 dark:text-slate-500"> {userEmail ?? 'Account'}</p>
                 <div className="mt-3 flex items-center gap-2">
                   <ThemeToggle />
                   <SignOutButton />
