@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const REFRESH_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 6_000;
 
@@ -123,15 +123,15 @@ export default function StatusPage() {
             <div className="status-ring" aria-hidden />
             {overall === 'checking'
               ? (
-                  <div className="status-badge-checking" aria-hidden>
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                )
+                <div className="status-badge-checking" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )
               : (
-                  <img className="status-badge-img" src={meta.image} alt="" width={96} height={96} />
-                )}
+                <img className="status-badge-img" src={meta.image} alt="" width={96} height={96} />
+              )}
           </div>
 
           <h1 className="status-title">{meta.title}</h1>

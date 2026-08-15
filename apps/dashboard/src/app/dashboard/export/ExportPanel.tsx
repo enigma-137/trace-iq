@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DateRangePicker, type DateRange } from '@traceiq/ui';
 import { Select } from '@traceiq/ui';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface ExportEvent {
   id: string;
@@ -104,7 +104,7 @@ export function ExportPanel({ eventNames }: { eventNames: string[] }) {
       }
       setStatus(
         `Downloaded ${data.count.toLocaleString()} event${data.count === 1 ? '' : 's'}.` +
-          (data.truncated ? ` Hit the ${Number(limit).toLocaleString()}-row cap — narrow the range for the rest.` : '')
+        (data.truncated ? ` Hit the ${Number(limit).toLocaleString()}-row cap — narrow the range for the rest.` : '')
       );
     } finally {
       setBusy(null);

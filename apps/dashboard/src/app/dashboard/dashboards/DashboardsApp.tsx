@@ -8,7 +8,7 @@ import { Checkbox } from '@traceiq/ui';
 import { dashboardToUrl, dashboardSummary, type DashboardDefinition, type DashboardView } from './types';
 import { TrendChart } from '@/components/charts/TrendChart';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface TrendsPoint {
   bucket: string;
@@ -262,11 +262,10 @@ export function DashboardsApp({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{dashboard.name}</span>
                       <span
-                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          mine
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${mine
                             ? 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300'
                             : 'border border-neutral-200 text-neutral-400 dark:border-slate-800 dark:text-slate-500'
-                        }`}
+                          }`}
                       >
                         {mine ? 'Mine' : 'Shared'}
                       </span>

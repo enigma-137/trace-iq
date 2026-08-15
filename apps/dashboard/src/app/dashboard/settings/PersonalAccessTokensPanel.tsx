@@ -8,7 +8,7 @@ import { DatePicker } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type TokenRecord = {
   id: string;
@@ -223,11 +223,10 @@ export function PersonalAccessTokensPanel() {
 
       {status ? (
         <p
-          className={`rounded-md border px-3 py-2 text-sm ${
-            status.tone === 'success'
+          className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
               ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
               : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-          }`}
+            }`}
         >
           {status.message}
         </p>
@@ -259,11 +258,10 @@ export function PersonalAccessTokensPanel() {
                     type="button"
                     onClick={() => setScopes(preset.scopes)}
                     aria-pressed={isActive}
-                    className={`h-7 rounded-full border px-3 text-xs font-semibold transition ${
-                      isActive
+                    className={`h-7 rounded-full border px-3 text-xs font-semibold transition ${isActive
                         ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-slate-950'
                         : 'border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-                    }`}
+                      }`}
                   >
                     {preset.label}
                   </button>

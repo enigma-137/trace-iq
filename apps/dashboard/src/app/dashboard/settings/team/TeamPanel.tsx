@@ -7,7 +7,7 @@ import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 import { useOrganization } from '@/lib/organization';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type Role = 'owner' | 'admin' | 'member';
 
@@ -268,11 +268,10 @@ export function TeamPanel() {
 
       {status ? (
         <p
-          className={`rounded-md border px-3 py-2 text-sm ${
-            status.tone === 'success'
+          className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
               ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
               : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-          }`}
+            }`}
         >
           {status.message}
         </p>

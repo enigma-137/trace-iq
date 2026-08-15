@@ -28,7 +28,7 @@ export const docsSections = [
   { id: 'mcp', label: 'MCP server', category: 'Reference' }
 ];
 
-export const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+export const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export const FALLBACK_PROJECT_ID = 'YOUR_PROJECT_ID';
 

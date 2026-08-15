@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Select, Combobox, Checkbox } from '@traceiq/ui';
 import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/SegmentFilters';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface Alert {
   id: string;
@@ -404,8 +404,8 @@ export function AlertManager({
                       ) : null}
                       <p className="mt-1 text-xs text-neutral-400 dark:text-slate-500">
                         {alert.lastValue !== null
-                           ? `Last value ${Math.round(alert.lastValue).toLocaleString()} · checked ${formatDate(alert.lastEvaluatedAt)}`
-                           : 'Not evaluated yet · runs automatically within a few minutes'}
+                          ? `Last value ${Math.round(alert.lastValue).toLocaleString()} · checked ${formatDate(alert.lastEvaluatedAt)}`
+                          : 'Not evaluated yet · runs automatically within a few minutes'}
                       </p>
                       {testResults[alert.id] ? (
                         <p className="mt-2 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">

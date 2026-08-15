@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Checkbox, Select } from '@traceiq/ui';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface Flag {
   id: string;
@@ -366,11 +366,10 @@ function FlagRow({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span
-              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                flag.enabled
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${flag.enabled
                   ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
                   : 'border border-neutral-200 text-neutral-400 dark:border-slate-800 dark:text-slate-600'
-              }`}
+                }`}
             >
               {flag.enabled ? 'On' : 'Off'}
             </span>

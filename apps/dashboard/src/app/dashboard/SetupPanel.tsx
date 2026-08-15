@@ -16,7 +16,7 @@ interface SetupResponse {
   sdkSnippet: string | null;
 }
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export function SetupPanel({
   organizationId,
@@ -253,38 +253,38 @@ export function SetupPanel({
             This organization has no projects yet. Only owners and admins can create one — ask an owner or admin to set up the first project.
           </p>
         ) : (
-        <form
-          className="grid items-end gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-          onSubmit={handleSubmit}
-        >
-          <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="organizationName">
-            Organization name
-            <input
-              className={inputClass}
-              id="organizationName"
-              value={organizationName}
-              onChange={(event) => setOrganizationName(event.target.value)}
-              required
-            />
-          </label>
-          <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="projectName">
-            Project name
-            <input
-              className={inputClass}
-              id="projectName"
-              value={projectName}
-              onChange={(event) => setProjectName(event.target.value)}
-              required
-            />
-          </label>
-          <button
-            className="min-h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-            type="submit"
-            disabled={isSubmitting}
+          <form
+            className="grid items-end gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            onSubmit={handleSubmit}
           >
-            {isSubmitting ? 'Creating…' : 'Create project'}
-          </button>
-        </form>
+            <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="organizationName">
+              Organization name
+              <input
+                className={inputClass}
+                id="organizationName"
+                value={organizationName}
+                onChange={(event) => setOrganizationName(event.target.value)}
+                required
+              />
+            </label>
+            <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="projectName">
+              Project name
+              <input
+                className={inputClass}
+                id="projectName"
+                value={projectName}
+                onChange={(event) => setProjectName(event.target.value)}
+                required
+              />
+            </label>
+            <button
+              className="min-h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Creating…' : 'Create project'}
+            </button>
+          </form>
         )
       ) : (
         <>
@@ -369,90 +369,90 @@ export function SetupPanel({
           {canManageProject && (createdProject?.project || newProjectOpen) ? (
             <div className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
               {createdProject?.project ? (
-              <div className="grid gap-4">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                <div className="grid gap-4">
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                    <div>
+                      <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+                        New project created — {createdProject.project.name}
+                      </h3>
+                      <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+                        Project ID {createdProject.project.id}. Copy the write key now; it is shown once.
+                      </p>
+                    </div>
+                    <button
+                      className="h-9 shrink-0 rounded-md bg-neutral-900 px-3 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                      type="button"
+                      onClick={() => router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
+                    >
+                      Open project
+                    </button>
+                  </div>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <SetupCard
+                      label="Write key"
+                      value={createdProject.writeKey?.value ?? 'Hidden'}
+                      detail="Copy it now — shown only once."
+                      copyValue={createdProject.writeKey?.value ?? null}
+                      copyLabel="Copy write key"
+                      mono
+                    />
+                    {createdProject.sdkSnippet ? (
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+                            SDK snippet
+                          </span>
+                          <CopyButton value={createdProject.sdkSnippet} label="Copy snippet" compact />
+                        </div>
+                        <pre className="max-h-40 overflow-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-6 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                          <code>{createdProject.sdkSnippet}</code>
+                        </pre>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
                   <div>
-                    <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
-                      New project created — {createdProject.project.name}
-                    </h3>
+                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Create another project</h3>
                     <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                      Project ID {createdProject.project.id}. Copy the write key now; it is shown once.
+                      Add a separate project for another app or product in {setup?.organization?.name ?? 'this organization'}. Each project gets its own write key.
                     </p>
                   </div>
-                  <button
-                    className="h-9 shrink-0 rounded-md bg-neutral-900 px-3 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                    type="button"
-                    onClick={() => router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
-                  >
-                    Open project
-                  </button>
-                </div>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <SetupCard
-                    label="Write key"
-                    value={createdProject.writeKey?.value ?? 'Hidden'}
-                    detail="Copy it now — shown only once."
-                    copyValue={createdProject.writeKey?.value ?? null}
-                    copyLabel="Copy write key"
-                    mono
-                  />
-                  {createdProject.sdkSnippet ? (
-                    <div className="grid gap-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-                          SDK snippet
-                        </span>
-                        <CopyButton value={createdProject.sdkSnippet} label="Copy snippet" compact />
-                      </div>
-                      <pre className="max-h-40 overflow-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-6 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                        <code>{createdProject.sdkSnippet}</code>
-                      </pre>
+                  <form className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleCreateProject}>
+                    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="newProjectName">
+                      Project name
+                      <input
+                        className={inputClass}
+                        id="newProjectName"
+                        value={newProjectName}
+                        onChange={(event) => setNewProjectName(event.target.value)}
+                        placeholder="Web App"
+                        maxLength={80}
+                        required
+                        autoFocus
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        type="button"
+                        disabled={isCreatingProject}
+                        onClick={() => setNewProjectOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                        type="submit"
+                        disabled={isCreatingProject}
+                      >
+                        {isCreatingProject ? 'Creating…' : 'Create project'}
+                      </button>
                     </div>
-                  ) : null}
+                  </form>
                 </div>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Create another project</h3>
-                  <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                    Add a separate project for another app or product in {setup?.organization?.name ?? 'this organization'}. Each project gets its own write key.
-                  </p>
-                </div>
-                <form className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleCreateProject}>
-                  <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="newProjectName">
-                    Project name
-                    <input
-                      className={inputClass}
-                      id="newProjectName"
-                      value={newProjectName}
-                      onChange={(event) => setNewProjectName(event.target.value)}
-                      placeholder="Web App"
-                      maxLength={80}
-                      required
-                      autoFocus
-                    />
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                      type="button"
-                      disabled={isCreatingProject}
-                      onClick={() => setNewProjectOpen(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                      type="submit"
-                      disabled={isCreatingProject}
-                    >
-                      {isCreatingProject ? 'Creating…' : 'Create project'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
+              )}
             </div>
           ) : null}
         </>

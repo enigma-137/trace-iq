@@ -7,7 +7,7 @@ import { Box, Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { OrganizationSummary, setActiveOrganizationId, useOrganization, useOrganizations } from '@/lib/organization';
 
-const apiBaseUrl = process.env.NEXT_NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const PANEL_WIDTH = 288;
 
 interface OrganizationSwitcherProps {
@@ -177,202 +177,200 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
 
       {open && anchor
         ? createPortal(
-            <div className="fixed inset-0 z-50" role="presentation" onMouseDown={() => setOpen(false)}>
-              <div
-                className="absolute z-10 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-xl shadow-neutral-950/10 dark:border-slate-700 dark:bg-slate-950 dark:shadow-black/40"
-                role="menu"
-                aria-label="Switch organization"
-                style={{
-                  top: anchor.dropUp ? undefined : anchor.top + 8,
-                  bottom: anchor.dropUp ? window.innerHeight - anchor.up + 8 : undefined,
-                  left: Math.max(12, Math.min(anchor.left, window.innerWidth - PANEL_WIDTH - 12)),
-                  width: Math.max(anchor.width, PANEL_WIDTH)
-                }}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5 dark:border-slate-800">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-                    Organizations
-                  </p>
-                  <button
-                    type="button"
-                    aria-label="Close organization switcher"
-                    className="inline-flex size-6 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
-                    onClick={() => setOpen(false)}
-                  >
-                    x
-                  </button>
-                </div>
+          <div className="fixed inset-0 z-50" role="presentation" onMouseDown={() => setOpen(false)}>
+            <div
+              className="absolute z-10 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-xl shadow-neutral-950/10 dark:border-slate-700 dark:bg-slate-950 dark:shadow-black/40"
+              role="menu"
+              aria-label="Switch organization"
+              style={{
+                top: anchor.dropUp ? undefined : anchor.top + 8,
+                bottom: anchor.dropUp ? window.innerHeight - anchor.up + 8 : undefined,
+                left: Math.max(12, Math.min(anchor.left, window.innerWidth - PANEL_WIDTH - 12)),
+                width: Math.max(anchor.width, PANEL_WIDTH)
+              }}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2.5 dark:border-slate-800">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+                  Organizations
+                </p>
+                <button
+                  type="button"
+                  aria-label="Close organization switcher"
+                  className="inline-flex size-6 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+                  onClick={() => setOpen(false)}
+                >
+                  x
+                </button>
+              </div>
 
-                <ul className="max-h-72 overflow-y-auto py-1" aria-label="Your organizations">
-                  {orgsLoading && organizations.length === 0 ? (
-                    <li className="px-3 py-6 text-center text-sm text-neutral-400 dark:text-slate-500">Loading…</li>
-                  ) : organizations.length === 0 ? (
-                    <li className="px-3 py-6 text-center text-sm text-neutral-400 dark:text-slate-500">
-                      No organizations yet.
-                    </li>
-                  ) : (
-                    organizations.map((org) => {
-                      const isCurrent = org.id === organization?.id;
-                      const isExpanded = expandedOrg === org.id;
-                      const projects = org.projects ?? (org.project ? [org.project] : []);
-                      return (
-                        <li key={org.id}>
-                          <div className="flex items-center">
-                            <button
-                              type="button"
-                              aria-label={isExpanded ? 'Hide projects' : `Show projects of ${org.name}`}
-                              className={`flex h-9 w-7 shrink-0 items-center justify-center text-neutral-400 transition hover:text-neutral-700 dark:text-slate-500 dark:hover:text-slate-300 ${
-                                projects.length === 0 ? 'pointer-events-none opacity-40' : ''
+              <ul className="max-h-72 overflow-y-auto py-1" aria-label="Your organizations">
+                {orgsLoading && organizations.length === 0 ? (
+                  <li className="px-3 py-6 text-center text-sm text-neutral-400 dark:text-slate-500">Loading…</li>
+                ) : organizations.length === 0 ? (
+                  <li className="px-3 py-6 text-center text-sm text-neutral-400 dark:text-slate-500">
+                    No organizations yet.
+                  </li>
+                ) : (
+                  organizations.map((org) => {
+                    const isCurrent = org.id === organization?.id;
+                    const isExpanded = expandedOrg === org.id;
+                    const projects = org.projects ?? (org.project ? [org.project] : []);
+                    return (
+                      <li key={org.id}>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            aria-label={isExpanded ? 'Hide projects' : `Show projects of ${org.name}`}
+                            className={`flex h-9 w-7 shrink-0 items-center justify-center text-neutral-400 transition hover:text-neutral-700 dark:text-slate-500 dark:hover:text-slate-300 ${projects.length === 0 ? 'pointer-events-none opacity-40' : ''
                               }`}
-                              onClick={() => setExpandedOrg(isExpanded ? null : org.id)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="size-4" />
-                              ) : (
-                                <ChevronRight className="size-4" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() => handleSelect(org)}
-                              className={`flex min-w-0 flex-1 items-center gap-2.5 py-2 pr-3 text-left transition hover:bg-neutral-100 dark:hover:bg-slate-900 ${
-                                isCurrent ? 'bg-blue-50/60 dark:bg-slate-900/70' : ''
+                            onClick={() => setExpandedOrg(isExpanded ? null : org.id)}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="size-4" />
+                            ) : (
+                              <ChevronRight className="size-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => handleSelect(org)}
+                            className={`flex min-w-0 flex-1 items-center gap-2.5 py-2 pr-3 text-left transition hover:bg-neutral-100 dark:hover:bg-slate-900 ${isCurrent ? 'bg-blue-50/60 dark:bg-slate-900/70' : ''
                               }`}
-                            >
-                              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-[10px] font-semibold text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
-                                {(org.name[0] || '?').toUpperCase()}
+                          >
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-[10px] font-semibold text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
+                              {(org.name[0] || '?').toUpperCase()}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-neutral-900 dark:text-white">
+                                {org.name}
                               </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium text-neutral-900 dark:text-white">
-                                  {org.name}
-                                </span>
-                                <span className="block text-[10px] capitalize text-neutral-400 dark:text-slate-500">
-                                  {org.role} · {org.memberCount ?? 0} member{org.memberCount === 1 ? '' : 's'}
-                                  {' · '}
-                                  {projects.length > 1
-                                    ? `${projects.length} projects`
-                                    : projects.length === 1
-                                      ? projects[0].name
-                                      : 'no project yet'}
-                                </span>
+                              <span className="block text-[10px] capitalize text-neutral-400 dark:text-slate-500">
+                                {org.role} · {org.memberCount ?? 0} member{org.memberCount === 1 ? '' : 's'}
+                                {' · '}
+                                {projects.length > 1
+                                  ? `${projects.length} projects`
+                                  : projects.length === 1
+                                    ? projects[0].name
+                                    : 'no project yet'}
                               </span>
-                              {isCurrent ? (
-                                <Check className="size-4 shrink-0 text-blue-600 dark:text-blue-400" aria-label="Current organization" />
-                              ) : null}
-                            </button>
-                          </div>
+                            </span>
+                            {isCurrent ? (
+                              <Check className="size-4 shrink-0 text-blue-600 dark:text-blue-400" aria-label="Current organization" />
+                            ) : null}
+                          </button>
+                        </div>
 
-                          {isExpanded ? (
-                            <ul className="ml-5 border-l border-neutral-200 py-1 pl-2 dark:border-slate-800" aria-label={`Projects in ${org.name}`}>
-                              {projects.length === 0 ? (
-                                <li className="px-2 py-1.5 text-xs text-neutral-400 dark:text-slate-500">No projects yet.</li>
-                              ) : (
-                                projects.map((project) => (
-                                  <li key={project.id}>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      onClick={() => handleSelectProject(org, project)}
-                                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-900"
-                                    >
-                                      <Box className="size-3.5 shrink-0 text-neutral-400 dark:text-slate-500" />
-                                      <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                                    </button>
-                                  </li>
-                                ))
-                              )}
-                              {org.role === 'owner' || org.role === 'admin' ? (
-                                <li>
+                        {isExpanded ? (
+                          <ul className="ml-5 border-l border-neutral-200 py-1 pl-2 dark:border-slate-800" aria-label={`Projects in ${org.name}`}>
+                            {projects.length === 0 ? (
+                              <li className="px-2 py-1.5 text-xs text-neutral-400 dark:text-slate-500">No projects yet.</li>
+                            ) : (
+                              projects.map((project) => (
+                                <li key={project.id}>
                                   <button
                                     type="button"
                                     role="menuitem"
-                                    onClick={() => {
-                                      setActiveOrganizationId(org.id);
-                                      setOpen(false);
-                                      setCreating(false);
-                                      router.push(`/dashboard/settings?organizationId=${encodeURIComponent(org.id)}&newProject=1`);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-900"
+                                    onClick={() => handleSelectProject(org, project)}
+                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-900"
                                   >
-                                    <Plus className="size-3.5" />
-                                    Add project
+                                    <Box className="size-3.5 shrink-0 text-neutral-400 dark:text-slate-500" />
+                                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
                                   </button>
                                 </li>
-                              ) : null}
-                            </ul>
-                          ) : null}
-                        </li>
-                      );
-                    })
-                  )}
-                </ul>
+                              ))
+                            )}
+                            {org.role === 'owner' || org.role === 'admin' ? (
+                              <li>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => {
+                                    setActiveOrganizationId(org.id);
+                                    setOpen(false);
+                                    setCreating(false);
+                                    router.push(`/dashboard/settings?organizationId=${encodeURIComponent(org.id)}&newProject=1`);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-900"
+                                >
+                                  <Plus className="size-3.5" />
+                                  Add project
+                                </button>
+                              </li>
+                            ) : null}
+                          </ul>
+                        ) : null}
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
 
-                <div className="border-t border-neutral-200 p-2 dark:border-slate-800">
-                  {creating ? (
-                    <form onSubmit={handleCreate} className="grid gap-2 p-1">
-                      <label className="grid gap-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
-                        Organization name
-                        <input
-                          className={inputClass}
-                          value={orgName}
-                          onChange={(event) => setOrgName(event.target.value)}
-                          placeholder="My Organization"
-                          maxLength={80}
-                          autoFocus
-                        />
-                      </label>
-                      <label className="grid gap-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
-                        Project name
-                        <input
-                          className={inputClass}
-                          value={projectName}
-                          onChange={(event) => setProjectName(event.target.value)}
-                          placeholder="Web App"
-                          maxLength={80}
-                        />
-                      </label>
-                      {error ? (
-                        <p className="rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                          {error}
-                        </p>
-                      ) : null}
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          className="h-8 rounded-md px-3 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-900"
-                          onClick={() => setCreating(false)}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          className="inline-flex h-8 items-center justify-center rounded-md bg-neutral-900 px-3 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-                        >
-                          {submitting ? 'Creating…' : 'Create'}
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-200 dark:hover:bg-slate-900"
-                      onClick={() => {
-                        setCreating(true);
-                        setError(null);
-                      }}
-                    >
-                      <Plus className="size-4" />
-                      Add organization
-                    </button>
-                  )}
-                </div>
+              <div className="border-t border-neutral-200 p-2 dark:border-slate-800">
+                {creating ? (
+                  <form onSubmit={handleCreate} className="grid gap-2 p-1">
+                    <label className="grid gap-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                      Organization name
+                      <input
+                        className={inputClass}
+                        value={orgName}
+                        onChange={(event) => setOrgName(event.target.value)}
+                        placeholder="My Organization"
+                        maxLength={80}
+                        autoFocus
+                      />
+                    </label>
+                    <label className="grid gap-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                      Project name
+                      <input
+                        className={inputClass}
+                        value={projectName}
+                        onChange={(event) => setProjectName(event.target.value)}
+                        placeholder="Web App"
+                        maxLength={80}
+                      />
+                    </label>
+                    {error ? (
+                      <p className="rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                        {error}
+                      </p>
+                    ) : null}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="h-8 rounded-md px-3 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-900"
+                        onClick={() => setCreating(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="inline-flex h-8 items-center justify-center rounded-md bg-neutral-900 px-3 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+                      >
+                        {submitting ? 'Creating…' : 'Create'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-200 dark:hover:bg-slate-900"
+                    onClick={() => {
+                      setCreating(true);
+                      setError(null);
+                    }}
+                  >
+                    <Plus className="size-4" />
+                    Add organization
+                  </button>
+                )}
               </div>
-            </div>,
-            document.body
-          )
+            </div>
+          </div>,
+          document.body
+        )
         : null}
     </>
   );
