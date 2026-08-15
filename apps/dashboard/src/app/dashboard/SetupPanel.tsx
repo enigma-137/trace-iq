@@ -44,6 +44,9 @@ export function SetupPanel({
   const [createdProject, setCreatedProject] = useState<SetupResponse | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const hasProject = Boolean(setup?.project);
+  const organizationRole = setup?.organization?.role;
+  const canManageProject = organizationRole === 'owner' || organizationRole === 'admin';
+  const canManageOrganization = canManageProject;
   const queryParams = new URLSearchParams();
   if (organizationId) queryParams.set('organizationId', organizationId);
   if (projectId) queryParams.set('projectId', projectId);
@@ -208,7 +211,7 @@ export function SetupPanel({
           </p>
         </div>
 
-        {hasProject ? (
+        {hasProject && canManageProject ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
             <button
@@ -223,6 +226,10 @@ export function SetupPanel({
               <Plus className="size-4" />
               New project
             </button>
+          </div>
+        ) : hasProject ? (
+          <div className="shrink-0">
+            <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
           </div>
         ) : null}
       </div>
@@ -241,6 +248,11 @@ export function SetupPanel({
       {isLoading ? (
         <SetupSkeleton />
       ) : !hasProject ? (
+        organizationRole === 'member' ? (
+          <p className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+            This organization has no projects yet. Only owners and admins can create one — ask an owner or admin to set up the first project.
+          </p>
+        ) : (
         <form
           className="grid items-end gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
           onSubmit={handleSubmit}
@@ -273,6 +285,7 @@ export function SetupPanel({
             {isSubmitting ? 'Creating…' : 'Create project'}
           </button>
         </form>
+        )
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-3">
@@ -295,29 +308,31 @@ export function SetupPanel({
             />
           </div>
 
-          <form
-            className="grid items-end gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_auto]"
-            onSubmit={handleRenameOrganization}
-          >
-            <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="organizationName">
-              Organization name
-              <input
-                className={inputClass}
-                id="organizationName"
-                value={setupOrgName}
-                onChange={(event) => setSetupOrgName(event.target.value)}
-                required
-                maxLength={80}
-              />
-            </label>
-            <button
-              className="min-h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-              type="submit"
-              disabled={isRenamingOrg || !setupOrgName.trim() || setupOrgName.trim() === setup?.organization?.name}
+          {canManageOrganization ? (
+            <form
+              className="grid items-end gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_auto]"
+              onSubmit={handleRenameOrganization}
             >
-              {isRenamingOrg ? 'Saving…' : 'Save name'}
-            </button>
-          </form>
+              <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="organizationName">
+                Organization name
+                <input
+                  className={inputClass}
+                  id="organizationName"
+                  value={setupOrgName}
+                  onChange={(event) => setSetupOrgName(event.target.value)}
+                  required
+                  maxLength={80}
+                />
+              </label>
+              <button
+                className="min-h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                type="submit"
+                disabled={isRenamingOrg || !setupOrgName.trim() || setupOrgName.trim() === setup?.organization?.name}
+              >
+                {isRenamingOrg ? 'Saving…' : 'Save name'}
+              </button>
+            </form>
+          ) : null}
 
           {setup?.sdkSnippet ? (
             <div className="grid gap-3 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
@@ -351,7 +366,7 @@ export function SetupPanel({
             </button>
           </div>
 
-          {createdProject?.project || newProjectOpen ? (
+          {canManageProject && (createdProject?.project || newProjectOpen) ? (
             <div className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
               {createdProject?.project ? (
               <div className="grid gap-4">

@@ -151,14 +151,16 @@ export function ProjectSwitcher({ projectId, organizationId }: ProjectSwitcherPr
                 </ul>
 
                 <div className="border-t border-neutral-200 p-2 dark:border-slate-800">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-200 dark:hover:bg-slate-900"
-                    onClick={handleCreateProject}
-                  >
-                    <Plus className="size-4" />
-                    New project
-                  </button>
+                  {organization?.role === 'owner' || organization?.role === 'admin' ? (
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-200 dark:hover:bg-slate-900"
+                      onClick={handleCreateProject}
+                    >
+                      <Plus className="size-4" />
+                      New project
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>,

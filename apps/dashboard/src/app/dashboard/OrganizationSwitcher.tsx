@@ -283,22 +283,24 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                                   </li>
                                 ))
                               )}
-                              <li>
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={() => {
-                                    setActiveOrganizationId(org.id);
-                                    setOpen(false);
-                                    setCreating(false);
-                                    router.push(`/dashboard/settings?organizationId=${encodeURIComponent(org.id)}&newProject=1`);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-900"
-                                >
-                                  <Plus className="size-3.5" />
-                                  Add project
-                                </button>
-                              </li>
+                              {org.role === 'owner' || org.role === 'admin' ? (
+                                <li>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setActiveOrganizationId(org.id);
+                                      setOpen(false);
+                                      setCreating(false);
+                                      router.push(`/dashboard/settings?organizationId=${encodeURIComponent(org.id)}&newProject=1`);
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-900"
+                                  >
+                                    <Plus className="size-3.5" />
+                                    Add project
+                                  </button>
+                                </li>
+                              ) : null}
                             </ul>
                           ) : null}
                         </li>
