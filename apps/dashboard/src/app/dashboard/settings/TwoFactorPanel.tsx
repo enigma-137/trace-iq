@@ -33,7 +33,7 @@ export function TwoFactorPanel() {
             </p>
           </div>
           <Link
-            className="h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-3 text-center text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+            className="h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-3 py-2 text-center text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
             href="/dashboard/settings/2fa"
           >
             Manage

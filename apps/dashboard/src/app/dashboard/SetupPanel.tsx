@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Plus } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from './DashboardDialog';
+import { ProjectSwitcher } from './ProjectSwitcher';
 import { Skeleton } from '@/components/Skeleton';
 
 interface SetupResponse {
@@ -16,7 +18,15 @@ interface SetupResponse {
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-export function SetupPanel({ organizationId, newProject = false }: { organizationId?: string | null; newProject?: boolean }) {
+export function SetupPanel({
+  organizationId,
+  projectId,
+  newProject = false
+}: {
+  organizationId?: string | null;
+  projectId?: string | null;
+  newProject?: boolean;
+}) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const [organizationName, setOrganizationName] = useState('My Organization');
@@ -34,7 +44,10 @@ export function SetupPanel({ organizationId, newProject = false }: { organizatio
   const [createdProject, setCreatedProject] = useState<SetupResponse | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const hasProject = Boolean(setup?.project);
-  const orgQuery = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
+  const queryParams = new URLSearchParams();
+  if (organizationId) queryParams.set('organizationId', organizationId);
+  if (projectId) queryParams.set('projectId', projectId);
+  const setupQuery = queryParams.toString() ? `?${queryParams.toString()}` : '';
 
   useEffect(() => {
     void loadSetup();
@@ -63,7 +76,7 @@ export function SetupPanel({ organizationId, newProject = false }: { organizatio
       setIsLoading(false);
       return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/setup${orgQuery}`, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`${apiBaseUrl}/v1/setup${setupQuery}`, { headers: { Authorization: `Bearer ${token}` } });
     setIsLoading(false);
     if (!response.ok) {
       setStatus({ tone: 'error', message: await readError(response) });
@@ -113,7 +126,7 @@ export function SetupPanel({ organizationId, newProject = false }: { organizatio
       setIsSubmitting(false);
       return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/setup/bootstrap${orgQuery}`, {
+    const response = await fetch(`${apiBaseUrl}/v1/setup/bootstrap${setupQuery}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ organizationName, projectName })
@@ -183,16 +196,35 @@ export function SetupPanel({ organizationId, newProject = false }: { organizatio
 
   return (
     <section className="grid gap-5" aria-labelledby="setup-title">
-      <div className='pt-4'>
-        {/* <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Project setup</p> */}
-        <h2 id="setup-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          {hasProject ? 'Project settings' : 'Create your tracking workspace'}
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-          {hasProject
-            ? 'Your install credentials, SDK snippet, and write-key management.'
-            : 'Create an organization, a project, and the first SDK write key for browser event tracking.'}
-        </p>
+      <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 id="setup-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+            {hasProject ? 'Project settings' : 'Create your tracking workspace'}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+            {hasProject
+              ? 'Manage the active project — switch projects or create new ones from here.'
+              : 'Create an organization, a project, and the first SDK write key for browser event tracking.'}
+          </p>
+        </div>
+
+        {hasProject ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
+            <button
+              className="inline-flex h-10 items-center gap-1.5 rounded-md bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+              type="button"
+              onClick={() => {
+                setNewProjectOpen(true);
+                setCreatedProject(null);
+                setStatus(null);
+              }}
+            >
+              <Plus className="size-4" />
+              New project
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {status ? (
@@ -319,8 +351,9 @@ export function SetupPanel({ organizationId, newProject = false }: { organizatio
             </button>
           </div>
 
-          <div className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            {createdProject?.project ? (
+          {createdProject?.project || newProjectOpen ? (
+            <div className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+              {createdProject?.project ? (
               <div className="grid gap-4">
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                   <div>
@@ -371,55 +404,42 @@ export function SetupPanel({ organizationId, newProject = false }: { organizatio
                     Add a separate project for another app or product in {setup?.organization?.name ?? 'this organization'}. Each project gets its own write key.
                   </p>
                 </div>
-                {newProjectOpen ? (
-                  <form className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleCreateProject}>
-                    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="newProjectName">
-                      Project name
-                      <input
-                        className={inputClass}
-                        id="newProjectName"
-                        value={newProjectName}
-                        onChange={(event) => setNewProjectName(event.target.value)}
-                        placeholder="Web App"
-                        maxLength={80}
-                        required
-                        autoFocus
-                      />
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        type="button"
-                        disabled={isCreatingProject}
-                        onClick={() => setNewProjectOpen(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                        type="submit"
-                        disabled={isCreatingProject}
-                      >
-                        {isCreatingProject ? 'Creating…' : 'Create project'}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <button
-                    className="h-9 shrink-0 self-start rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                    type="button"
-                    onClick={() => {
-                      setNewProjectOpen(true);
-                      setCreatedProject(null);
-                      setStatus(null);
-                    }}
-                  >
-                    Create project
-                  </button>
-                )}
+                <form className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleCreateProject}>
+                  <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="newProjectName">
+                    Project name
+                    <input
+                      className={inputClass}
+                      id="newProjectName"
+                      value={newProjectName}
+                      onChange={(event) => setNewProjectName(event.target.value)}
+                      placeholder="Web App"
+                      maxLength={80}
+                      required
+                      autoFocus
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      type="button"
+                      disabled={isCreatingProject}
+                      onClick={() => setNewProjectOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                      type="submit"
+                      disabled={isCreatingProject}
+                    >
+                      {isCreatingProject ? 'Creating…' : 'Create project'}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
-          </div>
+            </div>
+          ) : null}
         </>
       )}
 

@@ -26,7 +26,7 @@ export default async function SettingsPage({
       organizationId={organizationId}
     >
       <SettingsTabs />
-      <SetupPanel organizationId={organizationId} newProject={newProject} />
+      <SetupPanel organizationId={organizationId} projectId={projectId} newProject={newProject} />
       <TwoFactorPanel />
       <PersonalAccessTokensPanel />
     </DashboardShell>
