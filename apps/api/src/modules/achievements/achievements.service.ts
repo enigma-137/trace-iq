@@ -52,13 +52,13 @@ type MetricEvaluator = (database: DatabaseService, scope: MetricScope) => Promis
 // A straight COUNT over a project- or organization-scoped table.
 const counter =
   (table: string, column: 'project_id' | 'organization_id', key: 'projectId' | 'organizationId'): MetricEvaluator =>
-  async (database, scope) => {
-    const result = await database.query<{ value: number }>(
-      `SELECT COUNT(*)::float8 AS value FROM ${table} WHERE ${column} = $1`,
-      [scope[key]]
-    );
-    return result.rows[0]?.value ?? 0;
-  };
+    async (database, scope) => {
+      const result = await database.query<{ value: number }>(
+        `SELECT COUNT(*)::float8 AS value FROM ${table} WHERE ${column} = $1`,
+        [scope[key]]
+      );
+      return result.rows[0]?.value ?? 0;
+    };
 
 // Registry of metric keys -> SQL-backed values. Every metric a definition references
 // must live here; anything else evaluates to 0 and can never unlock. New achievement
@@ -109,7 +109,7 @@ export class AchievementsService {
     private readonly database: DatabaseService,
     private readonly projects: ProjectsService,
     private readonly email: EmailService
-  ) {}
+  ) { }
 
   /**
    * Dashboard listing. Evaluates progress live, awards anything newly earned to
@@ -340,18 +340,9 @@ export function unlockSubject(items: UnlockEmailItem[]): string {
 }
 
 export function buildUnlockEmail(items: UnlockEmailItem[]): string {
-  const dashboardUrl = process.env.DASHBOARD_URL ?? 'http://localhost:3000';
-  const medal =
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent(
-      [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 96 96">',
-        '<circle cx="48" cy="48" r="46" fill="#0b0d12"/>',
-        '<circle cx="48" cy="48" r="45" fill="none" stroke="#34d399" stroke-opacity="0.8" stroke-width="2"/>',
-        '<path d="M48 30 28 40l20 10 20-10-20-10ZM28 50l20 10 20-10M28 60l20 10 20-10" fill="none" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
-        '</svg>'
-      ].join('')
-    );
+  const dashboardUrl = process.env.DASHBOARD_URL ?? 'https://traceiq.run';
+
+  const medal = `${process.env.DASHBOARD_URL}/achievements/medal-badge.png`;
 
   const heading =
     items.length === 1
@@ -379,7 +370,7 @@ export function buildUnlockEmail(items: UnlockEmailItem[]): string {
       <p style="font-size:15px;line-height:1.5;color:#334155;">${heading}. It unlocked automatically as your workspace tracks usage.</p>
       ${cards}
       <p style="margin-top:20px;">
-        <a href="${dashboardUrl}/dashboard/achievements" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;">View achievements</a>
+        <a href="${dashboardUrl}/dashboard/achievements" style="display:inline-block;background:#4169e1;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;">View achievements</a>
       </p>
       <p style="font-size:13px;color:#94a3b8;margin-top:20px;">TraceIQ · traceiq.run</p>
     </div>`;
