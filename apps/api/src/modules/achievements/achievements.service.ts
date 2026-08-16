@@ -340,7 +340,7 @@ export function unlockSubject(items: UnlockEmailItem[]): string {
 }
 
 export function buildUnlockEmail(items: UnlockEmailItem[]): string {
-  const dashboardUrl = process.env.DASHBOARD_URL ?? 'https://traceiq.run';
+  const dashboardUrl = process.env.DASHBOARD_URL ?? 'https://traceiq.run/dashboard';
 
   const medal = `${process.env.DASHBOARD_URL}/achievements/medal-badge.png`;
 
