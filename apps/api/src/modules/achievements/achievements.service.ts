@@ -367,7 +367,7 @@ export function buildUnlockEmail(items: UnlockEmailItem[]): string {
   return `
     <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0f172a;">
       <div style="padding:20px 0;border-bottom:1px solid #e2e8f0;">
-        <img src="${medal}" width="56" height="56" alt="" style="display:block;margin:0 0 10px;" />
+       <img src="${medal}" width="96" height="96" alt="" style="display:block;width:96px;height:96px;margin:0 0 14px;" />
         <div style="font-size:13px;color:#94a3b8;">TraceIQ · achievements</div>
         <div style="font-size:20px;font-weight:700;margin-top:4px;">Achievement unlocked</div>
       </div>
