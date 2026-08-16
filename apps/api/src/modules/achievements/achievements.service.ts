@@ -340,9 +340,13 @@ export function unlockSubject(items: UnlockEmailItem[]): string {
 }
 
 export function buildUnlockEmail(items: UnlockEmailItem[]): string {
-  const dashboardUrl = process.env.DASHBOARD_URL ?? 'https://traceiq.run/dashboard';
+  const dashboardBaseUrl = (process.env.DASHBOARD_URL ?? 'https://traceiq.run')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/dashboard$/, '');
 
-  const medal = `${process.env.DASHBOARD_URL}/medal-badge.png`;
+  const medal = `${dashboardBaseUrl}/medal-badge.png`;
+  const achievementsUrl = `${dashboardBaseUrl}/dashboard/achievements`;
 
   const heading =
     items.length === 1
@@ -370,7 +374,7 @@ export function buildUnlockEmail(items: UnlockEmailItem[]): string {
       <p style="font-size:15px;line-height:1.5;color:#334155;">${heading}. It unlocked automatically as your workspace tracks usage.</p>
       ${cards}
       <p style="margin-top:20px;">
-        <a href="${dashboardUrl}/dashboard/achievements" style="display:inline-block;background:#4169e1;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;">View achievements</a>
+        <a href="${achievementsUrl}" style="display:inline-block;background:#4169e1;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;">View achievements</a>
       </p>
       <p style="font-size:13px;color:#94a3b8;margin-top:20px;">TraceIQ · traceiq.run</p>
     </div>`;

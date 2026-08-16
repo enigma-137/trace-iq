@@ -48,4 +48,32 @@ describe('buildUnlockEmail', () => {
     const html = buildUnlockEmail([item()]);
     expect(html).toContain('href="https://app.traceiq.dev/dashboard/achievements"');
   });
+
+  it('serves the medal badge from the site origin even when DASHBOARD_URL carries a /dashboard suffix', () => {
+    process.env.DASHBOARD_URL = 'https://traceiq.run/dashboard';
+    const html = buildUnlockEmail([item()]);
+    expect(html).toContain('src="https://traceiq.run/medal-badge.png"');
+  });
+
+  it('does not double the /dashboard path for the achievements link', () => {
+    process.env.DASHBOARD_URL = 'https://traceiq.run/dashboard';
+    const html = buildUnlockEmail([item()]);
+    expect(html).toContain('href="https://traceiq.run/dashboard/achievements"');
+    expect(html).not.toContain('dashboard/dashboard');
+  });
+
+  it('falls back to the site origin when DASHBOARD_URL is unset', () => {
+    delete process.env.DASHBOARD_URL;
+    const html = buildUnlockEmail([item()]);
+    expect(html).toContain('src="https://traceiq.run/medal-badge.png"');
+    expect(html).toContain('href="https://traceiq.run/dashboard/achievements"');
+    expect(html).not.toContain('undefined/');
+  });
+
+  it('tolerates a trailing slash on DASHBOARD_URL', () => {
+    process.env.DASHBOARD_URL = 'https://traceiq.run/dashboard/';
+    const html = buildUnlockEmail([item()]);
+    expect(html).toContain('src="https://traceiq.run/medal-badge.png"');
+    expect(html).toContain('href="https://traceiq.run/dashboard/achievements"');
+  });
 });
