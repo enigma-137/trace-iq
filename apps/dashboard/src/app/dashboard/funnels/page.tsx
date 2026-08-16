@@ -10,7 +10,7 @@ interface FunnelsResponse {
 }
 
 interface EventNamesResponse {
-  eventNames: Array<{ eventName: string; total: number }>;
+  eventNames: Array<{ eventName: string; total: number; actors?: number }>;
 }
 
 export default async function FunnelsPage() {

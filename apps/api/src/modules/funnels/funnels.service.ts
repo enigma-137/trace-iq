@@ -84,6 +84,8 @@ export type FunnelDebugStep = {
   label: string | null;
   eventCount: number;
   actorCount: number;
+  identifiedEventCount: number;
+  anonymousEventCount: number;
   qualifiedCount: number;
   samples: FunnelDebugSample[];
 };
@@ -343,16 +345,28 @@ export class FunnelsService {
     for (let index = 0; index < steps.length; index += 1) {
       const step = steps[index];
 
-      const statsResult = await this.database.query<{ eventCount: number; actorCount: number }>(
+      const statsResult = await this.database.query<{
+        eventCount: number;
+        actorCount: number;
+        identifiedEventCount: number;
+        anonymousEventCount: number;
+      }>(
         `SELECT
           count(*)::int AS "eventCount",
-          count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS "actorCount"
+          count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS "actorCount",
+          count(*) FILTER (WHERE user_id IS NOT NULL)::int AS "identifiedEventCount",
+          count(*) FILTER (WHERE user_id IS NULL AND anonymous_id IS NOT NULL)::int AS "anonymousEventCount"
         FROM events
         WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
           AND event_name = $4 AND COALESCE(user_id::text, anonymous_id) IS NOT NULL`,
         [project.id, from.toISOString(), to.toISOString(), step.eventName]
       );
-      const stats = statsResult.rows[0] ?? { eventCount: 0, actorCount: 0 };
+      const stats = statsResult.rows[0] ?? {
+        eventCount: 0,
+        actorCount: 0,
+        identifiedEventCount: 0,
+        anonymousEventCount: 0
+      };
 
       const samplesResult = await this.database.query<FunnelDebugSample>(
         `SELECT
@@ -374,6 +388,8 @@ export class FunnelsService {
         label: step.label,
         eventCount: stats.eventCount,
         actorCount: stats.actorCount,
+        identifiedEventCount: stats.identifiedEventCount ?? 0,
+        anonymousEventCount: stats.anonymousEventCount ?? 0,
         qualifiedCount: qualified[index] ?? 0,
         samples: samplesResult.rows
       });

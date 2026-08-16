@@ -9,7 +9,7 @@ import { DashboardDialog } from '../DashboardDialog';
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface FunnelFormProps {
-  eventNames: Array<{ eventName: string; total: number }>;
+  eventNames: Array<{ eventName: string; total: number; actors?: number }>;
   funnel?: {
     id: string;
     name: string;
@@ -28,15 +28,27 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const observedNames = useMemo(() => new Set(eventNames.map((entry) => entry.eventName)), [eventNames]);
+  const observedEvents = useMemo(() => new Map(eventNames.map((entry) => [entry.eventName, entry])), [eventNames]);
 
   function updateStep(index: number, value: string) {
     setSteps((current) => current.map((step, i) => (i === index ? value : step)));
   }
 
-  function hasRecentEvents(eventName: string): boolean {
+  function stepWarning(eventName: string): string | null {
     const cleaned = eventName.trim();
-    return cleaned.length === 0 || observedNames.has(cleaned);
+    if (cleaned.length === 0) return null;
+
+    const entry = observedEvents.get(cleaned);
+    if (!entry) {
+      return 'No events with this exact name exist in the last 30 days. Pick one of the observed events above, or check the exact event name your app sends (matches are case-sensitive).';
+    }
+
+    const trackable = entry.actors ?? entry.total;
+    if (trackable === 0) {
+      return `${entry.total.toLocaleString()} ${entry.total === 1 ? 'event' : 'events'} exist with this name, but none carry a trackable user (userId or anonymousId), so funnels cannot count them. Make sure the SDK sends an anonymousId (or userId) with every event.`;
+    }
+
+    return null;
   }
 
   function addStep() {
@@ -144,38 +156,38 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
       </label>
 
       <div className="grid gap-2">
-        {steps.map((step, index) => (
-          <div key={index}>
-            <div className="flex items-center gap-2">
-              <span className="w-6 shrink-0 text-center font-mono text-xs text-neutral-400 dark:text-slate-500">{index + 1}</span>
-              <Combobox
-                items={eventNames.map((entry) => ({
-                  value: entry.eventName,
-                  label: entry.eventName,
-                  description: `${entry.total.toLocaleString()}`
-                }))}
-                value={step}
-                onChange={(next) => updateStep(index, next)}
-                placeholder="event_name"
-                className="w-full"
-              />
-              <button
-                type="button"
-                className="h-9 shrink-0 rounded-md border border-neutral-300 px-2 text-xs font-semibold text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-900"
-                onClick={() => removeStep(index)}
-                disabled={steps.length <= 2}
-              >
-                Remove
-              </button>
+        {steps.map((step, index) => {
+          const warning = stepWarning(step);
+          return (
+            <div key={index}>
+              <div className="flex items-center gap-2">
+                <span className="w-6 shrink-0 text-center font-mono text-xs text-neutral-400 dark:text-slate-500">{index + 1}</span>
+                <Combobox
+                  items={eventNames.map((entry) => ({
+                    value: entry.eventName,
+                    label: entry.eventName,
+                    description: `${entry.total.toLocaleString()} events`
+                  }))}
+                  value={step}
+                  onChange={(next) => updateStep(index, next)}
+                  placeholder="event_name"
+                  className="w-full"
+                />
+                <button
+                  type="button"
+                  className="h-9 shrink-0 rounded-md border border-neutral-300 px-2 text-xs font-semibold text-neutral-500 transition hover:bg-neutral-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-900"
+                  onClick={() => removeStep(index)}
+                  disabled={steps.length <= 2}
+                >
+                  Remove
+                </button>
+              </div>
+              {warning ? (
+                <p className="mt-1 flex items-center gap-1.5 pl-9 text-xs text-amber-600 dark:text-amber-400">{warning}</p>
+              ) : null}
             </div>
-            {!hasRecentEvents(step) ? (
-              <p className="mt-1 flex items-center gap-1.5 pl-9 text-xs text-amber-600 dark:text-amber-400">
-                No events with this exact name exist in the last 30 days. Pick one of the observed events above, or check
-                the exact event name your app sends (matches are case-sensitive).
-              </p>
-            ) : null}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {error ? (

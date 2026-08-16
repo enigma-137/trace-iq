@@ -14,6 +14,8 @@ export interface DebugStep {
   label: string | null;
   eventCount: number;
   actorCount: number;
+  identifiedEventCount: number;
+  anonymousEventCount: number;
   qualifiedCount: number;
   samples: DebugSample[];
 }
@@ -49,6 +51,11 @@ function stepTone(step: DebugStep): Tone {
   if (step.qualifiedCount > 0) return 'ok';
   if (step.eventCount === 0) return 'miss';
   return 'warn';
+}
+
+function identitySplit(step: DebugStep, previous: DebugStep | undefined): boolean {
+  if (!previous || step.eventCount === 0) return false;
+  return previous.anonymousEventCount > 0 && previous.identifiedEventCount === 0 && step.anonymousEventCount === 0;
 }
 
 function stepTitle(step: DebugStep, tone: Tone): string {
@@ -128,6 +135,17 @@ export function FunnelDebugPanel({ data }: { data: FunnelDebugData }) {
 
               <p className="mt-2 max-w-3xl text-sm text-neutral-600 dark:text-slate-300">{stepHint(step, tone, data.days)}</p>
 
+              {identitySplit(step, data.steps[step.index - 1]) ? (
+                <p className="mt-2 flex max-w-3xl items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                  Identity split suspected: the previous step's events are all anonymous (keyed by
+                  <code className="font-mono">anonymous_id</code>), while this step's events are all identified (keyed by{' '}
+                  <code className="font-mono">user_id</code>). Unless the app sends a linking
+                  <code className="font-mono">identify</code> event carrying the same
+                  <code className="font-mono">anonymousId</code>, the funnel treats these as different actors and every user
+                  appears to drop here.
+                </p>
+              ) : null}
+
               <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
                 <div>
                   <p className="text-xs text-neutral-400 dark:text-slate-500">Raw events in window</p>
@@ -136,6 +154,14 @@ export function FunnelDebugPanel({ data }: { data: FunnelDebugData }) {
                 <div>
                   <p className="text-xs text-neutral-400 dark:text-slate-500">Distinct actors</p>
                   <p className="mt-0.5 font-semibold tabular-nums text-neutral-900 dark:text-white">{step.actorCount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-400 dark:text-slate-500">Identified events</p>
+                  <p className="mt-0.5 font-semibold tabular-nums text-neutral-900 dark:text-white">{step.identifiedEventCount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-400 dark:text-slate-500">Anonymous events</p>
+                  <p className="mt-0.5 font-semibold tabular-nums text-neutral-900 dark:text-white">{step.anonymousEventCount.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-xs text-neutral-400 dark:text-slate-500">Reached this step (funnel)</p>

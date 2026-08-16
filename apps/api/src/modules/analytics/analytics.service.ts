@@ -277,12 +277,15 @@ export class AnalyticsService {
     const project = await this.projects.resolveActiveProject(user, projectId);
 
     if (!project) {
-      return { project: null, eventNames: [] as Array<{ eventName: string; total: number }> };
+      return { project: null, eventNames: [] as Array<{ eventName: string; total: number; actors: number }> };
     }
 
-    const result = await this.database.query<{ eventName: string; total: number }>(
+    const result = await this.database.query<{ eventName: string; total: number; actors: number }>(
       `
-        SELECT event_name AS "eventName", count(*)::int AS total
+        SELECT
+          event_name AS "eventName",
+          count(*)::int AS total,
+          count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS actors
         FROM events
         WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
         GROUP BY event_name

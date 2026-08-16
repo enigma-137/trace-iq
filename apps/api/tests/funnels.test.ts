@@ -21,14 +21,14 @@ const ONBOARDING_STEPS = [
 function makeService(opts: {
   counts?: Record<string, number>;
   users?: Record<string, unknown>[];
-  stepStats?: { eventCount: number; actorCount: number };
+  stepStats?: { eventCount: number; actorCount: number; identifiedEventCount?: number; anonymousEventCount?: number };
   eventNames?: Array<{ eventName: string; eventCount: number }>;
 } = {}) {
   const counts = opts.counts ?? { step0: 100, step1: 60, step2: 25 };
   const users = opts.users ?? [
     { actor: 'usr_1', userId: 'usr_1', externalId: 'u1', anonymousId: 'anon_1', identified: true, lastSeenAt: null, os: null, country: null }
   ];
-  const stepStats = opts.stepStats ?? { eventCount: 100, actorCount: 80 };
+  const stepStats = opts.stepStats ?? { eventCount: 100, actorCount: 80, identifiedEventCount: 80, anonymousEventCount: 20 };
   const eventNames = opts.eventNames ?? [
     { eventName: 'sign_up', eventCount: 100 },
     { eventName: 'sign_up_complete', eventCount: 60 },
@@ -178,7 +178,7 @@ describe('FunnelsService.getStepUsers', () => {
 describe('FunnelsService.debugFunnel', () => {
   it('reports raw event + actor counts, funnel-qualified counts, and all observed event names', async () => {
     const { db, service } = makeService({
-      stepStats: { eventCount: 120, actorCount: 40 },
+      stepStats: { eventCount: 120, actorCount: 40, identifiedEventCount: 80, anonymousEventCount: 20 },
       eventNames: [
         { eventName: 'sign_up', eventCount: 120 },
         { eventName: 'sign_up_complete', eventCount: 60 }
@@ -191,7 +191,14 @@ describe('FunnelsService.debugFunnel', () => {
     expect(result.funnel.id).toBe('fnl_1');
     expect(result.projectId).toBe('proj_1');
     expect(result.steps).toHaveLength(3);
-    expect(result.steps[0]).toMatchObject({ eventName: 'sign_up', eventCount: 120, actorCount: 40, qualifiedCount: 100 });
+    expect(result.steps[0]).toMatchObject({
+      eventName: 'sign_up',
+      eventCount: 120,
+      actorCount: 40,
+      identifiedEventCount: 80,
+      anonymousEventCount: 20,
+      qualifiedCount: 100
+    });
     expect(result.steps[2]).toMatchObject({ eventName: 'onboarding_complete', eventCount: 120, actorCount: 40, qualifiedCount: 25 });
     expect(result.eventNames.map((entry) => entry.eventName)).toEqual(['sign_up', 'sign_up_complete']);
     expect(db.queryCalls(/SELECT event_name AS "eventName"/)).toHaveLength(1);
@@ -208,6 +215,16 @@ describe('FunnelsService.debugFunnel', () => {
     expect(typeof call.values[1]).toBe('string');
     expect(typeof call.values[2]).toBe('string');
     expect(call.values[3]).toBe('sign_up');
+  });
+
+  it('reports how many step events are identified vs anonymous for identity-split detection', async () => {
+    const { service } = makeService({
+      stepStats: { eventCount: 60, actorCount: 40, identifiedEventCount: 60, anonymousEventCount: 0 }
+    });
+
+    const result = await service.debugFunnel(user, 'fnl_1');
+
+    expect(result.steps[1]).toMatchObject({ identifiedEventCount: 60, anonymousEventCount: 0 });
   });
 
   it('exposes a misnamed step as zero raw events while the project actually has other names', async () => {

@@ -12,7 +12,7 @@ interface FunnelDetail {
 }
 
 interface EventNamesResponse {
-  eventNames: Array<{ eventName: string; total: number }>;
+  eventNames: Array<{ eventName: string; total: number; actors?: number }>;
 }
 
 export default async function EditFunnelPage({ params }: { params: { id: string } }) {
