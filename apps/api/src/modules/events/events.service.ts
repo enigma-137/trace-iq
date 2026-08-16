@@ -148,12 +148,14 @@ export class EventsService {
     }
 
     // 2) Upsert every distinct session once.
+    const sessionIds = [...new Set(prepared.filter((p) => p.sessionId).map((p) => p.sessionId as string))];
     await this.bulkEnsureSessions(
       auth.project_id,
       prepared
         .filter((p) => p.sessionId)
         .map((p) => ({ sessionId: p.sessionId as string, userId: p.userId, anonymousId: p.anonymousId, context: p.context }))
     );
+    await this.backfillSessionIdentities(auth.project_id, sessionIds);
 
     // 3) Stitch each distinct new anonymous→user pairing (cache-guarded, so repeats are free).
     const seenPairs = new Set<string>();
@@ -169,6 +171,7 @@ export class EventsService {
 
     // 4) One multi-row insert for the whole batch.
     const eventIds = await this.bulkInsertEvents(auth, prepared);
+    await this.backfillSessionIdentities(auth.project_id, sessionIds);
     prepared.forEach((p, i) => {
       const eventId = eventIds[i];
       results[p.index] = { accepted: true, eventId };
@@ -328,6 +331,9 @@ export class EventsService {
     // earlier anonymous events onto the user so they count as one person everywhere.
     if (userId && anonymousId) {
       await this.linkIdentity(auth.project_id, anonymousId, userId);
+    }
+    if (userId && sessionId) {
+      await this.backfillSessionIdentities(auth.project_id, [sessionId]);
     }
 
     const networkInfo = this.buildNetworkInfo(input.networkInfo, meta);
@@ -596,6 +602,26 @@ export class EventsService {
       this.linkedIdentities.clear();
     }
     this.linkedIdentities.add(cacheKey);
+  }
+
+  private async backfillSessionIdentities(projectId: string, sessionIds: string[]): Promise<void> {
+    if (sessionIds.length === 0) {
+      return;
+    }
+
+    await this.database.query(
+      `UPDATE events e
+        SET user_id = s.user_id
+        FROM sessions s
+        WHERE e.project_id = $1
+          AND e.session_id = ANY($2)
+          AND e.user_id IS NULL
+          AND e.anonymous_id IS NOT NULL
+          AND s.id = e.session_id
+          AND s.user_id IS NOT NULL
+          AND s.anonymous_id = e.anonymous_id`,
+      [projectId, sessionIds]
+    );
   }
 
   private buildNetworkInfo(clientNetworkInfo: JsonObject | undefined, meta: IngestMeta): JsonObject {

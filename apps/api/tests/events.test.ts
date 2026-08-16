@@ -149,4 +149,40 @@ describe('EventsService.ingestBatch', () => {
     expect(webhooks.deliverForEvent).toHaveBeenCalledTimes(2);
     expect(webhooks.deliverForEvent.mock.calls.map(([, e]) => e.eventName)).toEqual(['signup', 'checkout']);
   });
+
+  it('rebinds anonymous events to the session user once a session becomes identified', async () => {
+    const { db, service } = happyDb();
+
+    await service.ingestBatch('key_abc', 'proj_1', [
+      { eventName: 'signup_started', sessionId: 'sess_1' },
+      { eventName: 'login_completed', userId: 'u1', sessionId: 'sess_1' }
+    ]);
+
+    const backfills = db.queryCalls(/UPDATE events e/);
+    expect(backfills.length).toBeGreaterThan(0);
+    for (const call of backfills) {
+      expect(call.values[0]).toBe('proj_1');
+      expect(call.values[1]).toEqual(['sess_1']);
+      // Only anonymous events in the now-identified session are rebound.
+      expect(call.text).toContain('e.user_id IS NULL');
+      expect(call.text).toContain('s.anonymous_id = e.anonymous_id');
+      expect(call.text).toContain('s.user_id IS NOT NULL');
+    }
+  });
+
+  it('runs the session backfill for single event ingests that identify a user', async () => {
+    const { db, service } = happyDb();
+    await service.ingest({ writeKey: 'key_abc', projectId: 'proj_1', eventName: 'login_completed', userId: 'u1', sessionId: 'sess_9' });
+
+    const backfills = db.queryCalls(/UPDATE events e/);
+    expect(backfills.length).toBeGreaterThan(0);
+    expect(backfills[0].values[1]).toEqual(['sess_9']);
+  });
+
+  it('skips the session backfill when no session is involved', async () => {
+    const { db, service } = happyDb();
+    await service.ingest({ writeKey: 'key_abc', projectId: 'proj_1', eventName: 'signup' });
+
+    expect(db.queryCalls(/UPDATE events e/)).toHaveLength(0);
+  });
 });
