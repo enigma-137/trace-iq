@@ -52,6 +52,18 @@ export class FunnelsController {
     return this.funnelsService.remove(user, id, projectId);
   }
 
+  @Get(':id/debug')
+  async debugFunnel(
+    @Param('id') id: string,
+    @Headers('authorization') authorization?: string,
+    @Query('days') days?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'funnels:read');
+    return this.funnelsService.debugFunnel(user, id, days, projectId);
+  }
+
   @Get(':id/results')
   async getResults(
     @Param('id') id: string,

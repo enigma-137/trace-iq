@@ -18,10 +18,21 @@ const ONBOARDING_STEPS = [
   { order: 2, eventName: 'onboarding_complete', label: null }
 ];
 
-function makeService(opts: { counts?: Record<string, number>; users?: Record<string, unknown>[] } = {}) {
+function makeService(opts: {
+  counts?: Record<string, number>;
+  users?: Record<string, unknown>[];
+  stepStats?: { eventCount: number; actorCount: number };
+  eventNames?: Array<{ eventName: string; eventCount: number }>;
+} = {}) {
   const counts = opts.counts ?? { step0: 100, step1: 60, step2: 25 };
   const users = opts.users ?? [
     { actor: 'usr_1', userId: 'usr_1', externalId: 'u1', anonymousId: 'anon_1', identified: true, lastSeenAt: null, os: null, country: null }
+  ];
+  const stepStats = opts.stepStats ?? { eventCount: 100, actorCount: 80 };
+  const eventNames = opts.eventNames ?? [
+    { eventName: 'sign_up', eventCount: 100 },
+    { eventName: 'sign_up_complete', eventCount: 60 },
+    { eventName: 'onboarding_complete', eventCount: 25 }
   ];
   const db = mockDatabase((text) => {
     if (text.includes('actors AS')) {
@@ -29,6 +40,15 @@ function makeService(opts: { counts?: Record<string, number>; users?: Record<str
     }
     if (text.includes('WITH base AS')) {
       return rows([counts]);
+    }
+    if (text.includes('count(DISTINCT COALESCE(user_id::text, anonymous_id))')) {
+      return rows([stepStats]);
+    }
+    if (text.includes('ORDER BY received_at DESC')) {
+      return rows([]);
+    }
+    if (text.includes('GROUP BY event_name')) {
+      return rows(eventNames);
     }
     if (text.includes('count(fs.id)')) {
       return rows([{ id: 'fnl_1', name: 'Onboarding funnel', stepCount: 3, createdAt: '2026-01-01T00:00:00.000Z' }]);
@@ -152,6 +172,93 @@ describe('FunnelsService.getStepUsers', () => {
     await expect(service.getStepUsers(user, 'fnl_1', { step: '0', status: 'dropped' })).rejects.toBeInstanceOf(
       BadRequestException
     );
+  });
+});
+
+describe('FunnelsService.debugFunnel', () => {
+  it('reports raw event + actor counts, funnel-qualified counts, and all observed event names', async () => {
+    const { db, service } = makeService({
+      stepStats: { eventCount: 120, actorCount: 40 },
+      eventNames: [
+        { eventName: 'sign_up', eventCount: 120 },
+        { eventName: 'sign_up_complete', eventCount: 60 }
+      ]
+    });
+
+    const result = await service.debugFunnel(user, 'fnl_1', '7');
+
+    expect(result.days).toBe(7);
+    expect(result.funnel.id).toBe('fnl_1');
+    expect(result.projectId).toBe('proj_1');
+    expect(result.steps).toHaveLength(3);
+    expect(result.steps[0]).toMatchObject({ eventName: 'sign_up', eventCount: 120, actorCount: 40, qualifiedCount: 100 });
+    expect(result.steps[2]).toMatchObject({ eventName: 'onboarding_complete', eventCount: 120, actorCount: 40, qualifiedCount: 25 });
+    expect(result.eventNames.map((entry) => entry.eventName)).toEqual(['sign_up', 'sign_up_complete']);
+    expect(db.queryCalls(/SELECT event_name AS "eventName"/)).toHaveLength(1);
+    expect(db.queryCalls(/count\(DISTINCT COALESCE/)).toHaveLength(3);
+    expect(db.queryCalls(/ORDER BY received_at DESC/)).toHaveLength(3);
+  });
+
+  it('is bounded by the requested window', async () => {
+    const { db, service } = makeService();
+    await service.debugFunnel(user, 'fnl_1', '90');
+
+    const call = db.queryCalls(/count\(DISTINCT COALESCE/)[0];
+    expect(call?.values[0]).toBe('proj_1');
+    expect(typeof call.values[1]).toBe('string');
+    expect(typeof call.values[2]).toBe('string');
+    expect(call.values[3]).toBe('sign_up');
+  });
+
+  it('exposes a misnamed step as zero raw events while the project actually has other names', async () => {
+    const steps = [
+      { order: 0, eventName: 'sign_up', label: null },
+      { order: 1, eventName: 'otp_verification_completed', label: null },
+      { order: 2, eventName: 'log_food', label: null }
+    ];
+
+    const db = mockDatabase((text, values) => {
+      if (text.includes('GROUP BY event_name')) {
+        return rows([
+          { eventName: 'sign_up', eventCount: 4 },
+          { eventName: 'login_completed', eventCount: 2 },
+          { eventName: 'log_food', eventCount: 2 }
+        ]);
+      }
+      if (text.includes('count(DISTINCT COALESCE(user_id::text, anonymous_id))')) {
+        if (values[3] === 'otp_verification_completed') {
+          return rows([{ eventCount: 0, actorCount: 0 }]);
+        }
+        return rows([{ eventCount: 2, actorCount: 1 }]);
+      }
+      if (text.includes('ORDER BY received_at DESC')) {
+        return rows([]);
+      }
+      if (text.includes('WITH base AS')) {
+        return rows([{ step0: 2, step1: 0, step2: 0 }]);
+      }
+      if (text.includes('FROM funnels WHERE')) {
+        return rows([{ id: 'fnl_1', name: 'Signup funnel', created_at: '2026-01-01T00:00:00.000Z' }]);
+      }
+      if (text.includes('FROM funnel_steps')) {
+        return rows(steps);
+      }
+      return rows([]);
+    });
+    const projects = { requireActiveProject: vi.fn().mockResolvedValue(PROJECT), resolveActiveProject: vi.fn().mockResolvedValue(PROJECT) };
+    const service = new FunnelsService(db as never, projects as never);
+
+    const result = await service.debugFunnel(user, 'fnl_1');
+
+    expect(result.steps[1]).toMatchObject({ eventName: 'otp_verification_completed', eventCount: 0, actorCount: 0, qualifiedCount: 0 });
+    expect(result.steps[2]).toMatchObject({ eventName: 'log_food', eventCount: 2, actorCount: 1, qualifiedCount: 0 });
+    expect(result.eventNames).toContainEqual({ eventName: 'login_completed', eventCount: 2 });
+  });
+
+  it('loads the funnel from the active project', async () => {
+    const { projects, service } = makeService();
+    projects.requireActiveProject.mockRejectedValueOnce(new NotFoundException('Funnel not found.'));
+    await expect(service.debugFunnel(user, 'fnl_missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 

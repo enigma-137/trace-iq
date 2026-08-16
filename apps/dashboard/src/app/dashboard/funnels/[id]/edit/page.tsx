@@ -22,7 +22,7 @@ export default async function EditFunnelPage({ params }: { params: { id: string 
     dashboardGet<EventNamesResponse>('/v1/dashboard/insights/event-names', token)
   ]);
 
-  const eventNames = eventNamesData?.eventNames.map((item) => item.eventName) ?? [];
+  const eventNames = eventNamesData?.eventNames ?? [];
 
   return (
     <DashboardShell active="funnels" title={funnel ? `Edit ${funnel.name}` : 'Edit funnel'} userEmail={user.email}>

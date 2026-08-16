@@ -21,7 +21,7 @@ export default async function FunnelsPage() {
   ]);
 
   const funnels = funnelsData?.funnels ?? [];
-  const eventNames = eventNamesData?.eventNames.map((item) => item.eventName) ?? [];
+  const eventNames = eventNamesData?.eventNames ?? [];
 
   return (
     <DashboardShell active="funnels" title="Funnels" userEmail={user.email}>

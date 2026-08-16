@@ -4,6 +4,7 @@ import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { formatCount } from '@/lib/metrics';
 import { FunnelChart } from '@/components/charts/FunnelChart';
 import { FunnelAiSummary } from './FunnelAiSummary';
+import { FunnelDebugPanel, type FunnelDebugData } from './FunnelDebugPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,7 @@ export default async function FunnelResultsPage({
 }) {
   const { user, token } = await requireDashboardSession(`/dashboard/funnels/${params.id}`);
   const days = firstParam(searchParams.days) ?? '30';
+  const debugEnabled = firstParam(searchParams.debug) === '1';
   const stepParam = firstParam(searchParams.step);
   const statusParam = firstParam(searchParams.status) === 'dropped' ? 'dropped' : 'reached';
 
@@ -65,6 +67,15 @@ export default async function FunnelResultsPage({
     `/v1/dashboard/funnels/${params.id}/results?days=${encodeURIComponent(days)}`,
     token
   );
+
+  let debugData: FunnelDebugData | null = null;
+  if (debugEnabled) {
+    const debugResult = await dashboardGet<FunnelDebugData>(
+      `/v1/dashboard/funnels/${params.id}/debug?days=${encodeURIComponent(days)}`,
+      token
+    );
+    debugData = debugResult.data;
+  }
 
   let stepUsers: StepUsersResponse | null = null;
   if (stepParam !== undefined) {
@@ -89,12 +100,24 @@ export default async function FunnelResultsPage({
           ← All funnels
         </Link>
         {data ? (
-          <Link
-            href={`/dashboard/funnels/${params.id}/edit`}
-            className="inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            Edit funnel
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/funnels/${params.id}?days=${days}&debug=${debugEnabled ? '' : '1'}`}
+              className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-semibold transition ${
+                debugEnabled
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300'
+                  : 'border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+              }`}
+            >
+              Data check {debugEnabled ? 'on' : ''}
+            </Link>
+            <Link
+              href={`/dashboard/funnels/${params.id}/edit`}
+              className="inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Edit funnel
+            </Link>
+          </div>
         ) : null}
       </div>
 
@@ -170,6 +193,8 @@ export default async function FunnelResultsPage({
           <FunnelAiSummary funnelId={params.id} days={days} />
 
           {stepUsers ? <StepUsersPanel data={stepUsers} funnelId={params.id} days={days} /> : null}
+
+          {debugData ? <FunnelDebugPanel data={debugData} /> : null}
         </>
       ) : null}
     </DashboardShell>

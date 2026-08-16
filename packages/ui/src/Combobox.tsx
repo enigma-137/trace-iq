@@ -7,6 +7,7 @@ import { cn } from './utils';
 export interface ComboboxItem {
   value: string;
   label: string;
+  description?: string;
 }
 
 export interface ComboboxProps {
@@ -127,6 +128,11 @@ export function Combobox({
                   )}
                 >
                   {item.label}
+                  {item.description ? (
+                    <span className="ml-auto pl-4 font-mono text-xs tabular-nums text-neutral-400 dark:text-slate-500">
+                      {item.description}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

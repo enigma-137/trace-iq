@@ -70,6 +70,39 @@ export interface FunnelStepUsers {
   offset: number;
 }
 
+export type FunnelDebugSample = {
+  actor: string;
+  userId: string | null;
+  anonymousId: string | null;
+  occurredAt: string;
+  receivedAt: string;
+};
+
+export type FunnelDebugStep = {
+  index: number;
+  eventName: string;
+  label: string | null;
+  eventCount: number;
+  actorCount: number;
+  qualifiedCount: number;
+  samples: FunnelDebugSample[];
+};
+
+export type FunnelEventNameCount = {
+  eventName: string;
+  eventCount: number;
+};
+
+export type FunnelDebug = {
+  funnel: { id: string; name: string };
+  projectId: string;
+  from: string;
+  to: string;
+  days: number;
+  steps: FunnelDebugStep[];
+  eventNames: FunnelEventNameCount[];
+}
+
 @Injectable()
 export class FunnelsService {
   constructor(
@@ -292,6 +325,78 @@ export class FunnelsService {
       users: result.rows,
       limit,
       offset
+    };
+  }
+
+  async debugFunnel(user: DashboardUser, funnelId: string, daysParam?: string, projectId?: string): Promise<FunnelDebug> {
+    const project = await this.projects.requireActiveProject(user, projectId);
+    const funnel = await this.loadFunnel(project.id, funnelId);
+    const steps = await this.loadSteps(funnelId);
+
+    const days = this.clampDays(daysParam);
+    const to = new Date();
+    const from = new Date(to.getTime() - days * DAY_MS);
+
+    const qualified = await this.computeStepCounts(project.id, steps, from, to);
+
+    const stepsDebug: FunnelDebugStep[] = [];
+    for (let index = 0; index < steps.length; index += 1) {
+      const step = steps[index];
+
+      const statsResult = await this.database.query<{ eventCount: number; actorCount: number }>(
+        `SELECT
+          count(*)::int AS "eventCount",
+          count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS "actorCount"
+        FROM events
+        WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+          AND event_name = $4 AND COALESCE(user_id::text, anonymous_id) IS NOT NULL`,
+        [project.id, from.toISOString(), to.toISOString(), step.eventName]
+      );
+      const stats = statsResult.rows[0] ?? { eventCount: 0, actorCount: 0 };
+
+      const samplesResult = await this.database.query<FunnelDebugSample>(
+        `SELECT
+          COALESCE(user_id::text, anonymous_id) AS actor,
+          user_id::text AS "userId",
+          anonymous_id::text AS "anonymousId",
+          occurred_at AS "occurredAt",
+          received_at AS "receivedAt"
+        FROM events
+        WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3 AND event_name = $4
+        ORDER BY received_at DESC
+        LIMIT $5`,
+        [project.id, from.toISOString(), to.toISOString(), step.eventName, 5]
+      );
+
+      stepsDebug.push({
+        index,
+        eventName: step.eventName,
+        label: step.label,
+        eventCount: stats.eventCount,
+        actorCount: stats.actorCount,
+        qualifiedCount: qualified[index] ?? 0,
+        samples: samplesResult.rows
+      });
+    }
+
+    const namesResult = await this.database.query<FunnelEventNameCount>(
+      `SELECT event_name AS "eventName", count(*)::int AS "eventCount"
+      FROM events
+      WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+      GROUP BY event_name
+      ORDER BY "eventCount" DESC
+      LIMIT 50`,
+      [project.id, from.toISOString(), to.toISOString()]
+    );
+
+    return {
+      funnel: { id: funnel.id, name: funnel.name },
+      projectId: project.id,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      days,
+      steps: stepsDebug,
+      eventNames: namesResult.rows
     };
   }
 
