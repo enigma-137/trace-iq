@@ -17,3 +17,4 @@ WHERE e.session_id = s.id
   AND e.anonymous_id IS NOT NULL
   AND s.user_id IS NOT NULL
   AND s.anonymous_id = e.anonymous_id;
+  
