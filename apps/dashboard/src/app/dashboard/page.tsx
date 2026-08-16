@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { DashboardShell } from './DashboardShell';
+import { OverviewRangePicker } from './OverviewRangePicker';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { comparisonText, compactNumber, deltaInfo, formatCount } from '@/lib/metrics';
 import { StatTile } from '@/components/charts/StatTile';
@@ -33,13 +34,16 @@ export default async function DashboardPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const projectId = firstParam(searchParams.projectId);
+  const days = normalizeDays(firstParam(searchParams.days));
   const { user, token } = await requireDashboardSession('/dashboard');
   const activeOrganizationId = cookies().get('traceiq_active_org')?.value;
-  const overviewPath = withParams('/v1/dashboard/overview', { projectId, organizationId: activeOrganizationId });
+  const overviewPath = withParams('/v1/dashboard/overview', { projectId, organizationId: activeOrganizationId, days });
   const { data: overview, error } = await dashboardGet<OverviewResponse>(overviewPath, token);
 
   if (!projectId && overview?.project?.id) {
-    redirect(`/dashboard?projectId=${encodeURIComponent(overview.project.id)}`);
+    const params = new URLSearchParams({ projectId: overview.project.id });
+    params.set('days', days);
+    redirect(`/dashboard?${params.toString()}`);
   }
 
   const canonicalProjectId = overview?.project?.id ?? projectId;
@@ -65,6 +69,10 @@ export default async function DashboardPage({
       {/* {overview?.project ? <RevenueHeadline revenue={overview.revenue} sparkline={overview.sparkline} projectId={canonicalProjectId} /> : null} */}
 
       {overview?.project ? <AvailabilityStrip overview={overview} /> : null}
+
+      <div className="mb-5 flex items-center justify-end">
+        <OverviewRangePicker days={days} />
+      </div>
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Total events" value={overview?.totals.events ?? 0} hint="All time" delta={activityDelta} tone={activityTone}>
@@ -92,7 +100,7 @@ export default async function DashboardPage({
           <div className="relative flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-                Events, last 14 days
+                Events, last {days} days
               </p>
               <p className="mt-1 text-sm text-neutral-500 dark:text-slate-300">
                 {overview?.project ? overview.project.name : 'No project yet'}
@@ -115,7 +123,7 @@ export default async function DashboardPage({
 
         <div className={cardClass}>
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Top events (30 days)
+            Top events ({days} days)
           </p>
           <TopEventsList events={overview?.topEvents ?? []} />
         </div>
@@ -124,7 +132,7 @@ export default async function DashboardPage({
       <section className="mb-6 grid gap-3 lg:grid-cols-2">
         <div className={cardClass}>
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Devices (30 days)
+            Devices ({days} days)
           </p>
           <DonutChart
             items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total }))}
@@ -136,7 +144,7 @@ export default async function DashboardPage({
 
         <div className={cardClass}>
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Locations (30 days)
+            Locations ({days} days)
           </p>
           <DonutChart
             items={(overview?.topCountries ?? []).map((c) => ({ label: c.name, value: c.total }))}
@@ -315,7 +323,12 @@ function trendLabel(values: number[]) {
 }
 
 function shortBucket(bucket: string): string {
-  if (bucket.includes('T')) return bucket.split('T')[1].slice(0, 5);
+  if (bucket.includes('T')) {
+    const date = new Date(bucket);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${month}/${day}`;
+  }
   return bucket.slice(5);
 }
 
@@ -337,13 +350,26 @@ function withProjectId(href: string, projectId?: string | null): string {
 
 function withParams(
   href: string,
-  opts: { projectId?: string | null; organizationId?: string | null }
+  opts: { projectId?: string | null; organizationId?: string | null; days?: string | number }
 ): string {
   const [path, hash = ''] = href.split('#');
   const [pathname, query = ''] = path.split('?');
   const params = new URLSearchParams(query);
   if (opts.projectId) params.set('projectId', opts.projectId);
   if (opts.organizationId) params.set('organizationId', opts.organizationId);
+  if (opts.days) params.set('days', String(opts.days));
   const nextQuery = params.toString();
   return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${hash ? `#${hash}` : ''}`;
+}
+
+const OVERVIEW_RANGES = [7, 14, 30, 90] as const;
+
+function normalizeDays(value: string | undefined): string {
+  const parsed = value ? Number(value) : Number.NaN;
+  if (!Number.isFinite(parsed)) return '14';
+  const rounded = Math.trunc(parsed);
+  for (const range of [...OVERVIEW_RANGES].reverse()) {
+    if (rounded <= range) return String(range);
+  }
+  return '90';
 }
