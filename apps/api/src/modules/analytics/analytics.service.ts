@@ -140,12 +140,9 @@ export class AnalyticsService {
   async getOverview(
     user: DashboardUser,
     projectId?: string,
-    organizationId?: string,
-    daysParam?: string
+    organizationId?: string
   ): Promise<OverviewResponse> {
     const project = await this.projects.resolveActiveProject(user, projectId, organizationId);
-    const days = this.clampOverviewDays(daysParam);
-    const interval: TrendInterval = days > 31 ? 'week' : 'day';
 
     if (!project) {
       return {
@@ -184,49 +181,49 @@ export class AnalyticsService {
       `
         SELECT event_name AS "eventName", count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - make_interval(days => $2)
+        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
         GROUP BY event_name
         ORDER BY total DESC
         LIMIT 10
       `,
-      [project.id, days]
+      [project.id]
     );
 
     const sparklineRows = await this.database.query<{ bucket: string; total: number }>(
       `
         SELECT
-          to_char(date_trunc($3, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+          to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
           count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - make_interval(days => $2)
+        WHERE project_id = $1 AND occurred_at >= now() - interval '14 days'
         GROUP BY 1
         ORDER BY 1 ASC
       `,
-      [project.id, days, interval]
+      [project.id]
     );
 
     const topDevices = await this.database.query<{ name: string; total: number }>(
       `
         SELECT COALESCE(NULLIF(device_info->>'os', ''), 'unknown') AS name, count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - make_interval(days => $2)
+        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
         GROUP BY 1
         ORDER BY total DESC
         LIMIT 6
       `,
-      [project.id, days]
+      [project.id]
     );
 
     const topCountries = await this.database.query<{ name: string; total: number }>(
       `
         SELECT COALESCE(NULLIF(network_info->>'country', ''), 'unknown') AS name, count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - make_interval(days => $2)
+        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
         GROUP BY 1
         ORDER BY total DESC
         LIMIT 6
       `,
-      [project.id, days]
+      [project.id]
     );
 
     const revenueResult = await this.database.query<{
@@ -252,8 +249,8 @@ export class AnalyticsService {
     );
 
     const to = new Date();
-    const from = new Date(to.getTime() - days * DAY_MS);
-    const sparkline = this.zeroFill(this.generateBuckets(from, to, interval), sparklineRows.rows);
+    const from = new Date(to.getTime() - 14 * DAY_MS);
+    const sparkline = this.zeroFill(this.generateBuckets(from, to, 'day'), sparklineRows.rows);
 
     const totals = totalsResult.rows[0];
     const revenue = revenueResult.rows[0];
@@ -762,20 +759,6 @@ export class AnalyticsService {
       return 7;
     }
     return Math.min(Math.max(Math.trunc(parsed), 1), 365);
-  }
-
-  // The overview page offers a small set of toggles; snap any requested range to
-  // the nearest preset (7/14/30/90) so the sparkline bucketing stays consistent.
-  private clampOverviewDays(value?: string): number {
-    const parsed = value ? Number(value) : undefined;
-    if (parsed === undefined || !Number.isFinite(parsed)) {
-      return 14;
-    }
-    const rounded = Math.trunc(parsed);
-    if (rounded <= 7) return 7;
-    if (rounded <= 14) return 14;
-    if (rounded <= 30) return 30;
-    return 90;
   }
 
   private zeroFill(
