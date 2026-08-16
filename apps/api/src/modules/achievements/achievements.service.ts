@@ -96,6 +96,99 @@ const METRICS: Record<string, MetricEvaluator> = {
 // lazily on dashboard read instead, so a single event never triggers 20 queries.
 const INGEST_METRIC_KEYS: readonly string[] = ['events.all_time', 'events.24h', 'users.all_time'];
 
+// Unlocks whose milestone was first reached longer ago than this are treated as a
+// historical backfill: they are never emailed as a "new" unlock.
+const UNLOCK_NOTIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// The instant a metric first crossed `threshold`, or null when it hasn't yet.
+// Unlocks are stamped with this timestamp instead of "the day the pipeline first
+// noticed", so a milestone reached months ago isn't backdated to today.
+const metricReachedAt = async (
+  database: DatabaseService,
+  metric: string,
+  scope: MetricScope,
+  threshold: number
+): Promise<string | null> => {
+  const offset = Math.max(Math.floor(threshold) - 1, 0);
+
+  switch (metric) {
+    case 'events.all_time':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT occurred_at AS value FROM events WHERE project_id = $1 ORDER BY occurred_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'users.all_time':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM users WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'projects.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM projects WHERE organization_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.organizationId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'flags.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM feature_flags WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'alerts.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM alerts WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'webhooks.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM webhooks WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'funnels.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM funnels WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'dashboards.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM dashboards WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'cohorts.count':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at AS value FROM cohorts WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1 OFFSET $2`,
+          [scope.projectId, offset]
+        )
+      ).rows[0]?.value ?? null;
+    case 'org.tenure_months':
+      return (
+        await database.query<{ value: string }>(
+          `SELECT created_at + ($2::int * interval '1 month') AS value FROM organizations WHERE id = $1`,
+          [scope.organizationId, threshold]
+        )
+      ).rows[0]?.value ?? null;
+    default:
+      // Rolling windows and unknown metrics have no single historical crossing;
+      // the caller falls back to "right now".
+      return null;
+  }
+};
+
 const CATALOGUE_SQL = `
   SELECT id, slug, title, description, badge, category, kind, metric, threshold, hidden, sort_order
   FROM achievements
@@ -122,16 +215,21 @@ export class AchievementsService {
     const scope = { organizationId: project.organizationId, projectId: project.id };
     const catalogue = await this.loadCatalogue();
     const progress = await this.evaluateAll(catalogue, scope);
-    const toAward = catalogue.filter((row) => progress[row.id] >= row.threshold).map((row) => row.id);
+    const qualified = catalogue.filter((row) => progress[row.id] >= row.threshold);
 
     const unlocks = await this.userUnlocks(user.id);
-    if (toAward.length > 0) {
+    if (qualified.length > 0) {
       const memberIds = await this.orgMemberIds(project.organizationId);
+      const toAward: Array<{ achievementId: string; unlockedAt: string }> = [];
+      for (const row of qualified) {
+        const reachedAt = await metricReachedAt(this.database, row.metric, scope, row.threshold);
+        toAward.push({ achievementId: row.id, unlockedAt: reachedAt ?? new Date().toISOString() });
+      }
       await this.award(toAward, memberIds);
       const fresh = await this.userUnlocks(user.id);
-      for (const id of toAward) {
-        const unlockedAt = fresh.get(id);
-        if (unlockedAt) unlocks.set(id, unlockedAt);
+      for (const { achievementId } of toAward) {
+        const unlockedAt = fresh.get(achievementId);
+        if (unlockedAt) unlocks.set(achievementId, unlockedAt);
       }
     }
 
@@ -184,12 +282,19 @@ export class AchievementsService {
       if (relevant.length === 0) return;
 
       const progress = await this.evaluateAll(relevant, { organizationId: org.organization_id, projectId });
-      const toAward = relevant.filter((row) => progress[row.id] >= row.threshold).map((row) => row.id);
-      if (toAward.length === 0) return;
+      const qualified = relevant.filter((row) => progress[row.id] >= row.threshold);
+      if (qualified.length === 0) return;
 
-      const memberIds = await this.orgMemberIds(org.organization_id);
-      if (memberIds.length === 0) return;
-      await this.award(toAward, memberIds);
+      const members = await this.orgMemberIds(org.organization_id);
+      if (members.length === 0) return;
+
+      const scope = { organizationId: org.organization_id, projectId };
+      const toAward: Array<{ achievementId: string; unlockedAt: string }> = [];
+      for (const row of qualified) {
+        const reachedAt = await metricReachedAt(this.database, row.metric, scope, row.threshold);
+        toAward.push({ achievementId: row.id, unlockedAt: reachedAt ?? new Date().toISOString() });
+      }
+      await this.award(toAward, members);
 
       // Email members who have a cached email (they've opened the dashboard before).
       await this.emailNewUnlocks(org.organization_id);
@@ -219,19 +324,27 @@ export class AchievementsService {
   }
 
   // Idempotent: ON CONFLICT DO NOTHING means re-evaluation never overwrites the
-  // original unlocked_at, and a duplicate award is a no-op.
-  private async award(achievementIds: string[], userIds: string[]): Promise<void> {
+  // original unlocked_at, and a duplicate award is a no-op. Historical unlocks
+  // (milestones reached longer ago than UNLOCK_NOTIFY_WINDOW_MS) are marked as
+  // notified up-front so they can't blast a "you just unlocked" email.
+  private async award(
+    unlocks: Array<{ achievementId: string; unlockedAt: string }>,
+    userIds: string[]
+  ): Promise<void> {
     await this.database.transaction(async (client) => {
-      for (const achievementId of achievementIds) {
+      for (const { achievementId, unlockedAt } of unlocks) {
+        const notifiedAt =
+          new Date(unlockedAt).getTime() > Date.now() - UNLOCK_NOTIFY_WINDOW_MS ? null : new Date().toISOString();
+
         const values: unknown[] = [];
         const groups: string[] = [];
         userIds.forEach((userId, index) => {
-          const base = index * 2;
-          groups.push(`($${base + 1}, $${base + 2})`);
-          values.push(userId, achievementId);
+          const base = index * 4;
+          groups.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+          values.push(userId, achievementId, unlockedAt, notifiedAt);
         });
         await client.query(
-          `INSERT INTO achievement_unlocks (user_id, achievement_id)
+          `INSERT INTO achievement_unlocks (user_id, achievement_id, unlocked_at, email_sent_at)
            VALUES ${groups.join(', ')}
            ON CONFLICT (user_id, achievement_id) DO NOTHING`,
           values
