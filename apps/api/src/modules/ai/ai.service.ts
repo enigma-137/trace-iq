@@ -3,7 +3,7 @@ import Groq from 'groq-sdk';
 import { DashboardUser } from '../auth/auth.service';
 import { FunnelResults, FunnelsService } from '../funnels/funnels.service';
 
-const MODEL = 'llama-3.3-70b-versatile';
+export const AI_MODEL = 'llama-3.3-70b-versatile';
 
 export interface AiSummary {
   summary: string;
@@ -39,7 +39,7 @@ export class AiService {
     const prompt = this.buildFunnelPrompt(results);
     const summary = await this.complete(prompt);
 
-    return { summary, model: MODEL, generatedAt: new Date().toISOString() };
+    return { summary, model: AI_MODEL, generatedAt: new Date().toISOString() };
   }
 
   private buildFunnelPrompt(results: FunnelResults): string {
@@ -83,12 +83,26 @@ export class AiService {
     return worst;
   }
 
+  /**
+   * Best-effort completion for non-critical surfaces (Today's Story). Unlike
+   * {@link complete}, a missing GROQ_API_KEY or a failed call returns `null`
+   * instead of throwing, so the caller can fall back to a template.
+   */
+  async completeSafely(userPrompt: string): Promise<string | null> {
+    try {
+      return await this.complete(userPrompt);
+    } catch (error) {
+      this.logger.warn('AI completion unavailable; caller will use its fallback.', error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
+
   private async complete(userPrompt: string): Promise<string> {
     const client = this.getClient();
 
     try {
       const completion = await client.chat.completions.create({
-        model: MODEL,
+        model: AI_MODEL,
         temperature: 0.3,
         max_tokens: 220,
         messages: [

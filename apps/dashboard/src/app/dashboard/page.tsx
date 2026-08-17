@@ -10,6 +10,8 @@ import { MiniBars } from '@/components/charts/MiniBars';
 import { BarChart } from '@/components/charts/BarChart';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
+import { TodayStoryCard } from './TodayStoryCard';
+import { NowActivityPanel } from './NowActivityPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +99,8 @@ export default async function DashboardPage({
         </section>
       ) : null}
 
+      {overview?.project ? <TodayStoryCard projectId={canonicalProjectId} /> : null}
+
       {overview?.project ? <AvailabilityStrip overview={overview} /> : null}
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -146,11 +150,15 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <div className={cardClass}>
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Top events (30 days)
-          </p>
-          <TopEventsList events={overview?.topEvents ?? []} />
+        <div className="flex flex-col gap-3">
+          <NowActivityPanel projectId={canonicalProjectId} />
+
+          <div className={cardClass}>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+              Top events (30 days)
+            </p>
+            <TopEventsList events={overview?.topEvents ?? []} />
+          </div>
         </div>
       </section>
 

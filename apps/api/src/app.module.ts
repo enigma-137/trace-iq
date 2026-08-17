@@ -20,6 +20,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { MfaModule } from './modules/mfa/mfa.module';
 import { ErrorsModule } from './modules/errors/errors.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
+import { InsightsModule } from './modules/insights/insights.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 
@@ -52,6 +53,7 @@ import { DatabaseModule } from './database/database.module';
     MfaModule,
     ErrorsModule,
     AchievementsModule,
+    InsightsModule,
     BillingModule
   ],
   controllers: [AppController],
