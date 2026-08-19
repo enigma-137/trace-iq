@@ -136,6 +136,27 @@ export class AuthService {
     }
   }
 
+  /**
+   * Platform-admin gate for the operator console. Only users whose (lowercased)
+   * email is listed in `platform_admins` pass. Personal access tokens are
+   * rejected outright — admin access needs an interactive Supabase session with
+   * a verified email. Throws ForbiddenException otherwise.
+   */
+  async requirePlatformAdmin(user: DashboardUser): Promise<void> {
+    if (user.authMethod === 'pat' || !user.email) {
+      throw new ForbiddenException('Platform admin access requires a signed-in session.');
+    }
+
+    const result = await this.database.query<{ email: string }>(
+      `SELECT email FROM platform_admins WHERE email = $1 LIMIT 1`,
+      [user.email.trim().toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+      throw new ForbiddenException('You do not have platform admin access.');
+    }
+  }
+
   requireScope(user: DashboardUser, scope: string): void {
     if (user.authMethod !== 'pat') {
       return;

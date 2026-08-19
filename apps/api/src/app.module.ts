@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { EventsModule } from './modules/events/events.module';
 import { FunnelsModule } from './modules/funnels/funnels.module';
 import { CohortsModule } from './modules/cohorts/cohorts.module';
@@ -54,7 +55,8 @@ import { DatabaseModule } from './database/database.module';
     ErrorsModule,
     AchievementsModule,
     InsightsModule,
-    BillingModule
+    BillingModule,
+    AdminModule
   ],
   controllers: [AppController],
   providers: [
