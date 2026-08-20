@@ -60,13 +60,13 @@ export interface AdminTimelinePoint {
 
 const OVERVIEW_SQL = `
   SELECT
-    (SELECT COUNT(*)::int FROM organizations) AS organizations,
-    (SELECT COUNT(*)::int FROM projects) AS projects,
-    (SELECT COUNT(*)::int FROM events) AS eventsTotal,
-    (SELECT COUNT(*)::int FROM events WHERE received_at >= now() - interval '24 hours') AS events24h,
+    (SELECT COUNT(*)::int FROM organizations) AS "organizations",
+    (SELECT COUNT(*)::int FROM projects) AS "projects",
+    (SELECT COUNT(*)::int FROM events) AS "eventsTotal",
+    (SELECT COUNT(*)::int FROM events WHERE received_at >= now() - interval '24 hours') AS "events24h",
     (SELECT COUNT(DISTINCT organization_id)::int FROM events
-      WHERE received_at >= now() - interval '24 hours') AS activeOrgs24h,
-    (SELECT COUNT(*)::int FROM users) AS trackedUsers
+      WHERE received_at >= now() - interval '24 hours') AS "activeOrgs24h",
+    (SELECT COUNT(*)::int FROM users) AS "trackedUsers"
 `;
 
 const ORGANIZATIONS_SQL = `
