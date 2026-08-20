@@ -930,6 +930,21 @@ input {
   animation: traceiq-pulse-dot 2.6s ease-in-out infinite;
 }
 
+.traceiq-site .status-dot.degraded {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15), 0 0 12px rgba(245, 158, 11, 0.55);
+}
+
+.traceiq-site .status-dot.down {
+  background: #f43f5e;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.15), 0 0 12px rgba(244, 63, 94, 0.55);
+}
+
+.traceiq-site .status-dot.checking {
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15), 0 0 8px rgba(148, 163, 184, 0.4);
+}
+
 @keyframes traceiq-pulse-dot {
   0%, 100% { opacity: 0.75; }
   50% { opacity: 1; }

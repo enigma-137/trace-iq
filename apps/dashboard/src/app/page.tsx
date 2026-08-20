@@ -18,6 +18,7 @@ import {
   Zap
 } from 'lucide-react';
 import GlobeHero from '@/components/globe-hero';
+import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 
 const navItems = ['Product', 'Solutions', 'Docs', 'Resources', 'Company'];
 
@@ -408,7 +409,7 @@ export default function Page() {
           <div className="footer-brand">
             <a className="brand" href="#top"><img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-6 w-auto" /></a>
             <p>Make complexity legible.</p>
-            <span className="footer-status"><span className="status-dot" /> All systems operational</span>
+            <LiveFooterStatus />
           </div>
           <div className="footer-links">
             <div><strong>Product</strong><a href="#product">Overview</a><a href="#solutions">Solutions</a><a href="/docs">Resources</a></div>
