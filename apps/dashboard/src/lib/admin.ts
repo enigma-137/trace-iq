@@ -46,12 +46,18 @@ export interface AdminLogEntry {
   occurredAt: string;
 }
 
+export interface AdminTimelinePoint {
+  day: string;
+  total: number;
+}
+
 export interface AdminAccess {
   isAdmin: boolean;
   overview?: AdminOverview;
   organizations?: AdminOrganization[];
   projects?: AdminProject[];
   logs?: AdminLogEntry[];
+  timeline?: AdminTimelinePoint[];
 }
 
 /**
@@ -63,11 +69,12 @@ export interface AdminAccess {
 export async function requireAdminAccess(nextPath = '/admin'): Promise<AdminAccess> {
   const { token } = await requireDashboardSession(nextPath);
 
-  const [overview, organizations, projects, logs] = await Promise.all([
+  const [overview, organizations, projects, logs, timeline] = await Promise.all([
     dashboardGet<AdminOverview>('/v1/admin/overview', token),
     dashboardGet<AdminOrganization[]>('/v1/admin/organizations', token),
     dashboardGet<AdminProject[]>('/v1/admin/projects', token),
-    dashboardGet<AdminLogEntry[]>('/v1/admin/logs', token)
+    dashboardGet<AdminLogEntry[]>('/v1/admin/logs', token),
+    dashboardGet<AdminTimelinePoint[]>('/v1/admin/timeline', token)
   ]);
 
   if (!overview.data) {
@@ -79,7 +86,8 @@ export async function requireAdminAccess(nextPath = '/admin'): Promise<AdminAcce
     overview: overview.data,
     organizations: organizations.data ?? [],
     projects: projects.data ?? [],
-    logs: logs.data ?? []
+    logs: logs.data ?? [],
+    timeline: timeline.data ?? []
   };
 }
 

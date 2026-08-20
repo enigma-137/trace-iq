@@ -103,6 +103,23 @@ describe('admin logs', () => {
   });
 });
 
+describe('admin timeline', () => {
+  it('returns daily event totals in chronological order', async () => {
+    const db = mockDatabase(() =>
+      rows([
+        { day: '2026-08-15', total: 100 },
+        { day: '2026-08-16', total: 250 }
+      ])
+    );
+
+    const result = await makeService(db).timeline();
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ day: '2026-08-15', total: 100 });
+    expect(result[1].total).toBe(250);
+  });
+});
+
 describe('requirePlatformAdmin', () => {
   it('allows a user whose email is listed in platform_admins', async () => {
     const db = mockDatabase(() => rows([{ email: 'emmanuelonoja291@gmail.com' }]));
@@ -146,7 +163,8 @@ describe('admin controller', () => {
       organizations: vi.fn().mockResolvedValue([]),
       projects: vi.fn().mockResolvedValue([]),
       activity: vi.fn().mockResolvedValue([]),
-      logs: vi.fn().mockResolvedValue([])
+      logs: vi.fn().mockResolvedValue([]),
+      timeline: vi.fn().mockResolvedValue([])
     } as unknown as AdminClass;
 
     const controller = new AdminController(auth, svc);
@@ -156,9 +174,11 @@ describe('admin controller', () => {
     await controller.projects('Bearer x');
     await controller.activity('Bearer x');
     await controller.logs('Bearer x');
+    await controller.timeline('Bearer x');
 
-    expect(auth.requirePlatformAdmin).toHaveBeenCalledTimes(5);
+    expect(auth.requirePlatformAdmin).toHaveBeenCalledTimes(6);
     expect(svc.overview).toHaveBeenCalledTimes(1);
     expect(svc.logs).toHaveBeenCalledTimes(1);
+    expect(svc.timeline).toHaveBeenCalledTimes(1);
   });
 });

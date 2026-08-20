@@ -52,6 +52,12 @@ export interface AdminLogEntry {
   occurredAt: string;
 }
 
+export interface AdminTimelinePoint {
+  [column: string]: unknown;
+  day: string;
+  total: number;
+}
+
 const OVERVIEW_SQL = `
   SELECT
     (SELECT COUNT(*)::int FROM organizations) AS organizations,
@@ -159,6 +165,17 @@ const LOGS_SQL = `
   LIMIT 100
 `;
 
+// Daily event volume over the last 14 days, so the operator can spot trends at
+// a glance. Buckets are UTC calendar days (matches the rest of the platform).
+const TIMELINE_SQL = `
+  SELECT to_char(date_trunc('day', received_at), 'YYYY-MM-DD') AS day,
+         COUNT(*)::int AS total
+  FROM events
+  WHERE received_at >= now() - interval '14 days'
+  GROUP BY date_trunc('day', received_at)
+  ORDER BY date_trunc('day', received_at) ASC
+`;
+
 @Injectable()
 export class AdminService {
   constructor(private readonly database: DatabaseService) {}
@@ -185,6 +202,11 @@ export class AdminService {
 
   async logs(): Promise<AdminLogEntry[]> {
     const result = await this.database.query<AdminLogEntry>(LOGS_SQL);
+    return result.rows;
+  }
+
+  async timeline(): Promise<AdminTimelinePoint[]> {
+    const result = await this.database.query<AdminTimelinePoint>(TIMELINE_SQL);
     return result.rows;
   }
 }

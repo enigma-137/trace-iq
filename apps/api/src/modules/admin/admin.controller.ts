@@ -43,4 +43,11 @@ export class AdminController {
     await this.authService.requirePlatformAdmin(user);
     return this.adminService.logs();
   }
+
+  @Get('timeline')
+  async timeline(@Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    await this.authService.requirePlatformAdmin(user);
+    return this.adminService.timeline();
+  }
 }
