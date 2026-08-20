@@ -176,6 +176,7 @@ export default async function WebAnalyticsPage({
               <GeographyGlobe
                 data={(data?.countries ?? []).map((c) => ({ name: c.name, total: c.total }))}
                 metric="visitors"
+                
               />
             </div> */}
             <div>
