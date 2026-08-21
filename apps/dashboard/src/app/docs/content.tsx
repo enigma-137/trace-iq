@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { codeToHtml } from 'shiki';
 import { DocsLayout } from './DocsLayout';
+import { CodeBlockContainer } from './CodeBlock';
 
 export const docsSections = [
   { id: 'welcome', label: 'Welcome', category: 'Getting started' },
@@ -50,7 +51,7 @@ export function resolveActiveId(searchParams: { [key: string]: string | string[]
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24 border-b border-neutral-200 py-8 first:pt-0 last:border-0 dark:border-slate-800">
-      <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">{title}</h2>
+      <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">{title}</h2>
       <div className="mt-3 grid gap-3">{children}</div>
     </section>
   );
@@ -75,12 +76,7 @@ export async function Code({ children, lang = 'ts' }: { children: string; lang?:
     defaultColor: false
   });
 
-  return (
-    <div
-      className="overflow-hidden rounded-md border border-neutral-200 text-xs leading-6 dark:border-slate-800 [&_pre]:overflow-x-auto [&_pre]:p-4 [&_pre]:font-mono"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  return <CodeBlockContainer html={html} codeText={children} lang={lang} />;
 }
 
 export function Bullets({ items }: { items: Array<[string, string]> }) {
@@ -126,37 +122,68 @@ interface DocsSectionBodyProps {
 export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSectionBodyProps) {
   if (id === 'welcome') {
     return (
-      <Section id="welcome" title="Welcome to the TraceIQ docs">
-        <P>
-          TraceIQ is a developer-first behavior intelligence platform. These docs cover the full SDK and API
-          reference — everything you need to instrument events, understand conversion, and act on the signal.
-        </P>
-        <P>
-          <strong>How to use these docs.</strong> Browse with the contents on the left — or tap{' '}
-          <Mono>Table of contents</Mono> on mobile — and follow the pages in order. Every page has{' '}
-          <Mono>Previous</Mono> / <Mono>Next</Mono> links at the bottom.
-        </P>
-        <P>The docs are organised into three parts:</P>
-        <Bullets
-          items={[
-            ['Getting started', 'Quickstart, SDK methods, configuration, and what the SDK captures automatically.'],
-            ['Server & mobile SDKs', 'Node.js, React Native, Python, Swift, Kotlin, and Rust.'],
-            ['Features', 'Feature flags, alerts, dashboards, webhooks, data export, and the rest of the platform.'],
-            ['Reference', 'Raw server-side ingestion over HTTP and the MCP server.']
-          ]}
-        />
-        <P>
-          Ready to send real events?{' '}
-          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/waitlist">
-            Request early access
-          </a>{' '}
-          to get a project and write key, then start with{' '}
-          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=quickstart">
-            Quickstart
-          </a>
-          .
-        </P>
-      </Section>
+      <div className="space-y-8">
+        {/* Docs Hero Header */}
+        <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-blue-500/10 blur-3xl dark:bg-cyan-500/10" />
+          <div className="relative z-10">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 font-mono text-xs font-semibold text-blue-600 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-300">
+
+              TraceIQ Documentation
+            </span>
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white sm:text-4xl">
+              TraceIQ Docs
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 dark:text-slate-300 sm:text-base">
+              Instrument behavior telemetry, track conversion funnels, configure percentage feature flags, and run real-time user analytics across your web, mobile, and server applications.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link
+                href="/docs?page=quickstart"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white transition hover:bg-blue-700 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+              >
+                Start integration
+                <span aria-hidden>→</span>
+              </Link>
+              <Link
+                href="/docs?page=node"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Browse SDKs
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Callout Box */}
+        <div className="rounded-xl border-l-4 border-cyan-500 bg-cyan-500/10 p-5 dark:border-cyan-400 dark:bg-cyan-950/30">
+          <div className="flex items-center gap-2 text-sm font-bold text-cyan-700 dark:text-cyan-300">
+
+            <span>Start with a clean setup</span>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-neutral-700 dark:text-slate-300">
+            TraceIQ is built for developer efficiency. Have your <code className="rounded border border-cyan-500/20 bg-cyan-500/10 px-1 py-0.5 font-mono text-[11px] text-cyan-800 dark:text-cyan-200">Write Key</code> ready from Settings to begin capturing events, user identity timelines, and retention cohorts right away.
+          </p>
+        </div>
+
+        {/* Choose Your Path Grid */}
+        <PathCardsGrid basePath="/docs" />
+
+        {/* Overview Details */}
+        <Section id="welcome-details" title="Before You Install">
+          <P>
+            TraceIQ SDKs auto-batch telemetry payloads, handle offline retry logic, and support both client-side autocapture and server-side HTTP ingestion.
+          </P>
+          <Bullets
+            items={[
+              ['Getting started', 'Quickstart, SDK methods, configuration options, and automatic event capture.'],
+              ['Server & mobile SDKs', 'Node.js, React Native, Python, Swift, Kotlin, Rust, and PHP SDKs.'],
+              ['Features', 'Feature flags, alerts, dashboards, webhooks, export, and reserved events.'],
+              ['Reference', 'Direct REST ingestion over HTTP and the Model Context Protocol (MCP) server copilot.']
+            ]}
+          />
+        </Section>
+      </div>
     );
   }
 
@@ -834,22 +861,85 @@ function verify(rawBody, header, secret) {
   return null;
 }
 
+export function PathCardsGrid({ basePath }: { basePath: string }) {
+  const paths = [
+    {
+      title: 'Install TraceIQ JS',
+      desc: 'npm install traceiq-sdk-js and start capturing events in minutes.',
+      href: `${basePath}?page=quickstart`
+    },
+    {
+      title: 'Browser Autocapture',
+      desc: 'Automatic click tracking, rage clicks, and page view sessions.',
+      href: `${basePath}?page=autocapture`
+    },
+    {
+      title: 'Server & Mobile SDKs',
+      desc: 'Node.js, React Native, Python, Swift, Kotlin, Rust, and PHP SDKs.',
+      href: `${basePath}?page=node`
+    },
+    {
+      title: 'Feature Flags',
+      desc: 'Percentage rollouts, per-user overrides, and JSON remote config.',
+      href: `${basePath}?page=flags`
+    },
+    {
+      title: 'Alerts & Webhooks',
+      desc: 'Set rolling metric threshold alerts and dispatch real-time webhooks.',
+      href: `${basePath}?page=alerts`
+    },
+    {
+      title: 'MCP Copilot Server',
+      desc: 'Connect Claude Desktop or Cursor to TraceIQ as an analytics copilot.',
+      href: `${basePath}?page=mcp`
+    }
+  ];
+
+  return (
+    <div className="mt-8 space-y-4">
+      <h3 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">Choose Your Path</h3>
+      <div className="grid gap-3.5 sm:grid-cols-2">
+        {paths.map((p) => (
+          <Link
+            key={p.title}
+            href={p.href}
+            className="group flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-4.5 shadow-sm transition-all hover:border-neutral-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-neutral-900 transition group-hover:text-blue-600 dark:text-white dark:group-hover:text-cyan-400">
+                  {p.title}
+                </span>
+                <span className="text-neutral-400 transition-transform group-hover:translate-x-1 group-hover:text-blue-600 dark:text-slate-500 dark:group-hover:text-cyan-400">
+                  →
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-neutral-500 dark:text-slate-400">{p.desc}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface DocsExplorerProps {
   activeId: string;
   basePath: string;
   projectId: string;
   apiBaseUrl: string;
   snippet: string;
+  onOpenSearch?: () => void;
 }
 
-export function DocsExplorer({ activeId, basePath, projectId, apiBaseUrl, snippet }: DocsExplorerProps) {
+export function DocsExplorer({ activeId, basePath, projectId, apiBaseUrl, snippet, onOpenSearch }: DocsExplorerProps) {
   const activeSectionIndex = docsSections.findIndex((s) => s.id === activeId);
   const currentSection = activeSectionIndex !== -1 ? docsSections[activeSectionIndex] : docsSections[0];
   const currentId = currentSection.id;
 
   return (
-    <DocsLayout sections={docsSections} currentId={currentId} basePath={basePath}>
-      <div className="min-w-0 max-w-3xl">
+    <DocsLayout sections={docsSections} currentId={currentId} basePath={basePath} onOpenSearch={onOpenSearch}>
+      <div className="min-w-0 flex-1">
         <DocsSectionBody id={currentId} projectId={projectId} apiBaseUrl={apiBaseUrl} snippet={snippet} />
 
         {/* Pagination Controls */}
