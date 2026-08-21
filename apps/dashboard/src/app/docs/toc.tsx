@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight, BookOpen, Terminal, Sparkles, FileCode } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, Terminal, FileCode, Clock } from 'lucide-react';
 
 export interface DocsTocItem {
   id: string;
@@ -11,7 +11,7 @@ export interface DocsTocItem {
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  'Getting started': <Sparkles className="size-3.5" />,
+  'Getting started': <Clock className="size-3.5" />,
   'Server & mobile SDKs': <Terminal className="size-3.5" />,
   Features: <BookOpen className="size-3.5" />,
   Reference: <FileCode className="size-3.5" />
@@ -64,11 +64,10 @@ export function TocNav({
                     <li key={s.id}>
                       <Link
                         onClick={onItemClick}
-                        className={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-all ${
-                          isActive
+                        className={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-all ${isActive
                             ? 'bg-blue-50 font-semibold text-blue-700 dark:bg-cyan-500/10 dark:text-cyan-300 border-l-2 border-blue-600 dark:border-cyan-400'
                             : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-200'
-                        }`}
+                          }`}
                         href={`${basePath}?page=${s.id}`}
                       >
                         <span className="truncate">{s.label}</span>
