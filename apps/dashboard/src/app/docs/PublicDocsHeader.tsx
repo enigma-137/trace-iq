@@ -13,7 +13,7 @@ export function PublicDocsHeader({ onOpenSearch }: { onOpenSearch?: () => void }
             <img className="h-7 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
             <img className="hidden h-7 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
             <span className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">TraceIQ</span>
-            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-blue-600 dark:bg-cyan-500/10 dark:text-cyan-400">
+            <span className="rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-blue-600 dark:text-cyan-400">
               Docs
             </span>
           </Link>
