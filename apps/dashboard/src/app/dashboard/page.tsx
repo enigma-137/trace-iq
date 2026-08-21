@@ -15,6 +15,7 @@ import { MultiSeriesPerformanceChart } from '@/components/charts/MultiSeriesPerf
 import { VolumeDistributionTile } from '@/components/charts/VolumeDistributionTile';
 import { TodayStoryCard } from './TodayStoryCard';
 import { NowActivityPanel } from './NowActivityPanel';
+import { ProjectIdBadge } from './ProjectIdBadge';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,9 +84,7 @@ export default async function DashboardPage({
                 {overview.project.name}
               </span>
 
-              <span className="shrink-0 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 font-mono text-[11px] text-blue-600 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-400">
-                #{overview.project.id}
-              </span>
+              <ProjectIdBadge projectId={overview.project.id} />
             </div>
 
             <a

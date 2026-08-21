@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
 
@@ -27,7 +28,7 @@ interface TodayStoryResponse {
 /**
  * Today's Story — the plain-English headline for the overview. Fetches on mount,
  * regenerates when the button is clicked, and falls back to a template narrative
- * server-side, so this card is cheap even without GROQ_API_KEY.
+ * server-side.
  */
 export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -77,30 +78,35 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   }, [projectId]);
 
   return (
-    <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_20%,rgba(59,130,246,0.10),transparent_36%)] dark:bg-[radial-gradient(circle_at_82%_20%,rgba(59,130,246,0.18),transparent_36%)]" />
+    <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm transition-all hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-700/80">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.12),transparent_40%)] dark:bg-[radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.20),transparent_40%)]" />
       <div className="relative">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-              Today&apos;s story
-            </p>
-            <p className="mt-0.5 text-sm text-neutral-500 dark:text-slate-400">
-              {story?.project ? `${story.project.organizationName} / ${story.project.name}` : 'Your workspace in plain English'}
+            <div className="flex items-center gap-1.5">
+              {/* <Sparkles className="size-3.5 text-blue-600 dark:text-blue-400" /> */}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500 dark:text-slate-400">
+                Today&apos;s Story
+              </p>
+            </div>
+            <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">
+              {story?.project ? `${story.project.organizationName} / ${story.project.name}` : 'Workspace activity summary'}
             </p>
           </div>
+
           <button
             type="button"
             onClick={() => void load()}
             disabled={isLoading}
-            className="inline-flex h-8 shrink-0 items-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 self-start sm:self-auto"
           >
-            {isLoading ? 'Writing…' : 'Refresh'}
+            <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{isLoading ? 'Writing…' : 'Refresh'}</span>
           </button>
         </div>
 
         {error ? (
-          <p className="mt-4 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2.5 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <p className="mt-4 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2.5 text-xs text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             {error}
           </p>
         ) : null}
@@ -114,15 +120,29 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
         ) : null}
 
         {story ? (
-          <div className="mt-4">
-            <p className="max-w-3xl text-[15px] leading-6 text-neutral-700 dark:text-slate-200">{story.narrative}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <FactChip label="Today" value={story.facts.eventsToday.toLocaleString()} />
+          <div className="mt-3.5">
+            <p className="max-w-3xl text-sm leading-6 font-medium text-neutral-800 dark:text-slate-200">
+              {story.narrative}
+            </p>
+            <div className="mt-3.5 flex flex-wrap gap-2">
+              <FactChip label="Today" value={story.facts.eventsToday.toLocaleString()} tone="blue" />
               <FactChip label="Delta" value={deltaLabel(story.facts.deltaPct)} tone={deltaTone(story.facts.deltaPct)} />
-              <FactChip label="Users today" value={story.facts.uniquesToday.toLocaleString()} />
-              {story.facts.topEvent ? <FactChip label="Top event" value={story.facts.topEvent.name} title={`${story.facts.topEvent.count.toLocaleString()} events`} /> : null}
+              <FactChip label="Users today" value={story.facts.uniquesToday.toLocaleString()} tone="blue" />
+              {story.facts.topEvent ? (
+                <FactChip
+                  label="Top event"
+                  value={story.facts.topEvent.name}
+                  title={`${story.facts.topEvent.count.toLocaleString()} events`}
+                  tone="neutral"
+                />
+              ) : null}
               {story.facts.topCountry && story.facts.topCountry.name !== 'unknown' ? (
-                <FactChip label="Top region" value={story.facts.topCountry.name} title={`${story.facts.topCountry.pct}% of activity`} />
+                <FactChip
+                  label="Top region"
+                  value={story.facts.topCountry.name}
+                  title={`${story.facts.topCountry.pct}% of activity`}
+                  tone="neutral"
+                />
               ) : null}
               {story.facts.activeNow > 0 ? <FactChip label="Active now" value={String(story.facts.activeNow)} tone="green" /> : null}
             </div>
@@ -145,15 +165,15 @@ function FactChip({
   title?: string;
 }) {
   const tones = {
-    blue: 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-300',
-    green: 'border-emerald-400/15 bg-emerald-400/10 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300',
-    red: 'border-red-400/15 bg-red-400/10 text-red-600 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-300',
-    neutral: 'border-neutral-300 bg-neutral-100 text-neutral-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+    blue: 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/15 dark:text-blue-300',
+    green: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-300',
+    red: 'border-red-500/20 bg-red-500/10 text-red-700 dark:border-red-400/30 dark:bg-red-400/15 dark:text-red-300',
+    neutral: 'border-neutral-300 bg-neutral-100 text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'
   };
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`} title={title}>
-      <span className="text-neutral-400 dark:text-slate-500">{label}</span>
-      <span>{value}</span>
+      <span className="opacity-70">{label}</span>
+      <span className="font-mono">{value}</span>
     </span>
   );
 }
