@@ -903,7 +903,7 @@ export function PathCardsGrid({ basePath }: { basePath: string }) {
           <Link
             key={p.title}
             href={p.href}
-            className="group flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-4.5 shadow-sm transition-all hover:border-neutral-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+            className="group flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-all hover:border-neutral-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900"
           >
             <div>
               <div className="flex items-center justify-between">
