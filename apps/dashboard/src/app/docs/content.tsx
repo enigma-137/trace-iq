@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { codeToHtml } from 'shiki';
 import { DocsLayout } from './DocsLayout';
-import { CodeBlockContainer } from './CodeBlock';
+import { CodeBlock } from './CodeBlock';
 
 export const docsSections = [
   { id: 'welcome', label: 'Welcome', category: 'Getting started' },
@@ -69,14 +68,8 @@ export function Mono({ children }: { children: ReactNode }) {
   );
 }
 
-export async function Code({ children, lang = 'ts' }: { children: string; lang?: string }) {
-  const html = await codeToHtml(children, {
-    lang,
-    themes: { light: 'github-light', dark: 'github-dark' },
-    defaultColor: false
-  });
-
-  return <CodeBlockContainer html={html} codeText={children} lang={lang} />;
+export function Code({ children, lang = 'ts' }: { children: string; lang?: string }) {
+  return <CodeBlock codeText={children} lang={lang} />;
 }
 
 export function Bullets({ items }: { items: Array<[string, string]> }) {

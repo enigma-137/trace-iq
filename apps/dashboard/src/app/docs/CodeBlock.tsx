@@ -1,18 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { codeToHtml } from 'shiki';
 
-export function CodeBlockContainer({
-  html,
+export function CodeBlock({
   codeText,
   lang = 'ts'
 }: {
-  html: string;
   codeText: string;
   lang?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    codeToHtml(codeText, {
+      lang,
+      themes: { light: 'github-light', dark: 'github-dark' },
+      defaultColor: false
+    })
+      .then((res) => {
+        if (active) setHtml(res);
+      })
+      .catch(() => {
+        // Fallback on invalid language
+      });
+    return () => {
+      active = false;
+    };
+  }, [codeText, lang]);
 
   const handleCopy = async () => {
     try {
@@ -25,19 +43,19 @@ export function CodeBlockContainer({
   };
 
   return (
-    <div className="group relative my-3 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-900 dark:border-slate-800">
+    <div className="group relative my-4 overflow-hidden rounded-xl border border-neutral-200 bg-slate-950 dark:border-slate-800">
       {/* Code Header Bar */}
-      <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-950/80 px-4 py-2 text-[11px] font-mono text-neutral-400">
-        <span className="uppercase tracking-wide text-neutral-400">{lang}</span>
+      <div className="flex items-center justify-between border-b border-neutral-800 bg-slate-900/90 px-4 py-2 text-[11px] font-mono text-slate-400">
+        <span className="uppercase tracking-wide font-semibold text-slate-400">{lang}</span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 rounded px-2 py-1 text-xs font-sans text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          className="flex items-center gap-1.5 rounded px-2 py-1 text-xs font-sans text-slate-400 transition hover:bg-slate-800 hover:text-white"
         >
           {copied ? (
             <>
               <Check className="size-3.5 text-emerald-400" />
-              <span className="text-emerald-400">Copied!</span>
+              <span className="text-emerald-400 font-semibold">Copied!</span>
             </>
           ) : (
             <>
@@ -48,11 +66,17 @@ export function CodeBlockContainer({
         </button>
       </div>
 
-      {/* Rendered Shiki Code HTML */}
-      <div
-        className="overflow-x-auto p-4 text-xs leading-6 [&_pre]:!bg-transparent [&_pre]:font-mono"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      {/* Code Body */}
+      {html ? (
+        <div
+          className="overflow-x-auto p-4 text-xs leading-6 text-slate-100 [&_pre]:!bg-transparent [&_pre]:font-mono"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <div className="overflow-x-auto p-4 text-xs leading-6 text-slate-100">
+          <pre className="font-mono whitespace-pre">{codeText}</pre>
+        </div>
+      )}
     </div>
   );
 }
