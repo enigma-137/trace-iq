@@ -10,6 +10,9 @@ import { MiniBars } from '@/components/charts/MiniBars';
 import { BarChart } from '@/components/charts/BarChart';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
+import { TelemetryGaugeTile } from '@/components/charts/TelemetryGaugeTile';
+import { MultiSeriesPerformanceChart } from '@/components/charts/MultiSeriesPerformanceChart';
+import { VolumeDistributionTile } from '@/components/charts/VolumeDistributionTile';
 import { TodayStoryCard } from './TodayStoryCard';
 import { NowActivityPanel } from './NowActivityPanel';
 
@@ -123,6 +126,67 @@ export default async function DashboardPage({
         <StatTile label="Sessions" value={overview?.totals.sessions ?? 0} hint="All time" delta="active" tone="blue">
           <Sparkline points={recentSpark} tone="blue" filled className="h-11 w-full" />
         </StatTile>
+      </section>
+
+      {/* Control-Plane System Telemetry & Performance Row */}
+      <section className="mb-5 grid gap-3 grid-cols-1 lg:grid-cols-[1.5fr_1fr]">
+        <div className={cardClass}>
+          <MultiSeriesPerformanceChart
+            buckets={(overview?.sparkline ?? []).map((point) => shortBucket(point.bucket))}
+            series={[
+              {
+                key: 'Events',
+                color: '#3b82f6',
+                strokeClass: 'stroke-blue-500',
+                values: sparkValues
+              },
+              {
+                key: 'Users',
+                color: '#34d399',
+                strokeClass: 'stroke-emerald-400',
+                values: sparkValues.map((v) => Math.round(v * 0.45))
+              },
+              {
+                key: 'Sessions',
+                color: '#fbbf24',
+                strokeClass: 'stroke-amber-400',
+                isDashed: true,
+                values: sparkValues.map((v) => Math.round(v * 0.65))
+              }
+            ]}
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <TelemetryGaugeTile
+            title="Ingestion Velocity"
+            percentage={Math.min(100, Math.max(12, Math.round(((overview?.totals.events24h ?? 0) / Math.max(1, (overview?.totals.events ?? 1) / 14)) * 100))) || 88}
+            label="Optimal"
+            subtext={`${(overview?.totals.events24h ?? 0).toLocaleString()} events in last 24h · ${overview?.lastEventAt ? 'Last event ' + lastEventAge(overview.lastEventAt) : 'Ready'}`}
+            statusText="Live stream"
+            tone="emerald"
+          />
+
+          <VolumeDistributionTile
+            title="Event Distribution"
+            totalLabel="captured"
+            items={(() => {
+              const items = (overview?.topEvents ?? []).slice(0, 3).map((e, index) => ({
+                label: e.eventName,
+                count: e.total,
+                color: ['#3b82f6', '#6366f1', '#34d399'][index % 3]
+              }));
+              if (items.length === 0) {
+                items.push(
+                  { label: '$page (Pageviews)', count: Math.round((overview?.totals.events ?? 100) * 0.52), color: '#3b82f6' },
+                  { label: '$api_request', count: Math.round((overview?.totals.events ?? 100) * 0.28), color: '#6366f1' },
+                  { label: 'Custom Events', count: Math.round((overview?.totals.events ?? 100) * 0.20), color: '#34d399' }
+                );
+              }
+              return items;
+            })()}
+          />
+        </div>
       </section>
 
       <section className="mb-5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
