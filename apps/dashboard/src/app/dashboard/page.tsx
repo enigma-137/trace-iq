@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { DashboardShell } from './DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
-import { comparisonText, compactNumber, deltaInfo, formatCount } from '@/lib/metrics';
+import { compactNumber } from '@/lib/metrics';
 import { StatTile } from '@/components/charts/StatTile';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MiniBars } from '@/components/charts/MiniBars';
@@ -27,7 +27,7 @@ interface OverviewResponse {
 }
 
 const cardClass =
-  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 export default async function DashboardPage({
   searchParams
@@ -64,12 +64,10 @@ export default async function DashboardPage({
         </section>
       ) : null}
 
-      {/* {overview?.project ? <RevenueHeadline revenue={overview.revenue} sparkline={overview.sparkline} projectId={canonicalProjectId} /> : null} */}
-
       {overview?.project ? (
         <section className="mb-5 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-            <div className="flex min-w-0 items-center gap-2 text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-semibold text-neutral-900 dark:text-white">
                 {overview.project.organizationName}
               </span>
@@ -87,13 +85,16 @@ export default async function DashboardPage({
               </span>
             </div>
 
-            <a href={withProjectId('/dashboard/web', canonicalProjectId)} className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400">
+            <a
+              href={withProjectId('/dashboard/web', canonicalProjectId)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 sm:shrink-0"
+            >
               Web Analytics
               <span aria-hidden>&rarr;</span>
             </a>
           </div>
 
-          <div className="border-t border-neutral-100 px-5 py-3 text-xs text-neutral-500 dark:border-slate-800/70 dark:text-slate-400">
+          <div className="border-t border-neutral-100 px-4 py-2.5 sm:px-5 sm:py-3 text-xs text-neutral-500 dark:border-slate-800/70 dark:text-slate-400">
             This is your overall activity summary. For time-filtered, per-event breakdowns, use Web Analytics above.
           </div>
         </section>
@@ -103,7 +104,7 @@ export default async function DashboardPage({
 
       {overview?.project ? <AvailabilityStrip overview={overview} /> : null}
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-5 grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Total events" value={overview?.totals.events ?? 0} hint="All time" delta={activityDelta} tone={activityTone}>
           <MiniBars values={sparkValues} tone="blue" />
         </StatTile>
@@ -126,16 +127,19 @@ export default async function DashboardPage({
 
       <section className="mb-5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
         <div className={cardClass}>
-          <div className="relative flex items-center justify-between gap-3">
+          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
                 Events, last 14 days
               </p>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-slate-300">
+              <p className="mt-0.5 text-sm text-neutral-500 dark:text-slate-300">
                 {overview?.project ? overview.project.name : 'No project yet'}
               </p>
             </div>
-            <a className="shrink-0 text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href={withProjectId("/dashboard/insights", canonicalProjectId)}>
+            <a
+              className="shrink-0 text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white"
+              href={withProjectId('/dashboard/insights', canonicalProjectId)}
+            >
               Open insights &rarr;
             </a>
           </div>
@@ -162,7 +166,7 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      <section className="mb-6 grid gap-3 lg:grid-cols-2">
+      <section className="mb-6 grid gap-3 grid-cols-1 lg:grid-cols-2">
         <div className={cardClass}>
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Devices (30 days)
@@ -195,7 +199,7 @@ export default async function DashboardPage({
             Create your project and grab the SDK write key + install snippet to start capturing events.
           </p>
           <Link
-            href={withProjectId("/dashboard/settings", canonicalProjectId)}
+            href={withProjectId('/dashboard/settings', canonicalProjectId)}
             className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-slate-200"
           >
             Go to settings
@@ -205,74 +209,6 @@ export default async function DashboardPage({
     </DashboardShell>
   );
 }
-
-// function RevenueHeadline({
-//   revenue,
-//   sparkline,
-//   projectId
-// }: {
-//   revenue: OverviewResponse['revenue'];
-//   sparkline: OverviewResponse['sparkline'];
-//   projectId?: string | null;
-// }) {
-//   const hasData = revenue.transactions > 0 || revenue.total !== 0;
-//   const current = compactNumber(revenue.total);
-//   const previous = compactNumber(revenue.previous);
-//   const delta = deltaInfo(revenue.total, revenue.previous);
-//   const isPositive = revenue.total >= revenue.previous;
-//   const tone = delta.muted ? 'blue' : isPositive ? 'green' : 'red';
-
-//   return (
-//     <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-//       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_36%,rgba(59,130,246,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_78%_36%,rgba(59,130,246,0.24),transparent_32%)]" />
-//       <div className="relative grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] lg:items-end">
-//         <div className="min-w-0">
-//           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-//             Revenue (GTV) - last 30 days
-//           </p>
-//           {hasData ? (
-//             <>
-//               <div className="mt-1 flex items-baseline gap-3">
-//                 <span className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">{current}</span>
-//                 <span
-//                   className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold ${
-//                     tone === 'green'
-//                       ? 'border-emerald-400/15 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300'
-//                       : tone === 'red'
-//                         ? 'border-red-400/15 bg-red-400/10 text-red-600 dark:text-red-300'
-//                         : 'border-blue-500/10 bg-blue-500/5 text-blue-700 dark:text-blue-300'
-//                   }`}
-//                   title={`vs ${previous} the previous 30 days`}
-//                 >
-//                   {delta.label}
-//                 </span>
-//               </div>
-//               <p className="mt-1.5 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
-//                 Summed from the <span className="font-mono text-neutral-700 dark:text-slate-200">amount</span> on{' '}
-//                 {formatCount(revenue.transactions)} {revenue.transactions === 1 ? 'event' : 'events'} in the last 30 days.{' '}
-//                 <span className="text-neutral-400 dark:text-slate-500">{comparisonText(30, revenue.previous, previous, delta)}</span>
-//               </p>
-//             </>
-//           ) : (
-//             <p className="mt-2 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
-//               No revenue tracked yet. Send an event with a numeric{' '}
-//               <span className="font-mono text-neutral-700 dark:text-slate-200">amount</span> property and it&apos;ll add up here.
-//             </p>
-//           )}
-//         </div>
-//         <div className="min-h-28">
-//           <Sparkline points={sparkline} height={92} tone={tone} filled className="h-28 w-full" />
-//         </div>
-//         <Link
-//           className="justify-self-start text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white lg:col-start-2 lg:justify-self-end"
-//           href={withProjectId("/dashboard/insights?event=purchase&measure=sum&property=amount", projectId)}
-//         >
-//           Break down revenue &rarr;
-//         </Link>
-//       </div>
-//     </section>
-//   );
-// }
 
 function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
   const status = availabilityStatus(overview);
@@ -284,7 +220,7 @@ function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
         : { dot: 'bg-neutral-300 dark:bg-slate-600', chip: 'border-neutral-300 bg-neutral-100 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400', label: 'Idle' };
 
   return (
-    <section className="mb-5 grid gap-3 rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
+    <section className="mb-5 grid gap-4 rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
       <div className="flex items-center gap-3">
         <span className={`size-2.5 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
         <div className="min-w-0">
@@ -292,13 +228,13 @@ function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
           <p className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-xs font-bold ${tone.chip}`}>{tone.label}</p>
         </div>
       </div>
-      <div className="sm:border-l sm:border-neutral-200 sm:pl-5 dark:sm:border-slate-800">
+      <div className="border-t border-neutral-100 pt-3 dark:border-slate-800/70 sm:border-t-0 sm:pt-0 sm:border-l sm:border-neutral-200 sm:pl-5 dark:sm:border-slate-800">
         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Last event</p>
         <p className="mt-0.5 truncate text-sm font-semibold text-neutral-900 dark:text-white">
           {overview.lastEventAt ? lastEventAge(overview.lastEventAt) : 'No events yet'}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:border-l sm:border-neutral-200 sm:pl-5 dark:sm:border-slate-800">
+      <div className="grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3 dark:border-slate-800/70 sm:border-t-0 sm:pt-0 sm:border-l sm:border-neutral-200 sm:pl-5 dark:sm:border-slate-800">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Last hour</p>
           <p className="mt-0.5 text-sm font-semibold tabular-nums text-neutral-900 dark:text-white">
@@ -359,8 +295,6 @@ function shortBucket(bucket: string): string {
   if (bucket.includes('T')) return bucket.split('T')[1].slice(0, 5);
   return bucket.slice(5);
 }
-
-
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
