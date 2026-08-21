@@ -19,8 +19,8 @@ export function PublicDocsHeader({ onOpenSearch }: { onOpenSearch?: () => void }
           </Link>
         </div>
 
-        {/* Central Search Button Trigger */}
-        <div className="flex flex-1 max-w-md items-center justify-center px-4">
+        {/* Central Search Button Trigger (Desktop / Tablet) */}
+        <div className="hidden md:flex flex-1 max-w-md items-center justify-center px-4">
           <button
             type="button"
             onClick={onOpenSearch}
