@@ -11,3 +11,6 @@ Dockerfile.local
 vendor/
 composer.lock
 .phpunit.result.cache
+
+# Production database backups
+backups/

@@ -1,97 +1,47 @@
 services:
   postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: traceiq
-      POSTGRES_PASSWORD: traceiq
-      POSTGRES_DB: traceiq
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U traceiq -d traceiq"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    image: postgres:18-alpine
     restart: unless-stopped
+    environment:
+      POSTGRES_DB: traceiq
+      POSTGRES_USER: traceiq
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
 
   redis:
     image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
     restart: unless-stopped
 
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    environment:
-      - NODE_ENV=production
-      - API_PORT=4000
-      - DATABASE_URL=postgresql://traceiq:traceiq@postgres:5432/traceiq?sslmode=disable
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_SSL=false
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - RESEND_FROM=${RESEND_FROM}
-      - CORS_ORIGINS=${CORS_ORIGINS}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
     restart: unless-stopped
-
-  dashboard:
-    build:
-      context: .
-      dockerfile: apps/dashboard/Dockerfile
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      - NEXT_PUBLIC_WAITLIST_ONLY=false
     depends_on:
-      - api
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
+      - postgres
+      - redis
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DATABASE_URL: ${VPS_DATABASE_URL}
+      DATABASE_SSL: "false"
+      REDIS_URL: redis://redis:6379
 
-  caddy:
-    image: caddy:2-alpine
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+
+      GROQ_API_KEY: ${GROQ_API_KEY}
+
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM: ${RESEND_FROM}
+
+      
+      CORS_ORIGINS: https://traceiq.run
+      DASHBOARD_URL: https://traceiq.run
+      NEXT_PUBLIC_API_URL: https://api.traceiq.run
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
-      - dashboard
-    restart: unless-stopped
+      - "127.0.0.1:4000:4000"
 
 volumes:
   postgres_data:
-  redis_data:
-  caddy_data:
-  caddy_config:
