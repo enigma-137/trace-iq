@@ -15,9 +15,10 @@ interface FunnelFormProps {
     name: string;
     steps: Array<{ eventName: string }>;
   };
+  onSuccess?: () => void;
 }
 
-export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
+export function FunnelForm({ eventNames, funnel, onSuccess }: FunnelFormProps) {
   const isEdit = Boolean(funnel);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -102,6 +103,9 @@ export function FunnelForm({ eventNames, funnel }: FunnelFormProps) {
       }
 
       const result = (await response.json()) as { id: string };
+      if (onSuccess) {
+        onSuccess();
+      }
       router.push(`/dashboard/funnels/${isEdit ? funnel!.id : result.id}`);
       router.refresh();
     } catch (submitError) {
