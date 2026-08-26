@@ -19,7 +19,7 @@ const PROJECT = {
 
 function setup(options: { aiNull?: boolean } = {}) {
   const db = mockDatabase((text) => {
-    if (/SELECT count\(\*\)/ .test(text)) return empty();
+    if (/SELECT count\(\*\)/.test(text)) return empty();
     if (/aggregate|::float AS "previousRevenue"/.test(text)) return empty();
     return empty();
   });
@@ -104,7 +104,7 @@ describe('today story', () => {
     const result = await service.getTodayStory(user);
 
     expect(result.narrative).toBe('The story');
-    expect(result.model).toBe('llama-3.3-70b-versatile');
+    expect(result.model).toBe('openai/gpt-oss-120b');
   });
 
   it('returns a no-data story without calling the AI', async () => {

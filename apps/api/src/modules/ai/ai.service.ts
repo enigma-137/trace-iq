@@ -3,7 +3,7 @@ import Groq from 'groq-sdk';
 import { DashboardUser } from '../auth/auth.service';
 import { FunnelResults, FunnelsService } from '../funnels/funnels.service';
 
-export const AI_MODEL = 'llama-3.3-70b-versatile';
+export const AI_MODEL = 'openai/gpt-oss-120b';
 
 export interface AiSummary {
   summary: string;
@@ -16,7 +16,7 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private client: Groq | null | undefined;
 
-  constructor(private readonly funnels: FunnelsService) {}
+  constructor(private readonly funnels: FunnelsService) { }
 
   async summarizeFunnelDropOff(
     user: DashboardUser,

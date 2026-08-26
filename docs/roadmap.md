@@ -102,7 +102,7 @@ TraceIQ should be shaped around behavior analytics for fintechs, ecommerce teams
 - PostgreSQL first; ClickHouse later.
 - BullMQ for async ingestion and projection work.
 - Session replay is scaffolded in v1 but not a required launch feature.
-- AI insights use Groq (`llama-3.3-70b-versatile`) to summarize data the app has already computed (e.g. funnel drop-off) — the model explains numbers it's given, it never invents or fetches its own data.
+- AI insights use Groq (`openai/gpt-oss-120b`) to summarize data the app has already computed (e.g. funnel drop-off) — the model explains numbers it's given, it never invents or fetches its own data.
 - Billing is account metadata only in v1; no payment enforcement.
 
 ## Phase 0: Foundation Stabilization
