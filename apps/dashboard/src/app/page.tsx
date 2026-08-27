@@ -418,7 +418,7 @@ export default function Page() {
           </div>
           <div className="footer-links">
             <div><strong>Explore</strong><a href="/docs">Resources</a><a href="/status">Status</a><a href="/pricing">Pricing</a><a href="/blog">Blog</a></div>
-            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.run">Contact</a></div>
+            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:traceiq.run@gmail.comn">Contact</a></div>
             <div><strong>Product</strong><a href="#product">Overview</a><a href="/auth/login">Sign in</a></div>
           </div>
         </div>

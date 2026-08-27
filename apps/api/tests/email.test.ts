@@ -7,7 +7,7 @@ describe('isValidEmail', () => {
       'a@b.co',
       'user+tag@example.com',
       'name.last@sub.domain.example',
-      'hello@traceiq.run'
+      'traceiq.run@gmail.comn'
     ]) {
       expect(isValidEmail(email)).toBe(true);
     }
