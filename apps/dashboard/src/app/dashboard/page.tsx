@@ -33,6 +33,10 @@ interface OverviewResponse {
   sparkline: Array<{ bucket: string; total: number }>;
 }
 
+interface WebReferrersResponse {
+  referrers: Array<{ domain: string; visitors: number; views: number }>;
+}
+
 const cardClass =
   'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
@@ -52,6 +56,13 @@ export default async function DashboardPage({
   }
 
   const canonicalProjectId = overview?.project?.id ?? projectId;
+  let dashboardReferrers = overview?.topReferrers ?? [];
+  if (canonicalProjectId && dashboardReferrers.length === 0) {
+    const referrerParams = new URLSearchParams({ days: '30', projectId: canonicalProjectId });
+    const referrerPath = `/v1/dashboard/web?${referrerParams.toString()}`;
+    const { data: webReferrers } = await dashboardGet<WebReferrersResponse>(referrerPath, token);
+    dashboardReferrers = webReferrers?.referrers ?? [];
+  }
   const sparkValues = overview?.sparkline.map((point) => point.total) ?? [];
   const recentSpark = overview?.sparkline.slice(-10) ?? [];
   const activityTone = trendTone(sparkValues);
@@ -261,7 +272,7 @@ export default async function DashboardPage({
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Referrers (30 days)
           </p>
-          <CompactRanking items={(overview?.topReferrers ?? []).map((referrer) => ({ label: referrer.domain, value: referrer.views, secondary: `${referrer.visitors.toLocaleString()} visitors` }))} emptyLabel="No page referrers yet." />
+          <CompactRanking items={dashboardReferrers.map((referrer) => ({ label: referrer.domain, value: referrer.views, secondary: `${referrer.visitors.toLocaleString()} visitors` }))} emptyLabel="No page referrers yet." />
         </div>
       </section>
 
