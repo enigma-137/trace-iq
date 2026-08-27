@@ -20,6 +20,8 @@
     "@supabase/supabase-js": "^2.110.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "country-locale-map": "^1.9.13",
+    "dotted-map": "^3.1.0",
     "earcut": "^3.2.3",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.29.0",

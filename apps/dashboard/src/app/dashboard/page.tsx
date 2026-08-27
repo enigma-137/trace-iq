@@ -250,7 +250,7 @@ export default async function DashboardPage({
             Locations (30 days)
           </p>
           {(overview?.topCountries ?? []).length > 0 ? <>
-            <div className="h-64 overflow-hidden rounded-md bg-neutral-950">
+            <div className="aspect-[2/1] min-h-52 overflow-hidden rounded-md border border-neutral-100 bg-white dark:border-neutral-800 dark:bg-neutral-950">
               <OverviewGeographyGlobe data={overview?.topCountries ?? []} />
             </div>
             <CompactRanking items={(overview?.topCountries ?? []).map((country) => ({ label: alpha2ToName(country.name.toUpperCase()) ?? country.name, value: country.total }))} />

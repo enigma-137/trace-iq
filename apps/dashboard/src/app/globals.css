@@ -2120,6 +2120,34 @@ input {
 .blog-prose th, .blog-prose td { min-width: 9rem; border: 1px solid rgba(255,255,255,.1); padding: .7rem .8rem; text-align: left; vertical-align: top; }
 .blog-prose th { color: #fafafa; background: rgba(255,255,255,.04); }
 
+@keyframes overview-map-route-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes overview-map-point-pulse {
+  0%, 100% { opacity: 0.12; transform: scale(0.75); }
+  50% { opacity: 0.28; transform: scale(1.2); }
+}
+
+.overview-map-route {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: overview-map-route-draw 900ms ease-out forwards;
+}
+
+.overview-map-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: overview-map-point-pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-map-route,
+  .overview-map-pulse { animation: none; }
+  .overview-map-route { stroke-dashoffset: 0; }
+}
+
 @media (max-width: 560px) {
   .status-badge { width: 136px; height: 136px; }
   .status-badge-img { width: 92px; height: 92px; }
