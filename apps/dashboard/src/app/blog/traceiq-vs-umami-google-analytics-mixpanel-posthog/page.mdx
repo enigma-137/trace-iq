@@ -1,0 +1,73 @@
+import { BlogPostLayout } from '@/components/BlogPostLayout'
+
+export const metadata = {
+  title: 'TraceIQ vs Umami, Google Analytics, Mixpanel and PostHog',
+  description: 'An honest comparison of five analytics tools by focus, deployment model and ideal user.'
+}
+
+<BlogPostLayout
+  title="TraceIQ vs Umami, Google Analytics, Mixpanel and PostHog"
+  description="There is no universal winner. The useful question is which product matches the questions your team asks—and the infrastructure it is willing to operate."
+  date="August 27, 2026"
+  readTime="10 min read"
+>
+
+## The short version
+
+Choose **Umami** when you want focused, privacy-oriented web analytics with a very small tracking script and mature self-hosting. Choose **Google Analytics** when acquisition reporting and the wider Google marketing ecosystem are central. Choose **Mixpanel** when a mature hosted product-analytics workflow is more important than infrastructure ownership. Choose **PostHog** when you want a broad product-engineering suite and accept its larger surface area. Consider **TraceIQ** when you want a simpler self-hosted system that connects web traffic, product events, funnels, API performance, errors and feature operations.
+
+That is positioning, not a claim that TraceIQ is more mature. The other four products have larger communities, longer operating histories or much broader commercial resources.
+
+| Product | Strongest fit | Deployment | Breadth |
+| --- | --- | --- | --- |
+| TraceIQ | Small technical teams wanting understandable self-hosted telemetry | Self-hosted; managed hosting planned | Web and product analytics, API performance, errors, flags and alerts |
+| Umami | Simple privacy-focused website analytics | Self-hosted or cloud | Web analytics, events, funnels, journeys, retention, goals and performance |
+| Google Analytics | Marketing and acquisition reporting | Google-hosted | Website/app reporting and integrations across Google’s ecosystem |
+| Mixpanel | Deep product behavior analysis | Hosted service | Events, segmentation, funnels, flows and retention |
+| PostHog | Product engineers wanting an integrated toolkit | Primarily cloud, with open-source options | Analytics, replay, flags, experiments, warehouse, CDP, errors and more |
+
+## TraceIQ and Umami
+
+[Umami describes itself](https://docs.umami.is/docs) as open-source, privacy-first web analytics with self-hosting, a sub-2KB script, page views, visitors, referrers, devices, countries, funnels, journeys, retention, goals and UTM campaigns. Its current documentation also lists session replay and performance monitoring. It is the clearest benchmark when the job is “replace a traditional website analytics dashboard with something simpler.”
+
+TraceIQ overlaps increasingly with that foundation: realtime visitors, referrers, campaigns, goals, session transitions and Web Vitals. Its different emphasis is joining those web signals to named product events, user timelines, API timing, errors, alerts and feature flags. TraceIQ’s local mode can also run without mandatory hosted authentication; Supabase remains optional for teams that need accounts and 2FA.
+
+Today, Umami is the safer choice if script size, established deployment guides and a mature focused web-analytics experience are the priorities. TraceIQ is the more experimental choice if you want one understandable self-hosted codebase spanning user behavior and application signals.
+
+## TraceIQ and Google Analytics
+
+[Google’s official reporting overview](https://support.google.com/analytics/answer/9212670) centers reports for monitoring traffic, investigating data and understanding activity across websites and apps, including realtime and event reporting. GA is difficult to match when a team is already built around Google Ads, campaign attribution and Google’s marketing workflows.
+
+TraceIQ does not try to recreate that advertising ecosystem. Its appeal is operational ownership and a smaller mental model: PostgreSQL-backed event data, direct project keys, inspectable queries and self-hosted deployment. That control also means the operator—not Google and not TraceIQ—owns backups, upgrades, security, retention and lawful collection.
+
+Choose GA for marketing reach and integration depth. Choose TraceIQ when first-party operational control and product-engineering context matter more than advertising workflows.
+
+## TraceIQ and Mixpanel
+
+[Mixpanel positions its product analytics platform](https://mixpanel.com/platform/product-analytics/) around understanding engagement, conversion and retention, with funnels and flexible behavioral analysis. It has years of refinement in segmentation and self-serve analysis for product teams.
+
+TraceIQ has funnels, retention, cohorts, users and event trends, but it should not claim Mixpanel’s analytical depth yet. Its advantage is a narrower system that a technical team can inspect and operate itself, plus API performance and error context in the same interface.
+
+Choose Mixpanel when analysts and product managers need a mature hosted exploration environment. Consider TraceIQ when the team is engineering-led, comfortable operating PostgreSQL, and values code and data ownership over the deepest analysis catalogue.
+
+## TraceIQ and PostHog
+
+[PostHog’s current product](https://posthog.com/) is far broader than analytics: it lists product and web analytics, session replay, feature flags, experiments, surveys, error tracking, warehouse capabilities, CDP, workflows, logs, traces, heatmaps and AI features. That breadth is powerful, but it also creates a larger platform to learn.
+
+TraceIQ shares a few product-engineering ideas—events, flags, errors and behavioral analysis—but intentionally has a smaller scope. We have postponed session replay because safe replay requires serious redaction, consent, access and retention work. We would rather show an honest missing capability than rush a sensitive recorder into production.
+
+Choose PostHog when you want the integrated suite and its cloud economics work for you. Consider TraceIQ when you want fewer moving parts, a traditional PostgreSQL deployment and a codebase small enough for your team to understand.
+
+## A decision framework
+
+Ask five questions before comparing feature checklists:
+
+1. Is the primary user a marketer, analyst or product engineer?
+2. Must the data stay on infrastructure you control?
+3. Do you need only website traffic, or named users and application events too?
+4. Is operating the database a benefit or an unwanted responsibility?
+5. Which sensitive capabilities—identity, replay, exports, public links—require governance before rollout?
+
+The right analytics tool is the one your team can operate responsibly and use consistently. TraceIQ is being built for teams that want that answer to include self-hosting, understandable infrastructure and signals that connect the browser to the application behind it.
+
+</BlogPostLayout>

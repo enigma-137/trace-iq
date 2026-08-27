@@ -16,6 +16,8 @@ import { VolumeDistributionTile } from '@/components/charts/VolumeDistributionTi
 import { TodayStoryCard } from './TodayStoryCard';
 import { NowActivityPanel } from './NowActivityPanel';
 import { ProjectIdBadge } from './ProjectIdBadge';
+import { alpha2ToName } from '@/lib/country-codes';
+import { OverviewGeographyGlobe } from './OverviewGeographyGlobe';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +29,7 @@ interface OverviewResponse {
   topEvents: Array<{ eventName: string; total: number }>;
   topDevices: Array<{ name: string; total: number }>;
   topCountries: Array<{ name: string; total: number }>;
+  topReferrers: Array<{ domain: string; visitors: number; views: number }>;
   sparkline: Array<{ bucket: string; total: number }>;
 }
 
@@ -229,7 +232,7 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      <section className="mb-6 grid gap-3 grid-cols-1 lg:grid-cols-2">
+      <section className="mb-6 grid gap-3 grid-cols-1 lg:grid-cols-3">
         <div className={cardClass}>
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Devices (30 days)
@@ -246,12 +249,19 @@ export default async function DashboardPage({
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Locations (30 days)
           </p>
-          <DonutChart
-            items={(overview?.topCountries ?? []).map((c) => ({ label: c.name, value: c.total }))}
-            centerValue={compactNumber((overview?.topCountries ?? []).reduce((sum, c) => sum + c.total, 0))}
-            centerLabel="events"
-            emptyLabel="No location data yet (needs public-IP traffic)."
-          />
+          {(overview?.topCountries ?? []).length > 0 ? <>
+            <div className="h-64 overflow-hidden rounded-md bg-neutral-950">
+              <OverviewGeographyGlobe data={overview?.topCountries ?? []} />
+            </div>
+            <CompactRanking items={(overview?.topCountries ?? []).map((country) => ({ label: alpha2ToName(country.name.toUpperCase()) ?? country.name, value: country.total }))} />
+          </> : <p className="py-10 text-center text-sm text-neutral-500">No location data yet (needs public-IP traffic).</p>}
+        </div>
+
+        <div className={cardClass}>
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+            Referrers (30 days)
+          </p>
+          <CompactRanking items={(overview?.topReferrers ?? []).map((referrer) => ({ label: referrer.domain, value: referrer.views, secondary: `${referrer.visitors.toLocaleString()} visitors` }))} emptyLabel="No page referrers yet." />
         </div>
       </section>
 
@@ -384,4 +394,13 @@ function withParams(
   if (opts.organizationId) params.set('organizationId', opts.organizationId);
   const nextQuery = params.toString();
   return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${hash ? `#${hash}` : ''}`;
+}
+
+function CompactRanking({ items, emptyLabel = 'No data yet.' }: { items: Array<{ label: string; value: number; secondary?: string }>; emptyLabel?: string }) {
+  if (items.length === 0) return <p className="py-10 text-center text-sm text-neutral-500">{emptyLabel}</p>;
+  const max = Math.max(...items.map((item) => item.value), 1);
+  return <div className="mt-4 grid gap-3">{items.map((item) => <div key={item.label}>
+    <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium text-neutral-700 dark:text-slate-200">{item.label}</span><span className="shrink-0 tabular-nums text-neutral-500">{item.value.toLocaleString()}{item.secondary ? ` · ${item.secondary}` : ''}</span></div>
+    <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(4, (item.value / max) * 100)}%` }} /></div>
+  </div>)}</div>;
 }

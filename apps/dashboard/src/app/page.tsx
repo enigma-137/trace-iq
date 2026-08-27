@@ -20,7 +20,12 @@ import {
 import GlobeHero from '@/components/globe-hero';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 
-const navItems = ['Product', 'Solutions', 'Docs', 'Resources', 'Company'];
+const navItems = [
+  { label: 'Resources', href: '/docs' },
+  { label: 'Status', href: '/status' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Blog', href: '/blog' }
+];
 
 const metrics = [
   ['99.99%', 'signal fidelity'],
@@ -130,7 +135,7 @@ export default function Page() {
           </a>
           <nav className={`desktop-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
             {navItems.map((item) => (
-              <a href={`#${item.toLowerCase()}`} key={item}>{item}<ChevronDown size={13} /></a>
+              <a href={item.href} key={item.href}>{item.label}</a>
             ))}
           </nav>
           <div className="header-actions">
@@ -412,9 +417,9 @@ export default function Page() {
             <LiveFooterStatus />
           </div>
           <div className="footer-links">
-            <div><strong>Product</strong><a href="#product">Overview</a><a href="#solutions">Solutions</a><a href="/docs">Resources</a></div>
-            <div><strong>Company</strong><a href="#company">About</a><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.dev">Contact</a></div>
-            <div><strong>Connect</strong><a href="/docs">Docs</a><a className="" href="/status">Status</a></div>
+            <div><strong>Explore</strong><a href="/docs">Resources</a><a href="/status">Status</a><a href="/pricing">Pricing</a><a href="/blog">Blog</a></div>
+            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.run">Contact</a></div>
+            <div><strong>Product</strong><a href="#product">Overview</a><a href="/auth/login">Sign in</a></div>
           </div>
         </div>
         <div className="mx-auto max-w-[1200px] px-5 sm:px-8">

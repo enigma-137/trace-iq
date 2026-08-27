@@ -1,0 +1,65 @@
+import { BlogPostLayout } from '@/components/BlogPostLayout'
+
+export const metadata = {
+  title: 'Why we moved TraceIQ toward truly self-hosted analytics',
+  description: 'How local auth, one-command startup and deployment ownership changed TraceIQ self-hosting.'
+}
+
+<BlogPostLayout
+  title="Why we moved TraceIQ toward truly self-hosted analytics"
+  description="Self-hosting is not complete when the database is yours but the application still depends on somebody else’s identity service. We rebuilt that boundary."
+  date="August 27, 2026"
+  readTime="7 min read"
+>
+
+## Self-hosting has to include the front door
+
+TraceIQ could already run its API and data services on infrastructure we controlled. But opening the dashboard still assumed a configured hosted authentication provider. That was a reasonable way to support shared production accounts and two-factor authentication, yet it made the phrase “self-hosted” feel incomplete.
+
+If a private installation cannot start until it has credentials from another platform, the operator does not fully control its first-run experience. We wanted a fresh installation to be useful even when the internet is unavailable, the analytics instance belongs to one person, or the operator simply does not need accounts.
+
+## What changed
+
+We introduced two explicit authentication modes.
+
+- **Local mode** creates a private owner, workspace, project and development write key. It is intended for loopback-only, single-user installations.
+- **Supabase mode** keeps normal sign-in, teams and 2FA for shared or internet-facing deployments.
+
+Local mode does not pretend authentication is unnecessary everywhere. The API binds to loopback by default and refuses unsafe network exposure unless an operator deliberately overrides that guard. Public or multi-user installations should still use a real identity provider.
+
+We also added a Compose workflow that starts PostgreSQL, Redis, migrations, the API and dashboard together:
+
+```bash
+docker compose -f compose.local.yml up -d --build
+```
+
+That command is not the whole product, but it is an important contract: a new operator should not have to reverse-engineer service order, manually initialize tables or create an account before seeing a dashboard.
+
+## Migrations became part of the product
+
+A self-hosted release is only safe when upgrades are understandable. TraceIQ’s SQL migrations are ordered, recorded and idempotent. The deployment guide now treats backup, migration, health verification and rollback planning as one workflow—not scattered operational trivia.
+
+The practical sequence is simple:
+
+1. Back up PostgreSQL outside the container volume.
+2. Pull a reviewed release.
+3. Rebuild the API image.
+4. Run pending migrations as a one-off job.
+5. Restart the API without deleting data services.
+6. Check health and application behavior.
+
+The warning matters as much as the happy path: never use `docker compose down -v` during an ordinary upgrade, because the volume flag removes the database volume.
+
+## Why this matters beyond convenience
+
+True local operation changes who can adopt the software. A developer can evaluate TraceIQ on a modest machine. A regulated team can keep telemetry within an approved network. An open-source contributor can reproduce an issue without creating an unrelated SaaS account. A small company can choose managed identity when it needs collaboration instead of paying that complexity tax on day one.
+
+It also keeps our claims honest. Self-hosting does not make an installation automatically private, secure or compliant. Operators still decide what to collect, how long to retain it, who can access it and which notices or consent mechanisms apply. Our responsibility is to provide clear defaults, accurate documentation and controls that do what their labels say.
+
+## The direction from here
+
+We are keeping the two paths on purpose: a small private instance should remain simple, while shared deployments can retain user accounts, permissions and 2FA. Future managed hosting should be a convenience people can choose—not a dependency hidden inside the open-source version.
+
+Read the [self-hosting guide](/docs) or review our [privacy and data collection notes](/privacy).
+
+</BlogPostLayout>

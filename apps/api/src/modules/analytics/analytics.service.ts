@@ -91,6 +91,7 @@ export interface OverviewResponse {
   topEvents: Array<{ eventName: string; total: number }>;
   topDevices: Array<{ name: string; total: number }>;
   topCountries: Array<{ name: string; total: number }>;
+  topReferrers: Array<{ domain: string; visitors: number; views: number }>;
   sparkline: TrendPoint[];
 }
 
@@ -168,6 +169,7 @@ export class AnalyticsService {
         topEvents: [],
         topDevices: [],
         topCountries: [],
+        topReferrers: [],
         sparkline: []
       };
     }
@@ -241,6 +243,22 @@ export class AnalyticsService {
       [project.id]
     );
 
+    const topReferrers = await this.database.query<{ domain: string; visitors: number; views: number }>(
+      `SELECT
+        CASE WHEN ref IS NULL OR ref = '' THEN 'Direct'
+          ELSE COALESCE(NULLIF(regexp_replace(split_part(split_part(regexp_replace(ref, '^[a-z][a-z0-9+.-]*://', '', 'i'), '/', 1), ':', 1), '^www\\.', '', 'i'), ''), 'Direct')
+        END AS domain,
+        count(DISTINCT actor)::int AS visitors,
+        count(*)::int AS views
+       FROM (
+         SELECT context->'page'->>'referrer' AS ref, COALESCE(user_id::text, anonymous_id) AS actor
+         FROM events WHERE project_id = $1 AND event_name = '$page'
+           AND occurred_at >= now() - interval '30 days'
+       ) pageviews
+       GROUP BY 1 ORDER BY views DESC LIMIT 6`,
+      [project.id]
+    );
+
     const revenueResult = await this.database.query<{
       current_revenue: number;
       previous_revenue: number;
@@ -288,6 +306,7 @@ export class AnalyticsService {
       topEvents: topEventsResult.rows,
       topDevices: topDevices.rows,
       topCountries: topCountries.rows,
+      topReferrers: topReferrers.rows,
       sparkline
     };
   }
