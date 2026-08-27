@@ -1,0 +1,150 @@
+'use client';
+
+import { useState } from 'react';
+
+export interface TrafficMapPoint {
+  code: string;
+  label: string;
+  total: number;
+  lat: number;
+  lng: number;
+}
+
+interface OverviewTrafficMapProps {
+  mapSvg: string;
+  points: TrafficMapPoint[];
+}
+
+const MAP_WIDTH = 800;
+const MAP_HEIGHT = 400;
+const ACCENT = '#3b82f6';
+
+function projectPoint(lat: number, lng: number) {
+  return { x: (lng + 180) * (MAP_WIDTH / 360), y: (90 - lat) * (MAP_HEIGHT / 180) };
+}
+
+function curvedPath(start: { x: number; y: number }, end: { x: number; y: number }) {
+  const distance = Math.abs(end.x - start.x);
+  const lift = Math.min(80, Math.max(28, distance * 0.16));
+  return `M ${start.x} ${start.y} Q ${(start.x + end.x) / 2} ${Math.min(start.y, end.y) - lift} ${end.x} ${end.y}`;
+}
+
+export function OverviewTrafficMap({ mapSvg, points }: OverviewTrafficMapProps) {
+  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const activeCode = hoveredCode ?? selectedCode;
+  const activePoint = points.find((point) => point.code === activeCode) ?? null;
+  const hub = points[0];
+  const hubPosition = hub ? projectPoint(hub.lat, hub.lng) : null;
+  const maxValue = Math.max(1, ...points.map((point) => point.total));
+  const totalTraffic = Math.max(1, points.reduce((sum, point) => sum + point.total, 0));
+
+  const togglePoint = (code: string) => {
+    setSelectedCode((current) => current === code ? null : code);
+  };
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-white dark:bg-neutral-950">
+      <img
+        src={`data:image/svg+xml;utf8,${encodeURIComponent(mapSvg)}`}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill opacity-55 dark:invert dark:opacity-35"
+        draggable={false}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,white,transparent_10%,transparent_88%,white)] dark:bg-[linear-gradient(to_bottom,rgb(10_10_10),transparent_10%,transparent_88%,rgb(10_10_10))]" />
+
+      <svg
+        viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+        className="absolute inset-0 h-full w-full"
+        role="img"
+        aria-label={`Traffic from ${points.length} countries. Select a marker to inspect its value.`}
+        onMouseLeave={() => setHoveredCode(null)}
+      >
+        <defs>
+          <linearGradient id="overview-map-route" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={ACCENT} stopOpacity="0.12" />
+            <stop offset="12%" stopColor={ACCENT} stopOpacity="0.9" />
+            <stop offset="88%" stopColor={ACCENT} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={ACCENT} stopOpacity="0.12" />
+          </linearGradient>
+        </defs>
+
+        {hubPosition && points.slice(1).map((point, index) => {
+          const highlighted = !activeCode || activeCode === hub.code || activeCode === point.code;
+          return (
+            <path
+              key={`route-${point.code}`}
+              d={curvedPath(hubPosition, projectPoint(point.lat, point.lng))}
+              fill="none"
+              stroke="url(#overview-map-route)"
+              strokeWidth={activeCode === point.code ? 2.4 : 1.35}
+              strokeLinecap="round"
+              pathLength="1"
+              opacity={highlighted ? 1 : 0.14}
+              className="overview-map-route transition-all duration-200"
+              style={{ animationDelay: `${index * 140}ms` }}
+            />
+          );
+        })}
+
+        {points.map((point, index) => {
+          const position = projectPoint(point.lat, point.lng);
+          const radius = 3.2 + Math.sqrt(point.total / maxValue) * 3;
+          const active = activeCode === point.code;
+          const share = (point.total / totalTraffic) * 100;
+          return (
+            <g
+              key={point.code}
+              role="button"
+              tabIndex={0}
+              aria-label={`${point.label}, ${point.total.toLocaleString()} events, ${share.toFixed(1)} percent of shown traffic`}
+              aria-pressed={selectedCode === point.code}
+              className="cursor-pointer outline-none"
+              onMouseEnter={() => setHoveredCode(point.code)}
+              onFocus={() => setHoveredCode(point.code)}
+              onBlur={() => setHoveredCode(null)}
+              onClick={() => togglePoint(point.code)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  togglePoint(point.code);
+                } else if (event.key === 'Escape') {
+                  setSelectedCode(null);
+                }
+              }}
+            >
+              <circle cx={position.x} cy={position.y} r={radius * 3.4} fill={ACCENT} opacity="0.18" className="overview-map-pulse" style={{ animationDelay: `${index * 180}ms` }} />
+              <circle cx={position.x} cy={position.y} r={active ? radius + 1.8 : radius} fill={ACCENT} stroke="white" strokeWidth={active ? 2.5 : 1.5} className="transition-all duration-150 dark:stroke-neutral-950" />
+              <circle cx={position.x} cy={position.y} r={radius + 5} fill="transparent" stroke={active ? ACCENT : 'transparent'} strokeWidth="1.5" opacity="0.45" />
+            </g>
+          );
+        })}
+      </svg>
+
+      {activePoint ? (() => {
+        const position = projectPoint(activePoint.lat, activePoint.lng);
+        const share = (activePoint.total / totalTraffic) * 100;
+        return (
+          <div
+            className="pointer-events-none absolute z-20 min-w-36 -translate-x-1/2 -translate-y-[calc(100%+14px)] rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/95"
+            style={{ left: `${(position.x / MAP_WIDTH) * 100}%`, top: `${(position.y / MAP_HEIGHT) * 100}%` }}
+            role="status"
+          >
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-blue-500" />
+              <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white">{activePoint.label}</p>
+            </div>
+            <p className="mt-1 text-[11px] tabular-nums text-neutral-500 dark:text-neutral-400">
+              {activePoint.total.toLocaleString()} events · {share < 0.1 ? '<0.1' : share.toFixed(1)}%
+            </p>
+          </div>
+        );
+      })() : null}
+
+      <div className="absolute bottom-3 left-3 rounded-full border border-neutral-200 bg-white/90 px-2.5 py-1 text-[10px] font-medium text-neutral-500 shadow-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/85 dark:text-neutral-400">
+        {points.length > 0 ? `Top ${points.length} traffic locations · hover or select` : 'No mappable traffic locations'}
+      </div>
+    </div>
+  );
+}
