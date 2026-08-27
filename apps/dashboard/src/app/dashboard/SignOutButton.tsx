@@ -10,6 +10,10 @@ interface SignOutButtonProps {
 export function SignOutButton({ iconOnly = false }: SignOutButtonProps) {
   const router = useRouter();
 
+  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
+    return null;
+  }
+
   async function handleSignOut() {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();

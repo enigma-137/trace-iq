@@ -1,23 +1,62 @@
-# Contributing
+# Contributing to TraceIQ
 
-## Engineering Principles
+Thanks for helping improve TraceIQ. Contributions of code, tests, documentation, SDK fixes, and reproducible bug reports are welcome.
 
-- Use TypeScript across apps and packages.
-- Keep domain logic inside feature or module boundaries.
-- Prefer explicit interfaces before implementation.
-- Keep ingestion, analytics, replay, and AI concerns loosely coupled.
-- Add tests with each real behavior change once implementation begins.
+## Before you start
 
-## Branch Workflow
+- Search existing issues and pull requests before opening a duplicate.
+- Use an issue to discuss substantial features, schema changes, or architectural changes before investing in an implementation.
+- Use GitHub's private vulnerability reporting flow for security issues; do not open a public issue. See [SECURITY.md](SECURITY.md).
 
-1. Create a focused branch for the change.
-2. Update or add relevant interfaces and docs.
-3. Run type checks and package-specific validation.
-4. Open a pull request with scope, risk, and verification notes.
+## Development setup
 
-## Code Style
+Follow the [local quickstart](README.md#local-quickstart). The main requirements are Node.js 22, npm 10+, and Docker Compose. A Supabase project is only required when testing account, team, invitation, or 2FA behavior.
 
-- Use strict TypeScript.
-- Keep public contracts in `packages/types` or domain-local `interfaces` files.
-- Avoid adding provider-specific logic directly to domain modules.
-- Document architecture decisions in `docs/architecture.md` or a dedicated ADR once ADRs are introduced.
+Install the monorepo dependencies with:
+
+```bash
+npm ci --legacy-peer-deps
+```
+
+The legacy peer-dependency mode is currently required because of an unrelated React Native workspace peer conflict.
+
+## Making a change
+
+1. Fork the repository and create a focused branch from `main`.
+2. Keep changes scoped; avoid mixing refactors with behavioral changes.
+3. Add or update tests for changed behavior.
+4. Update public documentation when an API, environment variable, or workflow changes.
+5. Never commit `.env` files, credentials, database dumps, customer data, or production logs.
+
+Keep domain logic inside its feature or NestJS module. Put reusable public contracts in `packages/types` or a domain-local interface. Migrations must be deterministic, forward-only SQL files in `apps/api/migrations` and must preserve existing installations.
+
+## Validation
+
+Run the checks relevant to your change:
+
+```bash
+npm run typecheck
+npm test --workspace=@traceiq/api
+npm run build
+```
+
+For PHP SDK changes:
+
+```bash
+composer install
+composer test
+```
+
+Also run the package-specific test or build command for any SDK you modify.
+
+## Pull requests
+
+In the pull request description, include:
+
+- What changed and why
+- User-visible or API behavior changes
+- Migration or deployment impact
+- Tests and manual checks performed
+- Screenshots for dashboard changes
+
+Maintainers may ask for a smaller scope, additional tests, or documentation before merging. By contributing, you agree that your contribution is licensed under the repository's MIT License.

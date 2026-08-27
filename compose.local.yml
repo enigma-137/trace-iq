@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: traceiq
+      POSTGRES_USER: traceiq
+      POSTGRES_PASSWORD: traceiq-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traceiq -d traceiq"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - traceiq_local_postgres:/var/lib/postgresql
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://traceiq:traceiq-local@postgres:5432/traceiq
+      DATABASE_SSL: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npm", "run", "migrate", "--workspace=@traceiq/api"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      API_HOST: 0.0.0.0
+      AUTH_MODE: local
+      LOCAL_AUTH_ALLOW_NETWORK: "true"
+      LOCAL_PROJECT_WRITE_KEY: trq_local_development_only
+      DATABASE_URL: postgresql://traceiq:traceiq-local@postgres:5432/traceiq
+      DATABASE_SSL: "false"
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      DASHBOARD_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:4000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        NEXT_PUBLIC_AUTH_MODE: local
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+        NEXT_PUBLIC_WAITLIST_ONLY: "false"
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_AUTH_MODE: local
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      TRACEIQ_API_INTERNAL_URL: http://api:4000
+      NEXT_PUBLIC_WAITLIST_ONLY: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  traceiq_local_postgres:

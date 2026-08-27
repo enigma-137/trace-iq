@@ -243,7 +243,7 @@ export function AuthForm() {
             Product analytics built for how your users actually behave.
           </h2>
           <p className="mt-4 text-sm leading-7 text-neutral-500 dark:text-neutral-400">
-            Trends, funnels, retention, revenue, and error tracking — in one fast, privacy-friendly dashboard.
+            Trends, funnels, retention, revenue, and error tracking — in one fast, self-hostable dashboard.
           </p>
           <ul className="mt-8 grid gap-3 text-sm text-neutral-700 dark:text-neutral-300">
             {['Revenue & GTV as a first-class metric', 'Funnels with per-step drop-off', 'SDKs for web, server & mobile'].map(

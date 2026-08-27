@@ -41,6 +41,16 @@ function isIngestPath(pathname: string): boolean {
 }
 
 async function bootstrap() {
+  const authMode = (process.env.AUTH_MODE ?? 'supabase').trim().toLowerCase();
+  const host = process.env.API_HOST ?? (authMode === 'local' ? '127.0.0.1' : '0.0.0.0');
+  const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1']);
+
+  if (authMode === 'local' && !loopbackHosts.has(host) && process.env.LOCAL_AUTH_ALLOW_NETWORK !== 'true') {
+    throw new Error(
+      'AUTH_MODE=local may only bind to loopback by default. Set LOCAL_AUTH_ALLOW_NETWORK=true only behind a trusted private network or loopback-only port mapping.'
+    );
+  }
+
   const app = await NestFactory.create(AppModule);
 
   app.use(json({ limit: MAX_BODY_BYTES }));
@@ -65,7 +75,7 @@ async function bootstrap() {
 
   app.use(setSecurityHeaders);
 
-  await app.listen(process.env.API_PORT ? Number(process.env.API_PORT) : 4000);
+  await app.listen(process.env.API_PORT ? Number(process.env.API_PORT) : 4000, host);
 }
 
 void bootstrap();

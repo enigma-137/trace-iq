@@ -41,20 +41,22 @@ export function formatTotpSecret(secret: string): string {
  * - `enrolled === null`  → still loading (or Supabase env is unconfigured).
  */
 export function useMfaStatus() {
+  const localMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
   const supabase = useMemo(() => {
+    if (localMode) return null;
     try {
       return createSupabaseBrowserClient();
     } catch {
       return null;
     }
-  }, []);
+  }, [localMode]);
 
   const [enrolled, setEnrolled] = useState<boolean | null>(null);
   const [factors, setFactors] = useState<RegisteredFactor[]>([]);
 
   const refresh = useCallback(async () => {
     if (!supabase) {
-      setEnrolled(false);
+      setEnrolled(localMode ? null : false);
       return;
     }
 
@@ -78,7 +80,7 @@ export function useMfaStatus() {
       setEnrolled(false);
       setFactors([]);
     }
-  }, [supabase]);
+  }, [localMode, supabase]);
 
   useEffect(() => {
     void refresh();

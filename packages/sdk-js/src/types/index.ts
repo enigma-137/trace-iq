@@ -5,6 +5,8 @@ export interface TraceIQInitOptions {
   autoTrackPageViews?: boolean;
   autoCaptureExceptions?: boolean;
   autoCaptureRageClicks?: boolean;
+  /** Collect CLS, INP, LCP, FCP, and TTFB as `$web_vital` events. Defaults to true. */
+  autoCaptureWebVitals?: boolean;
   /**
    * Auto-capture outgoing fetch() calls as `$api_request` events (method, path,
    * status, durationMs) to power the API performance view. Off by default —

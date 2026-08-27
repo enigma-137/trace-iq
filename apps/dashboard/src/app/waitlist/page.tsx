@@ -82,7 +82,7 @@ export default function WaitlistPage() {
           <h1 id="hero-title">See every product journey before it slips.</h1>
           <p className="hero-lede">
             TraceIQ unifies clean event tracking, funnels, user timelines, retention,
-            revenue, and error tracking in one fast, privacy-friendly dashboard — instead
+            revenue, and error tracking in one fast, self-hostable dashboard — instead
             of duct-taping five tools together.
           </p>
 

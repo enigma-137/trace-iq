@@ -1,4 +1,5 @@
 import type { TraceIQClient, TraceIQFeatureFlags, TraceIQGroup, TraceIQIdentity, TraceIQInitOptions } from '../types';
+import { onCLS, onFCP, onINP, onLCP, onTTFB, type MetricType } from 'web-vitals';
 
 const DEFAULT_ENDPOINT = 'http://localhost:4000';
 const ANONYMOUS_ID_STORAGE_KEY = 'traceiq.anonymousId';
@@ -13,6 +14,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private errorHandlersInstalled = false;
   private clickHandlersInstalled = false;
   private requestCaptureInstalled = false;
+  private webVitalsInstalled = false;
   private recentClicks: Array<{ t: number; x: number; y: number }> = [];
   private lastRageAt = 0;
   private featureFlags: Record<string, boolean> = {};
@@ -39,9 +41,34 @@ export class BrowserTraceIQClient implements TraceIQClient {
       this.installRequestCapture();
     }
 
+    if (options.autoCaptureWebVitals !== false) {
+      this.installWebVitals();
+    }
+
     if (options.autoTrackPageViews) {
       this.page();
     }
+  }
+
+  private installWebVitals(): void {
+    if (typeof window === 'undefined' || this.webVitalsInstalled) return;
+    this.webVitalsInstalled = true;
+    const report = (metric: MetricType) => {
+      this.track('$web_vital', {
+        metric: metric.name,
+        value: metric.value,
+        delta: metric.delta,
+        rating: metric.rating,
+        metricId: metric.id,
+        navigationType: metric.navigationType,
+        navigationId: metric.navigationId
+      });
+    };
+    onCLS(report);
+    onINP(report);
+    onLCP(report);
+    onFCP(report);
+    onTTFB(report);
   }
 
   captureException(error: unknown, properties: Record<string, unknown> = {}): void {
@@ -351,12 +378,21 @@ export class BrowserTraceIQClient implements TraceIQClient {
     const location = this.getLocation();
     const navigator = this.getNavigator();
     const screen = this.getScreen();
+    const searchParams = new URLSearchParams(location?.search ?? '');
+    const utm = {
+      source: searchParams.get('utm_source') ?? undefined,
+      medium: searchParams.get('utm_medium') ?? undefined,
+      campaign: searchParams.get('utm_campaign') ?? undefined,
+      term: searchParams.get('utm_term') ?? undefined,
+      content: searchParams.get('utm_content') ?? undefined
+    };
 
     return {
       page: {
         url: location?.href,
         path: location?.pathname,
         search: location?.search,
+        utm,
         referrer: this.getReferrer(),
         title: this.getPageTitle()
       },

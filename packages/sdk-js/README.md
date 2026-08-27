@@ -32,6 +32,8 @@ traceiq.group({ organizationId: 'org_123', traits: { plan: 'growth' } });
 traceiq.captureException(new Error('Payment failed'));
 ```
 
+The browser SDK automatically captures CLS, INP, LCP, FCP, and TTFB as `$web_vital` events. Set `autoCaptureWebVitals: false` during initialization to disable this collection.
+
 ## Configuration
 
 The `initialize()` call accepts:
@@ -44,5 +46,9 @@ The `initialize()` call accepts:
 ## Notes
 
 - The browser SDK is intended for client-side integrations.
+- It does not set cookies. It stores a persistent anonymous ID in `localStorage` and a visit-scoped session ID in `sessionStorage` when browser storage is available.
+- Page context can include the full URL, path, query string, referrer, page title, user agent, locale, viewport, and timezone. The API can add the request IP address and approximate geography.
+- User IDs, traits, event properties, URLs, and exception messages or stacks can contain personal or sensitive data. Only send fields you are authorized to collect.
+- TraceIQ does not make an application automatically compliant with GDPR, CCPA, PECR, or other privacy laws. Operators are responsible for notices, consent or another legal basis, retention, access, and deletion processes.
 - Keep your write key in environment variables where possible.
 - For server-side event ingestion, use the dedicated server SDK packages in this repository.

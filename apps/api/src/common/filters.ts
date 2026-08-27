@@ -19,7 +19,14 @@ export const DIMENSION_SOURCES: Record<string, string> = {
   platform: "device_info->>'platform'",
   country: "network_info->>'country'",
   region: "network_info->>'region'",
-  city: "network_info->>'city'"
+  city: "network_info->>'city'",
+  path: "context->'page'->>'path'",
+  referrer: "context->'page'->>'referrer'",
+  utm_source: "context->'page'->'utm'->>'source'",
+  utm_medium: "context->'page'->'utm'->>'medium'",
+  utm_campaign: "context->'page'->'utm'->>'campaign'",
+  utm_term: "context->'page'->'utm'->>'term'",
+  utm_content: "context->'page'->'utm'->>'content'"
 };
 
 const ALLOWED_OPERATORS: FilterOperator[] = ['is', 'is_not', 'contains', 'is_set', 'is_not_set'];

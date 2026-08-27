@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient, hasSupabaseServerConfig } from '@/lib/supabase/server';
 
-export const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+export const apiBaseUrl = process.env.TRACEIQ_API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+export const isLocalAuthMode = () => process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
 
 export interface DashboardSession {
   user: { id: string; email?: string | null };
@@ -13,6 +15,13 @@ export interface DashboardSession {
  * the visitor is unauthenticated, otherwise returns the user + access token.
  */
 export async function requireDashboardSession(nextPath: string): Promise<DashboardSession> {
+  if (isLocalAuthMode()) {
+    return {
+      user: { id: 'traceiq-local-owner', email: 'local@traceiq.invalid' },
+      token: 'traceiq-local'
+    };
+  }
+
   if (!hasSupabaseServerConfig()) {
     redirect('/auth/login?missingConfig=1');
   }

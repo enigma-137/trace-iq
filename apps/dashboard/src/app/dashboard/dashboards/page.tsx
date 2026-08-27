@@ -32,7 +32,7 @@ export default async function DashboardsPage() {
         </section>
       ) : null}
 
-      <DashboardsApp projectId={project?.id ?? undefined} initialDashboards={dashboards} userId={user.id} />
+      <DashboardsApp projectId={project?.id ?? undefined} initialDashboards={dashboards} userId={user.id} initialToken={token ?? undefined} />
     </DashboardShell>
   );
 }

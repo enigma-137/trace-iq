@@ -124,8 +124,23 @@ export interface WebAnalyticsResponse {
   visitorsTrend: TrendPoint[];
   topPaths: Array<{ path: string; visitors: number; views: number }>;
   devices: Array<{ name: string; total: number }>;
+  browsers: Array<{ name: string; total: number }>;
+  operatingSystems: Array<{ name: string; total: number }>;
   countries: Array<{ name: string; total: number }>;
   sources: Array<{ channel: string; visitors: number }>;
+  referrers: Array<{ domain: string; visitors: number; views: number }>;
+  campaigns: Array<{ campaign: string; source: string; medium: string; visitors: number; views: number }>;
+  goals: Array<{ id: string; name: string; type: 'page' | 'event'; target: string; conversions: number; occurrences: number; conversionRate: number }>;
+  filters: FilterCondition[];
+  journey: {
+    sessions: number;
+    columns: Array<{ step: number; nodes: Array<{ path: string; sessions: number }> }>;
+    transitions: Array<{ fromStep: number; fromPath: string; toStep: number; toPath: string; sessions: number }>;
+  };
+  webVitals: {
+    metrics: Array<{ metric: string; p75: number; count: number; good: number; needsImprovement: number; poor: number }>;
+    pages: Array<{ path: string; metric: string; p75: number; count: number; poor: number }>;
+  };
   activeHours: number[][];
   frustratingPages: Array<{ path: string; errors: number; rageClicks: number; users: number }>;
 }
@@ -564,9 +579,13 @@ export class AnalyticsService {
     return Math.min(Math.max(Math.trunc(parsed), 2), 26);
   }
 
-  async getWebAnalytics(user: DashboardUser, daysParam?: string, projectId?: string): Promise<WebAnalyticsResponse> {
-    const project = await this.projects.resolveActiveProject(user, projectId);
-    const days = this.clampWebDays(daysParam);
+  async getWebAnalytics(
+    user: DashboardUser,
+    params: { days?: string; filters?: string; projectId?: string } = {}
+  ): Promise<WebAnalyticsResponse> {
+    const project = await this.projects.resolveActiveProject(user, params.projectId);
+    const days = this.clampWebDays(params.days);
+    const filters = parseFiltersParam(params.filters);
     const emptyTotals: WebTotals = { visitors: 0, pageviews: 0, sessions: 0, avgSessionDuration: 0, bounceRate: 0 };
 
     if (!project) {
@@ -578,8 +597,16 @@ export class AnalyticsService {
         visitorsTrend: [],
         topPaths: [],
         devices: [],
+        browsers: [],
+        operatingSystems: [],
         countries: [],
         sources: [],
+        referrers: [],
+        campaigns: [],
+        goals: [],
+        filters,
+        journey: { sessions: 0, columns: [], transitions: [] },
+        webVitals: { metrics: [], pages: [] },
         activeHours: Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)),
         frustratingPages: []
       };
@@ -591,54 +618,75 @@ export class AnalyticsService {
     const prevFrom = new Date(from.getTime() - days * DAY_MS);
 
     const [current, previous] = await Promise.all([
-      this.computeWebTotals(project.id, from, to),
-      this.computeWebTotals(project.id, prevFrom, prevTo)
+      this.computeWebTotals(project.id, from, to, filters),
+      this.computeWebTotals(project.id, prevFrom, prevTo, filters)
     ]);
 
+    const trendQuery = this.webFilterQuery(project.id, from, to, filters);
     const trendRows = await this.database.query<{ bucket: string; total: number }>(
       `
         SELECT to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+        WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3${trendQuery.clause}
         GROUP BY 1 ORDER BY 1 ASC
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      trendQuery.values
     );
     const visitorsTrend = this.zeroFill(this.generateBuckets(from, to, 'day'), trendRows.rows);
 
+    const pathsQuery = this.webFilterQuery(project.id, from, to, filters);
     const topPaths = await this.database.query<{ path: string; visitors: number; views: number }>(
       `
         SELECT COALESCE(NULLIF(context->'page'->>'path', ''), '(unknown)') AS path,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS visitors,
           count(*)::int AS views
         FROM events
-        WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3
+        WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${pathsQuery.clause}
         GROUP BY 1 ORDER BY views DESC LIMIT 10
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      pathsQuery.values
     );
 
+    const devicesQuery = this.webFilterQuery(project.id, from, to, filters);
     const devices = await this.database.query<{ name: string; total: number }>(
       `
         SELECT COALESCE(NULLIF(device_info->>'deviceType', ''), 'unknown') AS name,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
-        FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+        FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${devicesQuery.clause}
         GROUP BY 1 ORDER BY total DESC LIMIT 6
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      devicesQuery.values
     );
 
+    const browserQuery = this.webFilterQuery(project.id, from, to, filters);
+    const browsers = await this.database.query<{ name: string; total: number }>(
+      `SELECT COALESCE(NULLIF(device_info->>'browser', ''), 'unknown') AS name,
+        count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
+       FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${browserQuery.clause}
+       GROUP BY 1 ORDER BY total DESC LIMIT 8`, browserQuery.values
+    );
+
+    const osQuery = this.webFilterQuery(project.id, from, to, filters);
+    const operatingSystems = await this.database.query<{ name: string; total: number }>(
+      `SELECT COALESCE(NULLIF(device_info->>'os', ''), 'unknown') AS name,
+        count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
+       FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${osQuery.clause}
+       GROUP BY 1 ORDER BY total DESC LIMIT 8`, osQuery.values
+    );
+
+    const countriesQuery = this.webFilterQuery(project.id, from, to, filters);
     const countries = await this.database.query<{ name: string; total: number }>(
       `
         SELECT COALESCE(NULLIF(network_info->>'country', ''), 'unknown') AS name,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
-        FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+        FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${countriesQuery.clause}
         GROUP BY 1 ORDER BY total DESC LIMIT 8
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      countriesQuery.values
     );
 
+    const sourcesQuery = this.webFilterQuery(project.id, from, to, filters);
     const sources = await this.database.query<{ channel: string; visitors: number }>(
       `
         SELECT CASE
@@ -650,22 +698,56 @@ export class AnalyticsService {
           count(DISTINCT actor)::int AS visitors
         FROM (
           SELECT context->'page'->>'referrer' AS ref, COALESCE(user_id::text, anonymous_id) AS actor
-          FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+          FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${sourcesQuery.clause}
         ) s
         GROUP BY 1 ORDER BY visitors DESC
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      sourcesQuery.values
     );
 
+    const referrersQuery = this.webFilterQuery(project.id, from, to, filters);
+    const referrers = await this.database.query<{ domain: string; visitors: number; views: number }>(
+      `
+        SELECT
+          CASE
+            WHEN ref IS NULL OR ref = '' THEN 'Direct'
+            ELSE COALESCE(
+              NULLIF(
+                regexp_replace(
+                  split_part(split_part(regexp_replace(ref, '^[a-z][a-z0-9+.-]*://', '', 'i'), '/', 1), ':', 1),
+                  '^www\\.',
+                  '',
+                  'i'
+                ),
+                ''
+              ),
+              'Direct'
+            )
+          END AS domain,
+          count(DISTINCT actor)::int AS visitors,
+          count(*)::int AS views
+        FROM (
+          SELECT context->'page'->>'referrer' AS ref, COALESCE(user_id::text, anonymous_id) AS actor
+          FROM events
+          WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${referrersQuery.clause}
+        ) s
+        GROUP BY 1
+        ORDER BY views DESC
+        LIMIT 10
+      `,
+      referrersQuery.values
+    );
+
+    const hoursQuery = this.webFilterQuery(project.id, from, to, filters);
     const hourRows = await this.database.query<{ dow: number; hour: number; total: number }>(
       `
         SELECT EXTRACT(DOW FROM occurred_at AT TIME ZONE 'UTC')::int AS dow,
           EXTRACT(HOUR FROM occurred_at AT TIME ZONE 'UTC')::int AS hour,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
-        FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+        FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3${hoursQuery.clause}
         GROUP BY 1, 2
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      hoursQuery.values
     );
     const activeHours = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
     for (const row of hourRows.rows) {
@@ -674,6 +756,7 @@ export class AnalyticsService {
       }
     }
 
+    const frustrationQuery = this.webFilterQuery(project.id, from, to, filters);
     const frustratingPages = await this.database.query<{ path: string; errors: number; rageClicks: number; users: number }>(
       `
         SELECT
@@ -688,7 +771,7 @@ export class AnalyticsService {
             COALESCE(user_id::text, anonymous_id) AS actor
           FROM events
           WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
-            AND event_name IN ('$exception', '$rageclick')
+            AND event_name IN ('$exception', '$rageclick')${frustrationQuery.clause}
         ) s
         GROUP BY path
         ORDER BY (
@@ -696,7 +779,117 @@ export class AnalyticsService {
         ) DESC
         LIMIT 10
       `,
-      [project.id, from.toISOString(), to.toISOString()]
+      frustrationQuery.values
+    );
+
+    const campaignQuery = this.webFilterQuery(project.id, from, to, filters);
+    const campaigns = await this.database.query<{ campaign: string; source: string; medium: string; visitors: number; views: number }>(
+      `SELECT context->'page'->'utm'->>'campaign' AS campaign,
+        COALESCE(NULLIF(context->'page'->'utm'->>'source', ''), '(not set)') AS source,
+        COALESCE(NULLIF(context->'page'->'utm'->>'medium', ''), '(not set)') AS medium,
+        count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS visitors,
+        count(*)::int AS views
+       FROM events
+       WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3
+         AND NULLIF(context->'page'->'utm'->>'campaign', '') IS NOT NULL${campaignQuery.clause}
+       GROUP BY 1, 2, 3 ORDER BY visitors DESC LIMIT 20`,
+      campaignQuery.values
+    );
+
+    const goalRows = await this.database.query<{ id: string; name: string; type: 'page' | 'event'; target: string }>(
+      `SELECT id, name, goal_type AS type, target_value AS target FROM analytics_goals
+       WHERE project_id = $1 ORDER BY created_at DESC`, [project.id]
+    );
+    const goals = await Promise.all(goalRows.rows.map(async (goal) => {
+      const query = this.webFilterQuery(project.id, from, to, filters);
+      query.values.push(goal.target);
+      const targetParam = query.values.length;
+      const match = goal.type === 'page'
+        ? `event_name = '$page' AND context->'page'->>'path' = $${targetParam}`
+        : `event_name = $${targetParam}`;
+      const result = await this.database.query<{ conversions: number; occurrences: number }>(
+        `SELECT count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS conversions,
+          count(*)::int AS occurrences FROM events
+         WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3 AND ${match}${query.clause}`,
+        query.values
+      );
+      const conversion = result.rows[0] ?? { conversions: 0, occurrences: 0 };
+      return { ...goal, ...conversion, conversionRate: current.visitors > 0 ? conversion.conversions / current.visitors : 0 };
+    }));
+
+    const journeyQuery = this.webFilterQuery(project.id, from, to, filters);
+    const journeyRows = await this.database.query<{ step: number; path: string; sessions: number }>(
+      `WITH ordered_pages AS (
+         SELECT session_id,
+           COALESCE(NULLIF(context->'page'->>'path', ''), '(unknown)') AS path,
+           row_number() OVER (PARTITION BY session_id ORDER BY occurred_at, id) AS step
+         FROM events
+         WHERE project_id = $1 AND event_name = '$page' AND session_id IS NOT NULL
+           AND occurred_at >= $2 AND occurred_at < $3${journeyQuery.clause}
+       ), ranked AS (
+         SELECT step::int, path, count(DISTINCT session_id)::int AS sessions,
+           row_number() OVER (PARTITION BY step ORDER BY count(DISTINCT session_id) DESC, path) AS popularity
+         FROM ordered_pages WHERE step <= 4 GROUP BY step, path
+       )
+       SELECT step, path, sessions FROM ranked WHERE popularity <= 6 ORDER BY step, sessions DESC`,
+      journeyQuery.values
+    );
+    const transitionQuery = this.webFilterQuery(project.id, from, to, filters);
+    const transitionRows = await this.database.query<{ fromStep: number; fromPath: string; toStep: number; toPath: string; sessions: number }>(
+      `WITH ordered_pages AS (
+         SELECT session_id,
+           COALESCE(NULLIF(context->'page'->>'path', ''), '(unknown)') AS path,
+           row_number() OVER (PARTITION BY session_id ORDER BY occurred_at, id) AS step
+         FROM events
+         WHERE project_id = $1 AND event_name = '$page' AND session_id IS NOT NULL
+           AND occurred_at >= $2 AND occurred_at < $3${transitionQuery.clause}
+       )
+       SELECT a.step::int AS "fromStep", a.path AS "fromPath",
+         b.step::int AS "toStep", b.path AS "toPath", count(DISTINCT a.session_id)::int AS sessions
+       FROM ordered_pages a JOIN ordered_pages b ON b.session_id = a.session_id AND b.step = a.step + 1
+       WHERE a.step < 4
+       GROUP BY a.step, a.path, b.step, b.path
+       ORDER BY sessions DESC LIMIT 60`,
+      transitionQuery.values
+    );
+    const journeySessions = journeyRows.rows
+      .filter((row) => row.step === 1)
+      .reduce((sum, row) => sum + row.sessions, 0);
+    const journey = {
+      sessions: journeySessions,
+      columns: [1, 2, 3, 4]
+        .map((step) => ({ step, nodes: journeyRows.rows.filter((row) => row.step === step).map(({ path, sessions }) => ({ path, sessions })) }))
+        .filter((column) => column.nodes.length > 0),
+      transitions: transitionRows.rows
+    };
+
+    const vitalsQuery = this.webFilterQuery(project.id, from, to, filters);
+    const vitalMetrics = await this.database.query<{ metric: string; p75: number; count: number; good: number; needsImprovement: number; poor: number }>(
+      `SELECT properties->>'metric' AS metric,
+        percentile_cont(0.75) WITHIN GROUP (ORDER BY (properties->>'value')::double precision)::float AS p75,
+        count(*)::int AS count,
+        count(*) FILTER (WHERE properties->>'rating' = 'good')::int AS good,
+        count(*) FILTER (WHERE properties->>'rating' = 'needs-improvement')::int AS "needsImprovement",
+        count(*) FILTER (WHERE properties->>'rating' = 'poor')::int AS poor
+       FROM events
+       WHERE project_id = $1 AND event_name = '$web_vital' AND occurred_at >= $2 AND occurred_at < $3
+         AND properties->>'metric' IN ('CLS', 'INP', 'LCP', 'FCP', 'TTFB')
+         AND properties->>'value' ~ '^-?[0-9]+(?:\\.[0-9]+)?$'${vitalsQuery.clause}
+       GROUP BY 1 ORDER BY 1`, vitalsQuery.values
+    );
+    const vitalPagesQuery = this.webFilterQuery(project.id, from, to, filters);
+    const vitalPages = await this.database.query<{ path: string; metric: string; p75: number; count: number; poor: number }>(
+      `SELECT COALESCE(NULLIF(context->'page'->>'path', ''), '(unknown)') AS path,
+        properties->>'metric' AS metric,
+        percentile_cont(0.75) WITHIN GROUP (ORDER BY (properties->>'value')::double precision)::float AS p75,
+        count(*)::int AS count,
+        count(*) FILTER (WHERE properties->>'rating' = 'poor')::int AS poor
+       FROM events
+       WHERE project_id = $1 AND event_name = '$web_vital' AND occurred_at >= $2 AND occurred_at < $3
+         AND properties->>'metric' IN ('CLS', 'INP', 'LCP', 'FCP', 'TTFB')
+         AND properties->>'value' ~ '^-?[0-9]+(?:\\.[0-9]+)?$'${vitalPagesQuery.clause}
+       GROUP BY 1, 2 HAVING count(*) >= 1
+       ORDER BY poor DESC, p75 DESC LIMIT 20`, vitalPagesQuery.values
     );
 
     return {
@@ -707,14 +900,45 @@ export class AnalyticsService {
       visitorsTrend,
       topPaths: topPaths.rows,
       devices: devices.rows,
+      browsers: browsers.rows,
+      operatingSystems: operatingSystems.rows,
       countries: countries.rows,
       sources: sources.rows,
+      referrers: referrers.rows,
+      campaigns: campaigns.rows,
+      goals,
+      filters,
+      journey,
+      webVitals: { metrics: vitalMetrics.rows, pages: vitalPages.rows },
       activeHours,
       frustratingPages: frustratingPages.rows
     };
   }
 
-  private async computeWebTotals(projectId: string, from: Date, to: Date): Promise<WebTotals> {
+  async getWebRealtime(user: DashboardUser, params: { filters?: string; projectId?: string } = {}) {
+    const project = await this.projects.resolveActiveProject(user, params.projectId);
+    if (!project) return { project: null, windowMinutes: 5, visitors: 0, pageviews: 0, topPaths: [] };
+    const to = new Date();
+    const from = new Date(to.getTime() - 5 * 60 * 1000);
+    const query = this.webFilterQuery(project.id, from, to, parseFiltersParam(params.filters));
+    const totals = await this.database.query<{ visitors: number; pageviews: number }>(
+      `SELECT count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS visitors,
+        count(*) FILTER (WHERE event_name = '$page')::int AS pageviews
+       FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3${query.clause}`,
+      query.values
+    );
+    const pathsQuery = this.webFilterQuery(project.id, from, to, parseFiltersParam(params.filters));
+    const paths = await this.database.query<{ path: string; visitors: number }>(
+      `SELECT COALESCE(NULLIF(context->'page'->>'path', ''), '(unknown)') AS path,
+        count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS visitors
+       FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${pathsQuery.clause}
+       GROUP BY 1 ORDER BY visitors DESC LIMIT 5`, pathsQuery.values
+    );
+    return { project, windowMinutes: 5, visitors: totals.rows[0]?.visitors ?? 0, pageviews: totals.rows[0]?.pageviews ?? 0, topPaths: paths.rows };
+  }
+
+  private async computeWebTotals(projectId: string, from: Date, to: Date, filters: FilterCondition[]): Promise<WebTotals> {
+    const query = this.webFilterQuery(projectId, from, to, filters);
     const result = await this.database.query<{
       visitors: number;
       pageviews: number;
@@ -725,7 +949,7 @@ export class AnalyticsService {
       `
         WITH ev AS (
           SELECT COALESCE(user_id::text, anonymous_id) AS actor, session_id, event_name, occurred_at
-          FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3
+          FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3${query.clause}
         ),
         sess AS (
           SELECT session_id,
@@ -740,7 +964,7 @@ export class AnalyticsService {
           COALESCE((SELECT avg(duration) FROM sess), 0)::float AS avg_duration,
           COALESCE((SELECT (count(*) FILTER (WHERE pageviews <= 1))::float / NULLIF(count(*), 0) FROM sess), 0)::float AS bounce_rate
       `,
-      [projectId, from.toISOString(), to.toISOString()]
+      query.values
     );
 
     const row = result.rows[0];
@@ -751,6 +975,11 @@ export class AnalyticsService {
       avgSessionDuration: Math.round(row?.avg_duration ?? 0),
       bounceRate: row?.bounce_rate ?? 0
     };
+  }
+
+  private webFilterQuery(projectId: string, from: Date, to: Date, filters: FilterCondition[]) {
+    const values: unknown[] = [projectId, from.toISOString(), to.toISOString()];
+    return { values, clause: buildFilterClause(filters, values) };
   }
 
   private clampWebDays(value?: string): number {

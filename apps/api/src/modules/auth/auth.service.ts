@@ -19,7 +19,7 @@ export interface MfaFactor {
 export interface DashboardUser {
   id: string;
   email?: string;
-  authMethod?: 'supabase' | 'pat';
+  authMethod?: 'supabase' | 'pat' | 'local';
   scopes?: string[];
   amr?: AmrEntry[];
   factors?: MfaFactor[];
@@ -39,9 +39,22 @@ const MFA_METHODS = ['totp', 'webauthn', 'phone', 'sms'];
 
 @Injectable()
 export class AuthService {
+  private localWorkspaceReady?: Promise<void>;
+
   constructor(private readonly database: DatabaseService) {}
 
   async getDashboardUser(authorizationHeader?: string): Promise<DashboardUser> {
+    if (this.isLocalAuthMode()) {
+      await this.ensureLocalWorkspace();
+      return {
+        id: 'traceiq-local-owner',
+        email: 'local@traceiq.invalid',
+        authMethod: 'local',
+        amr: [],
+        factors: []
+      };
+    }
+
     const token = this.getBearerToken(authorizationHeader);
 
     if (token.startsWith('tiq_pat_')) {
@@ -72,6 +85,10 @@ export class AuthService {
    * service-role key is not configured or the Admin API is unreachable.
    */
   async resolveUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
+    if (this.isLocalAuthMode()) {
+      throw new ForbiddenException('Team invitations require an external authentication provider.');
+    }
+
     const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -171,6 +188,63 @@ export class AuthService {
     if (user.authMethod === 'pat') {
       throw new ForbiddenException('Personal access tokens cannot manage personal access tokens.');
     }
+  }
+
+  private isLocalAuthMode(): boolean {
+    return (process.env.AUTH_MODE ?? 'supabase').trim().toLowerCase() === 'local';
+  }
+
+  /**
+   * Local mode retains the normal organization/project authorization model.
+   * These deterministic rows are created idempotently so a fresh installation
+   * opens directly into a usable workspace without an external identity service.
+   */
+  private ensureLocalWorkspace(): Promise<void> {
+    if (!this.localWorkspaceReady) {
+      this.localWorkspaceReady = this.provisionLocalWorkspace().catch((error) => {
+        this.localWorkspaceReady = undefined;
+        throw error;
+      });
+    }
+    return this.localWorkspaceReady;
+  }
+
+  private async provisionLocalWorkspace(): Promise<void> {
+    const writeKey = process.env.LOCAL_PROJECT_WRITE_KEY ?? 'trq_local_development_only';
+    const writeKeyHash = createHash('sha256').update(writeKey).digest('hex');
+
+    await this.database.transaction(async (client) => {
+      await client.query(
+        `
+          INSERT INTO organizations (id, name, slug, created_by_user_id)
+          VALUES ('org_local', 'Local Workspace', 'local-workspace', 'traceiq-local-owner')
+          ON CONFLICT (id) DO NOTHING;
+        `
+      );
+      await client.query(
+        `
+          INSERT INTO organization_members (organization_id, user_id, role)
+          VALUES ('org_local', 'traceiq-local-owner', 'owner')
+          ON CONFLICT (organization_id, user_id)
+          DO UPDATE SET role = 'owner', updated_at = now();
+        `
+      );
+      await client.query(
+        `
+          INSERT INTO projects (id, organization_id, name, slug, created_by_user_id)
+          VALUES ('proj_local', 'org_local', 'Local Project', 'local-project', 'traceiq-local-owner')
+          ON CONFLICT (id) DO NOTHING;
+        `
+      );
+      await client.query(
+        `
+          INSERT INTO project_write_keys (id, project_id, key_prefix, key_hash, name, created_by_user_id)
+          VALUES ('pwk_local', 'proj_local', $1, $2, 'Local development write key', 'traceiq-local-owner')
+          ON CONFLICT (id) DO NOTHING;
+        `,
+        [writeKey.slice(0, 16), writeKeyHash]
+      );
+    });
   }
 
   /**

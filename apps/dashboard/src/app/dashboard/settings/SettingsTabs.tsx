@@ -10,13 +10,14 @@ const tabs = [
 
 export function SettingsTabs() {
   const pathname = usePathname();
+  const visibleTabs = process.env.NEXT_PUBLIC_AUTH_MODE === 'local' ? tabs.filter((tab) => tab.label !== 'Team') : tabs;
 
   return (
     <nav
       aria-label="Settings sections"
       className="mt-6 flex gap-1 border-b border-neutral-200 dark:border-slate-800"
     >
-      {tabs.map((tab) => {
+      {visibleTabs.map((tab) => {
         const active = pathname === tab.href;
         return (
           <Link

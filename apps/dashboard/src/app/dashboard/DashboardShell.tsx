@@ -12,6 +12,8 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ active, title, userEmail, projectId, organizationId, children }: DashboardShellProps) {
+  const localMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
+
   return (
     <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="flex min-h-screen w-full">
@@ -38,7 +40,14 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
             </div>
           </header>
 
-          <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">{children}</div>
+          <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">
+            {localMode ? (
+              <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                Local single-user mode · Authentication is disabled. Keep this instance bound to your own machine.
+              </div>
+            ) : null}
+            {children}
+          </div>
         </section>
       </div>
     </main>

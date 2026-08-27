@@ -1,100 +1,140 @@
 # TraceIQ
 
-TraceIQ is a developer-first behavior intelligence platform for web and mobile applications. It is designed to help teams understand user behavior, diagnose conversion issues, and prepare for high-volume analytics workloads.
+TraceIQ is an open-source, developer-first product analytics platform for web, mobile, and server applications. Capture events with an SDK, explore user journeys and funnels, monitor web and API performance, and run the control plane on infrastructure you own.
 
-## Workspace
+> TraceIQ is under active development. Review the configuration and back up your database before operating a public production instance.
+
+## What is included
+
+- Event ingestion and identity stitching
+- Web analytics with realtime visitors, referrers, browser/OS breakdowns, UTM campaigns, conversion goals, and reusable filters
+- Revocable, permission-scoped public links for saved dashboards
+- Error, rage-click, and API-performance analytics
+- Feature flags, alerts, webhooks, exports, and organization access controls
+- JavaScript, React Native, Node.js, Python, Rust, Swift, Kotlin, and PHP SDKs
+- An optional MCP server for AI clients
+
+## Architecture
 
 ```text
-apps/
-  api/          NestJS API and ingestion foundation
-  dashboard/    Next.js app: public landing page (/), waitlist (/waitlist),
-                docs (/docs), and the authenticated analytics dashboard (/dashboard)
-packages/
-  sdk-js/       Browser SDK foundation
-  shared/       Shared domain models and utilities
-  types/        Cross-package TypeScript contracts
-  ui/           Shared UI primitives
-docs/           Product, architecture, API, and deployment docs
-infrastructure/ Local and future production infrastructure assets
-scripts/        Developer automation
-src/            traceiq/traceiq-php — PHP SDK source (Composer package lives at repo root)
+SDKs and applications
+        |
+        v
+NestJS API (apps/api) ---- Redis
+        |
+        v
+PostgreSQL 18
+        ^
+        |
+Next.js dashboard (apps/dashboard)
 ```
 
-Start with `docs/architecture.md` and `docs/architecture-diagrams.md` for the system overview. For MCP server installation and usage details, see `docs/mcp-server.md`.
+The npm workspaces contain the API, dashboard, browser and server SDKs, shared types, UI primitives, and the MCP server. Additional language SDKs live under `sdks/`; the PHP SDK lives at the repository root.
 
-## Published packages
+See [Architecture](docs/architecture.md), [Event schema](docs/event-schema.md), and [Deployment](docs/deployment.md) for more detail.
 
-- JavaScript SDK: [traceiq-sdk-js on npm](https://www.npmjs.com/package/traceiq-sdk-js)
-- React Native SDK: [traceiq-react-native on npm](https://www.npmjs.com/package/traceiq-react-native)
-- Python SDK: [traceiq-py on PyPI](https://pypi.org/project/traceiq-py/0.1.0/)
-- Rust SDK: [traceiq on crates.io](https://crates.io/crates/traceiq)
-- PHP SDK: [traceiq/traceiq-php on Packagist](https://packagist.org/packages/traceiq/traceiq-php) — install with `composer require traceiq/traceiq-php`. See the [PHP SDK section](#php-sdk) below.
-- MCP server: [traceiq-mcp-server on npm](https://www.npmjs.com/package/traceiq-mcp-server)
+## Prerequisites
 
-## PHP SDK
+- Node.js 22
+- npm 10 or newer
+- Docker with Docker Compose
+- A Supabase project only when you want accounts, teams, invitations, and 2FA
 
-Server-side TraceIQ SDK for PHP (8.1+). Pure PHP — no runtime dependencies.
-Events are queued and flushed in batches, so your code never has to think about
-the network.
+## Local quickstart
 
-> Note: PHP has no portable background threads, so flushing is synchronous. The
-> client flushes automatically once `flush_at` events are queued and again on
-> request shutdown (registered automatically).
+Start a complete private instance with one command:
 
 ```bash
-composer require traceiq/traceiq-php
+docker compose -f compose.local.yml up -d --build
 ```
 
-```php
-use TraceIQ\Client;
+Open `http://localhost:3000`. PostgreSQL, migrations, Redis, the API, and dashboard are started automatically. No account or Supabase project is required. The stack creates a local owner, workspace, project, and development write key.
 
-$traceiq = new Client(
-    projectId: "YOUR_PROJECT_ID",
-    writeKey: "YOUR_WRITE_KEY",                  // keep server keys secret
-    endpoint: "https://your-traceiq-api.example.com",  // defaults to http://localhost:4000
-);
-
-// A trustworthy revenue event, straight from your payments service:
-$traceiq->capture(
-    event: "payout_succeeded",
-    userId: "user_123",
-    properties: ["amount" => 50000, "currency" => "NGN"],
-);
-
-$traceiq->identify("user_123", traits: ["email" => "a@b.com", "kyc_tier" => 2]);
-$traceiq->group("org_9", userId: "user_123", traits: ["plan" => "growth"]);
-
-$traceiq->shutdown(); // flush before a short-lived process exits
+```text
+Project ID: proj_local
+Write key: trq_local_development_only
+API URL: http://localhost:4000
 ```
 
-| Method | Purpose |
-| --- | --- |
-| `capture(event, userId=null, anonymousId=null, properties=[], context=[], timestamp=null)` | Track an event. |
-| `identify(userId, traits=[], timestamp=null)` | Create/update a user profile. |
-| `group(organizationId, userId=null, anonymousId=null, traits=[], timestamp=null)` | Associate a user with an account. |
-| `flush()` | Send everything queued now (blocks). |
-| `shutdown()` | Flush and mark the client shut down. |
+Both HTTP ports bind to `127.0.0.1`, and PostgreSQL and Redis are not published. Local mode is designed for a single operator on their own machine—not for a shared or publicly reachable server.
 
-Options: `endpoint`, `flush_at` (20), `flush_interval` (10.0s), `max_retries` (3),
-`timeout` (10.0s), `debug` (false), `on_error` (callback). `flush_interval` is
-accepted for parity with the Python/Rust SDKs and reserved for a future async
-transport.
-
-Delivery is at-most-once; a batch that fails after `max_retries` is dropped and
-passed to `on_error`. `properties["amount"]` (a number) powers the dashboard's
-revenue metrics.
-
-Run the suite from the repo root with `composer install && composer test`
-(PHPUnit). There is no vendored Composer tree committed to Git.
-
-## Local Setup
+Stop the stack without deleting its data:
 
 ```bash
-npm install
-cp .env.example .env
-docker compose up -d
+docker compose -f compose.local.yml down
+```
+
+For source development with hot reload, install dependencies with `npm ci --legacy-peer-deps`, run the database services from `compose.local.yml`, and configure `AUTH_MODE=local` plus `NEXT_PUBLIC_AUTH_MODE=local` in the respective API and dashboard environments.
+
+Useful checks:
+
+```bash
+docker compose ps
+curl http://localhost:4000/health
 npm run typecheck
-npm run dev
+npm test --workspace=@traceiq/api
 ```
 
-This foundation intentionally avoids advanced business logic. The current goal is stable architecture, clear contracts, and documentation that future engineers can build on confidently.
+## Self-hosting
+
+For accounts, organizations, invitations, and 2FA, use `AUTH_MODE=supabase`. The verified production topology keeps the public dashboard and API deployment independent:
+
+```text
+Vercel: Next.js dashboard
+DNS: api.example.com -> VPS
+VPS host: Caddy -> 127.0.0.1:4000
+Docker Compose: API + PostgreSQL 18 + Redis 7
+```
+
+For a VPS deployment:
+
+1. Provision Docker, Compose, and Caddy.
+2. Clone the repository and create `.env` from `.env.example`.
+3. Use unique database credentials and set `VPS_DATABASE_URL` to the Compose hostname `postgres`.
+4. Configure the dashboard URL, API URL, CORS origins, and Supabase Auth values for your domains.
+5. Start PostgreSQL and Redis, build the API, run pending migrations, then start the API.
+6. Reverse proxy the API domain to `127.0.0.1:4000`.
+7. Deploy `apps/dashboard` to Vercel or another Node.js host with its `NEXT_PUBLIC_*` variables.
+
+PostgreSQL and Redis do not publish host ports in the provided Compose configuration. The API publishes only `127.0.0.1:4000`. Do not use `docker compose down -v` during upgrades because `-v` deletes the database volume.
+
+Full upgrade, backup, Caddy, and environment guidance is in [docs/deployment.md](docs/deployment.md).
+
+## SDK example
+
+```bash
+npm install traceiq-sdk-js
+```
+
+```ts
+import { traceiq } from 'traceiq-sdk-js';
+
+traceiq.initialize({
+  projectId: 'YOUR_PROJECT_ID',
+  writeKey: 'YOUR_WRITE_KEY',
+  endpoint: 'https://api.example.com',
+  autoTrackPageViews: true
+});
+
+traceiq.track('signup_completed', { plan: 'starter' });
+```
+
+See the [JavaScript SDK README](packages/sdk-js/README.md) and the other package-specific READMEs for installation details.
+
+## Repository layout
+
+```text
+apps/api/              NestJS API, migrations, and tests
+apps/dashboard/        Next.js dashboard and public documentation UI
+packages/              TypeScript SDKs, shared packages, UI, and MCP server
+sdks/                  Python, Rust, Swift, and Kotlin SDKs
+src/ and tests/        PHP SDK and tests
+docs/                  Architecture, deployment, and protocol documentation
+infrastructure/        Infrastructure notes and assets
+```
+
+## Contributing and security
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Review [Privacy and data collection](docs/privacy.md) before instrumenting an application. Please report vulnerabilities privately using the process in [SECURITY.md](SECURITY.md), not through a public issue.
+
+TraceIQ is available under the [MIT License](LICENSE).

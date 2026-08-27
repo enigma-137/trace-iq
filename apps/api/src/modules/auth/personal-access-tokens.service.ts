@@ -9,6 +9,7 @@ const ALLOWED_SCOPES = new Set([
   'flags:read',
   'flags:write',
   'analytics:read',
+  'analytics:write',
   'insights:read',
   'funnels:read',
   'funnels:write',

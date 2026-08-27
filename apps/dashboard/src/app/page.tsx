@@ -29,10 +29,10 @@ const metrics = [
 ];
 
 const faqs = [
-  ['What does TraceIQ observe?', 'TraceIQ maps the full path of every click, API call, web vital, and error across your product, and compiles them into one living behavioral timeline.'],
-  ['How quickly can we get started?', 'Add a few lines of our SDK to your app and see your first live events in minutes. No cookies, no heavy scripts — just one lightweight script under 25 KB.'],
-  ['Do we need cookie banners?', 'No. TraceIQ uses privacy-first, cookieless telemetry hashes that do not store PII, making it GDPR and CCPA compliant out of the box.'],
-  ['How does it compare to Google Analytics?', 'GA4 loads over 45 KB of heavy tracking scripts that can hurt your Core Web Vitals. TraceIQ ships a micro-optimized, asynchronous bundle that stays out of your render path.']
+  ['What does TraceIQ observe?', 'TraceIQ collects the page views and custom events you configure, plus session, device, and error context used to explain product behavior. Optional request capture records API timing and status data.'],
+  ['How quickly can we get started?', 'Add a few lines of the browser SDK to see your first events in minutes. The current compiled client is under 25 KB before compression and sends events asynchronously.'],
+  ['Does the SDK use cookies?', 'The browser SDK does not set cookies. It uses first-party localStorage and sessionStorage for anonymous and session identifiers, which may still require notice or consent under laws that cover similar storage technologies.'],
+  ['Is using TraceIQ automatically GDPR or CCPA compliant?', 'No analytics tool makes an implementation automatically compliant. Operators control what they collect and must configure notices, consent or another legal basis, retention, access, and deletion processes for their users and jurisdictions.']
 ];
 
 const codeExamples = {
@@ -147,7 +147,7 @@ export default function Page() {
         <div className="hero-copy">
           <div className="eyebrow"><span className="status-dot" /> Observe everything. Understand instantly.</div>
           <h1>Clarity for<br /><em>complex systems.</em></h1>
-          <p>TraceIQ turns clicks, API response rates, web vitals, and errors into a clear, living map of how your software really works.</p>
+          <p>TraceIQ turns page views, custom events, API response data, and errors into a clear map of how your software really works.</p>
           <div className="hero-actions">
             <a className="button" href="/waitlist">Start tracing <ArrowUpRight size={16} /></a>
             <a className="quiet-link" href="#sandbox"><Play size={14} fill="currentColor" /> See how it works</a>
@@ -413,7 +413,7 @@ export default function Page() {
           </div>
           <div className="footer-links">
             <div><strong>Product</strong><a href="#product">Overview</a><a href="#solutions">Solutions</a><a href="/docs">Resources</a></div>
-            <div><strong>Company</strong><a href="#company">About</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.dev">Contact</a></div>
+            <div><strong>Company</strong><a href="#company">About</a><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:hello@traceiq.dev">Contact</a></div>
             <div><strong>Connect</strong><a href="/docs">Docs</a><a className="" href="/status">Status</a></div>
           </div>
         </div>

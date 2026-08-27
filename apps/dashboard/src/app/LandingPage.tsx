@@ -389,15 +389,15 @@ export default function LandingPage() {
   // const faqs = [
   //   {
   //     q: 'What is TraceIQ?',
-  //     a: 'TraceIQ is an open-source, developer-first behavior intelligence platform. It brings event tracking, conversion funnels, user timelines, and performance errors into one lightweight SDK (under 25 KB) and an easy-to-use analytics dashboard.'
+  //     a: 'TraceIQ is an open-source, developer-first behavior intelligence platform for events, funnels, user timelines, and performance errors.'
   //   },
   //   {
-  //     q: 'Do I need standard cookie banners with TraceIQ?',
-  //     a: 'No! By default, TraceIQ tracks user sessions using privacy-first, cookieless telemetry hashes that do not store personally identifiable information (PII) on the device. This makes it GDPR and CCPA compliant out of the box.'
+  //     q: 'Does the browser SDK set cookies?',
+  //     a: 'No, but it stores anonymous and session identifiers in first-party Web Storage. Operators must decide what notice or consent their implementation requires.'
   //   },
   //   {
-  //     q: 'How does the performance compare with Google Analytics?',
-  //     a: 'Google Analytics (GA4) loads scripts over 45 KB, runs heavy tracking scripts, and blocks rendering. TraceIQ uses a micro-optimized JS bundle under 25 KB that runs asynchronously and won’t affect your Core Web Vitals (LCP, INP, CLS).'
+  //     q: 'How does the SDK affect performance?',
+  //     a: 'The current compiled browser client is under 25 KB before compression and sends event requests asynchronously. Measure its impact in your own application.'
   //   },
   //   {
   //     q: 'Can I self-host TraceIQ?',
@@ -539,7 +539,7 @@ export default function LandingPage() {
               <span className="text-zinc-400">Solve conversion friction.</span>
             </h1>
             <p className="max-w-2xl text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg lg:text-xl">
-              TraceIQ logs clicks, API response times, web vitals, and errors, then compiles them into interactive
+              TraceIQ records configured events, API response times, and errors, then compiles them into interactive
               timelines and conversion paths — the precise signals you need to build seamless product flows.
             </p>
             <div className="flex w-full max-w-xs flex-col gap-3 pt-1 sm:max-w-none sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">

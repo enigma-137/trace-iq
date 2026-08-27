@@ -38,6 +38,8 @@ interface CompareState {
   data: TrendsResponse | null;
 }
 
+interface PublicShare { id: string; permissions: string[]; expiresAt: string | null; createdAt: string; lastAccessedAt: string | null }
+
 function isTrend(def: DashboardDefinition): def is Extract<DashboardDefinition, { source: 'trend' }> {
   return def.source === 'trend';
 }
@@ -45,11 +47,13 @@ function isTrend(def: DashboardDefinition): def is Extract<DashboardDefinition, 
 export function DashboardsApp({
   projectId,
   initialDashboards,
-  userId
+  userId,
+  initialToken
 }: {
   projectId?: string;
   initialDashboards: DashboardView[];
   userId: string;
+  initialToken?: string;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [dashboards, setDashboards] = useState<DashboardView[]>(initialDashboards);
@@ -62,15 +66,48 @@ export function DashboardsApp({
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [compareStates, setCompareStates] = useState<CompareState[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<DashboardView | null>(null);
+  const [shares, setShares] = useState<PublicShare[]>([]);
+  const [sharePermissions, setSharePermissions] = useState<string[]>(['summary', 'chart']);
+  const [shareExpiryDays, setShareExpiryDays] = useState('30');
+  const [createdShareUrl, setCreatedShareUrl] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
   const projectQuery = projectId ? `?projectId=${projectId}` : '';
 
   async function getToken(): Promise<string | null> {
+    if (initialToken) return initialToken;
     const {
       data: { session }
     } = await supabase.auth.getSession();
     return session?.access_token ?? null;
+  }
+
+  async function openShare(dashboard: DashboardView) {
+    setSharing(dashboard); setCreatedShareUrl(''); setError(null);
+    const response = await authFetch(`/v1/dashboard/dashboards/${dashboard.id}/shares${projectQuery}`, { method: 'GET' });
+    if (response?.ok) setShares(((await response.json()) as { shares: PublicShare[] }).shares);
+  }
+
+  async function createShare() {
+    if (!sharing || sharePermissions.length === 0) return;
+    setBusy(true); setError(null);
+    const days = Number(shareExpiryDays);
+    const expiresAt = Number.isFinite(days) && days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
+    const response = await authFetch(`/v1/dashboard/dashboards/${sharing.id}/shares`, {
+      method: 'POST', body: JSON.stringify({ projectId, permissions: sharePermissions, expiresAt })
+    });
+    setBusy(false);
+    if (!response?.ok) { setError(await readError(response)); return; }
+    const created = await response.json() as PublicShare & { token: string };
+    await openShare(sharing);
+    setCreatedShareUrl(`${window.location.origin}/share/${created.token}`);
+  }
+
+  async function revokeShare(shareId: string) {
+    if (!sharing) return;
+    const response = await authFetch(`/v1/dashboard/dashboards/${sharing.id}/shares/${shareId}${projectQuery}`, { method: 'DELETE' });
+    if (response?.ok) await openShare(sharing); else setError(await readError(response));
   }
 
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
@@ -283,6 +320,9 @@ export function DashboardsApp({
                         <button className={toolbarBtn} onClick={() => openEdit(dashboard)}>
                           Edit
                         </button>
+                        <button className={toolbarBtn} onClick={() => void openShare(dashboard)}>
+                          Public link
+                        </button>
                         <button className={deleteBtn} onClick={() => setDeleting(dashboard)} aria-label="Delete dashboard">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
@@ -338,6 +378,25 @@ export function DashboardsApp({
           </div>
         </section>
       ) : null}
+
+      <DashboardDialog
+        open={Boolean(sharing)}
+        title="Public dashboard link"
+        description="Create revocable, read-only links with only the permissions selected below."
+        onClose={() => { if (!busy) { setSharing(null); setCreatedShareUrl(''); } }}
+        footer={<><button className={secondaryBtn} disabled={busy} onClick={() => setSharing(null)}>Close</button><button className={primaryBtn} disabled={busy || sharePermissions.length === 0} onClick={() => void createShare()}>{busy ? 'Creating…' : 'Create link'}</button></>}
+      >
+        <div className="grid gap-4">
+          <div className="grid gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Allowed sections</p>
+            {([['summary', 'Summary numbers'], ['chart', 'Chart and series'], ['definition', 'Saved filters and configuration']] as const).map(([permission, label]) => <Checkbox key={permission} checked={sharePermissions.includes(permission)} onCheckedChange={(checked) => setSharePermissions((current) => checked ? [...new Set([...current, permission])] : current.filter((item) => item !== permission))} label={label} />)}
+          </div>
+          <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">Expires after
+            <select className={inputClass} value={shareExpiryDays} onChange={(event) => setShareExpiryDays(event.target.value)}><option value="1">1 day</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="">Never</option></select>
+          </label>
+          {createdShareUrl ? <div className="rounded border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Copy this link now—the secret is shown only once.</p><div className="mt-2 flex gap-2"><input readOnly className={inputClass} value={createdShareUrl} /><button className={toolbarBtn} onClick={() => void navigator.clipboard.writeText(createdShareUrl)}>Copy</button></div></div> : null}
+          <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Active links</p>{shares.length === 0 ? <p className="text-sm text-neutral-500">No active public links.</p> : <div className="grid gap-2">{shares.map((share) => <div key={share.id} className="flex items-center justify-between gap-3 rounded border border-neutral-200 p-3 text-xs dark:border-slate-700"><div><p className="font-semibold">{share.permissions.join(', ')}</p><p className="mt-1 text-neutral-500">{share.expiresAt ? `Expires ${new Date(share.expiresAt).toLocaleString()}` : 'Never expires'}{share.lastAccessedAt ? ` · last opened ${new Date(share.lastAccessedAt).toLocaleString()}` : ' · never opened'}</p></div><button className={deleteBtn} onClick={() => void revokeShare(share.id)} aria-label="Revoke public link">×</button></div>)}</div>}</div>
+        </div>
+      </DashboardDialog>
 
       <DashboardDialog
         open={Boolean(editing)}

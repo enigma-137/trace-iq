@@ -24,11 +24,23 @@ export class AnalyticsController {
   async getWebAnalytics(
     @Headers('authorization') authorization?: string,
     @Query('days') days?: string,
+    @Query('filters') filters?: string,
     @Query('projectId') projectId?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'analytics:read');
-    return this.analyticsService.getWebAnalytics(user, days, projectId);
+    return this.analyticsService.getWebAnalytics(user, { days, filters, projectId });
+  }
+
+  @Get('web/realtime')
+  async getWebRealtime(
+    @Headers('authorization') authorization?: string,
+    @Query('filters') filters?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'analytics:read');
+    return this.analyticsService.getWebRealtime(user, { filters, projectId });
   }
 
   @Get('api-performance')

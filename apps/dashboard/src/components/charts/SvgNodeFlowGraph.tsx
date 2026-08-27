@@ -182,6 +182,7 @@ export function SvgNodeFlowGraph({
 
   const totalNodes = columns.reduce((sum, col) => sum + col.nodes.length, 0);
   const totalConnections = connections.length;
+  const maxVolume = Math.max(...paths.map((path) => path.volume ?? 0), 1);
 
   return (
     <div className={`relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-2xl ${className}`}>
@@ -270,7 +271,7 @@ export function SvgNodeFlowGraph({
             const isFilteredOut = activeFilterStatus && p.status !== activeFilterStatus;
 
             let opacity = 0.55;
-            let strokeWidth = 2;
+            let strokeWidth = p.volume ? 1.5 + 4 * Math.sqrt(p.volume / maxVolume) : 2;
 
             if (hoveredNodeId) {
               if (isConnectedToHover) {
@@ -285,6 +286,7 @@ export function SvgNodeFlowGraph({
 
             return (
               <g key={`${p.fromId}-${p.toId}-${idx}`}>
+                <title>{p.label ?? (p.volume !== undefined ? `${p.volume.toLocaleString()} transitions` : 'Observed transition')}</title>
                 {/* Base curve path */}
                 <path
                   d={p.d}

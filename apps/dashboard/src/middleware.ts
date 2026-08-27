@@ -7,6 +7,16 @@ const authPrefixes = ['/auth'];
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
+    if (authPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/dashboard';
+      redirectUrl.search = '';
+      return NextResponse.redirect(redirectUrl);
+    }
+    return NextResponse.next();
+  }
+
   if (process.env.NEXT_PUBLIC_WAITLIST_ONLY === 'true') {
     // Avoid redirecting during Next.js build-time pre-rendering (which would cause build errors)
     if (process.env.NEXT_PHASE !== 'phase-production-build') {

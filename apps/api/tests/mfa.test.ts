@@ -27,6 +27,32 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_ANON_KEY;
+  delete process.env.AUTH_MODE;
+  delete process.env.LOCAL_PROJECT_WRITE_KEY;
+});
+
+describe('AuthService.getDashboardUser (local mode)', () => {
+  it('creates an idempotent local workspace and does not require a bearer token', async () => {
+    process.env.AUTH_MODE = 'local';
+    process.env.LOCAL_PROJECT_WRITE_KEY = 'trq_local_test';
+    const db = mockDatabase();
+    const service = new AuthService(db as never);
+
+    const first = await service.getDashboardUser();
+    const second = await service.getDashboardUser();
+
+    expect(first).toMatchObject({
+      id: 'traceiq-local-owner',
+      email: 'local@traceiq.invalid',
+      authMethod: 'local'
+    });
+    expect(second).toEqual(first);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.queryCalls(/INSERT INTO organizations/)).toHaveLength(1);
+    expect(db.queryCalls(/INSERT INTO organization_members/)).toHaveLength(1);
+    expect(db.queryCalls(/INSERT INTO projects/)).toHaveLength(1);
+    expect(db.queryCalls(/INSERT INTO project_write_keys/)).toHaveLength(1);
+  });
 });
 
 describe('AuthService.getDashboardUser (Supabase session)', () => {

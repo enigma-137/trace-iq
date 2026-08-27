@@ -17,5 +17,8 @@
   "files": [
     "dist",
     "README.md"
-  ]
+  ],
+  "dependencies": {
+    "web-vitals": "^6.2.1"
+  }
 }

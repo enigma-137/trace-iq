@@ -8,6 +8,7 @@ import { ActiveHoursHeatmap } from '@/components/charts/ActiveHoursHeatmap';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MiniBars } from '@/components/charts/MiniBars';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
+import { WebAnalyticsControls } from './WebAnalyticsControls';
 // import { GeographyGlobe } from '@/components/GeographyGlobe';
 
 export const dynamic = 'force-dynamic';
@@ -28,8 +29,23 @@ interface WebAnalyticsResponse {
   visitorsTrend: Array<{ bucket: string; total: number }>;
   topPaths: Array<{ path: string; visitors: number; views: number }>;
   devices: Array<{ name: string; total: number }>;
+  browsers: Array<{ name: string; total: number }>;
+  operatingSystems: Array<{ name: string; total: number }>;
   countries: Array<{ name: string; total: number }>;
   sources: Array<{ channel: string; visitors: number }>;
+  referrers: Array<{ domain: string; visitors: number; views: number }>;
+  campaigns: Array<{ campaign: string; source: string; medium: string; visitors: number; views: number }>;
+  goals: Array<{ id: string; name: string; type: 'page' | 'event'; target: string; conversions: number; occurrences: number; conversionRate: number }>;
+  filters: Array<{ field: string; operator: 'is' | 'is_not' | 'contains' | 'is_set' | 'is_not_set'; value?: string }>;
+  journey: {
+    sessions: number;
+    columns: Array<{ step: number; nodes: Array<{ path: string; sessions: number }> }>;
+    transitions: Array<{ fromStep: number; fromPath: string; toStep: number; toPath: string; sessions: number }>;
+  };
+  webVitals: {
+    metrics: Array<{ metric: string; p75: number; count: number; good: number; needsImprovement: number; poor: number }>;
+    pages: Array<{ path: string; metric: string; p75: number; count: number; poor: number }>;
+  };
   activeHours: number[][];
   frustratingPages: Array<{ path: string; errors: number; rageClicks: number; users: number }>;
 }
@@ -137,6 +153,47 @@ function buildWebNavigationFlowGraph(data?: WebAnalyticsResponse | null): { colu
   return { columns, connections };
 }
 
+function formatVital(metric: string, value: number): string {
+  return metric === 'CLS' ? value.toFixed(3) : `${Math.round(value).toLocaleString()} ms`;
+}
+
+function vitalRating(metric: string, value: number): 'good' | 'needs-improvement' | 'poor' {
+  const thresholds: Record<string, [number, number]> = {
+    CLS: [0.1, 0.25], INP: [200, 500], LCP: [2500, 4000], FCP: [1800, 3000], TTFB: [800, 1800]
+  };
+  const [good, poor] = thresholds[metric] ?? [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+  return value <= good ? 'good' : value <= poor ? 'needs-improvement' : 'poor';
+}
+
+function buildSessionTransitionGraph(journey: WebAnalyticsResponse['journey']): { columns: ColumnGroup[]; connections: ConnectionFlow[] } {
+  const nodeId = (step: number, path: string) => `journey-${step}-${encodeURIComponent(path)}`;
+  const included = new Set(journey.columns.flatMap((column) => column.nodes.map((node) => nodeId(column.step, node.path))));
+  const columns: ColumnGroup[] = journey.columns.map((column) => ({
+    id: `journey-step-${column.step}`,
+    title: column.step === 1 ? 'Entry page' : `Page ${column.step}`,
+    subtitle: column.step === 1 ? 'First page in session' : `Position ${column.step} in session`,
+    nodes: column.nodes.map((node, index) => ({
+      id: nodeId(column.step, node.path),
+      title: node.path,
+      description: `${node.sessions.toLocaleString()} session${node.sessions === 1 ? '' : 's'} reached this page`,
+      countBadge: node.sessions.toLocaleString(),
+      status: index === 0 ? 'healthy' : 'info',
+      tags: [`step ${column.step}`]
+    }))
+  }));
+  const connections: ConnectionFlow[] = journey.transitions
+    .filter((transition) => included.has(nodeId(transition.fromStep, transition.fromPath)) && included.has(nodeId(transition.toStep, transition.toPath)))
+    .map((transition) => ({
+      fromId: nodeId(transition.fromStep, transition.fromPath),
+      toId: nodeId(transition.toStep, transition.toPath),
+      label: `${transition.sessions.toLocaleString()} sessions`,
+      volume: transition.sessions,
+      status: 'info',
+      animated: true
+    }));
+  return { columns, connections };
+}
+
 export default async function WebAnalyticsPage({
   searchParams
 }: {
@@ -145,12 +202,16 @@ export default async function WebAnalyticsPage({
   const { user, token } = await requireDashboardSession('/dashboard/web');
   const days = firstParam(searchParams.days) ?? '7';
   const projectId = firstParam(searchParams.projectId);
+  const filtersParam = firstParam(searchParams.filters);
   const apiParams = new URLSearchParams({ days });
   if (projectId) apiParams.set('projectId', projectId);
+  if (filtersParam) apiParams.set('filters', filtersParam);
   const { data, error } = await dashboardGet<WebAnalyticsResponse>(`/v1/dashboard/web?${apiParams.toString()}`, token);
 
   if (!projectId && data?.project?.id) {
-    redirect(`/dashboard/web?days=${encodeURIComponent(days)}&projectId=${encodeURIComponent(data.project.id)}`);
+    const next = new URLSearchParams({ days, projectId: data.project.id });
+    if (filtersParam) next.set('filters', filtersParam);
+    redirect(`/dashboard/web?${next}`);
   }
 
   const canonicalProjectId = data?.project?.id ?? projectId;
@@ -158,7 +219,7 @@ export default async function WebAnalyticsPage({
   const prev = data?.previous;
   const trend = data?.visitorsTrend ?? [];
   const trendValues = trend.map((p) => p.total);
-  const webFlow = buildWebNavigationFlowGraph(data);
+  const sessionGraph = data?.journey ? buildSessionTransitionGraph(data.journey) : { columns: [], connections: [] };
 
   return (
     <DashboardShell active="web" title="Web analytics" userEmail={user.email} projectId={canonicalProjectId}>
@@ -185,6 +246,14 @@ export default async function WebAnalyticsPage({
           {error}
         </section>
       ) : null}
+
+      <WebAnalyticsControls
+        token={token ?? ''}
+        projectId={canonicalProjectId}
+        days={days}
+        initialFilters={data?.filters ?? []}
+        goals={data?.goals ?? []}
+      />
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatWithDelta label="Visitors" value={cur?.visitors ?? 0} prev={prev?.visitors ?? 0} values={trendValues} />
@@ -229,16 +298,6 @@ export default async function WebAnalyticsPage({
         </div>
       </section>
 
-      {/* Pure SVG User Journey & Navigation Flow Architecture */}
-      <section className="mb-6">
-        <SvgNodeFlowGraph
-          title="User Navigation Journey & Route Flow Architecture"
-          subtitle={`Interactive traffic flow from acquisition channels through entry routes to session outcomes`}
-          columns={webFlow.columns}
-          connections={webFlow.connections}
-        />
-      </section>
-
       <section className={tableClass}>
         <p className="border-b border-neutral-200 dark:border-slate-800 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
           Top paths
@@ -263,12 +322,26 @@ export default async function WebAnalyticsPage({
         )}
       </section>
 
-      <section className="mb-5 grid gap-3 lg:grid-cols-3">
+      <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <Card title="Sources by channel">
           <RankedList items={(data?.sources ?? []).map((s) => ({ label: s.channel, total: s.visitors }))} emptyLabel="No sources yet." />
         </Card>
+        <Card title="Top referrers">
+          <RankedList items={(data?.referrers ?? []).map((r) => ({ label: r.domain, total: r.views }))} emptyLabel="No referrers yet." />
+          {(data?.referrers ?? []).length > 0 ? (
+            <p className="mt-3 border-t border-neutral-200 pt-3 text-[11px] text-neutral-500 dark:border-slate-800 dark:text-slate-500">
+              Ranked by page views. Missing referrers are shown as Direct.
+            </p>
+          ) : null}
+        </Card>
         <Card title="Devices">
           <RankedList items={(data?.devices ?? []).map((d) => ({ label: d.name, total: d.total }))} emptyLabel="No device data yet." />
+        </Card>
+        <Card title="Browsers">
+          <RankedList items={(data?.browsers ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No browser data yet." />
+        </Card>
+        <Card title="Operating systems">
+          <RankedList items={(data?.operatingSystems ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No OS data yet." />
         </Card>
         <Card title="Geography">
           <div className="grid gap-4]">
@@ -287,6 +360,45 @@ export default async function WebAnalyticsPage({
             </div>
           </div>
         </Card>
+      </section>
+
+      {sessionGraph.connections.length > 0 ? (
+        <section className="mb-6">
+          <SvgNodeFlowGraph
+            title="Session navigation paths"
+            subtitle={`${(data?.journey.sessions ?? 0).toLocaleString()} sessions · consecutive page views · last ${days === '1' ? '24 hours' : `${days} days`}`}
+            columns={sessionGraph.columns}
+            connections={sessionGraph.connections}
+            legends={[{ label: 'Observed transition', status: 'info', color: '#3b82f6', description: 'Consecutive page views recorded in the same session' }]}
+          />
+        </section>
+      ) : (
+        <section className={`${cardClass} mb-6`}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400">Session navigation paths</p>
+          <p className="mt-2 text-sm text-neutral-500">No multi-page session transitions were captured in this period.</p>
+        </section>
+      )}
+
+      <section className="mb-5">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400">Web Vitals</p><p className="mt-1 text-sm text-neutral-500">75th percentile field measurements from real visits.</p></div>
+        </div>
+        {(data?.webVitals.metrics ?? []).length === 0 ? <div className={cardClass}><p className="text-sm text-neutral-500">No Web Vitals captured yet. Measurements appear after visitors load a page with the updated browser SDK.</p></div> : <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{data?.webVitals.metrics.map((vital) => {
+            const rating = vitalRating(vital.metric, vital.p75);
+            const tone = rating === 'good' ? 'text-emerald-600 dark:text-emerald-300' : rating === 'poor' ? 'text-red-600 dark:text-red-300' : 'text-amber-600 dark:text-amber-300';
+            return <div key={vital.metric} className={cardClass}><div className="flex items-center justify-between"><p className="font-mono text-xs font-semibold">{vital.metric}</p><span className={`text-[10px] font-semibold uppercase ${tone}`}>{rating.replace('-', ' ')}</span></div><p className={`mt-3 text-2xl font-semibold tabular-nums ${tone}`}>{formatVital(vital.metric, vital.p75)}</p><p className="mt-1 text-xs text-neutral-500">p75 · {vital.count.toLocaleString()} samples</p><div className="mt-3 flex gap-2 text-[10px] tabular-nums"><span className="text-emerald-600">{vital.good} good</span><span className="text-amber-600">{vital.needsImprovement} improve</span><span className="text-red-600">{vital.poor} poor</span></div></div>;
+          })}</div>
+          <div className={`${tableClass} mt-3`}><p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">Vitals by page</p><div className="divide-y divide-neutral-200 dark:divide-slate-800">{data?.webVitals.pages.map((page) => <div key={`${page.path}:${page.metric}`} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_90px_120px_100px]"><span className="truncate font-mono text-sm">{page.path}</span><span className="text-sm font-semibold">{page.metric}</span><span className="text-right text-sm tabular-nums">{formatVital(page.metric, page.p75)}</span><span className="text-right text-sm text-red-600">{page.poor} poor</span></div>)}</div></div>
+        </>}
+      </section>
+
+      <section className={tableClass}>
+        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">UTM campaigns</p>
+        {(data?.campaigns ?? []).length === 0 ? <p className="p-5 text-sm text-neutral-500">No tagged campaigns captured yet.</p> :
+          <div className="divide-y divide-neutral-200 dark:divide-slate-800">{data?.campaigns.map((campaign) => <div key={`${campaign.campaign}:${campaign.source}:${campaign.medium}`} className="grid gap-1 px-5 py-3 sm:grid-cols-[1fr_1fr_100px_100px]">
+            <span className="font-semibold">{campaign.campaign}</span><span className="text-sm text-neutral-500">{campaign.source} / {campaign.medium}</span><span className="text-right text-sm tabular-nums">{campaign.visitors} visitors</span><span className="text-right text-sm tabular-nums">{campaign.views} views</span>
+          </div>)}</div>}
       </section>
 
       <section className={`${cardClass} mb-5`}>

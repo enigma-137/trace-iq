@@ -7,6 +7,20 @@ import { Skeleton } from '@/components/Skeleton';
 export function TwoFactorPanel() {
   const { enrolled } = useMfaStatus();
 
+  if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
+    return (
+      <section className="mt-8 border-t border-neutral-200 pt-8 dark:border-slate-800" aria-labelledby="2fa-title">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Security</p>
+        <h2 id="2fa-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+          Authentication disabled
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+          This single-user instance relies on loopback network isolation. Switch to Supabase authentication before exposing it to other users or networks.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="mt-8 grid gap-5 border-t border-neutral-200 pt-8 dark:border-slate-800" aria-labelledby="2fa-title">
       <div>

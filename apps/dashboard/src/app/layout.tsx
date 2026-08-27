@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
 
   description:
-    'Privacy-first product analytics for events, funnels, users, retention, revenue, and errors.',
+    'Self-hostable product analytics for events, funnels, users, retention, revenue, and errors.',
 
   icons: {
     icon: '/favicon.ico'
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: 'TraceIQ — Data That Drives Real Growth',
-    description: 'Simple, powerful, privacy-first product analytics.',
+    description: 'Simple, powerful, self-hostable product analytics.',
     url: 'https://traceiq.run',
     siteName: 'TraceIQ',
     type: 'website',
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'TraceIQ — Data That Drives Real Growth',
-    description: 'Simple, powerful, privacy-first product analytics.',
+    description: 'Simple, powerful, self-hostable product analytics.',
     images: ['/og.png']
   }
 };
