@@ -1,8 +1,5 @@
 'use client'
 
-import type { Metadata } from 'next';
-import LandingPage from './LandingPage';
-
 import { useState } from 'react';
 import {
   ArrowUpRight,
@@ -28,24 +25,22 @@ const navItems = [
 ];
 
 const metrics = [
-  ['99.99%', 'signal fidelity'],
-  ['2.4M+', 'events modeled daily'],
-  ['< 45ms', 'average trace latency']
+  ['Self-hosted', 'your infrastructure'],
+  ['PostgreSQL', 'portable event data'],
+  ['Optional auth', 'local or Supabase']
 ];
 
 const faqs = [
   ['What does TraceIQ observe?', 'TraceIQ collects the page views and custom events you configure, plus session, device, and error context used to explain product behavior. Optional request capture records API timing and status data.'],
-  ['How quickly can we get started?', 'Add a few lines of the browser SDK to see your first events in minutes. The current compiled client is under 25 KB before compression and sends events asynchronously.'],
+  ['How quickly can we get started?', 'Start the local stack, create a project, and add the browser SDK to begin collecting page views, Web Vitals, and custom events.'],
   ['Does the SDK use cookies?', 'The browser SDK does not set cookies. It uses first-party localStorage and sessionStorage for anonymous and session identifiers, which may still require notice or consent under laws that cover similar storage technologies.'],
   ['Is using TraceIQ automatically GDPR or CCPA compliant?', 'No analytics tool makes an implementation automatically compliant. Operators control what they collect and must configure notices, consent or another legal basis, retention, access, and deletion processes for their users and jurisdictions.']
 ];
 
 const codeExamples = {
   JavaScript: `import { traceiq } from 'traceiq-sdk-js'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.track('checkout_started', {\n  cartValue: 4200,\n  currency: 'USD',\n})`,
-  'React Native': `import { traceiq } from 'traceiq-react-native'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.track('checkout_started', {\n  cartValue: 4200,\n  currency: 'USD',\n  platform: 'ios',\n})`,
-  Node: `import { TraceIQ } from '@traceiq/node'\n\nconst traceiq = new TraceIQ({\n  projectId: process.env.TRACEIQ_PROJECT_ID,\n  writeKey: process.env.TRACEIQ_WRITE_KEY,\n})\n\nawait traceiq.capture({\n  event: 'checkout_started',\n})`,
-  Python: `from traceiq import Client\n\ntraceiq = Client(\n    project_id="YOUR_PROJECT_ID",\n    write_key="YOUR_WRITE_KEY",\n)\n\ntraceiq.capture("checkout_started",\n    properties={"cart_value": 4200})`,
-  Rust: `use traceiq::Client;\nuse serde_json::json;\n\n#[tokio::main]\nasync fn main() -> Result<(), Box<dyn std::error::Error>> {\n    let traceiq = Client::new("YOUR_PROJECT_ID", "YOUR_WRITE_KEY");\n\n    traceiq\n        .capture("checkout_started", json!({ "cart_value": 4200 }))\n        .await?;\n\n    traceiq.shutdown().await?;\n    Ok(())\n}`
+  'React Native': `import { traceiq } from 'traceiq-react-native'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.capture({\n  event: 'checkout_started',\n  properties: { cartValue: 4200, currency: 'USD' },\n})`,
+  Node: `import { TraceIQ } from '@traceiq/node'\n\nconst traceiq = new TraceIQ({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: process.env.TRACEIQ_WRITE_KEY!,\n})\n\ntraceiq.capture({\n  event: 'checkout_started',\n  properties: { cartValue: 4200 },\n})`
 } as const;
 
 const mcpConfig = `{
@@ -97,17 +92,16 @@ export default function Page() {
     if (activeTab === 'event') {
       addLog('sdk', 'traceiq.track("purchase_completed")', { amount: 89.0, currency: 'USD', items: 1, gateway: 'stripe' });
       setTimeout(() => {
-        addLog('ingest', 'Event "purchase_completed" ingested successfully. Latency: 14ms.', { status: 202, eventId: `evt_${Math.floor(Math.random() * 900000 + 100000)}` });
+        addLog('ingest', 'Demo event accepted by the simulated ingestion step.', { status: 202 });
       }, 300);
     } else if (activeTab === 'user') {
-      addLog('sdk', 'traceiq.identify("usr_9981")', { email: 'developer@example.com', tier: 'enterprise', createdAt: '2026-07-06' });
+      addLog('sdk', 'traceiq.identify({ userId: "usr_9981", traits })', { email: 'developer@example.com', tier: 'growth' });
       setTimeout(() => {
         addLog('ingest', 'User profile associated. Properties synced with cohort engine.');
       }, 250);
     } else if (activeTab === 'flags') {
-      const variants = ['control', 'v2-sleek-checkout', 'control'];
-      const picked = variants[Math.floor(Math.random() * variants.length)];
-      addLog('flag', `traceiq.getFeatureFlag("checkout-redesign") -> resolved: "${picked}"`);
+      const enabled = Math.random() > 0.5;
+      addLog('flag', `traceiq.isFeatureEnabled("checkout-redesign") -> ${enabled}`);
     } else if (activeTab === 'errors') {
       addLog('error', 'TraceIQ captured uncaught runtime exception in dashboard/main.js');
       setTimeout(() => {
@@ -118,9 +112,9 @@ export default function Page() {
 
   const codeSnippets = {
     event: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.track('purchase_completed', {\n  amount: 89.00,\n  currency: 'USD',\n  gateway: 'stripe'\n});`,
-    user: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.identify('usr_9981', {\n  email: 'developer@example.com',\n  tier: 'enterprise'\n});`,
-    flags: `import { traceiq } from 'traceiq-sdk-js';\n\nconst checkoutVariant = traceiq.getFeatureFlag(\n  'checkout-redesign'\n);\n\nif (checkoutVariant === 'v2-sleek-checkout') {\n  renderSleekCheckout();\n}`,
-    errors: `import { traceiq } from 'traceiq-sdk-js';\n\ntry {\n  initiatePayment();\n} catch (error) {\n  traceiq.trackError(error, {\n    context: 'Checkout page failure'\n  });\n}`
+    user: `import { traceiq } from 'traceiq-sdk-js';\n\ntraceiq.identify({\n  userId: 'usr_9981',\n  traits: { email: 'developer@example.com', tier: 'growth' }\n});`,
+    flags: `import { traceiq } from 'traceiq-sdk-js';\n\nawait traceiq.loadFeatureFlags();\n\nif (traceiq.isFeatureEnabled('checkout-redesign')) {\n  renderNewCheckout(\n    traceiq.getFeatureFlagPayload('checkout-redesign')\n  );\n}`,
+    errors: `import { traceiq } from 'traceiq-sdk-js';\n\ntry {\n  initiatePayment();\n} catch (error) {\n  traceiq.captureException(error, {\n    context: 'Checkout page failure'\n  });\n}`
   };
 
   return (
@@ -157,7 +151,7 @@ export default function Page() {
             <a className="button" href="/waitlist">Start tracing <ArrowUpRight size={16} /></a>
             <a className="quiet-link" href="#sandbox"><Play size={14} fill="currentColor" /> See how it works</a>
           </div>
-          <div className="hero-note"><span>Trusted by teams building what&apos;s next</span><span className="note-line" /></div>
+          <div className="hero-note"><span>Open source · self-hosted · inspectable</span><span className="note-line" /></div>
         </div>
         <div className="hero-globe">
           <GlobeHero />
@@ -165,25 +159,51 @@ export default function Page() {
       </section>
 
       {/* Metrics */}
-      <section className="metrics mx-auto grid max-w-[1060px] grid-cols-1 border-y border-border px-5 py-6 sm:grid-cols-3 sm:px-0 sm:py-7" aria-label="TraceIQ performance metrics">
+      <section className="metrics mx-auto grid max-w-[1060px] grid-cols-1 border-y border-border px-5 py-6 sm:grid-cols-3 sm:px-0 sm:py-7" aria-label="TraceIQ deployment properties">
         {metrics.map(([value, label]) => <div className="metric" key={label}><strong>{value}</strong><span>{label}</span></div>)}
       </section>
 
-      {/* Intro / signal layer */}
+      {/* Product preview */}
       <section className="traceiq-frame mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-36" id="product">
-        <div className="section-kicker">01 / The signal layer</div>
+        <div className="section-kicker">01 / Inside TraceIQ</div>
         <div className="intro-grid">
-          <h2>See the whole picture.<br /><em>Not just the symptoms.</em></h2>
-          <p>Modern software is a network of invisible relationships. TraceIQ makes those relationships visible, so teams can move from alert to answer without guesswork.</p>
+          <h2>Traffic, behavior, and health.<br /><em>One inspectable view.</em></h2>
+          <p>Start with visitors and referrers, follow real session paths, then connect conversion behavior to errors, API latency, feature flags, and alerts.</p>
         </div>
-        <div className="signal-card">
-          <div className="signal-top">
-            <span className="mini-label">TRACE / LIVE</span>
-            <span className="signal-value"><span className="status-dot" /> All systems nominal</span>
+        <div className="mt-10 overflow-hidden rounded-xl border border-white/10 bg-[#08090b] shadow-2xl shadow-black/40" aria-label="TraceIQ dashboard preview using sample data">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2"><span className="size-2 rounded-full bg-emerald-400" /><span className="font-mono text-[11px] text-zinc-400">Dashboard overview</span></div>
+            <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] text-zinc-500">Sample data · 30 days</span>
           </div>
-          <div className="trace-lines"><span /><span /><span /><span /><span /><span /></div>
-          <div className="signal-bottom">
-            <span>checkout-service</span><span>api-gateway</span><span>analytics-ingest</span><span>payments-db</span><span>queue-worker</span>
+          <div className="grid gap-px bg-white/10 sm:grid-cols-4">
+            {[
+              ['12,480', 'Page views'],
+              ['4,218', 'Visitors'],
+              ['36.8%', 'Bounce rate'],
+              ['2m 41s', 'Visit duration']
+            ].map(([value, label]) => <div key={label} className="bg-[#0b0c0f] px-4 py-4"><strong className="block text-xl text-white">{value}</strong><span className="mt-1 block text-[11px] text-zinc-500">{label}</span></div>)}
+          </div>
+          <div className="grid gap-px bg-white/10 lg:grid-cols-[1.7fr_1fr]">
+            <div className="bg-[#090a0c] p-5">
+              <div className="mb-5 flex items-center justify-between"><span className="text-xs font-semibold text-zinc-300">Visitors and page views</span><span className="font-mono text-[10px] text-zinc-600">AUG 01—30</span></div>
+              <svg viewBox="0 0 640 190" className="h-auto w-full" role="img" aria-label="Sample traffic trend">
+                {[35, 75, 115, 155].map((y) => <line key={y} x1="0" y1={y} x2="640" y2={y} stroke="rgba(255,255,255,.07)" />)}
+                <path d="M0 154 C45 138 72 146 112 119 S184 130 226 92 S297 112 338 70 S405 90 450 48 S529 78 575 43 S617 47 640 28" fill="none" stroke="#3b82f6" strokeWidth="3" />
+                <path d="M0 171 C48 162 82 166 119 151 S185 158 229 135 S300 145 342 118 S408 130 452 103 S526 117 577 94 S617 91 640 75" fill="none" stroke="#22c55e" strokeWidth="2" opacity=".8" />
+              </svg>
+              <div className="mt-3 flex gap-5 text-[10px] text-zinc-500"><span><i className="mr-1.5 inline-block size-2 rounded-full bg-blue-500" />Page views</span><span><i className="mr-1.5 inline-block size-2 rounded-full bg-green-500" />Visitors</span></div>
+            </div>
+            <div className="bg-[#090a0c] p-5">
+              <span className="text-xs font-semibold text-zinc-300">Top referrers</span>
+              <div className="mt-5 space-y-4">
+                {[
+                  ['Direct', '1,842', '100%'],
+                  ['google.com', '683', '37%'],
+                  ['github.com', '391', '21%'],
+                  ['t.co', '148', '8%']
+                ].map(([label, value, width]) => <div key={label}><div className="mb-1.5 flex justify-between text-[11px]"><span className="text-zinc-400">{label}</span><span className="font-mono text-zinc-600">{value}</span></div><div className="h-1 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-blue-500" style={{ width }} /></div></div>)}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -219,7 +239,7 @@ export default function Page() {
           </div>
         </div>
         <div className="sdk-pills">
-          <span>Under 25 KB</span><span>Auto-capture exceptions</span><span>Timeline-driven</span><span>Server-side ready</span>
+          <span>Web Vitals</span><span>Exception capture</span><span>User timelines</span><span>Browser, mobile, and Node</span>
         </div>
       </section>
 
@@ -228,7 +248,7 @@ export default function Page() {
         <div className="section-kicker">03 / Bring your AI copilot</div>
         <div className="sdk-heading">
           <h2>Point your AI at<br /><em>your real data.</em></h2>
-          <p>TraceIQ ships an MCP server, so Claude, Cursor, and other agents can read your funnels, retention, users, and API health — and even toggle feature flags — straight from your trace data.</p>
+          <p>TraceIQ ships a permission-scoped MCP server, so compatible assistants can read funnels, retention, users, errors, and API health—and perform only the mutations your token permits.</p>
         </div>
         <div className="code-window overflow-hidden rounded-xl shadow-2xl">
           <div className="code-window-top">
@@ -244,16 +264,16 @@ export default function Page() {
           </div>
         </div>
         <div className="sdk-pills">
-          <span>30+ tools</span><span>Funnels &amp; retention</span><span>User timelines</span><span>API health</span><span>Toggle flags</span>
+          <span>Permission-scoped</span><span>Funnels &amp; retention</span><span>User timelines</span><span>API health</span><span>Guarded mutations</span>
         </div>
       </section>
 
       {/* Interactive SDK sandbox */}
       <section id="sandbox" className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-20 sm:px-8">
-        <div className="section-kicker">Live telemetry test-drive</div>
+        <div className="section-kicker">04 / SDK interaction demo</div>
         <div className="sdk-heading">
-          <h2>One script.<br /><em>Real-time telemetry.</em></h2>
-          <p>Switch between telemetry snippets, run them live, and watch the raw payload stream into our trace ingestion pipeline.</p>
+          <h2>Learn the SDK.<br /><em>Before you install it.</em></h2>
+          <p>Explore representative browser calls and simulate their payload lifecycle locally. This demo does not send data to a TraceIQ project.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
@@ -297,7 +317,7 @@ export default function Page() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Terminal size={14} className="text-zinc-400" />
-                <span className="text-xs font-mono text-zinc-300">TraceIQ Ingest Console</span>
+                <span className="text-xs font-mono text-zinc-300">TraceIQ Demo Console</span>
               </div>
               <button onClick={() => setLogs([])} className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded border border-border">
                 Clear
@@ -328,39 +348,27 @@ export default function Page() {
 
       {/* Features */}
       <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-32" id="solutions">
-        <div className="section-kicker">02 / Built for the edges</div>
+        <div className="section-kicker">05 / Core capabilities</div>
         <div className="feature-heading">
           <h2>Every signal,<br /><em>in focus.</em></h2>
-          <p>One observability layer for every event, every handoff, every moment that matters — from first click to final conversion.</p>
+          <p>The core workflows already available today—from acquisition and journeys to application health and controlled collaboration.</p>
         </div>
         <div className="feature-grid">
-          <article className="feature-card feature-wide">
-            <div>
-              <span className="card-number">01</span>
-              <h3>Follow the thread.</h3>
-              <p>End-to-end user timelines that stay intelligible as your segments and funnels grow.</p>
-            </div>
-            <div className="orbit-graphic"><i /><i /><i /><b>→</b></div>
-          </article>
-          <article className="feature-card">
-            <span className="card-number">02</span>
-            <h3>Find the friction.</h3>
-            <p>Surface the exact step, event, or variant behind every funnel drop-off.</p>
-            <div className="fracture-graphic"><span /><span /><span /><span /><span /></div>
-          </article>
-          <article className="feature-card">
-            <span className="card-number">03</span>
-            <h3>Move with signal.</h3>
-            <p>Give every team the context to act before customers feel the impact.</p>
-            <div className="signal-bars"><span /><span /><span /><span /><span /><span /></div>
-          </article>
+          {[
+            ['01', 'Web analytics', 'Realtime visitors, pages, referrers, browsers, operating systems, UTM campaigns, goals, Web Vitals, and reusable filters.'],
+            ['02', 'Funnels and journeys', 'Measure conversion and retention, then inspect real session-to-session page transitions instead of illustrative paths.'],
+            ['03', 'Users and cohorts', 'Connect anonymous activity to identified users, inspect chronological timelines, and reuse behavioral cohorts.'],
+            ['04', 'Errors and API health', 'Group exceptions, inspect affected users, and rank endpoints by traffic, error rate, average latency, and p95 latency.'],
+            ['05', 'Flags and alerts', 'Run deterministic rollouts, target segments, attach remote configuration, and notify teams through email or webhooks.'],
+            ['06', 'Share and export', 'Create permission-scoped public dashboards, forward signed events, or export your raw data as CSV and JSON.']
+          ].map(([number, title, body]) => <article className="feature-card" key={title}><span className="card-number">{number}</span><h3>{title}</h3><p>{body}</p></article>)}
         </div>
       </section>
 
       {/* Workflow */}
       <section className="traceiq-frame section mx-auto grid max-w-[1060px] gap-12 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:gap-20 lg:py-36" id="resources">
         <div>
-          <div className="section-kicker">03 / From event to insight</div>
+          <div className="section-kicker">06 / From event to insight</div>
           <div className="workflow-copy">
             <h2>Make every<br /><em>millisecond count.</em></h2>
             <p style={{ marginTop: 20 }}>TraceIQ keeps your team in the flow by connecting the tiny details to the big picture.</p>
@@ -382,7 +390,7 @@ export default function Page() {
 
       {/* FAQ */}
       <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-32" id="company">
-        <div className="section-kicker">04 / Clear by design</div>
+        <div className="section-kicker">07 / Clear by design</div>
         <div className="faq-grid">
           <h2>Questions,<br /><em>answered.</em></h2>
           <div className="faq-list">
@@ -397,8 +405,6 @@ export default function Page() {
           </div>
         </div>
       </section>
-
-      <LandingPage />
 
       {/* CTA */}
       <section className="cta-section border-t border-border" id="contact">
@@ -418,7 +424,7 @@ export default function Page() {
           </div>
           <div className="footer-links">
             <div><strong>Explore</strong><a href="/docs">Resources</a><a href="/status">Status</a><a href="/pricing">Pricing</a><a href="/blog">Blog</a></div>
-            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:traceiq.run@gmail.comn">Contact</a></div>
+            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
             <div><strong>Product</strong><a href="#product">Overview</a><a href="/auth/login">Sign in</a></div>
           </div>
         </div>
