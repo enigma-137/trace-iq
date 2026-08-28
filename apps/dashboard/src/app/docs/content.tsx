@@ -220,12 +220,23 @@ curl http://localhost:4000/health`}</Code>
         </Section>
 
         <Section id="auth-modes" title="Choose an authentication mode">
-          <OptionsTable rows={[
-            ['local', 'Private development', 'No login or hosted provider. Best for a single operator on a loopback-only installation.'],
-            ['supabase', 'Shared or public installation', 'Accounts, organizations, invitations, team membership, and two-factor authentication.']
-          ]} />
+          <P>Supabase is not required. Choose the path that matches who can reach the dashboard:</P>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border-2 border-blue-500 bg-blue-50/50 p-5 dark:border-cyan-500 dark:bg-cyan-500/10">
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-cyan-300">No hosted auth</span>
+              <h3 className="mt-2 text-base font-bold text-neutral-900 dark:text-white">Private local mode</h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-slate-300">No login, Supabase project, or external identity service. Intended for one operator on localhost, a private machine, or a trusted private network.</p>
+              <code className="mt-4 block rounded-md bg-slate-950 p-3 font-mono text-xs text-slate-200">AUTH_MODE=local<br />NEXT_PUBLIC_AUTH_MODE=local</code>
+            </div>
+            <div className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900/70">
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Team authentication</span>
+              <h3 className="mt-2 text-base font-bold text-neutral-900 dark:text-white">Supabase mode</h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-slate-300">Use when multiple people need accounts, organizations, invitations, team permissions, and two-factor authentication.</p>
+              <code className="mt-4 block rounded-md bg-slate-950 p-3 font-mono text-xs text-slate-200">AUTH_MODE=supabase<br />NEXT_PUBLIC_AUTH_MODE=supabase</code>
+            </div>
+          </div>
           <P>
-            The API and dashboard modes must match: set <Mono>AUTH_MODE</Mono> for the API and <Mono>NEXT_PUBLIC_AUTH_MODE</Mono> for the dashboard. Supabase mode also requires the public URL and anonymous key on the dashboard plus the service-role key on the API. Never expose the service-role key to the browser.
+            The API and dashboard modes must match. Supabase variables are read only in Supabase mode. Local mode contains no login boundary, so never expose its dashboard directly to the public internet; keep it loopback-bound, behind a VPN, or protected by a trusted access proxy.
           </P>
         </Section>
 
@@ -249,24 +260,34 @@ API domain -> Caddy -> 127.0.0.1:4000
         </Section>
 
         <Section id="production-environment" title="Production environment">
-          <P>Copy <Mono>.env.example</Mono> to <Mono>.env</Mono>, replace every placeholder, and keep the file out of Git.</P>
-          <Code lang="dotenv">{`AUTH_MODE=supabase
-DATABASE_URL=postgresql://traceiq:UNIQUE_PASSWORD@postgres:5432/traceiq?sslmode=disable
+          <P>Copy <Mono>.env.example</Mono> to <Mono>.env</Mono>, replace every placeholder, and keep the file out of Git. Begin with the values common to both authentication modes:</P>
+          <Code lang="dotenv">{`DATABASE_URL=postgresql://traceiq:UNIQUE_PASSWORD@postgres:5432/traceiq?sslmode=disable
 DATABASE_SSL=false
 REDIS_URL=redis://redis:6379
+CORS_ORIGINS=https://analytics.example.com,https://www.example.com
+NEXT_PUBLIC_API_URL=https://api.example.com
+NEXT_PUBLIC_WAITLIST_ONLY=false`}</Code>
+          <h3 className="pt-2 text-base font-bold text-neutral-900 dark:text-white">Option A: private local authentication</h3>
+          <Code lang="dotenv">{`AUTH_MODE=local
+NEXT_PUBLIC_AUTH_MODE=local
+LOCAL_PROJECT_WRITE_KEY=replace-with-a-random-write-key
+
+# Required only when the API container binds beyond loopback internally.
+# Keep the host port loopback-only or privately protected.
+LOCAL_AUTH_ALLOW_NETWORK=true`}</Code>
+          <P>No <Mono>SUPABASE_*</Mono> or <Mono>NEXT_PUBLIC_SUPABASE_*</Mono> values are needed for this path.</P>
+          <h3 className="pt-2 text-base font-bold text-neutral-900 dark:text-white">Option B: Supabase authentication</h3>
+          <Code lang="dotenv">{`AUTH_MODE=supabase
+NEXT_PUBLIC_AUTH_MODE=supabase
 
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
 
-CORS_ORIGINS=https://analytics.example.com,https://www.example.com
-NEXT_PUBLIC_API_URL=https://api.example.com
-NEXT_PUBLIC_AUTH_MODE=supabase
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
-NEXT_PUBLIC_WAITLIST_ONLY=false`}</Code>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY`}</Code>
           <P>
-            Inside Compose, use <Mono>postgres</Mono> rather than <Mono>localhost</Mono> as the database hostname. Configure the production dashboard URL as an allowed callback in Supabase Auth.
+            Inside Compose, use <Mono>postgres</Mono> rather than <Mono>localhost</Mono> as the database hostname. Only Supabase-mode installations need to configure the production dashboard callback URL in Supabase Auth. Never expose <Mono>SUPABASE_SERVICE_ROLE_KEY</Mono> to the dashboard or browser.
           </P>
         </Section>
 
