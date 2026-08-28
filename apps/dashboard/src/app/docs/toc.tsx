@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight, BookOpen, Terminal, FileCode, Clock } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, Terminal, FileCode, Clock, Server } from 'lucide-react';
 
 export interface DocsTocItem {
   id: string;
@@ -12,6 +12,7 @@ export interface DocsTocItem {
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'Getting started': <Clock className="size-3.5" />,
+  Deployment: <Server className="size-3.5" />,
   'Server & mobile SDKs': <Terminal className="size-3.5" />,
   Features: <BookOpen className="size-3.5" />,
   Reference: <FileCode className="size-3.5" />

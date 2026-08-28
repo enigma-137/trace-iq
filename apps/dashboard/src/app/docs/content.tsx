@@ -9,16 +9,14 @@ export const docsSections = [
   { id: 'methods', label: 'SDK methods', category: 'Getting started' },
   { id: 'config', label: 'Configuration', category: 'Getting started' },
   { id: 'autocapture', label: 'Autocapture', category: 'Getting started' },
+  { id: 'self-hosting', label: 'Self-hosting', category: 'Deployment' },
   { id: 'node', label: 'Node.js SDK', category: 'Server & mobile SDKs' },
   { id: 'react-native', label: 'React Native SDK', category: 'Server & mobile SDKs' },
-  { id: 'python', label: 'Python SDK', category: 'Server & mobile SDKs' },
-  { id: 'swift', label: 'Swift SDK', category: 'Server & mobile SDKs' },
-  { id: 'kotlin', label: 'Kotlin SDK', category: 'Server & mobile SDKs' },
-  { id: 'rust', label: 'Rust SDK', category: 'Server & mobile SDKs' },
-  { id: 'php', label: 'PHP SDK', category: 'Server & mobile SDKs' },
+  { id: 'web-analytics', label: 'Web analytics', category: 'Features' },
   { id: 'flags', label: 'Feature flags', category: 'Features' },
   { id: 'alerts', label: 'Alerts', category: 'Features' },
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
+  { id: 'public-sharing', label: 'Public sharing', category: 'Features' },
   { id: 'api-performance', label: 'API performance', category: 'Features' },
   { id: 'webhooks', label: 'Webhooks', category: 'Features' },
   { id: 'export', label: 'Data export', category: 'Features' },
@@ -132,8 +130,15 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <Link
-                href="/docs?page=quickstart"
+                href="/docs?page=self-hosting"
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white transition hover:bg-blue-700 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+              >
+                Self-host TraceIQ
+                <span aria-hidden>→</span>
+              </Link>
+              <Link
+                href="/docs?page=quickstart"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Start integration
                 <span aria-hidden>→</span>
@@ -170,11 +175,137 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
           <Bullets
             items={[
               ['Getting started', 'Quickstart, SDK methods, configuration options, and automatic event capture.'],
-              ['Server & mobile SDKs', 'Node.js, React Native, Python, Swift, Kotlin, Rust, and PHP SDKs.'],
-              ['Features', 'Feature flags, alerts, dashboards, webhooks, export, and reserved events.'],
+              ['Deployment', 'One-command private setup, production topology, authentication modes, backups, migrations, and safe upgrades.'],
+              ['Server & mobile SDKs', 'Node.js and React Native SDKs alongside the browser SDK.'],
+              ['Features', 'Web analytics, Web Vitals, public sharing, flags, alerts, dashboards, webhooks, and export.'],
               ['Reference', 'Direct REST ingestion over HTTP and the Model Context Protocol (MCP) server copilot.']
             ]}
           />
+        </Section>
+      </div>
+    );
+  }
+
+  if (id === 'self-hosting') {
+    return (
+      <div className="space-y-8">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:p-8">
+          <span className="inline-flex rounded-full border border-blue-500/20 px-3 py-1 font-mono text-xs font-semibold text-blue-600 dark:border-cyan-400/20 dark:text-cyan-300">
+            Open source · your infrastructure
+          </span>
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white">Self-host TraceIQ</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-600 dark:text-slate-300 sm:text-base">
+            Run a private local instance with one command, or deploy the API, PostgreSQL, Redis, and dashboard on infrastructure you control. Local authentication needs no hosted identity provider; Supabase remains available for shared installations that need accounts, teams, invitations, and 2FA.
+          </p>
+        </div>
+
+        <Section id="local-install" title="One-command private installation">
+          <P>Install Docker with Docker Compose, clone the repository, and start the complete local stack:</P>
+          <Code lang="bash">{`docker compose -f compose.local.yml up -d --build`}</Code>
+          <P>
+            Open <Mono>http://localhost:3000</Mono>. Compose starts PostgreSQL 18, runs every pending migration, starts Redis and the API, then starts the dashboard. No TraceIQ account or Supabase project is required.
+          </P>
+          <OptionsTable rows={[
+            ['Project ID', 'proj_local', 'The project created automatically for local mode.'],
+            ['Write key', 'trq_local_development_only', 'Development key for browser, mobile, server, and HTTP ingestion.'],
+            ['API URL', 'http://localhost:4000', 'Loopback-bound API endpoint used by the SDK and dashboard.']
+          ]} />
+          <Code lang="bash">{`docker compose -f compose.local.yml ps
+curl http://localhost:4000/health`}</Code>
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            Local mode is designed for one operator on their own machine. Both HTTP services bind to loopback, and PostgreSQL and Redis are not published. Do not expose this configuration through a public reverse proxy.
+          </div>
+          <P>Stop the containers without deleting PostgreSQL data:</P>
+          <Code lang="bash">{`docker compose -f compose.local.yml down`}</Code>
+        </Section>
+
+        <Section id="auth-modes" title="Choose an authentication mode">
+          <OptionsTable rows={[
+            ['local', 'Private development', 'No login or hosted provider. Best for a single operator on a loopback-only installation.'],
+            ['supabase', 'Shared or public installation', 'Accounts, organizations, invitations, team membership, and two-factor authentication.']
+          ]} />
+          <P>
+            The API and dashboard modes must match: set <Mono>AUTH_MODE</Mono> for the API and <Mono>NEXT_PUBLIC_AUTH_MODE</Mono> for the dashboard. Supabase mode also requires the public URL and anonymous key on the dashboard plus the service-role key on the API. Never expose the service-role key to the browser.
+          </P>
+        </Section>
+
+        <Section id="production-topology" title="Production topology">
+          <P>The verified production shape keeps the public dashboard and API deployment independent:</P>
+          <Code lang="text">{`Dashboard host (Vercel or Node.js)
+              |
+              v
+API domain -> Caddy -> 127.0.0.1:4000
+                         |
+                    Docker Compose
+                    |- NestJS API
+                    |- PostgreSQL 18
+                    \- Redis 7`}</Code>
+          <Bullets items={[
+            ['Dashboard', 'Deploy apps/dashboard as a Next.js application and set its NEXT_PUBLIC_* values at build time.'],
+            ['API', 'Bind port 4000 to loopback and expose it only through a TLS reverse proxy such as Caddy.'],
+            ['PostgreSQL and Redis', 'Keep both services on the private Compose network; do not publish their ports.'],
+            ['CORS', 'Set CORS_ORIGINS to the exact dashboard and instrumented website origins that should reach the API.']
+          ]} />
+        </Section>
+
+        <Section id="production-environment" title="Production environment">
+          <P>Copy <Mono>.env.example</Mono> to <Mono>.env</Mono>, replace every placeholder, and keep the file out of Git.</P>
+          <Code lang="dotenv">{`AUTH_MODE=supabase
+DATABASE_URL=postgresql://traceiq:UNIQUE_PASSWORD@postgres:5432/traceiq?sslmode=disable
+DATABASE_SSL=false
+REDIS_URL=redis://redis:6379
+
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_ANON_KEY=YOUR_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+
+CORS_ORIGINS=https://analytics.example.com,https://www.example.com
+NEXT_PUBLIC_API_URL=https://api.example.com
+NEXT_PUBLIC_AUTH_MODE=supabase
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+NEXT_PUBLIC_WAITLIST_ONLY=false`}</Code>
+          <P>
+            Inside Compose, use <Mono>postgres</Mono> rather than <Mono>localhost</Mono> as the database hostname. Configure the production dashboard URL as an allowed callback in Supabase Auth.
+          </P>
+        </Section>
+
+        <Section id="first-deployment" title="First VPS deployment">
+          <Code lang="bash">{`docker compose up -d postgres redis
+docker compose build api
+docker compose run --rm api npm run migrate --workspace=@traceiq/api
+docker compose up -d api
+docker compose ps
+curl http://127.0.0.1:4000/health`}</Code>
+          <P>Point the API DNS record to the VPS and proxy the public API hostname to the loopback API:</P>
+          <Code lang="caddy">{`api.example.com {
+  reverse_proxy 127.0.0.1:4000
+}`}</Code>
+          <P>Then build or deploy the dashboard with its production environment values and verify that its origin is included in <Mono>CORS_ORIGINS</Mono>.</P>
+        </Section>
+
+        <Section id="backups-upgrades" title="Backups, migrations, and safe upgrades">
+          <P>Back up PostgreSQL before migrations or major upgrades. Store the dump outside the Compose volume and test restoration periodically.</P>
+          <Code lang="bash">{`docker compose exec -T postgres pg_dump -U traceiq -d traceiq --no-owner --no-acl > traceiq-backup.sql`}</Code>
+          <Code lang="bash">{`git pull --ff-only
+docker compose build api
+docker compose run --rm api npm run migrate --workspace=@traceiq/api
+docker compose up -d api
+docker compose ps
+curl http://127.0.0.1:4000/health`}</Code>
+          <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm leading-6 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            Never use <Mono>docker compose down -v</Mono> during an upgrade. The <Mono>-v</Mono> flag removes the PostgreSQL volume and can permanently delete analytics data.
+          </div>
+        </Section>
+
+        <Section id="operations-checklist" title="Operational checklist">
+          <Bullets items={[
+            ['Credentials', 'Use unique database passwords and rotate exposed Supabase, project, email, AI, and access-token secrets.'],
+            ['Backups', 'Back up before migrations, keep copies outside the VPS, and test restoration.'],
+            ['Network', 'Expose only the TLS proxy; keep API, PostgreSQL, and Redis ports private or loopback-bound.'],
+            ['Monitoring', 'Watch API health, disk capacity, PostgreSQL growth, backup completion, and container restarts.'],
+            ['Updates', 'Review dependency and container-image changes before deploying them.']
+          ]} />
         </Section>
       </div>
     );
@@ -471,6 +602,44 @@ $traceiq->shutdown(); // flush before a short-lived process exits`}</Code>
     );
   }
 
+  if (id === 'web-analytics') {
+    return (
+      <div className="space-y-8">
+        <Section id="web-analytics" title="Web analytics">
+          <P>
+            The Web Analytics page combines acquisition, engagement, experience, and navigation data from <Mono>$page</Mono>, <Mono>$web_vital</Mono>, <Mono>$rageclick</Mono>, and related events. Use the date range and reusable filters to apply the same segment across every panel.
+          </P>
+          <Bullets items={[
+            ['Realtime', 'Current visitors and recent activity for the selected project.'],
+            ['Acquisition', 'Top paths, referrer domains, traffic channels, and UTM source, medium, and campaign values.'],
+            ['Technology', 'Device type, browser, operating system, country, and active-hour breakdowns.'],
+            ['Engagement', 'Visitors, page views, sessions, bounce rate, visit duration, goals, and conversion rates.'],
+            ['Journeys', 'Observed page-to-page transitions reconstructed from real session sequences.'],
+            ['Experience', 'Core Web Vitals distributions and frustrating pages with errors or rage clicks.']
+          ]} />
+        </Section>
+        <Section id="web-vitals" title="Collect Web Vitals">
+          <P>The JavaScript SDK collects CLS, INP, LCP, FCP, and TTFB by default and sends each measurement as a <Mono>$web_vital</Mono> event.</P>
+          <Code>{`traceiq.initialize({
+  projectId: 'YOUR_PROJECT_ID',
+  writeKey: 'YOUR_WRITE_KEY',
+  endpoint: 'https://api.example.com',
+  autoCaptureWebVitals: true,
+});`}</Code>
+          <P>Set <Mono>autoCaptureWebVitals: false</Mono> when another integration owns performance collection or when your consent configuration requires it.</P>
+        </Section>
+        <Section id="web-filters-goals" title="Filters and goals">
+          <P>
+            Filters support path, referrer, browser, operating system, device type, country, and UTM dimensions with equality, exclusion, containment, and presence operators. Save a filter set when your team repeatedly inspects the same audience.
+          </P>
+          <P>
+            Goals can match either a page path or a custom event. TraceIQ reports qualifying visitors, occurrences, and the conversion rate against visitors in the selected period.
+          </P>
+        </Section>
+      </div>
+    );
+  }
+
   if (id === 'flags') {
     return (
       <Section id="flags" title="Feature flags & remote config">
@@ -686,6 +855,27 @@ await traceiq.loadFeatureFlags({ plan: 'pro', country: 'US' });
     );
   }
 
+  if (id === 'public-sharing') {
+    return (
+      <Section id="public-sharing" title="Permission-scoped public sharing">
+        <P>
+          Share a saved dashboard without giving the viewer an account or access to the rest of the workspace. Public links use opaque tokens and expose only the permissions selected when the link is created.
+        </P>
+        <OptionsTable rows={[
+          ['summary', 'Optional', 'Headline totals and the saved dashboard summary.'],
+          ['chart', 'Optional', 'Rendered chart data for the shared dashboard.'],
+          ['definition', 'Optional', 'Saved dashboard metadata and metric definitions.']
+        ]} />
+        <Bullets items={[
+          ['Least privilege', 'Select only the information the recipient needs; permissions are not automatically expanded.'],
+          ['Revocation', 'Disable or delete the share link when access is no longer required.'],
+          ['Token handling', 'Treat the URL as a secret: anyone holding an active link can view its permitted content.'],
+          ['No workspace access', 'A public link does not grant project, event, user, settings, or team access.']
+        ]} />
+      </Section>
+    );
+  }
+
   if (id === 'api-performance') {
     return (
       <Section id="api-performance" title="API performance">
@@ -857,6 +1047,11 @@ function verify(rawBody, header, secret) {
 export function PathCardsGrid({ basePath }: { basePath: string }) {
   const paths = [
     {
+      title: 'Self-host TraceIQ',
+      desc: 'One-command private setup plus production VPS, authentication, backup, and upgrade guidance.',
+      href: `${basePath}?page=self-hosting`
+    },
+    {
       title: 'Install TraceIQ JS',
       desc: 'npm install traceiq-sdk-js and start capturing events in minutes.',
       href: `${basePath}?page=quickstart`
@@ -868,7 +1063,7 @@ export function PathCardsGrid({ basePath }: { basePath: string }) {
     },
     {
       title: 'Server & Mobile SDKs',
-      desc: 'Node.js, React Native, Python, Swift, Kotlin, Rust, and PHP SDKs.',
+      desc: 'Capture trusted backend events with Node.js and mobile activity with React Native / Expo.',
       href: `${basePath}?page=node`
     },
     {
