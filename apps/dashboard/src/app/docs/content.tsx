@@ -85,17 +85,17 @@ export function Bullets({ items }: { items: Array<[string, string]> }) {
 export function OptionsTable({ rows }: { rows: Array<[string, string, string]> }) {
   return (
     <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
-      <div className="hidden grid-cols-[180px_120px_1fr] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500 sm:grid">
+      <div className="hidden grid-cols-[minmax(120px,.7fr)_minmax(110px,.8fr)_minmax(0,1.5fr)] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500 md:grid">
         <span>Option</span>
         <span>Default</span>
         <span>Description</span>
       </div>
       <div className="divide-y divide-neutral-200 dark:divide-slate-800">
         {rows.map(([name, def, desc]) => (
-          <div key={name} className="grid gap-1 px-4 py-2.5 sm:grid-cols-[180px_120px_1fr] sm:gap-4">
-            <span className="font-mono text-xs text-neutral-900 dark:text-white">{name}</span>
-            <span className="font-mono text-xs text-neutral-500 dark:text-slate-400">{def}</span>
-            <span className="text-sm text-neutral-600 dark:text-slate-400">{desc}</span>
+          <div key={name} className="grid min-w-0 gap-1 px-4 py-3 md:grid-cols-[minmax(120px,.7fr)_minmax(110px,.8fr)_minmax(0,1.5fr)] md:gap-4">
+            <span className="min-w-0 break-words font-mono text-xs text-neutral-900 dark:text-white">{name}</span>
+            <span className="min-w-0 break-all font-mono text-xs text-neutral-500 dark:text-slate-400">{def}</span>
+            <span className="min-w-0 break-words text-sm leading-5 text-neutral-600 dark:text-slate-400">{desc}</span>
           </div>
         ))}
       </div>
