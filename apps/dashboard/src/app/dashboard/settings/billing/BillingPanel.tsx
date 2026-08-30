@@ -66,47 +66,46 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [billingResult, loadEntitlements]);
 
-  // Payment implementation paused until billing is live.
-  // async function beginCheckout(period: 'monthly' | 'yearly') {
-  //   setBusy(period);
-  //   setError(null);
-  //   try {
-  //     const token = await accessToken();
-  //     if (!token) throw new Error('Your dashboard session expired. Sign in again.');
-  //     const response = await fetch(`${apiBaseUrl}/v1/dashboard/billing/checkout`, {
-  //       method: 'POST',
-  //       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ billingPeriod: period, projectId })
-  //     });
-  //     if (!response.ok) throw new Error(await readError(response));
-  //     const result = (await response.json()) as { checkout_url?: string };
-  //     if (!result.checkout_url) throw new Error('Bachs did not return a checkout URL.');
-  //     window.location.assign(result.checkout_url);
-  //   } catch (caught) {
-  //     setError(caught instanceof Error ? caught.message : 'Could not start checkout.');
-  //     setBusy(null);
-  //   }
-  // }
+  async function beginCheckout(period: 'monthly' | 'yearly') {
+    setBusy(period);
+    setError(null);
+    try {
+      const token = await accessToken();
+      if (!token) throw new Error('Your dashboard session expired. Sign in again.');
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/billing/checkout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billingPeriod: period, projectId })
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const result = (await response.json()) as { checkout_url?: string };
+      if (!result.checkout_url) throw new Error('Bachs did not return a checkout URL.');
+      window.location.assign(result.checkout_url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not start checkout.');
+      setBusy(null);
+    }
+  }
 
-  // async function openPortal() {
-  //   setBusy('portal');
-  //   setError(null);
-  //   try {
-  //     const token = await accessToken();
-  //     if (!token) throw new Error('Your dashboard session expired. Sign in again.');
-  //     const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  //     const response = await fetch(`${apiBaseUrl}/v1/dashboard/billing/portal${query}`, {
-  //       method: 'POST', headers: { Authorization: `Bearer ${token}` }
-  //     });
-  //     if (!response.ok) throw new Error(await readError(response));
-  //     const result = (await response.json()) as { url?: string };
-  //     if (!result.url) throw new Error('Bachs did not return a portal URL.');
-  //     window.location.assign(result.url);
-  //   } catch (caught) {
-  //     setError(caught instanceof Error ? caught.message : 'Could not open the billing portal.');
-  //     setBusy(null);
-  //   }
-  // }
+  async function openPortal() {
+    setBusy('portal');
+    setError(null);
+    try {
+      const token = await accessToken();
+      if (!token) throw new Error('Your dashboard session expired. Sign in again.');
+      const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/billing/portal${query}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const result = (await response.json()) as { url?: string };
+      if (!result.url) throw new Error('Bachs did not return a portal URL.');
+      window.location.assign(result.url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not open the billing portal.');
+      setBusy(null);
+    }
+  }
 
   if (loading) return <div className="mt-6 rounded-xl border border-neutral-200 p-6 text-sm text-neutral-500 dark:border-slate-800 dark:text-slate-400">Loading billing details…</div>;
 
@@ -166,23 +165,19 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
           name="Pro" price="$19/month" description="For growing products and teams."
           features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 AI insights/month', 'Public dashboards']}
           current={pro}
-          actions={
-            // Payment implementation paused until billing is live.
-            // pro ? (
-            //   <button className={secondaryButton} disabled={busy !== null} onClick={() => void openPortal()}>
-            //     {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage billing
-            //   </button>
-            // ) : (
-            //   <div className="grid gap-2 sm:grid-cols-2">
-            //     <button className={primaryButton} disabled={busy !== null} onClick={() => void beginCheckout('monthly')}>
-            //       {busy === 'monthly' ? <Loader2 className="size-4 animate-spin" /> : null} Upgrade monthly
-            //     </button>
-            //     <button className={secondaryButton} disabled={busy !== null} onClick={() => void beginCheckout('yearly')}>
-            //       {busy === 'yearly' ? <Loader2 className="size-4 animate-spin" /> : null} $190 yearly
-            //     </button>
-            //   </div>
-            // )
-            <span className="text-xs text-neutral-400 dark:text-slate-500">Payments coming soon</span>
+          actions={pro ? (
+            <button className={secondaryButton} disabled={busy !== null} onClick={() => void openPortal()}>
+              {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage billing
+            </button>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button className={primaryButton} disabled={busy !== null} onClick={() => void beginCheckout('monthly')}>
+                {busy === 'monthly' ? <Loader2 className="size-4 animate-spin" /> : null} Upgrade monthly
+              </button>
+              <button className={secondaryButton} disabled={busy !== null} onClick={() => void beginCheckout('yearly')}>
+                {busy === 'yearly' ? <Loader2 className="size-4 animate-spin" /> : null} $190 yearly
+              </button>
+            </div>
           )}
         />
       </div>

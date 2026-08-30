@@ -30,7 +30,7 @@ export default function BillingSuccessPage({
       <main>
         <section className="mx-auto max-w-5xl px-5 pb-20 pt-16 sm:px-8 sm:pt-24">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-full border border-emerald-400/30  text-emerald-300">
               <Check className="size-7" strokeWidth={2.5} />
             </div>
             <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-emerald-300">Payment successful</p>
