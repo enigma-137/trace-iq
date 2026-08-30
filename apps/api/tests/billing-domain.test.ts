@@ -56,6 +56,23 @@ describe('EntitlementService', () => {
 
     await expect(service.assertAvailable('org_1', 'events', 2)).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('takes an organization resource lock before checking count-based capacity', async () => {
+    const executor = { query: vi.fn()
+      .mockResolvedValueOnce(result([]))
+      .mockResolvedValueOnce(result([{ ...freeRow, projects: '0' }]))
+      .mockResolvedValueOnce(result([])) };
+    const service = new EntitlementService({ query: vi.fn() } as never, { deploymentMode: 'cloud' });
+
+    await service.lockAndAssertAvailable(executor as never, 'org_1', 'projects');
+
+    expect(executor.query).toHaveBeenNthCalledWith(
+      1,
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      ['org_1:projects']
+    );
+    expect(String(executor.query.mock.calls[1][0])).toContain('SELECT');
+  });
 });
 
 describe('UsageService', () => {
@@ -82,16 +99,19 @@ describe('UsageService', () => {
 
 describe('RetentionService', () => {
   it('deletes expired self-hosted events in bounded batches', async () => {
-    const database = { query: vi.fn()
-      .mockResolvedValueOnce(result([{ id: 'proj_1', organization_id: 'org_1', data_retention_days: 30 }]))
-      .mockResolvedValueOnce(result([], 4))
+    const client = { query: vi.fn()
+      .mockResolvedValueOnce(result([]))
+      .mockResolvedValueOnce(result([], 4)) };
+    const database = {
+      query: vi.fn().mockResolvedValueOnce(result([{ id: 'proj_1', organization_id: 'org_1', data_retention_days: 30 }])),
+      transaction: vi.fn(async (callback: (executor: typeof client) => Promise<unknown>) => callback(client))
     };
     const service = new RetentionService(database as never, {} as never);
     const summary = await service.runSweep();
 
     expect(summary).toEqual({ projectsScanned: 1, deletedEvents: 4 });
-    expect(database.query.mock.calls[1][0]).toContain("occurred_at < now() - ($2::int * interval '1 day')");
-    expect(database.query.mock.calls[1][1]).toEqual(['proj_1', 30]);
+    expect(client.query).toHaveBeenNthCalledWith(1, "SELECT set_config('traceiq.retention_sweep', 'on', true)");
+    expect(client.query.mock.calls[1][0]).toContain("occurred_at < now() - ($2::int * interval '1 day')");
+    expect(client.query.mock.calls[1][1]).toEqual(['proj_1', 30]);
   });
 });
-

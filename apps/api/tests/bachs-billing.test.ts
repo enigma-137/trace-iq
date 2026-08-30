@@ -62,7 +62,7 @@ describe('Bachs billing integration', () => {
       product_cart: [{ product_id: 'prod_yearly', quantity: 1 }],
       billing_currency: 'USD',
       customer: { email: 'owner@example.com', name: 'owner' },
-      success_url: expect.stringContaining('/dashboard/settings/billing?billing=success&projectId=proj_1'),
+      success_url: expect.stringContaining('/billing/success?projectId=proj_1'),
       metadata: { organization_id: 'org_1', plan_key: 'pro', billing_period: 'yearly' }
     }));
   });
@@ -80,13 +80,31 @@ describe('Bachs billing integration', () => {
         cancel_url: 'https://billing-test.traceiq.run/v1/billing/return?status=cancelled&projectId=proj_1'
       }));
       expect(service.checkoutReturnRedirect('success', 'proj_1')).toBe(
-        'http://localhost:3000/dashboard/settings/billing?billing=success&projectId=proj_1'
+        'http://localhost:3000/billing/success?projectId=proj_1'
       );
     } finally {
       if (previousDashboard === undefined) delete process.env.BILLING_DASHBOARD_RETURN_URL;
       else process.env.BILLING_DASHBOARD_RETURN_URL = previousDashboard;
       if (previousPublicApi === undefined) delete process.env.BILLING_PUBLIC_API_URL;
       else process.env.BILLING_PUBLIC_API_URL = previousPublicApi;
+    }
+  });
+
+  it('returns successful production checkouts to the configured dashboard success page', async () => {
+    const previousDashboard = process.env.BILLING_DASHBOARD_RETURN_URL;
+    process.env.BILLING_DASHBOARD_RETURN_URL = 'https://cloud.example.com';
+    try {
+      const { service, bachs } = makeService();
+      await service.createCheckout({ organizationId: 'org_1', projectId: 'proj_1', email: 'owner@example.com', billingPeriod: 'monthly' });
+      expect(bachs.createCheckout).toHaveBeenCalledWith(expect.objectContaining({
+        success_url: 'https://cloud.example.com/billing/success?projectId=proj_1'
+      }));
+      expect(service.checkoutReturnRedirect('success', 'proj_1')).toBe(
+        'https://cloud.example.com/billing/success?projectId=proj_1'
+      );
+    } finally {
+      if (previousDashboard === undefined) delete process.env.BILLING_DASHBOARD_RETURN_URL;
+      else process.env.BILLING_DASHBOARD_RETURN_URL = previousDashboard;
     }
   });
 
@@ -108,6 +126,7 @@ describe('Bachs billing integration', () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO billing_customers'))).toBe(true);
     const subscriptionCall = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
     expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['org_1', 'sub_bachs_1', 'prod_monthly', 'active']));
+    expect(String(subscriptionCall?.[0])).toContain('COALESCE(subscriptions.grace_period_ends_at');
   });
 
   it('acknowledges duplicate provider events without applying them twice', async () => {

@@ -207,7 +207,7 @@ export class OrganizationsService {
 
     return this.database.transaction(async (client) => {
       const organization = await this.createOrganization(client, user, organizationName);
-      await this.entitlements.assertAvailable(organization.id, 'projects', 1, client);
+      await this.entitlements.lockAndAssertAvailable(client, organization.id, 'projects', 1);
       const project = await this.createProject(client, user, organization.id, projectName);
       const writeKey = await this.createWriteKey(client, user, project.id);
 
@@ -243,7 +243,7 @@ export class OrganizationsService {
       }
 
       await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
-      await this.entitlements.assertAvailable(existing.organization.id, 'projects', 1, client);
+      await this.entitlements.lockAndAssertAvailable(client, existing.organization.id, 'projects', 1);
       const project = await this.createProject(client, user, existing.organization.id, projectName);
       const writeKey = await this.createWriteKey(client, user, project.id);
 
@@ -273,7 +273,7 @@ export class OrganizationsService {
 
       const organization = existing.organization ?? (await this.createOrganization(client, user, organizationName));
       await this.entitlements.assertMemberWritable(organization.id, user.id, client);
-      await this.entitlements.assertAvailable(organization.id, 'projects', 1, client);
+      await this.entitlements.lockAndAssertAvailable(client, organization.id, 'projects', 1);
       const project = await this.createProject(client, user, organization.id, projectName);
       const writeKey = await this.createWriteKey(client, user, project.id);
 
@@ -645,6 +645,7 @@ export class OrganizationsService {
 
   async assertSeatAvailable(client: QueryExecutor, organizationId: string) {
     if (appConfig.deploymentMode === 'self_hosted') return;
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${organizationId}:members`]);
     const pending = await client.query<{ count: string }>(
       `
         SELECT COUNT(*) AS count FROM organization_invites

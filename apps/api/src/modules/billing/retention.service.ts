@@ -41,21 +41,29 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
 
     for (const project of projects.rows) {
       const retentionDays = await this.effectiveRetentionDays(project);
-      // Bound each sweep so one large tenant cannot monopolize the worker.
-      for (let batch = 0; batch < 20; batch += 1) {
-        const result = await this.database.query(`
-          DELETE FROM events
-          WHERE id IN (
-            SELECT id FROM events
-            WHERE project_id = $1 AND occurred_at < now() - ($2::int * interval '1 day')
-            ORDER BY occurred_at
-            LIMIT 1000
-          )
-        `, [project.id, retentionDays]);
-        const count = result.rowCount ?? 0;
-        deletedEvents += count;
-        if (count < 1000) break;
-      }
+      deletedEvents += await this.database.transaction(async (client) => {
+        // The forced SELECT policy hides expired rows from normal Cloud queries.
+        // This transaction-local, server-only flag lets the retention worker see
+        // those rows solely for physical deletion.
+        await client.query("SELECT set_config('traceiq.retention_sweep', 'on', true)");
+        let projectDeleted = 0;
+        // Bound each sweep so one large tenant cannot monopolize the worker.
+        for (let batch = 0; batch < 20; batch += 1) {
+          const result = await client.query(`
+            DELETE FROM events
+            WHERE id IN (
+              SELECT id FROM events
+              WHERE project_id = $1 AND occurred_at < now() - ($2::int * interval '1 day')
+              ORDER BY occurred_at
+              LIMIT 1000
+            )
+          `, [project.id, retentionDays]);
+          const count = result.rowCount ?? 0;
+          projectDeleted += count;
+          if (count < 1000) break;
+        }
+        return projectDeleted;
+      });
     }
 
     if (deletedEvents > 0) this.logger.log(`Retention sweep deleted ${deletedEvents} expired events.`);
@@ -70,4 +78,3 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
     return Math.max(1, snapshot.limits.retentionDays ?? 30);
   }
 }
-

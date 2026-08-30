@@ -76,8 +76,12 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
 
   checkoutReturnRedirect(status: 'success' | 'cancelled', projectId?: string) {
     const dashboard = this.dashboardReturnBaseUrl();
-    const query = new URLSearchParams({ billing: status });
+    const query = new URLSearchParams();
     if (projectId) query.set('projectId', projectId);
+    if (status === 'success') {
+      return `${dashboard}/billing/success${query.size ? `?${query.toString()}` : ''}`;
+    }
+    query.set('billing', 'cancelled');
     return `${dashboard}/dashboard/settings/billing?${query.toString()}`;
   }
 
@@ -204,7 +208,12 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
         currency = EXCLUDED.currency, amount = EXCLUDED.amount,
         current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end,
         cancel_at_period_end = EXCLUDED.cancel_at_period_end, canceled_at = EXCLUDED.canceled_at,
-        grace_period_ends_at = EXCLUDED.grace_period_ends_at, last_provider_sync_at = now(),
+        grace_period_ends_at = CASE
+          WHEN EXCLUDED.status = 'past_due'
+            THEN COALESCE(subscriptions.grace_period_ends_at, EXCLUDED.grace_period_ends_at)
+          ELSE NULL
+        END,
+        last_provider_sync_at = now(),
         provider_event_created_at = EXCLUDED.provider_event_created_at, metadata = EXCLUDED.metadata, updated_at = now()
       WHERE subscriptions.provider_event_created_at IS NULL OR subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at
     `, [
@@ -275,7 +284,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     const loopback = dashboardUrl.hostname === 'localhost' || dashboardUrl.hostname === '127.0.0.1';
     if (!loopback) {
       return {
-        successUrl: `${dashboard}/dashboard/settings/billing?billing=success&projectId=${encodeURIComponent(projectId)}`,
+        successUrl: `${dashboard}/billing/success?projectId=${encodeURIComponent(projectId)}`,
         cancelUrl: `${dashboard}/dashboard/settings/billing?billing=cancelled&projectId=${encodeURIComponent(projectId)}`
       };
     }

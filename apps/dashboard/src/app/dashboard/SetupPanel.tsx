@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from './DashboardDialog';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { Skeleton } from '@/components/Skeleton';
+import { readApiError } from '@/lib/api-error';
 
 interface SetupResponse {
   hasSetup: boolean;
@@ -82,7 +83,7 @@ export function SetupPanel({
     const response = await fetch(`${apiBaseUrl}/v1/setup${setupQuery}`, { headers: { Authorization: `Bearer ${token}` } });
     setIsLoading(false);
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     const nextSetup = (await response.json()) as SetupResponse;
@@ -111,7 +112,7 @@ export function SetupPanel({
     });
     setIsRenamingOrg(false);
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setSetup((current) => (current ? { ...current, organization: { ...current.organization!, name: trimmed } } : current));
@@ -136,7 +137,7 @@ export function SetupPanel({
     });
     setIsSubmitting(false);
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setSetup((await response.json()) as SetupResponse);
@@ -164,7 +165,7 @@ export function SetupPanel({
     });
     setIsCreatingProject(false);
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     const created = (await response.json()) as SetupResponse;
@@ -189,7 +190,7 @@ export function SetupPanel({
     });
     setIsRegenerating(false);
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setSetup((await response.json()) as SetupResponse);
@@ -571,15 +572,6 @@ function CopyButton({ value, label, compact = false }: { value: string; label: s
       {copied ? 'Copied' : label}
     </button>
   );
-}
-
-async function readError(response: Response) {
-  try {
-    const body = (await response.json()) as { message?: string };
-    return body.message ?? `Request failed with ${response.status}`;
-  } catch {
-    return `Request failed with ${response.status}`;
-  }
 }
 
 const inputClass =

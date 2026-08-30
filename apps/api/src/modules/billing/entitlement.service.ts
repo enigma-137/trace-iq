@@ -104,6 +104,22 @@ export class EntitlementService {
     return snapshot;
   }
 
+  /**
+   * Serializes count-based capacity checks with the write that follows in the
+   * caller's transaction. This prevents concurrent project/member requests
+   * from both observing the same final available slot.
+   */
+  async lockAndAssertAvailable(
+    executor: QueryExecutor,
+    organizationId: string,
+    resource: Extract<LimitedResource, 'projects' | 'members'>,
+    amount = 1
+  ) {
+    if (this.config.deploymentMode === 'self_hosted') return this.getSnapshot(organizationId, executor);
+    await executor.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${organizationId}:${resource}`]);
+    return this.assertAvailable(organizationId, resource, amount, executor);
+  }
+
   async assertProjectWritable(projectId: string, executor: QueryExecutor = this.database) {
     if (this.config.deploymentMode === 'self_hosted') return;
     const result = await executor.query<{ organization_id: string; position: string }>(`

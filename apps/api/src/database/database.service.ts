@@ -14,10 +14,13 @@ export class DatabaseService implements OnApplicationShutdown {
   private readonly pool = new Pool({
     connectionString: databaseConfig.url,
     max: databaseConfig.poolSize,
+    // PostgreSQL uses this connection-local setting in the events RLS policy.
+    // The value comes from server configuration only; clients cannot influence it.
+    options: `-c traceiq.deployment_mode=${process.env.TRACEIQ_DEPLOYMENT_MODE === 'cloud' ? 'cloud' : 'self_hosted'}`,
     ssl: databaseConfig.ssl
       ? { rejectUnauthorized: databaseConfig.sslRejectUnauthorized }
       : undefined
-  });
+  } as ConstructorParameters<typeof Pool>[0] & { options: string });
 
   query<T extends QueryResultRow = QueryResultRow>(
     text: string,

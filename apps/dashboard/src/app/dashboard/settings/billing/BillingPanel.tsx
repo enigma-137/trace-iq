@@ -12,6 +12,7 @@ interface Entitlements {
   subscriptionStatus: string | null;
   limits: { events: number | null; projects: number | null; members: number | null; retentionDays: number | null; aiInsights: number | null };
   usage: { events: number; projects: number; members: number; aiInsights: number };
+  overLimit: { projects: boolean; members: boolean };
 }
 
 export function BillingPanel({ projectId, billingResult }: { projectId?: string; billingResult?: string }) {
@@ -115,6 +116,8 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   }
 
   const pro = entitlements.plan === 'pro';
+  const eventPercent = percentage(entitlements.usage.events, entitlements.limits.events);
+  const warningThreshold = eventPercent >= 100 ? 100 : eventPercent >= 90 ? 90 : eventPercent >= 70 ? 70 : null;
   return (
     <section className="mt-6 grid gap-5" aria-labelledby="billing-title">
       <div>
@@ -126,6 +129,31 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       {billingResult === 'success' && pro ? <BillingMessage tone="success">Your organization is now on Pro.</BillingMessage> : null}
       {billingResult === 'cancelled' ? <BillingMessage tone="info">Checkout was cancelled. Your current plan was not changed.</BillingMessage> : null}
       {error ? <BillingMessage tone="error">{error}</BillingMessage> : null}
+
+      {warningThreshold ? (
+        <BillingMessage tone={warningThreshold >= 100 ? 'error' : 'info'}>
+          You have used {Math.floor(eventPercent)}% of this month’s event allowance.
+          {warningThreshold >= 100
+            ? ' The 5% grace buffer is active; ingestion stops at 105%. Upgrade to avoid dropped events.'
+            : ' Upgrade before reaching the limit to keep ingestion uninterrupted.'}
+        </BillingMessage>
+      ) : null}
+
+      <div className="rounded-xl border border-neutral-200 p-5 dark:border-slate-800">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div><h3 className="font-semibold text-neutral-900 dark:text-white">Current usage</h3><p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">Usage and capacity for the active organization.</p></div>
+          <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold uppercase text-neutral-600 dark:bg-slate-900 dark:text-slate-300">{entitlements.plan}</span>
+        </div>
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <UsageMeter label="Events this month" value={entitlements.usage.events} limit={entitlements.limits.events} />
+          <UsageMeter label="AI insights this month" value={entitlements.usage.aiInsights} limit={entitlements.limits.aiInsights} />
+          <UsageMeter label="Projects" value={entitlements.usage.projects} limit={entitlements.limits.projects} overLimit={entitlements.overLimit.projects} />
+          <UsageMeter label="Team members" value={entitlements.usage.members} limit={entitlements.limits.members} overLimit={entitlements.overLimit.members} />
+        </div>
+        <p className="mt-5 border-t border-neutral-100 pt-4 text-sm text-neutral-500 dark:border-slate-800 dark:text-slate-400">
+          Data retention: <strong className="text-neutral-800 dark:text-slate-200">{entitlements.limits.retentionDays ?? 'Unlimited'} days</strong>
+        </p>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <PlanCard
@@ -155,6 +183,22 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       </div>
     </section>
   );
+}
+
+function UsageMeter({ label, value, limit, overLimit = false }: { label: string; value: number; limit: number | null; overLimit?: boolean }) {
+  const pct = percentage(value, limit);
+  const danger = overLimit || pct >= 100;
+  const warning = !danger && pct >= 70;
+  const bar = danger ? 'bg-red-500' : warning ? 'bg-amber-500' : 'bg-blue-500';
+  return <div>
+    <div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="font-medium text-neutral-700 dark:text-slate-300">{label}</span><span className={`tabular-nums ${danger ? 'font-semibold text-red-600 dark:text-red-400' : 'text-neutral-500 dark:text-slate-400'}`}>{value.toLocaleString()} / {limit === null ? 'Unlimited' : limit.toLocaleString()}</span></div>
+    <div className="h-2 overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800"><div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
+    {overLimit ? <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">Excess resource is read-only until usage is within the plan limit.</p> : null}
+  </div>;
+}
+
+function percentage(value: number, limit: number | null) {
+  return limit && limit > 0 ? value / limit * 100 : 0;
 }
 
 function PlanCard({ name, price, description, features, current, actions }: { name: string; price: string; description: string; features: string[]; current: boolean; actions?: React.ReactNode }) {

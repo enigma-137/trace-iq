@@ -42,7 +42,6 @@ export class AiService {
       }
       const project = await this.projects.requireActiveProject(user, projectId);
       organizationId = project.organizationId;
-      await this.entitlements.assertAvailable(organizationId, 'aiInsights');
     }
     const results = await this.funnels.getResults(user, funnelId, daysParam, projectId);
 
@@ -56,12 +55,14 @@ export class AiService {
       };
     }
 
-    const prompt = this.buildFunnelPrompt(results);
-    const summary = await this.complete(prompt);
-
+    // Reserve the AI unit atomically before making the paid model call. This
+    // prevents concurrent direct API requests from all crossing the final slot.
     if (organizationId && this.database && this.usage) {
       await this.database.transaction((client) => this.usage!.consume(client, organizationId!, 'aiInsights', 1));
     }
+
+    const prompt = this.buildFunnelPrompt(results);
+    const summary = await this.complete(prompt);
 
     return { summary, model: AI_MODEL, generatedAt: new Date().toISOString() };
   }

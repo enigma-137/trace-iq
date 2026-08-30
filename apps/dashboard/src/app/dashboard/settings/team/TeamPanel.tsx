@@ -6,6 +6,7 @@ import { Select } from '@traceiq/ui';
 import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 import { useOrganization } from '@/lib/organization';
+import { readApiError } from '@/lib/api-error';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -104,7 +105,7 @@ export function TeamPanel() {
     setIsLoading(false);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     const body = (await response.json()) as { organizationId: string; members: MemberRecord[] };
@@ -116,7 +117,7 @@ export function TeamPanel() {
     const response = await authFetch('/v1/organization/invites');
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     const body = (await response.json()) as { invites: InviteRecord[] };
@@ -140,7 +141,7 @@ export function TeamPanel() {
     setBusy(null);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setPendingForMe((current) => current.filter((item) => item.id !== invite.id));
@@ -169,7 +170,7 @@ export function TeamPanel() {
     setIsSubmitting(false);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
 
@@ -193,7 +194,7 @@ export function TeamPanel() {
     setBusy(null);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setMembers((current) => current.map((m) => (m.userId === member.userId ? { ...m, role: newRole } : m)));
@@ -209,7 +210,7 @@ export function TeamPanel() {
     setBusy(null);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setMembers((current) => current.filter((m) => m.userId !== memberToRemove.userId));
@@ -225,7 +226,7 @@ export function TeamPanel() {
     setBusy(null);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     const body = (await response.json()) as { invite: InviteRecord; emailDelivered: boolean };
@@ -243,7 +244,7 @@ export function TeamPanel() {
     setBusy(null);
     if (!response) return;
     if (!response.ok) {
-      setStatus({ tone: 'error', message: await readError(response) });
+      setStatus({ tone: 'error', message: await readApiError(response) });
       return;
     }
     setInvites((current) => current.map((i) => (i.id === invite.id ? { ...i, status: 'revoked' as const } : i)));
@@ -589,15 +590,6 @@ function capitalizeRole(role: Role) {
 function formatDate(value: string | null) {
   if (!value) return 'Never';
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
-}
-
-async function readError(response: Response) {
-  try {
-    const body = (await response.json()) as { message?: string };
-    return body.message ?? `Request failed with ${response.status}`;
-  } catch {
-    return `Request failed with ${response.status}`;
-  }
 }
 
 const inputClass =

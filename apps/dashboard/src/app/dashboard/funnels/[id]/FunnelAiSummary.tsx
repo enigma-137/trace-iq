@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { readApiError } from '@/lib/api-error';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -38,8 +39,7 @@ export function FunnelAiSummary({ funnelId, days }: { funnelId: string; days: st
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(body?.message ?? `Request failed with ${response.status}`);
+        setError(await readApiError(response));
         return;
       }
 
