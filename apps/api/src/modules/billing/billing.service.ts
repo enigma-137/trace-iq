@@ -9,7 +9,16 @@ export interface BachsEvent {
   id: string;
   type: string;
   created_at: string;
-  data: BachsSubscription;
+  data: BachsSubscription | BachsCheckoutCompleted;
+}
+
+interface BachsCheckoutCompleted {
+  checkout_id: string;
+  status: string;
+  payment_status: string;
+  customer: { customer_id: string; email?: string } | null;
+  subscription: { subscription_id: string } | null;
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -36,22 +45,40 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     if (this.reconciliationTimer) clearInterval(this.reconciliationTimer);
   }
 
-  async createCheckout(input: { organizationId: string; email: string; billingPeriod: 'monthly' | 'yearly' }) {
+  async createCheckout(input: { organizationId: string; projectId: string; email: string; billingPeriod: 'monthly' | 'yearly' }) {
     this.requireCloud();
     const productId = input.billingPeriod === 'yearly'
       ? this.config.bachs!.products.proYearly : this.config.bachs!.products.proMonthly;
-    const dashboard = (process.env.DASHBOARD_URL ?? 'https://traceiq.run').replace(/\/+$/, '');
-    return this.bachs.createCheckout({
+    const { successUrl, cancelUrl } = this.checkoutReturnUrls(input.projectId);
+    const checkout = await this.bachs.createCheckout({
       product_cart: [{ product_id: productId, quantity: 1 }],
       billing_currency: 'USD',
       // Bachs requires both fields when checkout creates a new customer. TraceIQ
       // currently stores only the authenticated email, so use its local part as
       // a stable, non-sensitive display name until profile names are available.
       customer: { email: input.email, name: input.email.split('@')[0] || 'TraceIQ customer' },
-      success_url: `${dashboard}/dashboard/settings?billing=success`,
-      cancel_url: `${dashboard}/pricing?billing=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: { organization_id: input.organizationId, plan_key: 'pro', billing_period: input.billingPeriod }
     });
+    await this.database.query(`
+      INSERT INTO billing_checkout_sessions (
+        id, provider, provider_checkout_id, organization_id, project_id,
+        provider_product_id, billing_period, status, expires_at
+      ) VALUES ($1, 'bachs', $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (provider, provider_checkout_id) DO NOTHING
+    `, [
+      `bcs_${randomUUID()}`, checkout.checkout_id, input.organizationId, input.projectId,
+      productId, input.billingPeriod, checkout.status, checkout.expires_at
+    ]);
+    return checkout;
+  }
+
+  checkoutReturnRedirect(status: 'success' | 'cancelled', projectId?: string) {
+    const dashboard = this.dashboardReturnBaseUrl();
+    const query = new URLSearchParams({ billing: status });
+    if (projectId) query.set('projectId', projectId);
+    return `${dashboard}/dashboard/settings/billing?${query.toString()}`;
   }
 
   async createPortal(organizationId: string) {
@@ -97,8 +124,15 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     if (claimed.rowCount === 0) return { processed: false, duplicate: true };
 
     try {
+      const checkoutSubscription = event.type === 'checkout.completed'
+        ? await this.subscriptionForCompletedCheckout(event)
+        : null;
       await this.database.transaction(async (client) => {
-        if (event.type.startsWith('customer.subscription.')) await this.upsertSubscription(client, event);
+        if (event.type === 'checkout.completed') {
+          await this.applyCompletedCheckout(client, event, checkoutSubscription);
+        } else if (event.type.startsWith('customer.subscription.')) {
+          await this.upsertSubscription(client, event);
+        }
         await client.query(`UPDATE billing_webhook_events SET processing_status = 'processed', processed_at = now() WHERE provider = 'bachs' AND provider_event_id = $1`, [event.id]);
       });
       return { processed: true, duplicate: false };
@@ -127,9 +161,17 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
   }
 
   private async upsertSubscription(executor: QueryExecutor, event: BachsEvent, reconciliation = false): Promise<void> {
-    const data = event.data;
+    const data = event.data as BachsSubscription;
     const subscriptionId = data.subscription_id ?? data.id;
-    const organizationId = typeof data.metadata?.organization_id === 'string' ? data.metadata.organization_id : null;
+    let organizationId = typeof data.metadata?.organization_id === 'string' ? data.metadata.organization_id : null;
+    if (!organizationId && data.customer?.customer_id) {
+      const mapped = await executor.query<{ organization_id: string }>(
+        `SELECT organization_id FROM billing_customers WHERE provider = 'bachs' AND provider_customer_id = $1`,
+        [data.customer.customer_id]
+      );
+      organizationId = mapped.rows[0]?.organization_id ?? null;
+      if (organizationId) data.metadata = { ...data.metadata, organization_id: organizationId };
+    }
     if (!subscriptionId || !organizationId || !data.customer?.customer_id) {
       if (reconciliation && subscriptionId) {
         const existing = await executor.query<{ organization_id: string }>(`SELECT organization_id FROM subscriptions WHERE provider = 'bachs' AND provider_subscription_id = $1`, [subscriptionId]);
@@ -173,9 +215,102 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     ]);
   }
 
+  private async subscriptionForCompletedCheckout(event: BachsEvent) {
+    const data = event.data as BachsCheckoutCompleted;
+    const subscriptionId = data.subscription?.subscription_id;
+    if (!subscriptionId) return null;
+    const mapping = await this.database.query<{ organization_id: string }>(`
+      SELECT organization_id FROM billing_checkout_sessions
+      WHERE provider = 'bachs' AND provider_checkout_id = $1
+    `, [data.checkout_id]);
+    const organizationId = mapping.rows[0]?.organization_id;
+    if (!organizationId) throw new BadRequestException('Unknown Bachs checkout session.');
+    const subscription = await this.bachs.getSubscription(subscriptionId);
+    subscription.metadata = { ...subscription.metadata, organization_id: organizationId };
+    return subscription;
+  }
+
+  private async applyCompletedCheckout(executor: QueryExecutor, event: BachsEvent, subscription: BachsSubscription | null) {
+    const data = event.data as BachsCheckoutCompleted;
+    const result = await executor.query<{ organization_id: string }>(`
+      UPDATE billing_checkout_sessions SET
+        status = $2, provider_customer_id = $3, provider_subscription_id = $4,
+        completed_at = $5, updated_at = now()
+      WHERE provider = 'bachs' AND provider_checkout_id = $1
+      RETURNING organization_id
+    `, [
+      data.checkout_id, data.status, data.customer?.customer_id ?? null,
+      data.subscription?.subscription_id ?? null, event.created_at
+    ]);
+    const organizationId = result.rows[0]?.organization_id;
+    if (!organizationId) throw new BadRequestException('Unknown Bachs checkout session.');
+    const metadataOrg = typeof data.metadata?.organization_id === 'string' ? data.metadata.organization_id : null;
+    if (metadataOrg && metadataOrg !== organizationId) {
+      throw new BadRequestException('Bachs checkout organization metadata does not match the stored checkout.');
+    }
+    if (data.customer?.customer_id) {
+      await executor.query(`
+        INSERT INTO billing_customers (organization_id, provider, provider_customer_id)
+        VALUES ($1, 'bachs', $2)
+        ON CONFLICT (organization_id, provider) DO UPDATE
+        SET provider_customer_id = EXCLUDED.provider_customer_id, updated_at = now()
+      `, [organizationId, data.customer.customer_id]);
+    }
+    if (subscription) {
+      await this.upsertSubscription(executor, {
+        id: event.id, type: 'customer.subscription.created', created_at: event.created_at, data: subscription
+      });
+    }
+  }
+
   private requireCloud() {
     if (this.config.deploymentMode !== 'cloud' || !this.config.bachs) {
       throw new NotFoundException('Cloud billing is not available in this deployment.');
     }
+  }
+
+  private checkoutReturnUrls(projectId: string) {
+    const dashboard = this.dashboardReturnBaseUrl();
+    const dashboardUrl = new URL(dashboard);
+    const loopback = dashboardUrl.hostname === 'localhost' || dashboardUrl.hostname === '127.0.0.1';
+    if (!loopback) {
+      return {
+        successUrl: `${dashboard}/dashboard/settings/billing?billing=success&projectId=${encodeURIComponent(projectId)}`,
+        cancelUrl: `${dashboard}/dashboard/settings/billing?billing=cancelled&projectId=${encodeURIComponent(projectId)}`
+      };
+    }
+
+    // Bachs requires public redirect URLs. In local dashboard development the
+    // public API relays the customer back to the fixed localhost dashboard URL.
+    const publicApi = this.validBaseUrl(process.env.BILLING_PUBLIC_API_URL, 'BILLING_PUBLIC_API_URL');
+    if (new URL(publicApi).protocol !== 'https:') {
+      throw new BadRequestException('BILLING_PUBLIC_API_URL must use HTTPS.');
+    }
+    return {
+      successUrl: `${publicApi}/v1/billing/return?status=success&projectId=${encodeURIComponent(projectId)}`,
+      cancelUrl: `${publicApi}/v1/billing/return?status=cancelled&projectId=${encodeURIComponent(projectId)}`
+    };
+  }
+
+  private dashboardReturnBaseUrl() {
+    return this.validBaseUrl(
+      process.env.BILLING_DASHBOARD_RETURN_URL?.trim() || process.env.DASHBOARD_URL?.trim() || 'https://traceiq.run',
+      'BILLING_DASHBOARD_RETURN_URL'
+    );
+  }
+
+  private validBaseUrl(value: string | undefined, name: string) {
+    if (!value) throw new BadRequestException(`${name} is required for this billing flow.`);
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new BadRequestException(`${name} must be an absolute URL.`);
+    }
+    const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) {
+      throw new BadRequestException(`${name} must use HTTPS, except for a localhost development dashboard.`);
+    }
+    return url.toString().replace(/\/+$/, '');
   }
 }

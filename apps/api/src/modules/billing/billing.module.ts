@@ -5,10 +5,11 @@ import { RetentionService } from './retention.service';
 import { BachsClient } from './bachs.client';
 import { BillingService } from './billing.service';
 import { BachsWebhookController } from './bachs-webhook.controller';
+import { BillingReturnController } from './billing-return.controller';
 
 @Global()
 @Module({
-  controllers: [BachsWebhookController],
+  controllers: [BachsWebhookController, BillingReturnController],
   providers: [EntitlementService, UsageService, RetentionService, BachsClient, BillingService],
   exports: [EntitlementService, UsageService, RetentionService, BillingService]
 })

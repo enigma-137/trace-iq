@@ -7,7 +7,7 @@ export class BachsClient {
   constructor(@Optional() private readonly config: BachsConfig | null = appConfig.bachs) {}
 
   createCheckout(body: Record<string, unknown>) {
-    return this.request<{ checkout_id: string; checkout_url: string; status: string; expires_at: string }>(
+    return this.request<BachsCheckoutSession>(
       'POST', '/v1/checkout-sessions', body, randomUUID()
     );
   }
@@ -49,6 +49,13 @@ export class BachsClient {
       clearTimeout(timeout);
     }
   }
+}
+
+export interface BachsCheckoutSession {
+  checkout_id: string;
+  checkout_url: string;
+  status: string;
+  expires_at: string;
 }
 
 interface BachsError {

@@ -55,6 +55,46 @@ In Cloud mode, active Bachs subscriptions are reconciled every six hours to
 repair missed webhook deliveries. `BILLING_RECONCILIATION_INTERVAL_MS` changes
 that cadence; webhook delivery remains the real-time path.
 
+### Bachs sandbox E2E with a local dashboard
+
+Keep the sandbox API and database isolated while exercising the real signed-in
+dashboard flow. The public API is also used as a redirect relay because Bachs
+does not accept `localhost` as a checkout success URL.
+
+On the temporary API deployment, configure:
+
+```dotenv
+TRACEIQ_DEPLOYMENT_MODE=cloud
+CORS_ORIGINS=https://traceiq.run,http://localhost:3000,http://127.0.0.1:3000
+BILLING_DASHBOARD_RETURN_URL=http://localhost:3000
+BILLING_PUBLIC_API_URL=https://billing-test.traceiq.run
+```
+
+Use only Bachs sandbox credentials and product IDs there. Configure the Bachs
+webhook endpoint as
+`https://billing-test.traceiq.run/v1/billing/webhooks/bachs` and subscribe to:
+
+- `checkout.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
+`checkout.completed` carries the checkout metadata and safely binds the Bachs
+customer/subscription to the TraceIQ organization. The subscription events then
+keep its status current.
+
+Point the local dashboard at the temporary API before starting Next.js:
+
+```dotenv
+NEXT_PUBLIC_API_URL=https://billing-test.traceiq.run
+```
+
+After deploying billing changes, apply all migrations (including
+`0026_billing_checkout_sessions.sql`) to `traceiq_billing_test`, never the
+production `traceiq` database. Then sign in locally, complete Setup, and use
+Settings -> Billing -> Upgrade monthly. The success relay returns to localhost
+and the Billing panel polls briefly for the authoritative webhook update.
+
 Required for the Compose API stack:
 
 ```dotenv

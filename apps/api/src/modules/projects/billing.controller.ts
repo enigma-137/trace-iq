@@ -25,6 +25,7 @@ export class BillingController {
     if (!user.email) throw new BadRequestException('A billing email is required.');
     return this.billing.createCheckout({
       organizationId: project.organizationId,
+      projectId: project.id,
       email: user.email,
       billingPeriod: body.billingPeriod
     });
@@ -49,4 +50,3 @@ export class BillingController {
     return project;
   }
 }
-
