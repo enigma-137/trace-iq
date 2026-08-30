@@ -11,6 +11,8 @@ import { DatabaseService, QueryExecutor } from '../../database/database.service'
 import { DashboardUser } from '../auth/auth.service';
 import { AuditService } from './audit.service';
 import { EmailService, toUniqueEmails } from '../emails/email.service';
+import { EntitlementService } from '../billing/entitlement.service';
+import { appConfig } from '../../config/app.config';
 
 export interface BootstrapSetupRequest {
   organizationName?: string;
@@ -56,7 +58,8 @@ export class OrganizationsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly email?: EmailService,
-    private readonly audit?: AuditService
+    private readonly audit?: AuditService,
+    private readonly entitlements: EntitlementService = new EntitlementService(database)
   ) {}
 
   async getSetup(user: DashboardUser, organizationId?: string, projectId?: string) {
@@ -204,6 +207,7 @@ export class OrganizationsService {
 
     return this.database.transaction(async (client) => {
       const organization = await this.createOrganization(client, user, organizationName);
+      await this.entitlements.assertAvailable(organization.id, 'projects', 1, client);
       const project = await this.createProject(client, user, organization.id, projectName);
       const writeKey = await this.createWriteKey(client, user, project.id);
 
@@ -238,6 +242,8 @@ export class OrganizationsService {
         throw new ForbiddenException('Only owners and admins can create projects.');
       }
 
+      await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
+      await this.entitlements.assertAvailable(existing.organization.id, 'projects', 1, client);
       const project = await this.createProject(client, user, existing.organization.id, projectName);
       const writeKey = await this.createWriteKey(client, user, project.id);
 
@@ -266,6 +272,8 @@ export class OrganizationsService {
       }
 
       const organization = existing.organization ?? (await this.createOrganization(client, user, organizationName));
+      await this.entitlements.assertMemberWritable(organization.id, user.id, client);
+      await this.entitlements.assertAvailable(organization.id, 'projects', 1, client);
       const project = await this.createProject(client, user, organization.id, projectName);
       const writeKey = await this.createWriteKey(client, user, project.id);
 
@@ -291,6 +299,8 @@ export class OrganizationsService {
         throw new ForbiddenException('Only owners and admins can regenerate project write keys.');
       }
 
+      await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
+      await this.entitlements.assertProjectWritable(existing.project.id, client);
       await client.query(
         `
           UPDATE project_write_keys
@@ -346,6 +356,7 @@ export class OrganizationsService {
         throw new ForbiddenException('Only owners and admins can rename the organization.');
       }
 
+      await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
       await client.query(
         `
           UPDATE organizations
@@ -412,6 +423,7 @@ export class OrganizationsService {
         throw new ForbiddenException('Only owners and admins can add team members.');
       }
 
+      await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
       await this.assertSeatAvailable(client, existing.organization.id);
 
       const duplicate = await client.query<{ exists: boolean }>(
@@ -466,6 +478,8 @@ export class OrganizationsService {
       if (!['owner', 'admin'].includes(actingRole)) {
         throw new ForbiddenException('Only owners and admins can change member roles.');
       }
+
+      await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
 
       const target = await client.query<{ role: MemberRole }>(
         `
@@ -629,33 +643,16 @@ export class OrganizationsService {
     };
   }
 
-  /**
-   * Enforces an optional paid-plan seat cap. When MAX_ORGANIZATION_SEATS is set,
-   * the number of current members plus pending invites may not reach it. Counting
-   * pending invites means an org can't stall on invites it never collected.
-   */
   async assertSeatAvailable(client: QueryExecutor, organizationId: string) {
-    const max = Number(process.env.MAX_ORGANIZATION_SEATS ?? 0);
-    if (!Number.isFinite(max) || max <= 0) {
-      return;
-    }
-
-    const result = await client.query<{ count: string }>(
+    if (appConfig.deploymentMode === 'self_hosted') return;
+    const pending = await client.query<{ count: string }>(
       `
-        SELECT
-          (SELECT COUNT(*) FROM organization_members WHERE organization_id = $1)
-          + (SELECT COUNT(*) FROM organization_invites WHERE organization_id = $1 AND status = 'pending')
-          AS count;
+        SELECT COUNT(*) AS count FROM organization_invites
+        WHERE organization_id = $1 AND status = 'pending';
       `,
       [organizationId]
     );
-
-    const count = Number(result.rows[0]?.count ?? 0);
-    if (count >= max) {
-      throw new BadRequestException(
-        `This organization is limited to ${max} seats. Remove a member or cancel a pending invite before adding more.`
-      );
-    }
+    await this.entitlements.assertAvailable(organizationId, 'members', Number(pending.rows[0]?.count ?? 0) + 1, client);
   }
 
   private async memberEmails(organizationId: string) {

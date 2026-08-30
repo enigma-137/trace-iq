@@ -10,7 +10,11 @@ function setup(rowCount = 1) {
   const db = mockDatabase((sql) => sql.includes('SELECT id, name')
     ? rows([{ id: 'gol_1', name: 'Purchase', type: 'event', target: 'purchase', createdAt: '2026-01-01' }])
     : affected(rowCount));
-  const projects = { resolveActiveProject: vi.fn().mockResolvedValue(project), requireActiveProject: vi.fn().mockResolvedValue(project) };
+  const projects = {
+    resolveActiveProject: vi.fn().mockResolvedValue(project),
+    requireActiveProject: vi.fn().mockResolvedValue(project),
+    requireWritableProject: vi.fn().mockResolvedValue(project)
+  };
   return { db, service: new GoalsService(db as never, projects as never) };
 }
 

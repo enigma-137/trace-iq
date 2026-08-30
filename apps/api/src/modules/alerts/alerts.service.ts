@@ -178,7 +178,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async create(user: DashboardUser, body: CreateAlertRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) throw new BadRequestException('Alert name is required.');
@@ -254,7 +254,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setEnabled(user: DashboardUser, id: string, enabled: boolean, projectId?: string) {
-    const project = await this.projects.requireActiveProject(user, projectId);
+    const project = await this.projects.requireWritableProject(user, projectId);
     const result = await this.database.query(
       `UPDATE alerts SET enabled = $3, last_status = 'pending', updated_at = now() WHERE id = $1 AND project_id = $2`,
       [id, project.id, enabled]

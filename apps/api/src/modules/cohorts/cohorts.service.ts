@@ -54,7 +54,7 @@ export class CohortsService {
   }
 
   async create(user: DashboardUser, body: CreateCohortRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
       throw new BadRequestException('Cohort name is required.');

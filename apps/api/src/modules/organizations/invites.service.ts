@@ -447,6 +447,7 @@ export class InvitesService {
     }
 
     await this.database.transaction(async (client) => {
+      await this.organizations.assertSeatAvailable(client, invite.organization_id);
       await client.query(
         `
           INSERT INTO organization_members (organization_id, user_id, role, email)

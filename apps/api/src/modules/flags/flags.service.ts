@@ -76,7 +76,7 @@ export class FlagsService {
   }
 
   async create(user: DashboardUser, body: CreateFlagRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
 
     const key = (typeof body.key === 'string' ? body.key.trim().toLowerCase() : '').replace(/\s+/g, '-');
     if (!KEY_PATTERN.test(key)) {
@@ -119,7 +119,7 @@ export class FlagsService {
   }
 
   async update(user: DashboardUser, id: string, body: UpdateFlagRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const current = await this.database.query<FlagRow>(`SELECT * FROM feature_flags WHERE id = $1 AND project_id = $2`, [
       id,
       project.id

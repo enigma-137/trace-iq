@@ -46,7 +46,7 @@ export class NotificationGroupsService {
   }
 
   async create(user: DashboardUser, body: CreateGroupRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) throw new BadRequestException('Group name is required.');
 
@@ -64,7 +64,7 @@ export class NotificationGroupsService {
   }
 
   async update(user: DashboardUser, id: string, body: CreateGroupRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) throw new BadRequestException('Group name is required.');
 

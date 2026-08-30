@@ -43,6 +43,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      TRACEIQ_DEPLOYMENT_MODE: self_hosted
       API_PORT: 4000
       API_HOST: 0.0.0.0
       AUTH_MODE: local

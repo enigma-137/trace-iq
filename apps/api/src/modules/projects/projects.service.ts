@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
+import { EntitlementService } from '../billing/entitlement.service';
 
 export type ResolvedProject = {
   id: string;
@@ -13,7 +14,10 @@ export type ResolvedProject = {
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly entitlements: EntitlementService = new EntitlementService(database)
+  ) {}
 
   async listAccessibleProjects(user: DashboardUser) {
     const result = await this.database.query<ResolvedProject>(
@@ -96,6 +100,13 @@ export class ProjectsService {
     return project;
   }
 
+  async requireWritableProject(user: DashboardUser, projectId?: string): Promise<ResolvedProject> {
+    const project = await this.requireActiveProject(user, projectId);
+    await this.entitlements.assertProjectWritable(project.id);
+    await this.entitlements.assertMemberWritable(project.organizationId, user.id);
+    return project;
+  }
+
   private optionalString(value: unknown): string | undefined {
     if (typeof value !== 'string') {
       return undefined;
@@ -105,4 +116,3 @@ export class ProjectsService {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 }
-

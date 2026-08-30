@@ -5,6 +5,8 @@ import { DatabaseService } from '../../database/database.service';
 import { extractClientIp, resolveGeo } from '../../common/geo';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { AchievementsService } from '../achievements/achievements.service';
+import { UsageService } from '../billing/usage.service';
+import { EntitlementService } from '../billing/entitlement.service';
 
 type JsonObject = Record<string, unknown>;
 
@@ -42,11 +44,13 @@ export interface IngestEventRequest {
 export interface IngestEventResponse {
   accepted: true;
   eventId: string;
+  usageWarningPercentage?: 70 | 90 | 100;
 }
 
 export interface BatchIngestResponse {
   accepted: true;
   results: Array<{ accepted: boolean; eventId?: string; error?: string }>;
+  usageWarningPercentage?: 70 | 90 | 100;
 }
 
 const MAX_BATCH_SIZE = 500;
@@ -81,7 +85,8 @@ export class EventsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly webhooks: WebhooksService,
-    private readonly achievements: AchievementsService
+    private readonly achievements: AchievementsService,
+    private readonly usage: UsageService = new UsageService(new EntitlementService(database))
   ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
@@ -170,7 +175,7 @@ export class EventsService {
     }
 
     // 4) One multi-row insert for the whole batch.
-    const eventIds = await this.bulkInsertEvents(auth, prepared);
+    const { eventIds, usageWarningPercentage } = await this.bulkInsertEvents(auth, prepared);
     await this.backfillSessionIdentities(auth.project_id, sessionIds);
     prepared.forEach((p, i) => {
       const eventId = eventIds[i];
@@ -189,7 +194,7 @@ export class EventsService {
     // Re-evaluate workspace achievements without blocking the ingest response.
     void this.achievements.afterProjectIngest(auth.project_id);
 
-    return { accepted: true, results };
+    return { accepted: true, results, ...(usageWarningPercentage ? { usageWarningPercentage } : {}) };
   }
 
   // Upsert distinct identified users in a single statement; returns external_id → user id.
@@ -274,8 +279,8 @@ export class EventsService {
   }
 
   // Insert all prepared events in one multi-row statement; returns ids aligned to `prepared`.
-  private async bulkInsertEvents(auth: WriteKeyRecord, prepared: PreparedEvent[]): Promise<string[]> {
-    if (prepared.length === 0) return [];
+  private async bulkInsertEvents(auth: WriteKeyRecord, prepared: PreparedEvent[]) {
+    if (prepared.length === 0) return { eventIds: [] as string[], usageWarningPercentage: undefined };
 
     const values: unknown[] = [];
     const groups: string[] = [];
@@ -303,17 +308,18 @@ export class EventsService {
       );
     });
 
-    await this.database.query(
-      `
+    const consumption = await this.database.transaction(async (client) => {
+      const usage = await this.usage.consumeProjectEvents(client, auth.organization_id, auth.project_id, prepared.length);
+      await client.query(`
         INSERT INTO events (
           id, organization_id, project_id, user_id, anonymous_id, session_id,
           event_name, properties, device_info, network_info, context, occurred_at
         )
         VALUES ${groups.join(', ')}
-      `,
-      values
-    );
-    return ids;
+      `, values);
+      return usage;
+    });
+    return { eventIds: ids, usageWarningPercentage: consumption.warningThreshold ?? undefined };
   }
 
   private async ingestWithAuth(
@@ -339,8 +345,9 @@ export class EventsService {
     const networkInfo = this.buildNetworkInfo(input.networkInfo, meta);
     const eventId = `evt_${randomUUID()}`;
 
-    await this.database.query(
-      `
+    const consumption = await this.database.transaction(async (client) => {
+      const usage = await this.usage.consumeProjectEvents(client, auth.organization_id, auth.project_id, 1);
+      await client.query(`
         INSERT INTO events (
           id,
           organization_id,
@@ -356,8 +363,7 @@ export class EventsService {
           occurred_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12)
-      `,
-      [
+      `, [
         eventId,
         auth.organization_id,
         auth.project_id,
@@ -370,8 +376,9 @@ export class EventsService {
         JSON.stringify(networkInfo),
         JSON.stringify(input.context ?? {}),
         occurredAt.toISOString()
-      ]
-    );
+      ]);
+      return usage;
+    });
 
     // Forward to outbound webhooks without blocking the ingest response — delivery
     // is best-effort and must never fail or slow down an event write.
@@ -390,7 +397,8 @@ export class EventsService {
 
     return {
       accepted: true,
-      eventId
+      eventId,
+      ...(consumption.warningThreshold ? { usageWarningPercentage: consumption.warningThreshold } : {})
     };
   }
 

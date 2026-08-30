@@ -63,6 +63,7 @@ function makeService(opts: {
   });
   const projects = {
     requireActiveProject: vi.fn().mockResolvedValue(PROJECT),
+    requireWritableProject: vi.fn().mockResolvedValue(PROJECT),
     resolveActiveProject: vi.fn().mockResolvedValue(PROJECT)
   };
   const service = new FunnelsService(db as never, projects as never);
@@ -339,7 +340,7 @@ describe('FunnelsService.create', () => {
 
   it('throws for an unknown project', async () => {
     const { projects, service } = makeService();
-    projects.requireActiveProject.mockRejectedValueOnce(new NotFoundException('No project found for this account.'));
+    projects.requireWritableProject.mockRejectedValueOnce(new NotFoundException('No project found for this account.'));
     await expect(service.create(user, { name: 'X', steps: ['a', 'b'] })).rejects.toBeInstanceOf(NotFoundException);
   });
 });

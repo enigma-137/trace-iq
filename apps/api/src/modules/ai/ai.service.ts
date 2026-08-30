@@ -1,7 +1,12 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import Groq from 'groq-sdk';
 import { DashboardUser } from '../auth/auth.service';
 import { FunnelResults, FunnelsService } from '../funnels/funnels.service';
+import { appConfig } from '../../config/app.config';
+import { DatabaseService } from '../../database/database.service';
+import { EntitlementService } from '../billing/entitlement.service';
+import { UsageService } from '../billing/usage.service';
+import { ProjectsService } from '../projects/projects.service';
 
 export const AI_MODEL = 'openai/gpt-oss-120b';
 
@@ -16,7 +21,13 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private client: Groq | null | undefined;
 
-  constructor(private readonly funnels: FunnelsService) { }
+  constructor(
+    private readonly funnels: FunnelsService,
+    @Optional() private readonly projects?: ProjectsService,
+    @Optional() private readonly entitlements?: EntitlementService,
+    @Optional() private readonly usage?: UsageService,
+    @Optional() private readonly database?: DatabaseService
+  ) { }
 
   async summarizeFunnelDropOff(
     user: DashboardUser,
@@ -24,6 +35,15 @@ export class AiService {
     daysParam: string | undefined,
     projectId: string | undefined
   ): Promise<AiSummary> {
+    let organizationId: string | null = null;
+    if (appConfig.deploymentMode === 'cloud') {
+      if (!this.projects || !this.entitlements || !this.usage || !this.database) {
+        throw new ServiceUnavailableException('Cloud AI entitlements are not configured.');
+      }
+      const project = await this.projects.requireActiveProject(user, projectId);
+      organizationId = project.organizationId;
+      await this.entitlements.assertAvailable(organizationId, 'aiInsights');
+    }
     const results = await this.funnels.getResults(user, funnelId, daysParam, projectId);
 
     const insufficientData = results.steps.length < 2 || (results.steps[0]?.count ?? 0) < 5;
@@ -38,6 +58,10 @@ export class AiService {
 
     const prompt = this.buildFunnelPrompt(results);
     const summary = await this.complete(prompt);
+
+    if (organizationId && this.database && this.usage) {
+      await this.database.transaction((client) => this.usage!.consume(client, organizationId!, 'aiInsights', 1));
+    }
 
     return { summary, model: AI_MODEL, generatedAt: new Date().toISOString() };
   }

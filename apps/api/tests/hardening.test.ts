@@ -134,29 +134,21 @@ afterEach(() => {
   delete process.env.MAX_ORGANIZATION_SEATS;
 });
 
-describe('seat limits', () => {
-  it('blocks adding a member at the seat cap', async () => {
+describe('legacy deployment-wide seat limits', () => {
+  it('does not restrict self-hosted member creation', async () => {
     process.env.MAX_ORGANIZATION_SEATS = '2';
-    const { service } = makeService({ seatCount: '2' });
-
-    await expect(service.addMember(user, { userId: 'user_2', email: 'user2@example.com' })).rejects.toThrow(
-      BadRequestException
-    );
-  });
-
-  it('allows adding a member under the seat cap', async () => {
-    process.env.MAX_ORGANIZATION_SEATS = '3';
     const { service } = makeService({ seatCount: '2' });
 
     const result = await service.addMember(user, { userId: 'user_2', email: 'user2@example.com' });
     expect(result.member.userId).toBe('user_2');
   });
 
-  it('blocks creating an invite at the seat cap', async () => {
+  it('does not restrict self-hosted invitations', async () => {
     process.env.MAX_ORGANIZATION_SEATS = '2';
     const { service } = makeInvitesService({ seatCount: '2' });
 
-    await expect(service.createInvite(user, { email: 'teammate@example.com' })).rejects.toThrow(BadRequestException);
+    const result = await service.createInvite(user, { email: 'teammate@example.com' });
+    expect(result.invite.email).toBe('teammate@example.com');
   });
 
   it('is a no-op when MAX_ORGANIZATION_SEATS is unset', async () => {

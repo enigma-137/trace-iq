@@ -34,6 +34,27 @@ Do not expose this configuration through a public proxy. Use Supabase mode for s
 
 Copy `.env.example` to `.env` and replace every placeholder needed by your installation. Never commit `.env`.
 
+TraceIQ defaults to unrestricted self-hosted mode. Keep this setting for every
+Community deployment, including shared installations using Supabase Auth:
+
+```dotenv
+TRACEIQ_DEPLOYMENT_MODE=self_hosted
+```
+
+`cloud` is reserved for the TraceIQ-managed service. It enables commercial
+plan enforcement and requires complete Bachs billing configuration. Community
+installations do not need Bachs credentials and do not call Bachs.
+
+The API runs a bounded retention sweep every six hours. Self-hosted projects use
+their configured `data_retention_days`; TraceIQ Cloud uses the organization's
+plan entitlement. Set `RETENTION_SWEEP_INTERVAL_MS` to change the cadence. Event
+deletion never reduces the immutable monthly usage counters used for Cloud plan
+enforcement.
+
+In Cloud mode, active Bachs subscriptions are reconciled every six hours to
+repair missed webhook deliveries. `BILLING_RECONCILIATION_INTERVAL_MS` changes
+that cadence; webhook delivery remains the real-time path.
+
 Required for the Compose API stack:
 
 ```dotenv

@@ -107,7 +107,7 @@ export class WebhooksService {
   }
 
   async create(user: DashboardUser, body: CreateWebhookRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
 
     const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Webhook';
     const url = normalizeUrl(body.url);
@@ -127,7 +127,7 @@ export class WebhooksService {
   }
 
   async update(user: DashboardUser, id: string, body: UpdateWebhookRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const current = await this.database.query<WebhookRow>(`SELECT * FROM webhooks WHERE id = $1 AND project_id = $2`, [
       id,
       project.id
@@ -156,7 +156,7 @@ export class WebhooksService {
   }
 
   async remove(user: DashboardUser, id: string, projectId?: string) {
-    const project = await this.projects.requireActiveProject(user, projectId);
+    const project = await this.projects.requireWritableProject(user, projectId);
     const result = await this.database.query(`DELETE FROM webhooks WHERE id = $1 AND project_id = $2`, [id, project.id]);
     if (result.rowCount === 0) throw new NotFoundException('Webhook not found.');
     this.cache.delete(project.id);

@@ -38,7 +38,7 @@ export class GoalsService {
   }
 
   async create(user: DashboardUser, body: CreateGoalRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const name = this.required(body.name, 'Goal name');
     const target = this.required(body.target, 'Goal target');
     const type = body.type === 'page' || body.type === 'event' ? body.type : null;

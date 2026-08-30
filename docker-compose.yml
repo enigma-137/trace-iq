@@ -23,6 +23,7 @@ services:
       - redis
     environment:
       NODE_ENV: production
+      TRACEIQ_DEPLOYMENT_MODE: ${TRACEIQ_DEPLOYMENT_MODE:-self_hosted}
       API_PORT: 4000
       DATABASE_URL: ${VPS_DATABASE_URL}
       DATABASE_SSL: "false"

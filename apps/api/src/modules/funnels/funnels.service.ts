@@ -113,7 +113,7 @@ export class FunnelsService {
   ) {}
 
   async create(user: DashboardUser, body: CreateFunnelRequest): Promise<FunnelDetail> {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const name = this.requiredString(body.name, 'name');
     const steps = this.normalizeSteps(body.steps);
 
@@ -138,7 +138,7 @@ export class FunnelsService {
   }
 
   async update(user: DashboardUser, funnelId: string, body: CreateFunnelRequest): Promise<FunnelDetail> {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     await this.loadFunnel(project.id, funnelId);
     const name = this.requiredString(body.name, 'name');
     const steps = this.normalizeSteps(body.steps);

@@ -202,7 +202,7 @@ export class DashboardsService {
   }
 
   async create(user: DashboardUser, body: CreateDashboardRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
       throw new BadRequestException('Dashboard name is required.');
@@ -222,7 +222,7 @@ export class DashboardsService {
   }
 
   async update(user: DashboardUser, id: string, body: UpdateDashboardRequest) {
-    const project = await this.projects.requireActiveProject(user, body.projectId);
+    const project = await this.projects.requireWritableProject(user, body.projectId);
     const existing = await this.database.query<DashboardRow>(
       `
         SELECT id, name, owner_id AS "ownerId", is_shared AS "isShared",

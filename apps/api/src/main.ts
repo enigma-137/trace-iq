@@ -53,7 +53,14 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  app.use(json({ limit: MAX_BODY_BYTES }));
+  app.use(json({
+    limit: MAX_BODY_BYTES,
+    verify: (request, _response, buffer) => {
+      // Bachs signs the exact request bytes. Preserve them before Express parses
+      // JSON; re-serializing the object would invalidate the signature.
+      (request as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    }
+  }));
 
   // CORS is path-aware: ingestion endpoints stay open for browser SDKs running
   // on any customer site, while dashboard/setup APIs are restricted to the
