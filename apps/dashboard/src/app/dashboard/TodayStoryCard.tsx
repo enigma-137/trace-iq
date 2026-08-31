@@ -165,10 +165,10 @@ function FactChip({
   title?: string;
 }) {
   const tones = {
-    blue: 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/15 dark:text-blue-300',
-    green: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-300',
-    red: 'border-red-500/20 bg-red-500/10 text-red-700 dark:border-red-400/30 dark:bg-red-400/15 dark:text-red-300',
-    neutral: 'border-neutral-300 bg-neutral-100 text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'
+    blue: 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white',
+    green: 'border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500 dark:text-white',
+    red: 'border-red-600 bg-red-600 text-white dark:border-red-500 dark:bg-red-500 dark:text-white',
+    neutral: 'border-neutral-400 bg-neutral-800 text-white dark:border-neutral-600 dark:bg-neutral-100 dark:text-neutral-900'
   };
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`} title={title}>

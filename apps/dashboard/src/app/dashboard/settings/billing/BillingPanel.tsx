@@ -142,7 +142,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       <div className="rounded-xl border border-neutral-200 p-5 dark:border-slate-800">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div><h3 className="font-semibold text-neutral-900 dark:text-white">Current usage</h3><p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">Usage and capacity for the active organization.</p></div>
-          <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold uppercase text-neutral-600 dark:bg-slate-900 dark:text-slate-300">{entitlements.plan}</span>
+          <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold uppercase text-white">{entitlements.plan}</span>
         </div>
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <UsageMeter label="Events this month" value={entitlements.usage.events} limit={entitlements.limits.events} />
@@ -203,7 +203,7 @@ function percentage(value: number, limit: number | null) {
 
 function PlanCard({ name, price, description, features, current, actions }: { name: string; price: string; description: string; features: string[]; current: boolean; actions?: React.ReactNode }) {
   return <article className={`rounded-xl border p-5 ${current ? 'border-blue-500 ring-1 ring-blue-500' : 'border-neutral-200 dark:border-slate-800'}`}>
-    <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{name}</h3><p className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">{price}</p></div>{current ? <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">Current plan</span> : null}</div>
+    <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{name}</h3><p className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">{price}</p></div>{current ?             <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">Current plan</span> : null}</div>
     <p className="mt-3 text-sm text-neutral-500 dark:text-slate-400">{description}</p>
     <ul className="my-5 grid gap-2 text-sm text-neutral-700 dark:text-slate-300">{features.map((feature) => <li key={feature} className="flex items-center gap-2"><Check className="size-4 text-blue-600" />{feature}</li>)}</ul>
     {actions}
