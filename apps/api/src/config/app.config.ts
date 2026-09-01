@@ -1,4 +1,5 @@
 export type DeploymentMode = 'self_hosted' | 'cloud';
+export type ReplayStorageDriver = 'filesystem' | 'supabase';
 export type BachsEnvironment = 'sandbox' | 'production';
 
 export interface BachsConfig {
@@ -16,6 +17,7 @@ export interface AppConfig {
   environment: string;
   port: number;
   deploymentMode: DeploymentMode;
+  replayStorageDriver: ReplayStorageDriver;
   bachs: BachsConfig | null;
 }
 
@@ -26,8 +28,21 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     environment: env.NODE_ENV ?? 'development',
     port: parsePort(env.API_PORT),
     deploymentMode,
+    replayStorageDriver: parseReplayStorageDriver(env.REPLAY_STORAGE_DRIVER, deploymentMode),
     bachs: deploymentMode === 'cloud' ? parseBachsConfig(env) : null
   };
+}
+
+export function parseReplayStorageDriver(
+  value: string | undefined,
+  deploymentMode: DeploymentMode
+): ReplayStorageDriver {
+  const normalized = value?.trim().toLowerCase()
+    || (deploymentMode === 'cloud' ? 'supabase' : 'filesystem');
+  if (normalized !== 'filesystem' && normalized !== 'supabase') {
+    throw new Error('REPLAY_STORAGE_DRIVER must be either "filesystem" or "supabase".');
+  }
+  return normalized;
 }
 
 function parseDeploymentMode(value: string | undefined): DeploymentMode {

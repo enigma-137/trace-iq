@@ -45,6 +45,36 @@ TRACEIQ_DEPLOYMENT_MODE=self_hosted
 plan enforcement and requires complete Bachs billing configuration. Community
 installations do not need Bachs credentials and do not call Bachs.
 
+### Session Replay storage
+
+Choose replay object storage independently from the deployment mode:
+
+```dotenv
+# Self-hosted and local development
+REPLAY_STORAGE_DRIVER=filesystem
+TRACEIQ_REPLAY_STORAGE_DIR=/var/lib/traceiq/session-replays
+```
+
+The filesystem driver is the self-hosted/local default and does not require any
+Supabase replay credential. Persist the directory and grant the API process
+read/write access.
+
+TraceIQ Cloud defaults to the Supabase driver. Configure it explicitly before
+enabling replay for any project:
+
+```dotenv
+REPLAY_STORAGE_DRIVER=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+REPLAY_STORAGE_BUCKET=session-replays
+```
+
+Keep `SUPABASE_SERVICE_ROLE_KEY` on the API process only; never use a
+`NEXT_PUBLIC_*` variable for it. The bucket must already exist and remain
+private. Starting the API with replay disabled does not initialize this backend.
+Missing values produce a configuration error when replay is enabled or an
+enabled project first requests an upload grant.
+
 The API runs a bounded retention sweep every six hours. Self-hosted projects use
 their configured `data_retention_days`; TraceIQ Cloud uses the organization's
 plan entitlement. Set `RETENTION_SWEEP_INTERVAL_MS` to change the cadence. Event

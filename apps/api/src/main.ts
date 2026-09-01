@@ -11,7 +11,10 @@ const MAX_BODY_BYTES = 1_048_576;
 
 // Paths the browser SDKs call directly with the project write key. These must
 // accept requests from any customer origin, so CORS stays open for them.
-const PUBLIC_INGEST_PATHS = ['/v1/events', '/v1/events/batch', '/v1/flags/evaluate'];
+const PUBLIC_INGEST_PATHS = [
+  '/v1/events', '/v1/events/batch', '/v1/flags/evaluate',
+  '/v1/replays/config', '/v1/replays/authorize', '/v1/replays/chunks', '/v1/replays/complete'
+];
 
 function setSecurityHeaders(_req: Request, res: Response, next: NextFunction) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -75,7 +78,7 @@ async function bootstrap() {
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     const corsMiddleware = isIngestPath(req.path)
-      ? cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-traceiq-write-key'], maxAge: 86400 })
+      ? cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-traceiq-write-key', 'x-traceiq-replay-token'], maxAge: 86400 })
       : cors({ origin: corsOrigins, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'x-traceiq-write-key'], maxAge: 86400 });
     corsMiddleware(req, res, next);
   });

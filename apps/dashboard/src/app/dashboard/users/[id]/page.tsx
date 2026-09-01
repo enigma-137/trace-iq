@@ -30,18 +30,18 @@ interface TimelineResponse {
   }>;
 }
 
-export default async function UserProfilePage({ params }: { params: { id: string } }) {
+export default async function UserProfilePage({ params, searchParams }: { params: { id: string }; searchParams: { projectId?: string } }) {
   const { user, token } = await requireDashboardSession(`/dashboard/users/${params.id}`);
   const [{ data: profile, error: profileError }, { data: timeline }] = await Promise.all([
-    dashboardGet<PersonProfile>(`/v1/dashboard/users/${params.id}`, token),
-    dashboardGet<TimelineResponse>(`/v1/dashboard/users/${params.id}/timeline?limit=100`, token)
+    dashboardGet<PersonProfile>(`/v1/dashboard/users/${params.id}${searchParams.projectId ? `?projectId=${encodeURIComponent(searchParams.projectId)}` : ''}`, token),
+    dashboardGet<TimelineResponse>(`/v1/dashboard/users/${params.id}/timeline?limit=100${searchParams.projectId ? `&projectId=${encodeURIComponent(searchParams.projectId)}` : ''}`, token)
   ]);
 
   const items = timeline?.items ?? [];
   const traitEntries = profile ? Object.entries(profile.traits ?? {}) : [];
 
   return (
-    <DashboardShell active="users" title="User timeline" userEmail={user.email}>
+    <DashboardShell active="users" title="User timeline" userEmail={user.email} projectId={searchParams.projectId}>
       <div className="mb-4">
         <Link href="/dashboard/users" className="text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white">
           ← All users
@@ -102,6 +102,7 @@ export default async function UserProfilePage({ params }: { params: { id: string
                 <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-neutral-900 dark:bg-white" />
                 <p className="font-mono text-sm font-semibold text-neutral-900 dark:text-white">{item.eventName}</p>
                 <p className="text-xs text-neutral-500 dark:text-slate-500">{formatDateTime(item.occurredAt)}</p>
+                {item.sessionId ? <Link className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:underline" href={`/dashboard/replays?sessionId=${encodeURIComponent(item.sessionId)}${searchParams.projectId ? `&projectId=${encodeURIComponent(searchParams.projectId)}` : ''}`}>Watch replay</Link> : null}
                 {item.properties && Object.keys(item.properties).length > 0 ? (
                   <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
                     <code>{JSON.stringify(item.properties, null, 2)}</code>

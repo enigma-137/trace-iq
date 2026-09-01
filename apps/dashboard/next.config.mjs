@@ -31,6 +31,28 @@ const nextConfig = {
             ].join('; ')
           }
         ]
+      },
+      {
+        source: '/dashboard/replays/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "media-src data: blob:",
+              "font-src 'self' data:",
+              "connect-src 'self' https: http://localhost:* ws: wss:",
+              "object-src 'none'",
+              "frame-src 'self' data: blob:",
+              "frame-ancestors 'none'",
+              "base-uri 'none'",
+              "form-action 'none'"
+            ].join('; ')
+          }
+        ]
       }
     ];
   }

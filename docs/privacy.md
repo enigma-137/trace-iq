@@ -37,7 +37,7 @@ Do not place secrets, passwords, access tokens, complete payment-card data, or u
 
 ## Current controls and limitations
 
-TraceIQ currently provides project isolation, write-key authentication, dashboard authorization, self-hosted storage, and data export. The schema includes a project retention setting, but automatic retention enforcement is not currently implemented. A complete end-user access, correction, deletion, consent-management, IP-anonymization, and global-privacy-control workflow is also not yet provided.
+TraceIQ provides project isolation, write-key authentication, dashboard authorization, event retention enforcement, self-hosted storage, and data export. Session Replay adds a separate retention/deletion worker, conservative masking, server-side replay sanitization, and SDK consent primitives; see [Session Replay](./session-replay.md). Customers must still connect those primitives to their own consent and data-subject workflows. A complete universal end-user access, correction, consent-management, IP-anonymization, and global-privacy-control workflow is not provided.
 
 Operators should establish their own procedures for:
 

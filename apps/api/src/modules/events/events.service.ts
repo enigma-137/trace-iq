@@ -16,7 +16,7 @@ export interface IngestMeta {
   headers?: Record<string, string | undefined>;
 }
 
-interface WriteKeyRecord {
+export interface WriteKeyRecord {
   [column: string]: unknown;
   project_id: string;
   organization_id: string;
@@ -602,6 +602,11 @@ export class EventsService {
         `UPDATE sessions SET user_id = $3 WHERE project_id = $1 AND anonymous_id = $2 AND user_id IS NULL`,
         [projectId, anonymousId, userId]
       );
+      await client.query(
+        `UPDATE session_replays SET user_id = $3, updated_at = now()
+          WHERE project_id = $1 AND anonymous_id = $2 AND user_id IS NULL AND deleted_at IS NULL`,
+        [projectId, anonymousId, userId]
+      );
     });
 
     // Remember the pairing so later events skip straight past this. Bounded so a
@@ -628,6 +633,19 @@ export class EventsService {
           AND s.id = e.session_id
           AND s.user_id IS NOT NULL
           AND s.anonymous_id = e.anonymous_id`,
+      [projectId, sessionIds]
+    );
+    await this.database.query(
+      `UPDATE session_replays r
+        SET user_id = s.user_id, updated_at = now()
+        FROM sessions s
+        WHERE r.project_id = $1
+          AND r.session_id = ANY($2)
+          AND r.user_id IS NULL
+          AND r.session_id = s.id
+          AND r.project_id = s.project_id
+          AND s.user_id IS NOT NULL
+          AND r.deleted_at IS NULL`,
       [projectId, sessionIds]
     );
   }

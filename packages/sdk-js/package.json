@@ -12,13 +12,18 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "files": [
     "dist",
     "README.md"
   ],
   "dependencies": {
+    "@rrweb/record": "^2.1.1",
     "web-vitals": "^6.2.1"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
   }
 }

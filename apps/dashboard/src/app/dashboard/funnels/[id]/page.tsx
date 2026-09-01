@@ -244,12 +244,14 @@ function StepUsersPanel({ data, funnelId, days }: { data: StepUsersResponse; fun
                 <span className="shrink-0 text-xs text-neutral-500 dark:text-slate-400">{formatDate(person.lastSeenAt)}</span>
               </div>
             );
-            return person.identified && person.userId ? (
-              <Link key={person.actor} href={`/dashboard/users/${person.userId}`} className="block transition hover:bg-neutral-50 dark:hover:bg-slate-900/40">
-                {row}
-              </Link>
-            ) : (
-              <div key={person.actor}>{row}</div>
+            const replayFilter = person.userId
+              ? `userId=${encodeURIComponent(person.userId)}`
+              : `anonymousId=${encodeURIComponent(person.anonymousId ?? person.actor)}`;
+            return (
+              <div key={person.actor} className="flex items-center transition hover:bg-neutral-50 dark:hover:bg-slate-900/40">
+                {person.identified && person.userId ? <Link href={`/dashboard/users/${person.userId}`} className="min-w-0 flex-1">{row}</Link> : <div className="min-w-0 flex-1">{row}</div>}
+                <Link href={`/dashboard/replays?${replayFilter}`} className="mr-5 shrink-0 text-xs font-semibold text-blue-600 hover:underline">Watch related replays</Link>
+              </div>
             );
           })}
         </div>

@@ -1,5 +1,6 @@
 import type { TraceIQClient, TraceIQFeatureFlags, TraceIQGroup, TraceIQIdentity, TraceIQInitOptions } from '../types';
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type MetricType } from 'web-vitals';
+import { ReplayRecorder } from './replay';
 
 const DEFAULT_ENDPOINT = 'http://localhost:4000';
 const ANONYMOUS_ID_STORAGE_KEY = 'traceiq.anonymousId';
@@ -20,6 +21,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private featureFlags: Record<string, boolean> = {};
   private featureFlagPayloads: Record<string, unknown> = {};
   private featureFlagsLoaded = false;
+  private replayConsentGranted = false;
+  private replayRecorder?: ReplayRecorder;
 
   initialize(options: TraceIQInitOptions): void {
     this.options = {
@@ -28,6 +31,20 @@ export class BrowserTraceIQClient implements TraceIQClient {
     };
     this.anonymousId = this.loadOrCreateId('localStorage', ANONYMOUS_ID_STORAGE_KEY, 'anon');
     this.sessionId = this.loadOrCreateId('sessionStorage', SESSION_ID_STORAGE_KEY, 'sess');
+
+    if (options.replay?.enabled === true || options.enableReplay === true) {
+      this.replayRecorder = new ReplayRecorder(
+        this.options.endpoint ?? DEFAULT_ENDPOINT,
+        { ...options.replay, enabled: true },
+        () => this.options && this.sessionId ? {
+          projectId: this.options.projectId, writeKey: this.options.writeKey, sessionId: this.sessionId,
+          anonymousId: this.anonymousId, userId: this.identity?.userId
+        } : undefined,
+        () => this.replayConsentGranted,
+        (message, error) => this.debug(message, error)
+      );
+      void this.startReplay();
+    }
 
     if (options.autoCaptureExceptions !== false) {
       this.installErrorHandlers();
@@ -333,6 +350,26 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
   get initialized(): boolean {
     return Boolean(this.options);
+  }
+
+  grantReplayConsent(): void {
+    this.replayConsentGranted = true;
+    void this.replayRecorder?.grantConsent();
+  }
+
+  revokeReplayConsent(): void {
+    this.replayConsentGranted = false;
+    // Already-uploaded chunks follow project retention or can be deleted through
+    // TraceIQ's replay/data-subject deletion APIs. Unsent data is discarded.
+    this.replayRecorder?.revokeConsent();
+  }
+
+  startReplay(): Promise<boolean> {
+    return this.replayRecorder?.start() ?? Promise.resolve(false);
+  }
+
+  stopReplay(): void {
+    this.replayRecorder?.stop();
   }
 
   private async sendEvent(eventName: string, properties: Record<string, unknown>): Promise<void> {

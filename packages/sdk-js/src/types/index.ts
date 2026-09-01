@@ -13,8 +13,25 @@ export interface TraceIQInitOptions {
    * enabling it records every non-TraceIQ request the page makes.
    */
   autoCaptureRequests?: boolean;
+  /** @deprecated Use replay.enabled. */
   enableReplay?: boolean;
+  replay?: TraceIQReplayOptions;
   debug?: boolean;
+}
+
+export type TraceIQReplayPrivacyMode = 'strict' | 'balanced' | 'custom';
+
+export interface TraceIQReplayOptions {
+  /** Replay stays off unless explicitly enabled here and in project settings. */
+  enabled?: boolean;
+  /** Require grantReplayConsent() before rrweb is imported or started. */
+  requireConsent?: boolean;
+  /** Optional client-side ceiling; the server project/entitlement rate remains authoritative. */
+  sampleRate?: number;
+  /** Additional selectors. TraceIQ's built-in credential/payment blocks cannot be removed. */
+  maskSelectors?: string[];
+  blockSelectors?: string[];
+  ignoreSelectors?: string[];
 }
 
 export interface TraceIQIdentity {
@@ -49,4 +66,8 @@ export interface TraceIQClient {
   isFeatureEnabled(key: string): boolean;
   /** Remote-config payload for a flag, or undefined when off / not loaded / no payload. */
   getFeatureFlagPayload(key: string): unknown;
+  grantReplayConsent(): void;
+  revokeReplayConsent(): void;
+  startReplay(): Promise<boolean>;
+  stopReplay(): void;
 }

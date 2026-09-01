@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadAppConfig } from '../src/config/app.config';
+import { loadAppConfig, parseReplayStorageDriver } from '../src/config/app.config';
 import { CLOUD_BILLING_POLICY, CLOUD_PLAN_CATALOG, SELF_HOSTED_POLICY } from '../src/modules/billing/plan-catalog';
 
 describe('canonical plan catalogue', () => {
@@ -29,7 +29,17 @@ describe('canonical plan catalogue', () => {
 
 describe('deployment configuration', () => {
   it('defaults to unrestricted self-hosted mode without Bachs', () => {
-    expect(loadAppConfig({})).toMatchObject({ deploymentMode: 'self_hosted', bachs: null, port: 4000 });
+    expect(loadAppConfig({})).toMatchObject({
+      deploymentMode: 'self_hosted', replayStorageDriver: 'filesystem', bachs: null, port: 4000
+    });
+  });
+
+  it('defaults replay storage by deployment mode and accepts explicit overrides', () => {
+    expect(parseReplayStorageDriver(undefined, 'self_hosted')).toBe('filesystem');
+    expect(parseReplayStorageDriver(undefined, 'cloud')).toBe('supabase');
+    expect(parseReplayStorageDriver('supabase', 'self_hosted')).toBe('supabase');
+    expect(parseReplayStorageDriver('filesystem', 'cloud')).toBe('filesystem');
+    expect(() => parseReplayStorageDriver('s3', 'self_hosted')).toThrow('REPLAY_STORAGE_DRIVER');
   });
 
   it('ignores incomplete Bachs values in self-hosted mode', () => {
@@ -51,6 +61,7 @@ describe('deployment configuration', () => {
       apiBaseUrl: 'https://sandbox-api.bachs.io',
       products: { proMonthly: 'prod_monthly', proYearly: 'prod_yearly' }
     });
+    expect(config.replayStorageDriver).toBe('supabase');
   });
 
   it('rejects incomplete cloud configuration', () => {

@@ -8,6 +8,24 @@ TraceIQ helps you capture product analytics, user events, feature-flag usage, an
 npm install traceiq-sdk-js
 ```
 
+## Session Replay
+
+Replay is off by default. Enabling it in SDK code is only an opt-in request; the server-side project setting and entitlement remain authoritative. With consent required, rrweb is dynamically imported only after consent is granted.
+
+```ts
+traceiq.initialize({
+  projectId: 'proj_...',
+  writeKey: 'trq_...',
+  replay: { enabled: true, requireConsent: true }
+});
+
+// Wire these primitives to your existing CMP or consent UI.
+traceiq.grantReplayConsent();
+traceiq.revokeReplayConsent();
+```
+
+Use `data-traceiq-mask` and `data-traceiq-block` for application-specific privacy controls. `data-traceiq-ignore` suppresses interaction events only; it is not a privacy control. All inputs and known credential/payment fields retain permanent conservative handling. Every iframe is blocked unless a reviewed same-origin iframe has `data-traceiq-allow-replay="true"`; cross-origin and detected authentication/payment frame content remains disabled. Revocation aborts in-flight requests and discards unsent replay events; previously committed chunks remain until retention or authorized deletion.
+
 ## Quick start
 
 ```ts

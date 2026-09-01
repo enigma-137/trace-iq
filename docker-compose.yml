@@ -31,6 +31,12 @@ services:
 
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      REPLAY_STORAGE_DRIVER: ${REPLAY_STORAGE_DRIVER:-}
+      REPLAY_STORAGE_BUCKET: ${REPLAY_STORAGE_BUCKET:-}
+      TRACEIQ_REPLAY_STORAGE_DIR: ${TRACEIQ_REPLAY_STORAGE_DIR:-/var/lib/traceiq/session-replays}
+      REPLAY_UPLOAD_TOKEN_SECRET: ${REPLAY_UPLOAD_TOKEN_SECRET:-}
 
       GROQ_API_KEY: ${GROQ_API_KEY}
 
@@ -51,6 +57,9 @@ services:
       NEXT_PUBLIC_API_URL: https://api.traceiq.run
     ports:
       - "127.0.0.1:4000:4000"
+    volumes:
+      - replay_data:/var/lib/traceiq/session-replays
 
 volumes:
   postgres_data:
+  replay_data:
