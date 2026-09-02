@@ -30,7 +30,8 @@ function makeService(inserted = true) {
   const bachs = {
     createCheckout: vi.fn().mockResolvedValue({ checkout_id: 'chk_1', checkout_url: 'https://checkout.bachs.io/c/test' }),
     createPortalSession: vi.fn(),
-    getSubscription: vi.fn()
+    getSubscription: vi.fn(),
+    updateSubscription: vi.fn()
   };
   return { service: new BillingService(database as never, bachs as never, cloudConfig), database, bachs, query };
 }
@@ -65,6 +66,76 @@ describe('Bachs billing integration', () => {
       success_url: expect.stringContaining('/billing/success?projectId=proj_1'),
       metadata: { organization_id: 'org_1', plan_key: 'pro', billing_period: 'yearly' }
     }));
+  });
+
+  it('rejects a second checkout while an organization has a nonterminal subscription', async () => {
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT 1 FROM subscriptions')
+      ? queryResult(1, [{ exists: 1 }]) : queryResult());
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn() };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await expect(service.createCheckout({
+      organizationId: 'org_1', projectId: 'proj_1', email: 'owner@example.com', billingPeriod: 'yearly'
+    })).rejects.toThrow(/already has a Bachs subscription/);
+    expect(bachs.createCheckout).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock(hashtext($1))', ['org_1:billingSubscriptionChange']);
+  });
+
+  it('upgrades monthly Pro in place with immediate proration and no second checkout', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT id,provider_subscription_id')) return queryResult(1, [{
+        id: 'sub_local', provider_subscription_id: 'sub_bachs_1', provider_product_id: 'prod_monthly',
+        billing_period: 'monthly', status: 'active'
+      }]);
+      return queryResult();
+    });
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = {
+      createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(),
+      updateSubscription: vi.fn().mockResolvedValue({
+        ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00',
+        metadata: { organization_id: 'org_1' }
+      })
+    };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await expect(service.upgradeToYearly('org_1')).resolves.toMatchObject({
+      changed: true, billingPeriod: 'yearly', subscriptionStatus: 'active'
+    });
+    expect(bachs.updateSubscription).toHaveBeenCalledWith(
+      'sub_bachs_1',
+      { product_id: 'prod_yearly', proration_behavior: 'invoice_now' },
+      'traceiq:sub_bachs_1:pro-yearly'
+    );
+    expect(bachs.createCheckout).not.toHaveBeenCalled();
+    const upsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(upsert?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '190.00']));
+  });
+
+  it('treats an already-yearly upgrade as idempotent without calling Bachs', async () => {
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT id,provider_subscription_id')
+      ? queryResult(1, [{
+        id: 'sub_local', provider_subscription_id: 'sub_bachs_1', provider_product_id: 'prod_yearly',
+        billing_period: 'yearly', status: 'active'
+      }]) : queryResult());
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn() };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await expect(service.upgradeToYearly('org_1')).resolves.toEqual({
+      changed: false, billingPeriod: 'yearly', subscriptionStatus: 'active'
+    });
+    expect(bachs.updateSubscription).not.toHaveBeenCalled();
   });
 
   it('uses the public API relay when the billing dashboard returns to localhost', async () => {
@@ -126,13 +197,118 @@ describe('Bachs billing integration', () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO billing_customers'))).toBe(true);
     const subscriptionCall = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
     expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['org_1', 'sub_bachs_1', 'prod_monthly', 'active']));
+    expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['monthly']));
     expect(String(subscriptionCall?.[0])).toContain('COALESCE(subscriptions.grace_period_ends_at');
+    expect(String(subscriptionCall?.[0])).toContain('subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at');
+  });
+
+  it('persists yearly interval from the provider product rather than plan_key', async () => {
+    const { service, query } = makeService();
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_yearly',
+      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+    });
+    const subscriptionCall = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '190.00']));
+  });
+
+  it('preserves a seven-day payment-failure grace deadline and clears it on recovery', async () => {
+    const { service, query } = makeService();
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_payment_failed',
+      created_at: '2026-09-01T08:00:00Z',
+      data: { ...subscriptionEvent.data, status: 'past_due' }
+    });
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_payment_recovered',
+      created_at: '2026-09-03T08:00:00Z',
+      data: { ...subscriptionEvent.data, status: 'active' }
+    });
+
+    const upserts = query.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(upserts[0][1]?.[12]).toBe('2026-09-08T08:00:00.000Z');
+    expect(upserts[1][1]?.[12]).toBeNull();
+    expect(String(upserts[0][0])).toContain('COALESCE(subscriptions.grace_period_ends_at');
+    expect(String(upserts[1][0])).toContain('ELSE NULL');
+  });
+
+  it('keeps period-end cancellations active until Bachs sends the terminal canceled state', async () => {
+    const { service, query } = makeService();
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_cancel_scheduled',
+      data: { ...subscriptionEvent.data, status: 'active', cancel_at_period_end: true }
+    });
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_cancel_effective',
+      created_at: '2026-09-30T08:00:00Z',
+      data: {
+        ...subscriptionEvent.data, status: 'canceled', cancel_at_period_end: true,
+        canceled_at: '2026-09-30T08:00:00Z'
+      }
+    });
+
+    const upserts = query.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(upserts[0][1]).toEqual(expect.arrayContaining(['active', true]));
+    expect(upserts[1][1]).toEqual(expect.arrayContaining(['canceled', '2026-09-30T08:00:00Z']));
   });
 
   it('acknowledges duplicate provider events without applying them twice', async () => {
     const { service, query } = makeService(false);
     expect(await service.processWebhook(subscriptionEvent)).toEqual({ processed: false, duplicate: true });
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
+  });
+
+  it('does not let out-of-order subscription or checkout events replace newer subscription state', async () => {
+    let stored = { createdAt: '', productId: '' };
+    const query = vi.fn(async (sql: string, values?: unknown[]) => {
+      if (sql.includes('INSERT INTO billing_webhook_events')) return queryResult(1);
+      if (sql.includes('SELECT organization_id FROM billing_checkout_sessions')) {
+        return queryResult(1, [{ organization_id: 'org_1' }]);
+      }
+      if (sql.includes('UPDATE billing_checkout_sessions')) return queryResult(1, [{ organization_id: 'org_1' }]);
+      if (sql.includes('INSERT INTO subscriptions')) {
+        expect(sql).toContain('subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at');
+        const createdAt = String(values?.[13]);
+        if (!stored.createdAt || stored.createdAt <= createdAt) {
+          stored = { createdAt, productId: String(values?.[3]) };
+        }
+      }
+      return queryResult();
+    });
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = {
+      createCheckout: vi.fn(), createPortalSession: vi.fn(), updateSubscription: vi.fn(),
+      getSubscription: vi.fn().mockResolvedValue({
+        ...subscriptionEvent.data, product_id: 'prod_monthly', metadata: { organization_id: 'org_1' }
+      })
+    };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_newer_yearly',
+      created_at: '2026-09-02T12:00:00Z',
+      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+    });
+    await service.processWebhook({
+      id: 'evt_older_checkout', type: 'checkout.completed', created_at: '2026-09-02T11:00:00Z',
+      data: {
+        checkout_id: 'chk_old', status: 'completed', payment_status: 'paid',
+        customer: { customer_id: 'cust_1', email: 'owner@example.com' },
+        subscription: { subscription_id: 'sub_bachs_1' },
+        metadata: { organization_id: 'org_1', plan_key: 'pro', billing_period: 'monthly' }
+      }
+    });
+
+    expect(stored).toEqual({ createdAt: '2026-09-02T12:00:00Z', productId: 'prod_yearly' });
   });
 
   it('maps checkout.completed metadata to the organization and provisions its subscription', async () => {

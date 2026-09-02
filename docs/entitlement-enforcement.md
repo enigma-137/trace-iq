@@ -10,7 +10,7 @@ The browser is never authoritative for billing. Cloud plan state is resolved fro
 | AI insights | `AiService` reserves usage before calling the model provider. | `UsageService.consume` locks `organization:aiInsights` and increments atomically, preventing concurrent paid model calls from crossing quota. |
 | Retention | Migration `0027_event_retention_access_policy.sql` applies a forced PostgreSQL row-level SELECT policy to `events`. | Cloud connections receive a server-controlled deployment-mode setting. Old rows are invisible at query time even before `RetentionService` physically deletes them. Self-hosted connections bypass the policy. |
 | Public dashboards | Allowed on both plans by the canonical plan catalogue. | Public queries use the same database connection and therefore the same retention policy. |
-| Bachs subscription | Webhook state is persisted in `subscriptions`; checkout metadata is mapped server-side. | Provider events are idempotent. The first `past_due` grace deadline is preserved rather than extended by later events. |
+| Bachs subscription | Webhook state, provider product, and `monthly`/`yearly` billing period are persisted in `subscriptions`; checkout metadata is mapped server-side. | Provider events are idempotent and ordered by provider event time. The first `past_due` grace deadline is preserved rather than extended by later events. |
 
 Count limits are checked immediately before writes inside the same transaction. Database advisory locks are used instead of process-local locks, so the guarantees hold across multiple API replicas and direct API/SDK/curl requests.
 
@@ -19,4 +19,24 @@ Count limits are checked immediately before writes inside the same transaction. 
 1. Apply migrations through `0027` to the target database.
 2. Set `TRACEIQ_DEPLOYMENT_MODE=cloud` only for TraceIQ Cloud API processes.
 3. Verify the Bachs webhook rows and resulting subscription in the same database used by the API.
+
+## Billing periods and plan changes
+
+Both paid products map to the internal `pro` plan. The billing period is never
+inferred from `plan_key`; it is mapped from the allowlisted Bachs product ID and
+persisted as `subscriptions.billing_period`.
+
+- Monthly Pro is `$19/month`.
+- Yearly Pro is `$190/year`.
+- A monthly-to-yearly change updates the existing Bachs subscription with
+  `PATCH /v1/subscriptions/{id}` using the yearly `product_id` and
+  `proration_behavior=invoice_now`.
+- TraceIQ never creates a second checkout/subscription for that change. An
+  organization-scoped transaction lock, a stable provider idempotency key, and
+  a partial unique database index prevent overlapping nonterminal Bachs
+  subscriptions.
+
+Bachs applies the product change immediately and generates the proration invoice
+for the current period. Subsequent webhook delivery remains authoritative and
+periodic reconciliation repairs a missed webhook.
 4. Exercise Free, Pro, past-due grace and downgrade flows before replacing sandbox credentials.

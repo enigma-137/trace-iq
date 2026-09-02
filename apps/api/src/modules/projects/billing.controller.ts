@@ -42,6 +42,17 @@ export class BillingController {
     return this.billing.createPortal(project.organizationId);
   }
 
+  @Post('upgrade-yearly')
+  async upgradeYearly(
+    @Body() body: { projectId?: string },
+    @Headers('authorization') authorization?: string
+  ) {
+    const user = await this.auth.getDashboardUser(authorization);
+    this.auth.requireSupabaseSession(user);
+    const project = await this.requireBillingManager(user, body.projectId);
+    return this.billing.upgradeToYearly(project.organizationId);
+  }
+
   private async requireBillingManager(user: Awaited<ReturnType<AuthService['getDashboardUser']>>, projectId?: string) {
     const project = await this.projects.requireActiveProject(user, projectId);
     if (project.role !== 'owner' && project.role !== 'admin') {

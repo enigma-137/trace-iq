@@ -1,5 +1,6 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { QueryResultRow } from 'pg';
 import { appConfig } from '../../config/app.config';
 import { DatabaseService, QueryExecutor } from '../../database/database.service';
 import { CLOUD_BILLING_POLICY } from './plan-catalog';
@@ -19,6 +20,16 @@ interface BachsCheckoutCompleted {
   customer: { customer_id: string; email?: string } | null;
   subscription: { subscription_id: string } | null;
   metadata?: Record<string, unknown>;
+}
+
+type BillingPeriod = 'monthly' | 'yearly';
+
+interface SubscriptionRow extends QueryResultRow {
+  id: string;
+  provider_subscription_id: string;
+  provider_product_id: string | null;
+  billing_period: BillingPeriod | null;
+  status: string;
 }
 
 @Injectable()
@@ -45,33 +56,94 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     if (this.reconciliationTimer) clearInterval(this.reconciliationTimer);
   }
 
-  async createCheckout(input: { organizationId: string; projectId: string; email: string; billingPeriod: 'monthly' | 'yearly' }) {
+  async createCheckout(input: { organizationId: string; projectId: string; email: string; billingPeriod: BillingPeriod }) {
     this.requireCloud();
     const productId = input.billingPeriod === 'yearly'
       ? this.config.bachs!.products.proYearly : this.config.bachs!.products.proMonthly;
     const { successUrl, cancelUrl } = this.checkoutReturnUrls(input.projectId);
-    const checkout = await this.bachs.createCheckout({
-      product_cart: [{ product_id: productId, quantity: 1 }],
-      billing_currency: 'USD',
-      // Bachs requires both fields when checkout creates a new customer. TraceIQ
-      // currently stores only the authenticated email, so use its local part as
-      // a stable, non-sensitive display name until profile names are available.
-      customer: { email: input.email, name: input.email.split('@')[0] || 'TraceIQ customer' },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: { organization_id: input.organizationId, plan_key: 'pro', billing_period: input.billingPeriod }
+    return this.database.transaction(async (client) => {
+      await this.lockSubscriptionChange(client, input.organizationId);
+      const existing = await client.query(`
+        SELECT 1 FROM subscriptions
+        WHERE organization_id=$1 AND provider='bachs'
+          AND status IN ('trialing','active','past_due','paused')
+        LIMIT 1 FOR UPDATE
+      `, [input.organizationId]);
+      if (existing.rows.length) {
+        throw new ConflictException('This organization already has a Bachs subscription. Manage or change the existing plan instead of creating another checkout.');
+      }
+      const pending = await client.query(`
+        SELECT 1 FROM billing_checkout_sessions
+        WHERE organization_id=$1 AND provider='bachs' AND completed_at IS NULL
+          AND (expires_at IS NULL OR expires_at>now())
+        LIMIT 1 FOR UPDATE
+      `, [input.organizationId]);
+      if (pending.rows.length) throw new ConflictException('A billing checkout is already pending for this organization.');
+      const checkout = await this.bachs.createCheckout({
+        product_cart: [{ product_id: productId, quantity: 1 }],
+        billing_currency: 'USD',
+        // Bachs requires both fields when checkout creates a new customer. TraceIQ
+        // currently stores only the authenticated email, so use its local part as
+        // a stable, non-sensitive display name until profile names are available.
+        customer: { email: input.email, name: input.email.split('@')[0] || 'TraceIQ customer' },
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: { organization_id: input.organizationId, plan_key: 'pro', billing_period: input.billingPeriod }
+      });
+      await client.query(`
+        INSERT INTO billing_checkout_sessions (
+          id, provider, provider_checkout_id, organization_id, project_id,
+          provider_product_id, billing_period, status, expires_at
+        ) VALUES ($1, 'bachs', $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (provider, provider_checkout_id) DO NOTHING
+      `, [
+        `bcs_${randomUUID()}`, checkout.checkout_id, input.organizationId, input.projectId,
+        productId, input.billingPeriod, checkout.status, checkout.expires_at
+      ]);
+      return checkout;
     });
-    await this.database.query(`
-      INSERT INTO billing_checkout_sessions (
-        id, provider, provider_checkout_id, organization_id, project_id,
-        provider_product_id, billing_period, status, expires_at
-      ) VALUES ($1, 'bachs', $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (provider, provider_checkout_id) DO NOTHING
-    `, [
-      `bcs_${randomUUID()}`, checkout.checkout_id, input.organizationId, input.projectId,
-      productId, input.billingPeriod, checkout.status, checkout.expires_at
-    ]);
-    return checkout;
+  }
+
+  async upgradeToYearly(organizationId: string) {
+    this.requireCloud();
+    return this.database.transaction(async (client) => {
+      await this.lockSubscriptionChange(client, organizationId);
+      const result = await client.query<SubscriptionRow>(`
+        SELECT id,provider_subscription_id,provider_product_id,billing_period,status
+        FROM subscriptions
+        WHERE organization_id=$1 AND provider='bachs'
+          AND status IN ('trialing','active','past_due','paused')
+        ORDER BY provider_event_created_at DESC NULLS LAST,updated_at DESC
+        LIMIT 1 FOR UPDATE
+      `, [organizationId]);
+      const current = result.rows[0];
+      if (!current) throw new NotFoundException('No active Bachs subscription exists for this organization.');
+      const currentPeriod = this.billingPeriod(current.provider_product_id, current.billing_period);
+      if (currentPeriod === 'yearly') {
+        return { changed: false, billingPeriod: 'yearly' as const, subscriptionStatus: current.status };
+      }
+      if (currentPeriod !== 'monthly') throw new ConflictException('The active subscription product is not a recognized monthly Pro product.');
+      if (current.status !== 'active' && current.status !== 'trialing') {
+        throw new ConflictException('Resolve the current subscription status before changing its billing period.');
+      }
+      const updated = await this.bachs.updateSubscription(
+        current.provider_subscription_id,
+        { product_id: this.config.bachs!.products.proYearly, proration_behavior: 'invoice_now' },
+        `traceiq:${current.provider_subscription_id}:pro-yearly`
+      );
+      const updatedProductId = this.subscriptionProductId(updated);
+      if (updatedProductId !== this.config.bachs!.products.proYearly) {
+        throw new BadGatewayException('Bachs did not confirm the yearly product change.');
+      }
+      updated.metadata = { ...updated.metadata, organization_id: organizationId, billing_period: 'yearly' };
+      await this.upsertSubscription(client, {
+        id: `evt_upgrade_${randomUUID()}`,
+        type: 'customer.subscription.updated',
+        created_at: new Date().toISOString(),
+        data: updated
+      }, true);
+      return { changed: true, billingPeriod: 'yearly' as const, subscriptionStatus: updated.status };
+    });
   }
 
   checkoutReturnRedirect(status: 'success' | 'cancelled', projectId?: string) {
@@ -186,9 +258,11 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       }
       throw new BadRequestException('Bachs subscription is missing TraceIQ organization metadata.');
     }
-    const productId = data.product_id ?? data.product?.id ?? null;
+    const productId = this.subscriptionProductId(data);
     const knownProducts = [this.config.bachs!.products.proMonthly, this.config.bachs!.products.proYearly];
     if (!productId || !knownProducts.includes(productId)) throw new BadRequestException('Unknown Bachs subscription product.');
+    const billingPeriod = this.billingPeriod(productId);
+    const metadata = { ...(data.metadata ?? {}), billing_period: billingPeriod };
     const graceEnd = data.status === 'past_due'
       ? new Date(new Date(event.created_at).getTime() + CLOUD_BILLING_POLICY.failedPaymentGraceDays * 86_400_000).toISOString()
       : null;
@@ -199,12 +273,13 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     `, [organizationId, data.customer.customer_id]);
     await executor.query(`
       INSERT INTO subscriptions (
-        id, organization_id, provider, provider_subscription_id, provider_product_id, plan_key, status,
+        id, organization_id, provider, provider_subscription_id, provider_product_id, billing_period, plan_key, status,
         currency, amount, current_period_start, current_period_end, cancel_at_period_end, canceled_at,
         grace_period_ends_at, last_provider_sync_at, provider_event_created_at, metadata
-      ) VALUES ($1, $2, 'bachs', $3, $4, 'pro', $5, $6, $7, $8, $9, $10, $11, $12, now(), $13, $14::jsonb)
+      ) VALUES ($1, $2, 'bachs', $3, $4, $5, 'pro', $6, $7, $8, $9, $10, $11, $12, $13, now(), $14, $15::jsonb)
       ON CONFLICT (provider, provider_subscription_id) DO UPDATE SET
-        provider_product_id = EXCLUDED.provider_product_id, status = EXCLUDED.status,
+        provider_product_id = EXCLUDED.provider_product_id, billing_period = EXCLUDED.billing_period,
+        status = EXCLUDED.status,
         currency = EXCLUDED.currency, amount = EXCLUDED.amount,
         current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end,
         cancel_at_period_end = EXCLUDED.cancel_at_period_end, canceled_at = EXCLUDED.canceled_at,
@@ -217,10 +292,10 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
         provider_event_created_at = EXCLUDED.provider_event_created_at, metadata = EXCLUDED.metadata, updated_at = now()
       WHERE subscriptions.provider_event_created_at IS NULL OR subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at
     `, [
-      `sub_${randomUUID()}`, organizationId, subscriptionId, productId, data.status,
+      `sub_${randomUUID()}`, organizationId, subscriptionId, productId, billingPeriod, data.status,
       data.currency ?? null, data.amount ?? null, data.current_period_start ?? null, data.current_period_end ?? null,
       data.cancel_at_period_end ?? false, data.canceled_at ?? null, graceEnd, event.created_at,
-      JSON.stringify(data.metadata ?? {})
+      JSON.stringify(metadata)
     ]);
   }
 
@@ -276,6 +351,20 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     if (this.config.deploymentMode !== 'cloud' || !this.config.bachs) {
       throw new NotFoundException('Cloud billing is not available in this deployment.');
     }
+  }
+
+  private async lockSubscriptionChange(executor: QueryExecutor, organizationId: string) {
+    await executor.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${organizationId}:billingSubscriptionChange`]);
+  }
+
+  private subscriptionProductId(subscription: BachsSubscription) {
+    return subscription.product_id ?? subscription.product?.id ?? null;
+  }
+
+  private billingPeriod(productId: string | null, stored?: BillingPeriod | null): BillingPeriod | null {
+    if (productId === this.config.bachs!.products.proMonthly) return 'monthly';
+    if (productId === this.config.bachs!.products.proYearly) return 'yearly';
+    return stored ?? null;
   }
 
   private checkoutReturnUrls(projectId: string) {

@@ -10,6 +10,13 @@ interface Entitlements {
   deploymentMode: 'self_hosted' | 'cloud';
   plan: 'free' | 'pro' | 'self_hosted';
   subscriptionStatus: string | null;
+  subscription: {
+    providerProductId: string | null;
+    billingPeriod: 'monthly' | 'yearly' | null;
+    status: string;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
   limits: { events: number | null; projects: number | null; members: number | null; retentionDays: number | null; aiInsights: number | null };
   usage: { events: number; projects: number; members: number; aiInsights: number };
   overLimit: { projects: boolean; members: boolean };
@@ -19,8 +26,9 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<'monthly' | 'yearly' | 'portal' | null>(null);
+  const [busy, setBusy] = useState<'monthly' | 'yearly' | 'upgrade-yearly' | 'portal' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const accessToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -69,6 +77,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   async function beginCheckout(period: 'monthly' | 'yearly') {
     setBusy(period);
     setError(null);
+    setNotice(null);
     try {
       const token = await accessToken();
       if (!token) throw new Error('Your dashboard session expired. Sign in again.');
@@ -90,6 +99,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   async function openPortal() {
     setBusy('portal');
     setError(null);
+    setNotice(null);
     try {
       const token = await accessToken();
       if (!token) throw new Error('Your dashboard session expired. Sign in again.');
@@ -107,6 +117,28 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
     }
   }
 
+  async function upgradeToYearly() {
+    setBusy('upgrade-yearly');
+    setError(null);
+    setNotice(null);
+    try {
+      const token = await accessToken();
+      if (!token) throw new Error('Your dashboard session expired. Sign in again.');
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/billing/upgrade-yearly`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId })
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      await loadEntitlements();
+      setNotice('Your Pro subscription was upgraded to yearly billing.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not upgrade to yearly billing.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (loading) return <div className="mt-6 rounded-xl border border-neutral-200 p-6 text-sm text-neutral-500 dark:border-slate-800 dark:text-slate-400">Loading billing details…</div>;
 
   if (!entitlements) return <BillingMessage tone="error">{error ?? 'Billing details are unavailable.'}</BillingMessage>;
@@ -116,6 +148,12 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   }
 
   const pro = entitlements.plan === 'pro';
+  const billingPeriod = entitlements.subscription?.billingPeriod ?? null;
+  const hasNonterminalSubscription = ['trialing', 'active', 'past_due', 'paused']
+    .includes(entitlements.subscription?.status ?? '');
+  const proPrice = hasNonterminalSubscription
+    ? billingPeriod === 'yearly' ? '$190/year' : billingPeriod === 'monthly' ? '$19/month' : 'Pro'
+    : '$19/month';
   const eventPercent = percentage(entitlements.usage.events, entitlements.limits.events);
   const warningThreshold = eventPercent >= 100 ? 100 : eventPercent >= 90 ? 90 : eventPercent >= 70 ? 70 : null;
   return (
@@ -128,6 +166,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       {billingResult === 'success' && !pro ? <BillingMessage tone="info">Payment completed. Waiting for Bachs to confirm your subscription…</BillingMessage> : null}
       {billingResult === 'success' && pro ? <BillingMessage tone="success">Your organization is now on Pro.</BillingMessage> : null}
       {billingResult === 'cancelled' ? <BillingMessage tone="info">Checkout was cancelled. Your current plan was not changed.</BillingMessage> : null}
+      {notice ? <BillingMessage tone="success">{notice}</BillingMessage> : null}
       {error ? <BillingMessage tone="error">{error}</BillingMessage> : null}
 
       {warningThreshold ? (
@@ -162,12 +201,24 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
           current={!pro}
         />
         <PlanCard
-          name="Pro" price="$19/month" description="For growing products and teams."
+          name="Pro" price={proPrice} secondaryPrice={!hasNonterminalSubscription ? '$190/year' : undefined}
+          description={hasNonterminalSubscription && !billingPeriod ? 'Billing interval is syncing from Bachs.' : 'For growing products and teams.'}
           features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 AI insights/month', 'Public dashboards']}
           current={pro}
           actions={pro ? (
+            <div className={`grid gap-2 ${billingPeriod === 'monthly' ? 'sm:grid-cols-2' : ''}`}>
+              <button className={secondaryButton} disabled={busy !== null} onClick={() => void openPortal()}>
+                {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage plan
+              </button>
+              {billingPeriod === 'monthly' ? (
+                <button className={primaryButton} disabled={busy !== null} onClick={() => void upgradeToYearly()}>
+                  {busy === 'upgrade-yearly' ? <Loader2 className="size-4 animate-spin" /> : null} Upgrade to yearly
+                </button>
+              ) : null}
+            </div>
+          ) : hasNonterminalSubscription ? (
             <button className={secondaryButton} disabled={busy !== null} onClick={() => void openPortal()}>
-              {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage billing
+              {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage plan
             </button>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -201,9 +252,9 @@ function percentage(value: number, limit: number | null) {
   return limit && limit > 0 ? value / limit * 100 : 0;
 }
 
-function PlanCard({ name, price, description, features, current, actions }: { name: string; price: string; description: string; features: string[]; current: boolean; actions?: React.ReactNode }) {
+function PlanCard({ name, price, secondaryPrice, description, features, current, actions }: { name: string; price: string; secondaryPrice?: string; description: string; features: string[]; current: boolean; actions?: React.ReactNode }) {
   return <article className={`rounded-xl border p-5 ${current ? 'border-blue-500 ring-1 ring-blue-500' : 'border-neutral-200 dark:border-slate-800'}`}>
-    <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{name}</h3><p className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">{price}</p></div>{current ?             <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">Current plan</span> : null}</div>
+    <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{name}</h3><p className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">{price}</p>{secondaryPrice ? <p className="mt-1 text-sm font-semibold text-neutral-600 dark:text-slate-300">or {secondaryPrice}</p> : null}</div>{current ? <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">Current plan</span> : null}</div>
     <p className="mt-3 text-sm text-neutral-500 dark:text-slate-400">{description}</p>
     <ul className="my-5 grid gap-2 text-sm text-neutral-700 dark:text-slate-300">{features.map((feature) => <li key={feature} className="flex items-center gap-2"><Check className="size-4 text-blue-600" />{feature}</li>)}</ul>
     {actions}

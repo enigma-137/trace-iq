@@ -20,6 +20,16 @@ export class BachsClient {
     return this.request<BachsSubscription>('GET', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`);
   }
 
+  updateSubscription(
+    subscriptionId: string,
+    body: { product_id: string; proration_behavior: 'invoice_now' },
+    idempotencyKey: string
+  ) {
+    return this.request<BachsSubscription>(
+      'PATCH', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, body, idempotencyKey
+    );
+  }
+
   private async request<T>(method: string, path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
     if (!this.config) throw new BadGatewayException('Bachs billing is unavailable in self-hosted mode.');
     const controller = new AbortController();
@@ -70,6 +80,7 @@ export interface BachsSubscription {
   customer: { customer_id: string; email?: string };
   product?: { id: string };
   product_id?: string;
+  billing_cycle?: { interval?: string; frequency?: number };
   status: 'trialing' | 'active' | 'past_due' | 'unpaid' | 'canceled' | 'paused';
   currency?: string;
   amount?: string;

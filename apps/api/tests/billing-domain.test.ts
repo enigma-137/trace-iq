@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import { EntitlementService } from '../src/modules/billing/entitlement.service';
 import { UsageService } from '../src/modules/billing/usage.service';
@@ -10,8 +10,12 @@ function result(rows: Record<string, unknown>[], rowCount = rows.length) {
 
 const freeRow = {
   plan_key: null, status: null, grace_period_ends_at: null,
+  subscription_updated_at: null, provider_product_id: null, billing_period: null,
+  current_period_end: null, cancel_at_period_end: false,
   projects: '1', members: '1', events: '0', ai_insights: '0'
 };
+
+afterEach(() => vi.useRealTimers());
 
 describe('EntitlementService', () => {
   it('keeps self-hosted installations unrestricted without database reads', async () => {
@@ -46,6 +50,69 @@ describe('EntitlementService', () => {
     expect(snapshot.plan).toBe('pro');
     expect(snapshot.limits.projects).toBe(20);
     expect(snapshot.limits.events).toBe(1_000_000);
+  });
+
+  it('keeps past-due Pro during the seven-day grace period and downgrades after it expires', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-05T00:00:00Z'));
+    const withinGraceDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'past_due', billing_period: 'monthly',
+        provider_product_id: 'prod_monthly', grace_period_ends_at: '2026-09-08T00:00:00Z'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const withinGrace = await new EntitlementService(withinGraceDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(withinGrace.plan).toBe('pro');
+
+    vi.setSystemTime(new Date('2026-09-09T00:00:00Z'));
+    const expiredGraceDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'past_due', billing_period: 'monthly',
+        provider_product_id: 'prod_monthly', grace_period_ends_at: '2026-09-08T00:00:00Z'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const expiredGrace = await new EntitlementService(expiredGraceDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(expiredGrace.plan).toBe('free');
+  });
+
+  it('restores Pro after payment recovery and exposes the provider-backed yearly interval', async () => {
+    const database = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'active', provider_product_id: 'prod_yearly',
+        billing_period: 'yearly', current_period_end: '2027-09-02T00:00:00Z'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const service = new EntitlementService(database as never, {
+      deploymentMode: 'cloud',
+      bachs: { products: { proMonthly: 'prod_monthly', proYearly: 'prod_yearly' } }
+    } as never);
+    const snapshot = await service.getSnapshot('org_1');
+
+    expect(snapshot.plan).toBe('pro');
+    expect(snapshot.subscription).toMatchObject({
+      status: 'active', providerProductId: 'prod_yearly', billingPeriod: 'yearly'
+    });
+  });
+
+  it('keeps Pro through a period-end cancellation and becomes Free on the terminal cancellation event', async () => {
+    const scheduledDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'active', billing_period: 'monthly',
+        cancel_at_period_end: true, current_period_end: '2026-10-02T00:00:00Z'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const scheduled = await new EntitlementService(scheduledDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(scheduled.plan).toBe('pro');
+    expect(scheduled.subscription?.cancelAtPeriodEnd).toBe(true);
+
+    const canceledDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'canceled', billing_period: 'monthly',
+        current_period_end: '2026-10-02T00:00:00Z'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const canceled = await new EntitlementService(canceledDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(canceled.plan).toBe('free');
   });
 
   it('stops Free event ingestion above the 5 percent grace allowance', async () => {

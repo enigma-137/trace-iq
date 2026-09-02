@@ -16,6 +16,13 @@ export interface EntitlementSnapshot {
   deploymentMode: 'self_hosted' | 'cloud';
   plan: CloudPlanKey | 'self_hosted';
   subscriptionStatus: string | null;
+  subscription: {
+    providerProductId: string | null;
+    billingPeriod: 'monthly' | 'yearly' | null;
+    status: string;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
   limits: Record<LimitedResource | ReplayLimit | 'retentionDays', number | null>;
   features: { publicDashboards: boolean; sessionReplay: boolean };
   usage: Record<LimitedResource | 'replaySessions' | 'replayStorageBytes', number>;
@@ -27,6 +34,10 @@ interface EntitlementRow extends QueryResultRow {
   status: string | null;
   grace_period_ends_at: string | null;
   subscription_updated_at: string | null;
+  provider_product_id: string | null;
+  billing_period: 'monthly' | 'yearly' | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean | null;
   projects: string;
   members: string;
   events: string;
@@ -39,13 +50,13 @@ interface EntitlementRow extends QueryResultRow {
 export class EntitlementService {
   constructor(
     private readonly database: DatabaseService,
-    @Optional() private readonly config: Pick<typeof appConfig, 'deploymentMode'> = appConfig
+    @Optional() private readonly config: Pick<typeof appConfig, 'deploymentMode'> & Partial<Pick<typeof appConfig, 'bachs'>> = appConfig
   ) {}
 
   async getSnapshot(organizationId: string, executor: QueryExecutor = this.database): Promise<EntitlementSnapshot> {
     if (this.config.deploymentMode === 'self_hosted') {
       return {
-        deploymentMode: 'self_hosted', plan: 'self_hosted', subscriptionStatus: null,
+        deploymentMode: 'self_hosted', plan: 'self_hosted', subscriptionStatus: null, subscription: null,
         limits: {
           events: null, projects: null, members: null, retentionDays: null, aiInsights: null,
           replaySessions: null, replayStorageBytes: null, replayMaxSampleRatePercent: null,
@@ -60,6 +71,7 @@ export class EntitlementService {
     const result = await executor.query<EntitlementRow>(`
       SELECT
         s.plan_key, s.status, s.grace_period_ends_at, s.subscription_updated_at,
+        s.provider_product_id, s.billing_period, s.current_period_end, s.cancel_at_period_end,
         (SELECT COUNT(*) FROM projects WHERE organization_id = $1) AS projects,
         (SELECT COUNT(*) FROM organization_members WHERE organization_id = $1) AS members,
         COALESCE((SELECT quantity FROM organization_usage_monthly
@@ -72,9 +84,11 @@ export class EntitlementService {
           WHERE organization_id = $1 AND metric = 'replay_storage_bytes' AND period_start = date_trunc('month', now())::date), 0) AS replay_storage_bytes
       FROM (SELECT 1) seed
       LEFT JOIN LATERAL (
-        SELECT plan_key, status, grace_period_ends_at, updated_at AS subscription_updated_at FROM subscriptions
+        SELECT plan_key,status,grace_period_ends_at,updated_at AS subscription_updated_at,
+          provider_product_id,billing_period,current_period_end,cancel_at_period_end
+        FROM subscriptions
         WHERE organization_id = $1
-        ORDER BY updated_at DESC LIMIT 1
+        ORDER BY provider_event_created_at DESC NULLS LAST,updated_at DESC LIMIT 1
       ) s ON true
     `, [organizationId]);
     const row = result.rows[0];
@@ -85,6 +99,10 @@ export class EntitlementService {
     );
     const planKey: CloudPlanKey = paid ? 'pro' : 'free';
     const plan = CLOUD_PLAN_CATALOG[planKey];
+    const configuredProducts = this.config.bachs?.products;
+    const billingPeriod = row?.billing_period
+      ?? (row?.provider_product_id === configuredProducts?.proMonthly ? 'monthly'
+        : row?.provider_product_id === configuredProducts?.proYearly ? 'yearly' : null);
     const overrides = await this.loadOverrides(organizationId, executor);
     const limit = (key: LimitedResource | ReplayLimit | 'retentionDays', fallback: number | null) => overrides.get(key) ?? fallback;
     const usage = {
@@ -104,7 +122,15 @@ export class EntitlementService {
       replayMaxDurationSeconds: limit('replayMaxDurationSeconds', null)
     };
     return {
-      deploymentMode: 'cloud', plan: planKey, subscriptionStatus: row?.status ?? null, limits,
+      deploymentMode: 'cloud', plan: planKey, subscriptionStatus: row?.status ?? null,
+      subscription: row?.status ? {
+        providerProductId: row.provider_product_id ?? null,
+        billingPeriod,
+        status: row.status,
+        currentPeriodEnd: row.current_period_end ?? null,
+        cancelAtPeriodEnd: row.cancel_at_period_end ?? false
+      } : null,
+      limits,
       features: { publicDashboards: true, sessionReplay: overrides.get('sessionReplay') === 1 }, usage,
       overLimit: {
         projects: limits.projects !== null && usage.projects > limits.projects,

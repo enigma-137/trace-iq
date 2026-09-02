@@ -23,4 +23,27 @@ describe('BachsClient', () => {
       expect.objectContaining<BadGatewayException>({ message: 'The API key lacks the required scope.' })
     );
   });
+
+  it('changes an existing subscription product with immediate proration and idempotency', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      subscription_id: 'sub_1', customer: { customer_id: 'cust_1' },
+      product_id: 'prod_yearly', status: 'active'
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new BachsClient(config).updateSubscription(
+      'sub_1',
+      { product_id: 'prod_yearly', proration_behavior: 'invoice_now' },
+      'traceiq:sub_1:pro-yearly'
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://sandbox-api.bachs.io/v1/subscriptions/sub_1',
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: expect.objectContaining({ 'Idempotency-Key': 'traceiq:sub_1:pro-yearly' }),
+        body: JSON.stringify({ product_id: 'prod_yearly', proration_behavior: 'invoice_now' })
+      })
+    );
+  });
 });
