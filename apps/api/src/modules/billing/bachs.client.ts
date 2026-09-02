@@ -25,7 +25,9 @@ export class BachsClient {
     body: { product_id: string; proration_behavior: 'invoice_now' },
     idempotencyKey: string
   ) {
-    return this.request<BachsSubscription>(
+    // A 2xx response acknowledges the change request; Bachs may still be
+    // processing its proration payment, so this payload is not subscription truth.
+    return this.request<unknown>(
       'PATCH', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, body, idempotencyKey
     );
   }

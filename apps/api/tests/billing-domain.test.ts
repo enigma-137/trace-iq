@@ -12,6 +12,8 @@ const freeRow = {
   plan_key: null, status: null, grace_period_ends_at: null,
   subscription_updated_at: null, provider_product_id: null, billing_period: null,
   current_period_end: null, cancel_at_period_end: false,
+  subscription_change_status: null, subscription_change_target_billing_period: null,
+  subscription_change_requested_at: null, subscription_change_failure_code: null,
   projects: '1', members: '1', events: '0', ai_insights: '0'
 };
 
@@ -91,6 +93,37 @@ describe('EntitlementService', () => {
     expect(snapshot.plan).toBe('pro');
     expect(snapshot.subscription).toMatchObject({
       status: 'active', providerProductId: 'prod_yearly', billingPeriod: 'yearly'
+    });
+  });
+
+  it('exposes pending and failed yearly changes while retaining the monthly interval', async () => {
+    const pendingDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'active', provider_product_id: 'prod_monthly',
+        billing_period: 'monthly', subscription_change_status: 'pending',
+        subscription_change_target_billing_period: 'yearly',
+        subscription_change_requested_at: '2026-09-02T12:00:00Z'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const pending = await new EntitlementService(pendingDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(pending.subscription).toMatchObject({
+      billingPeriod: 'monthly',
+      billingChange: { status: 'pending', targetBillingPeriod: 'yearly', failureCode: null }
+    });
+
+    const failedDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{
+        ...freeRow, plan_key: 'pro', status: 'active', provider_product_id: 'prod_monthly',
+        billing_period: 'monthly', subscription_change_status: 'failed',
+        subscription_change_target_billing_period: 'yearly',
+        subscription_change_requested_at: '2026-09-02T12:00:00Z',
+        subscription_change_failure_code: 'payment_failed'
+      }]))
+      .mockResolvedValueOnce(result([])) };
+    const failed = await new EntitlementService(failedDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(failed.subscription).toMatchObject({
+      billingPeriod: 'monthly',
+      billingChange: { status: 'failed', targetBillingPeriod: 'yearly', failureCode: 'payment_failed' }
     });
   });
 

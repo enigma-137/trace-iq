@@ -16,6 +16,12 @@ interface Entitlements {
     status: string;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
+    billingChange: {
+      status: 'pending' | 'failed';
+      targetBillingPeriod: 'monthly' | 'yearly';
+      requestedAt: string;
+      failureCode: string | null;
+    } | null;
   } | null;
   limits: { events: number | null; projects: number | null; members: number | null; retentionDays: number | null; aiInsights: number | null };
   usage: { events: number; projects: number; members: number; aiInsights: number };
@@ -74,6 +80,20 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [billingResult, loadEntitlements]);
 
+  const upgradeConfirmationPending = entitlements?.subscription?.billingChange?.status === 'pending';
+  useEffect(() => {
+    if (!upgradeConfirmationPending) return;
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts += 1;
+      void loadEntitlements().catch((caught) => {
+        setError(caught instanceof Error ? caught.message : 'Could not refresh the pending billing change.');
+      });
+      if (attempts >= 15) clearInterval(timer);
+    }, 2_000);
+    return () => clearInterval(timer);
+  }, [loadEntitlements, upgradeConfirmationPending]);
+
   async function beginCheckout(period: 'monthly' | 'yearly') {
     setBusy(period);
     setError(null);
@@ -131,7 +151,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       });
       if (!response.ok) throw new Error(await readError(response));
       await loadEntitlements();
-      setNotice('Your Pro subscription was upgraded to yearly billing.');
+      setNotice('Bachs accepted the yearly upgrade. The prorated payment is processing.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not upgrade to yearly billing.');
     } finally {
@@ -149,6 +169,11 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
 
   const pro = entitlements.plan === 'pro';
   const billingPeriod = entitlements.subscription?.billingPeriod ?? null;
+  const billingChange = entitlements.subscription?.billingChange ?? null;
+  const yearlyUpgradePending = billingChange?.status === 'pending'
+    && billingChange.targetBillingPeriod === 'yearly';
+  const yearlyUpgradeFailed = billingChange?.status === 'failed'
+    && billingChange.targetBillingPeriod === 'yearly';
   const hasNonterminalSubscription = ['trialing', 'active', 'past_due', 'paused']
     .includes(entitlements.subscription?.status ?? '');
   const proPrice = hasNonterminalSubscription
@@ -166,7 +191,9 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       {billingResult === 'success' && !pro ? <BillingMessage tone="info">Payment completed. Waiting for Bachs to confirm your subscription…</BillingMessage> : null}
       {billingResult === 'success' && pro ? <BillingMessage tone="success">Your organization is now on Pro.</BillingMessage> : null}
       {billingResult === 'cancelled' ? <BillingMessage tone="info">Checkout was cancelled. Your current plan was not changed.</BillingMessage> : null}
-      {notice ? <BillingMessage tone="success">{notice}</BillingMessage> : null}
+      {notice ? <BillingMessage tone="info">{notice}</BillingMessage> : null}
+      {yearlyUpgradePending ? <BillingMessage tone="info">Upgrading to yearly… Your monthly plan remains active while Bachs processes the prorated payment.</BillingMessage> : null}
+      {yearlyUpgradeFailed ? <BillingMessage tone="error">The yearly upgrade payment failed. Your monthly plan remains active; retry the upgrade or manage your payment method.</BillingMessage> : null}
       {error ? <BillingMessage tone="error">{error}</BillingMessage> : null}
 
       {warningThreshold ? (
@@ -211,8 +238,9 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
                 {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage plan
               </button>
               {billingPeriod === 'monthly' ? (
-                <button className={primaryButton} disabled={busy !== null} onClick={() => void upgradeToYearly()}>
-                  {busy === 'upgrade-yearly' ? <Loader2 className="size-4 animate-spin" /> : null} Upgrade to yearly
+                <button className={primaryButton} disabled={busy !== null || yearlyUpgradePending} onClick={() => void upgradeToYearly()}>
+                  {busy === 'upgrade-yearly' || yearlyUpgradePending ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {yearlyUpgradePending ? 'Upgrading to yearly…' : yearlyUpgradeFailed ? 'Retry yearly upgrade' : 'Upgrade to yearly'}
                 </button>
               ) : null}
             </div>

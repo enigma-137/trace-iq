@@ -22,6 +22,12 @@ export interface EntitlementSnapshot {
     status: string;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
+    billingChange: {
+      status: 'pending' | 'failed';
+      targetBillingPeriod: 'monthly' | 'yearly';
+      requestedAt: string;
+      failureCode: string | null;
+    } | null;
   } | null;
   limits: Record<LimitedResource | ReplayLimit | 'retentionDays', number | null>;
   features: { publicDashboards: boolean; sessionReplay: boolean };
@@ -38,6 +44,10 @@ interface EntitlementRow extends QueryResultRow {
   billing_period: 'monthly' | 'yearly' | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
+  subscription_change_status: 'pending' | 'failed' | null;
+  subscription_change_target_billing_period: 'monthly' | 'yearly' | null;
+  subscription_change_requested_at: string | null;
+  subscription_change_failure_code: string | null;
   projects: string;
   members: string;
   events: string;
@@ -72,6 +82,8 @@ export class EntitlementService {
       SELECT
         s.plan_key, s.status, s.grace_period_ends_at, s.subscription_updated_at,
         s.provider_product_id, s.billing_period, s.current_period_end, s.cancel_at_period_end,
+        s.subscription_change_status, s.subscription_change_target_billing_period,
+        s.subscription_change_requested_at, s.subscription_change_failure_code,
         (SELECT COUNT(*) FROM projects WHERE organization_id = $1) AS projects,
         (SELECT COUNT(*) FROM organization_members WHERE organization_id = $1) AS members,
         COALESCE((SELECT quantity FROM organization_usage_monthly
@@ -85,7 +97,9 @@ export class EntitlementService {
       FROM (SELECT 1) seed
       LEFT JOIN LATERAL (
         SELECT plan_key,status,grace_period_ends_at,updated_at AS subscription_updated_at,
-          provider_product_id,billing_period,current_period_end,cancel_at_period_end
+          provider_product_id,billing_period,current_period_end,cancel_at_period_end,
+          subscription_change_status,subscription_change_target_billing_period,
+          subscription_change_requested_at,subscription_change_failure_code
         FROM subscriptions
         WHERE organization_id = $1
         ORDER BY provider_event_created_at DESC NULLS LAST,updated_at DESC LIMIT 1
@@ -128,7 +142,15 @@ export class EntitlementService {
         billingPeriod,
         status: row.status,
         currentPeriodEnd: row.current_period_end ?? null,
-        cancelAtPeriodEnd: row.cancel_at_period_end ?? false
+        cancelAtPeriodEnd: row.cancel_at_period_end ?? false,
+        billingChange: row.subscription_change_status
+          && row.subscription_change_target_billing_period
+          && row.subscription_change_requested_at ? {
+            status: row.subscription_change_status,
+            targetBillingPeriod: row.subscription_change_target_billing_period,
+            requestedAt: row.subscription_change_requested_at,
+            failureCode: row.subscription_change_failure_code ?? null
+          } : null
       } : null,
       limits,
       features: { publicDashboards: true, sessionReplay: overrides.get('sessionReplay') === 1 }, usage,

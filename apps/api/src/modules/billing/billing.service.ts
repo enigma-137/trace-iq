@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { QueryResultRow } from 'pg';
 import { appConfig } from '../../config/app.config';
@@ -10,7 +10,7 @@ export interface BachsEvent {
   id: string;
   type: string;
   created_at: string;
-  data: BachsSubscription | BachsCheckoutCompleted;
+  data: BachsSubscription | BachsCheckoutCompleted | BachsPaymentEvent;
 }
 
 interface BachsCheckoutCompleted {
@@ -22,6 +22,17 @@ interface BachsCheckoutCompleted {
   metadata?: Record<string, unknown>;
 }
 
+interface BachsPaymentEvent {
+  subscription_id?: string | null;
+  subscription?: { subscription_id?: string | null } | string | null;
+  invoice?: { subscription_id?: string | null } | null;
+  status?: string;
+  payment_status?: string;
+  billing_reason?: string;
+  reason?: string;
+  description?: string;
+}
+
 type BillingPeriod = 'monthly' | 'yearly';
 
 interface SubscriptionRow extends QueryResultRow {
@@ -30,6 +41,7 @@ interface SubscriptionRow extends QueryResultRow {
   provider_product_id: string | null;
   billing_period: BillingPeriod | null;
   status: string;
+  subscription_change_status: 'pending' | 'failed' | null;
 }
 
 @Injectable()
@@ -109,7 +121,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     return this.database.transaction(async (client) => {
       await this.lockSubscriptionChange(client, organizationId);
       const result = await client.query<SubscriptionRow>(`
-        SELECT id,provider_subscription_id,provider_product_id,billing_period,status
+        SELECT id,provider_subscription_id,provider_product_id,billing_period,status,subscription_change_status
         FROM subscriptions
         WHERE organization_id=$1 AND provider='bachs'
           AND status IN ('trialing','active','past_due','paused')
@@ -120,29 +132,39 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       if (!current) throw new NotFoundException('No active Bachs subscription exists for this organization.');
       const currentPeriod = this.billingPeriod(current.provider_product_id, current.billing_period);
       if (currentPeriod === 'yearly') {
-        return { changed: false, billingPeriod: 'yearly' as const, subscriptionStatus: current.status };
+        return {
+          changed: false, billingPeriod: 'yearly' as const,
+          upgradeStatus: null, subscriptionStatus: current.status
+        };
       }
       if (currentPeriod !== 'monthly') throw new ConflictException('The active subscription product is not a recognized monthly Pro product.');
+      if (current.subscription_change_status === 'pending') {
+        throw new ConflictException('A yearly billing upgrade is already pending for this organization.');
+      }
       if (current.status !== 'active' && current.status !== 'trialing') {
         throw new ConflictException('Resolve the current subscription status before changing its billing period.');
       }
-      const updated = await this.bachs.updateSubscription(
+      const requestedAt = new Date().toISOString();
+      await this.bachs.updateSubscription(
         current.provider_subscription_id,
         { product_id: this.config.bachs!.products.proYearly, proration_behavior: 'invoice_now' },
         `traceiq:${current.provider_subscription_id}:pro-yearly`
       );
-      const updatedProductId = this.subscriptionProductId(updated);
-      if (updatedProductId !== this.config.bachs!.products.proYearly) {
-        throw new BadGatewayException('Bachs did not confirm the yearly product change.');
-      }
-      updated.metadata = { ...updated.metadata, organization_id: organizationId, billing_period: 'yearly' };
-      await this.upsertSubscription(client, {
-        id: `evt_upgrade_${randomUUID()}`,
-        type: 'customer.subscription.updated',
-        created_at: new Date().toISOString(),
-        data: updated
-      }, true);
-      return { changed: true, billingPeriod: 'yearly' as const, subscriptionStatus: updated.status };
+      await client.query(`
+        UPDATE subscriptions SET
+          subscription_change_status = 'pending',
+          subscription_change_target_product_id = $2,
+          subscription_change_target_billing_period = 'yearly',
+          subscription_change_requested_at = $3,
+          subscription_change_failure_code = NULL,
+          subscription_change_failure_at = NULL,
+          updated_at = now()
+        WHERE id = $1
+      `, [current.id, this.config.bachs!.products.proYearly, requestedAt]);
+      return {
+        changed: true, billingPeriod: 'monthly' as const,
+        upgradeStatus: 'pending' as const, subscriptionStatus: current.status
+      };
     });
   }
 
@@ -208,6 +230,8 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
           await this.applyCompletedCheckout(client, event, checkoutSubscription);
         } else if (event.type.startsWith('customer.subscription.')) {
           await this.upsertSubscription(client, event);
+        } else if (this.isSubscriptionChangePaymentFailure(event)) {
+          await this.applySubscriptionChangePaymentFailure(client, event);
         }
         await client.query(`UPDATE billing_webhook_events SET processing_status = 'processed', processed_at = now() WHERE provider = 'bachs' AND provider_event_id = $1`, [event.id]);
       });
@@ -253,7 +277,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
         const existing = await executor.query<{ organization_id: string }>(`SELECT organization_id FROM subscriptions WHERE provider = 'bachs' AND provider_subscription_id = $1`, [subscriptionId]);
         if (!existing.rows[0]) throw new BadRequestException('Cannot reconcile an unmapped Bachs subscription.');
         data.metadata = { ...data.metadata, organization_id: existing.rows[0].organization_id };
-        await this.upsertSubscription(executor, event, false);
+        await this.upsertSubscription(executor, event, true);
         return;
       }
       throw new BadRequestException('Bachs subscription is missing TraceIQ organization metadata.');
@@ -266,6 +290,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     const graceEnd = data.status === 'past_due'
       ? new Date(new Date(event.created_at).getTime() + CLOUD_BILLING_POLICY.failedPaymentGraceDays * 86_400_000).toISOString()
       : null;
+    await this.lockSubscriptionChange(executor, organizationId);
     await executor.query(`
       INSERT INTO billing_customers (organization_id, provider, provider_customer_id)
       VALUES ($1, 'bachs', $2)
@@ -278,25 +303,121 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
         grace_period_ends_at, last_provider_sync_at, provider_event_created_at, metadata
       ) VALUES ($1, $2, 'bachs', $3, $4, $5, 'pro', $6, $7, $8, $9, $10, $11, $12, $13, now(), $14, $15::jsonb)
       ON CONFLICT (provider, provider_subscription_id) DO UPDATE SET
-        provider_product_id = EXCLUDED.provider_product_id, billing_period = EXCLUDED.billing_period,
+        provider_product_id = CASE
+          WHEN $17::boolean AND subscriptions.subscription_change_status IS NOT NULL
+            THEN subscriptions.provider_product_id
+          ELSE EXCLUDED.provider_product_id
+        END,
+        billing_period = CASE
+          WHEN $17::boolean AND subscriptions.subscription_change_status IS NOT NULL
+            THEN subscriptions.billing_period
+          ELSE EXCLUDED.billing_period
+        END,
         status = EXCLUDED.status,
-        currency = EXCLUDED.currency, amount = EXCLUDED.amount,
-        current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end,
+        currency = EXCLUDED.currency,
+        amount = CASE
+          WHEN $17::boolean AND subscriptions.subscription_change_status IS NOT NULL
+            THEN subscriptions.amount
+          ELSE EXCLUDED.amount
+        END,
+        current_period_start = CASE
+          WHEN $17::boolean AND subscriptions.subscription_change_status IS NOT NULL
+            THEN subscriptions.current_period_start
+          ELSE EXCLUDED.current_period_start
+        END,
+        current_period_end = CASE
+          WHEN $17::boolean AND subscriptions.subscription_change_status IS NOT NULL
+            THEN subscriptions.current_period_end
+          ELSE EXCLUDED.current_period_end
+        END,
         cancel_at_period_end = EXCLUDED.cancel_at_period_end, canceled_at = EXCLUDED.canceled_at,
         grace_period_ends_at = CASE
           WHEN EXCLUDED.status = 'past_due'
             THEN COALESCE(subscriptions.grace_period_ends_at, EXCLUDED.grace_period_ends_at)
           ELSE NULL
         END,
+        subscription_change_status = CASE
+          WHEN $16::boolean AND EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id
+            THEN NULL
+          ELSE subscriptions.subscription_change_status
+        END,
+        subscription_change_target_product_id = CASE
+          WHEN $16::boolean AND EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id
+            THEN NULL
+          ELSE subscriptions.subscription_change_target_product_id
+        END,
+        subscription_change_target_billing_period = CASE
+          WHEN $16::boolean AND EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id
+            THEN NULL
+          ELSE subscriptions.subscription_change_target_billing_period
+        END,
+        subscription_change_requested_at = CASE
+          WHEN $16::boolean AND EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id
+            THEN NULL
+          ELSE subscriptions.subscription_change_requested_at
+        END,
+        subscription_change_failure_code = CASE
+          WHEN $16::boolean AND EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id
+            THEN NULL
+          ELSE subscriptions.subscription_change_failure_code
+        END,
+        subscription_change_failure_at = CASE
+          WHEN $16::boolean AND EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id
+            THEN NULL
+          ELSE subscriptions.subscription_change_failure_at
+        END,
         last_provider_sync_at = now(),
-        provider_event_created_at = EXCLUDED.provider_event_created_at, metadata = EXCLUDED.metadata, updated_at = now()
-      WHERE subscriptions.provider_event_created_at IS NULL OR subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at
+        provider_event_created_at = CASE
+          WHEN $17::boolean THEN subscriptions.provider_event_created_at
+          ELSE EXCLUDED.provider_event_created_at
+        END,
+        metadata = CASE
+          WHEN $17::boolean AND subscriptions.subscription_change_status IS NOT NULL
+            THEN subscriptions.metadata
+          ELSE EXCLUDED.metadata
+        END,
+        updated_at = now()
+      WHERE $17::boolean
+        OR subscriptions.provider_event_created_at IS NULL
+        OR subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at
     `, [
       `sub_${randomUUID()}`, organizationId, subscriptionId, productId, billingPeriod, data.status,
       data.currency ?? null, data.amount ?? null, data.current_period_start ?? null, data.current_period_end ?? null,
       data.cancel_at_period_end ?? false, data.canceled_at ?? null, graceEnd, event.created_at,
-      JSON.stringify(metadata)
+      JSON.stringify(metadata), event.type === 'customer.subscription.updated' && !reconciliation, reconciliation
     ]);
+  }
+
+  private isSubscriptionChangePaymentFailure(event: BachsEvent) {
+    return ['invoice.payment_failed', 'invoice.failed', 'payment.failed'].includes(event.type);
+  }
+
+  private async applySubscriptionChangePaymentFailure(executor: QueryExecutor, event: BachsEvent) {
+    const data = event.data as BachsPaymentEvent;
+    const billingReason = data.billing_reason ?? data.reason ?? '';
+    if (billingReason.replace(/[^a-z]/gi, '').toLowerCase() !== 'subscriptionupdate') return;
+    const nestedSubscription = typeof data.subscription === 'object' ? data.subscription?.subscription_id : data.subscription;
+    const subscriptionId = data.subscription_id ?? nestedSubscription ?? data.invoice?.subscription_id ?? null;
+    if (!subscriptionId) return;
+    const result = await executor.query<{ organization_id: string }>(`
+      SELECT organization_id FROM subscriptions
+      WHERE provider = 'bachs' AND provider_subscription_id = $1
+      LIMIT 1
+    `, [subscriptionId]);
+    const organizationId = result.rows[0]?.organization_id;
+    if (!organizationId) return;
+    await this.lockSubscriptionChange(executor, organizationId);
+    await executor.query(`
+      UPDATE subscriptions SET
+        subscription_change_status = 'failed',
+        subscription_change_failure_code = 'payment_failed',
+        subscription_change_failure_at = $2,
+        updated_at = now()
+      WHERE provider = 'bachs' AND provider_subscription_id = $1
+        AND subscription_change_status = 'pending'
+        AND subscription_change_target_billing_period = 'yearly'
+        AND subscription_change_requested_at <= $2::timestamptz + interval '5 minutes'
+    `, [subscriptionId, event.created_at]);
   }
 
   private async subscriptionForCompletedCheckout(event: BachsEvent) {
@@ -316,22 +437,26 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
 
   private async applyCompletedCheckout(executor: QueryExecutor, event: BachsEvent, subscription: BachsSubscription | null) {
     const data = event.data as BachsCheckoutCompleted;
-    const result = await executor.query<{ organization_id: string }>(`
-      UPDATE billing_checkout_sessions SET
-        status = $2, provider_customer_id = $3, provider_subscription_id = $4,
-        completed_at = $5, updated_at = now()
+    const mapping = await executor.query<{ organization_id: string }>(`
+      SELECT organization_id FROM billing_checkout_sessions
       WHERE provider = 'bachs' AND provider_checkout_id = $1
-      RETURNING organization_id
-    `, [
-      data.checkout_id, data.status, data.customer?.customer_id ?? null,
-      data.subscription?.subscription_id ?? null, event.created_at
-    ]);
-    const organizationId = result.rows[0]?.organization_id;
+    `, [data.checkout_id]);
+    const organizationId = mapping.rows[0]?.organization_id;
     if (!organizationId) throw new BadRequestException('Unknown Bachs checkout session.');
     const metadataOrg = typeof data.metadata?.organization_id === 'string' ? data.metadata.organization_id : null;
     if (metadataOrg && metadataOrg !== organizationId) {
       throw new BadRequestException('Bachs checkout organization metadata does not match the stored checkout.');
     }
+    await this.lockSubscriptionChange(executor, organizationId);
+    await executor.query(`
+      UPDATE billing_checkout_sessions SET
+        status = $2, provider_customer_id = $3, provider_subscription_id = $4,
+        completed_at = $5, updated_at = now()
+      WHERE provider = 'bachs' AND provider_checkout_id = $1
+    `, [
+      data.checkout_id, data.status, data.customer?.customer_id ?? null,
+      data.subscription?.subscription_id ?? null, event.created_at
+    ]);
     if (data.customer?.customer_id) {
       await executor.query(`
         INSERT INTO billing_customers (organization_id, provider, provider_customer_id)

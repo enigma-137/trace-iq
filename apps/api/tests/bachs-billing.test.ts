@@ -85,7 +85,7 @@ describe('Bachs billing integration', () => {
     expect(query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock(hashtext($1))', ['org_1:billingSubscriptionChange']);
   });
 
-  it('upgrades monthly Pro in place with immediate proration and no second checkout', async () => {
+  it('keeps monthly state after PATCH acceptance until a subscription webhook confirms yearly', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('SELECT id,provider_subscription_id')) return queryResult(1, [{
         id: 'sub_local', provider_subscription_id: 'sub_bachs_1', provider_product_id: 'prod_monthly',
@@ -100,14 +100,13 @@ describe('Bachs billing integration', () => {
     const bachs = {
       createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(),
       updateSubscription: vi.fn().mockResolvedValue({
-        ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00',
-        metadata: { organization_id: 'org_1' }
+        subscription_id: 'sub_bachs_1', status: 'active', payment_status: 'Processing'
       })
     };
     const service = new BillingService(database as never, bachs as never, cloudConfig);
 
     await expect(service.upgradeToYearly('org_1')).resolves.toMatchObject({
-      changed: true, billingPeriod: 'yearly', subscriptionStatus: 'active'
+      changed: true, billingPeriod: 'monthly', upgradeStatus: 'pending', subscriptionStatus: 'active'
     });
     expect(bachs.updateSubscription).toHaveBeenCalledWith(
       'sub_bachs_1',
@@ -115,8 +114,49 @@ describe('Bachs billing integration', () => {
       'traceiq:sub_bachs_1:pro-yearly'
     );
     expect(bachs.createCheckout).not.toHaveBeenCalled();
-    const upsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
-    expect(upsert?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '190.00']));
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
+    const pendingUpdate = query.mock.calls.find(([sql]) => String(sql).includes("subscription_change_status = 'pending'"));
+    expect(pendingUpdate?.[1]).toEqual(['sub_local', 'prod_yearly', expect.any(String)]);
+
+    await service.processWebhook({
+      id: 'evt_upgrade_payment_processing',
+      type: 'payment.processing',
+      created_at: '2026-09-02T11:59:00Z',
+      data: {
+        subscription_id: 'sub_bachs_1', status: 'Processing',
+        billing_reason: 'Subscription Update',
+        description: 'Remaining time on new plan + Unused time on previous plan'
+      }
+    });
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
+
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_upgrade_confirmed',
+      type: 'customer.subscription.updated',
+      created_at: '2026-09-02T12:00:00Z',
+      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+    });
+    const confirmedUpsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(confirmedUpsert?.[1]).toEqual(expect.arrayContaining(['sub_bachs_1', 'prod_yearly', 'yearly', '190.00', true]));
+    expect(String(confirmedUpsert?.[0])).toContain('EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id');
+  });
+
+  it('rejects a duplicate yearly-upgrade click while the first request is pending', async () => {
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT id,provider_subscription_id')
+      ? queryResult(1, [{
+        id: 'sub_local', provider_subscription_id: 'sub_bachs_1', provider_product_id: 'prod_monthly',
+        billing_period: 'monthly', status: 'active', subscription_change_status: 'pending'
+      }]) : queryResult());
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn() };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await expect(service.upgradeToYearly('org_1')).rejects.toThrow(/already pending/);
+    expect(bachs.updateSubscription).not.toHaveBeenCalled();
   });
 
   it('treats an already-yearly upgrade as idempotent without calling Bachs', async () => {
@@ -133,7 +173,7 @@ describe('Bachs billing integration', () => {
     const service = new BillingService(database as never, bachs as never, cloudConfig);
 
     await expect(service.upgradeToYearly('org_1')).resolves.toEqual({
-      changed: false, billingPeriod: 'yearly', subscriptionStatus: 'active'
+      changed: false, billingPeriod: 'yearly', upgradeStatus: null, subscriptionStatus: 'active'
     });
     expect(bachs.updateSubscription).not.toHaveBeenCalled();
   });
@@ -211,6 +251,83 @@ describe('Bachs billing integration', () => {
     });
     const subscriptionCall = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
     expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '190.00']));
+  });
+
+  it('marks a pending yearly change failed without changing the monthly subscription state', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('INSERT INTO billing_webhook_events')) return queryResult(1);
+      if (sql.includes('SELECT organization_id FROM subscriptions')) {
+        return queryResult(1, [{ organization_id: 'org_1' }]);
+      }
+      return queryResult();
+    });
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn() };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await expect(service.processWebhook({
+      id: 'evt_upgrade_payment_failed',
+      type: 'payment.failed',
+      created_at: '2026-09-02T12:01:00Z',
+      data: {
+        subscription_id: 'sub_bachs_1', status: 'Failed',
+        billing_reason: 'Subscription Update',
+        description: 'Remaining time on new plan + Unused time on previous plan'
+      }
+    })).resolves.toEqual({ processed: true, duplicate: false });
+
+    const failedUpdate = query.mock.calls.find(([sql]) => String(sql).includes("subscription_change_status = 'failed'"));
+    expect(failedUpdate?.[1]).toEqual(['sub_bachs_1', '2026-09-02T12:01:00Z']);
+    expect(String(failedUpdate?.[0])).toContain("subscription_change_status = 'pending'");
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
+  });
+
+  it('does not let invoice.paid independently invent yearly subscription state', async () => {
+    const { service, query } = makeService();
+    await expect(service.processWebhook({
+      id: 'evt_upgrade_invoice_paid',
+      type: 'invoice.paid',
+      created_at: '2026-09-02T12:01:00Z',
+      data: {
+        subscription_id: 'sub_bachs_1', status: 'Paid',
+        billing_reason: 'Subscription Update'
+      }
+    })).resolves.toEqual({ processed: true, duplicate: false });
+
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE subscriptions'))).toBe(false);
+  });
+
+  it('does not let reconciliation finalize a pending upgrade or advance signed-event chronology', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT provider_subscription_id FROM subscriptions')) {
+        return queryResult(1, [{ provider_subscription_id: 'sub_bachs_1' }]);
+      }
+      if (sql.includes('SELECT organization_id FROM subscriptions')) {
+        return queryResult(1, [{ organization_id: 'org_1' }]);
+      }
+      return queryResult();
+    });
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = {
+      createCheckout: vi.fn(), createPortalSession: vi.fn(), updateSubscription: vi.fn(),
+      getSubscription: vi.fn().mockResolvedValue({
+        ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00', metadata: {}
+      })
+    };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+
+    await expect(service.reconcile()).resolves.toEqual({ reconciled: 1 });
+    const upsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(upsert?.[1]?.slice(-2)).toEqual([false, true]);
+    expect(String(upsert?.[0])).toContain('THEN subscriptions.provider_product_id');
+    expect(String(upsert?.[0])).toContain('THEN subscriptions.provider_event_created_at');
   });
 
   it('preserves a seven-day payment-failure grace deadline and clears it on recovery', async () => {
@@ -297,6 +414,13 @@ describe('Bachs billing integration', () => {
       id: 'evt_newer_yearly',
       created_at: '2026-09-02T12:00:00Z',
       data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+    });
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_older_monthly',
+      type: 'customer.subscription.updated',
+      created_at: '2026-09-02T11:30:00Z',
+      data: { ...subscriptionEvent.data, product_id: 'prod_monthly', amount: '19.00' }
     });
     await service.processWebhook({
       id: 'evt_older_checkout', type: 'checkout.completed', created_at: '2026-09-02T11:00:00Z',

@@ -119,9 +119,10 @@ Point the local dashboard at the temporary API before starting Next.js:
 NEXT_PUBLIC_API_URL=https://billing-test.traceiq.run
 ```
 
-After deploying billing changes, apply all migrations (including
-`0026_billing_checkout_sessions.sql`) to `traceiq_billing_test`, never the
-production `traceiq` database. Then sign in locally, complete Setup, and use
+After deploying billing changes, apply all migrations through
+`0030_billing_subscription_change_state.sql` to `traceiq_billing_test`, never
+the production `traceiq` database. Migration `0029_billing_subscription_period.sql`
+must not be edited after application; `0030` is additive on top of it. Then sign in locally, complete Setup, and use
 Settings -> Billing -> Upgrade monthly. The success relay returns to
 `http://localhost:3000/billing/success`; that page polls briefly for the
 authoritative webhook update before confirming that Pro is active. With

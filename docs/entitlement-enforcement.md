@@ -16,7 +16,9 @@ Count limits are checked immediately before writes inside the same transaction. 
 
 ## Deployment checklist
 
-1. Apply migrations through `0027` to the target database.
+1. Apply migrations through `0030` to the target database. Migration `0029`
+   owns the persisted billing period and one-subscription constraint; additive
+   migration `0030` owns asynchronous subscription-change state.
 2. Set `TRACEIQ_DEPLOYMENT_MODE=cloud` only for TraceIQ Cloud API processes.
 3. Verify the Bachs webhook rows and resulting subscription in the same database used by the API.
 
@@ -35,8 +37,19 @@ persisted as `subscriptions.billing_period`.
   organization-scoped transaction lock, a stable provider idempotency key, and
   a partial unique database index prevent overlapping nonterminal Bachs
   subscriptions.
+- A successful PATCH means only that Bachs accepted the change. TraceIQ keeps
+  the persisted monthly product and exposes a pending change while the prorated
+  payment is processing.
+- Only a signed `customer.subscription.updated` event that reports the target
+  yearly product changes the persisted billing period to `yearly`. Payment or
+  invoice success events never synthesize subscription state.
+- A payment-failure event changes the pending request to `failed`; it does not
+  change the current monthly product or entitlements. A later authoritative
+  subscription event can still confirm the provider's final state.
 
-Bachs applies the product change immediately and generates the proration invoice
-for the current period. Subsequent webhook delivery remains authoritative and
-periodic reconciliation repairs a missed webhook.
-4. Exercise Free, Pro, past-due grace and downgrade flows before replacing sandbox credentials.
+Bachs generates the proration payment asynchronously. Signed provider webhook
+delivery is authoritative. Periodic reconciliation may refresh ordinary
+subscription state, but it intentionally cannot finalize a pending interval
+change or advance the signed-provider-event clock.
+
+4. Exercise Free, Pro, pending/failed plan changes, past-due grace and downgrade flows before replacing sandbox credentials.
