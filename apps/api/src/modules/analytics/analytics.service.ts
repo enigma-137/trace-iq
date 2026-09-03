@@ -361,6 +361,7 @@ export class AnalyticsService {
 
     const [
       apiTelemetryResult,
+      apiLatencyResult,
       topErrorsResult,
       alertsResult,
       tracesResult,
@@ -370,6 +371,7 @@ export class AnalyticsService {
     ] = await Promise.all([
       this.database.query<{
         total_requests: number;
+        http_errors: number;
         avg_duration: number;
         p50: number;
         p90: number;
@@ -386,12 +388,14 @@ export class AnalyticsService {
               (properties->>'durationMs')::numeric AS duration,
               (properties->>'status')::int AS status
             FROM events
-            WHERE project_id = $1 AND (event_name = '$api_request' OR properties->>'durationMs' IS NOT NULL)
+            WHERE project_id = $1 AND event_name = '$api_request'
               AND occurred_at >= now() - interval '14 days'
               AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+              AND properties->>'status' ~ '^[0-9]+$'
           )
           SELECT
             count(*)::int AS total_requests,
+            count(*) FILTER (WHERE status >= 400)::int AS http_errors,
             COALESCE(round(avg(duration), 1)::float, 0) AS avg_duration,
             COALESCE(round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p50,
             COALESCE(round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p90,
@@ -402,6 +406,35 @@ export class AnalyticsService {
             count(*) FILTER (WHERE status >= 500)::int AS error_500,
             count(*) FILTER (WHERE status IS NOT NULL AND (status < 200 OR status >= 300) AND status <> 429 AND status < 500)::int AS other_status
           FROM base
+        `,
+        [project.id]
+      ).catch(() => ({ rows: [] })),
+
+      this.database.query<{
+        bucket: string;
+        p50: number;
+        p90: number;
+        p99: number;
+      }>(
+        `
+          WITH base AS (
+            SELECT
+              occurred_at,
+              (properties->>'durationMs')::numeric AS duration
+            FROM events
+            WHERE project_id = $1 AND event_name = '$api_request'
+              AND occurred_at >= now() - interval '14 days'
+              AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+              AND properties->>'status' ~ '^[0-9]+$'
+          )
+          SELECT
+            to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+            round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p50,
+            round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p90,
+            round((percentile_cont(0.99) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p99
+          FROM base
+          GROUP BY 1
+          ORDER BY 1 ASC
         `,
         [project.id]
       ).catch(() => ({ rows: [] })),
@@ -462,12 +495,15 @@ export class AnalyticsService {
             id,
             COALESCE(NULLIF(properties->>'method', ''), 'POST') AS method,
             COALESCE(NULLIF(properties->>'path', ''), NULLIF(context->'page'->>'path', ''), event_name) AS path,
-            COALESCE((properties->>'status')::int, 200) AS status,
-            COALESCE((properties->>'durationMs')::float, round((15 + (random() * 45))::numeric, 1)::float) AS duration_ms,
+            (properties->>'status')::int AS status,
+            (properties->>'durationMs')::float AS duration_ms,
             occurred_at AS occurred_at,
             COALESCE(user_id::text, anonymous_id) AS actor
           FROM events
-          WHERE project_id = $1
+          WHERE project_id = $1 AND event_name = '$api_request'
+            AND occurred_at >= now() - interval '14 days'
+            AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+            AND properties->>'status' ~ '^[0-9]+$'
           ORDER BY occurred_at DESC
           LIMIT 8
         `,
@@ -541,18 +577,14 @@ export class AnalyticsService {
     const sessionRow = sessionMetricsResult.rows[0] ?? { avg_duration_sec: 0 };
 
     const totalRequests = apiTel?.total_requests ?? 0;
-    const errCount = (apiTel?.error_500 ?? 0) + topErrorsResult.rows.reduce((sum, r) => sum + r.occurrences, 0);
+    const errCount = apiTel?.http_errors ?? 0;
     const errorRate = totalRequests > 0 ? Number(((errCount / totalRequests) * 100).toFixed(2)) : 0;
 
-    const latencySeries = totalRequests > 0 ? buckets14.map((bucket) => {
-      const base = apiTel?.p50 || 0;
-      return {
-        bucket,
-        p50: apiTel?.p50 || 0,
-        p90: apiTel?.p90 || 0,
-        p99: apiTel?.p99 || 0
-      };
-    }) : [];
+    const latencyByBucket = new Map(apiLatencyResult.rows.map((row) => [row.bucket, row]));
+    const latencySeries = buckets14.flatMap((bucket) => {
+      const row = latencyByBucket.get(bucket);
+      return row ? [{ bucket, p50: row.p50, p90: row.p90, p99: row.p99 }] : [];
+    });
 
     const topErrors: ErrorIssueOverview[] = topErrorsResult.rows.map((row) => ({
       type: row.type,

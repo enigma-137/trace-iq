@@ -21,11 +21,14 @@ export function RequestStatusCard({
   const ok = breakdown.ok200 ?? 0;
   const rateLimit = breakdown.rateLimit429 ?? 0;
   const error = breakdown.error500 ?? 0;
-  const total = totalRequests || Math.max(1, ok + rateLimit + error);
+  const other = breakdown.other ?? 0;
+  const total = totalRequests ?? ok + rateLimit + error + other;
+  const denominator = Math.max(1, total);
 
-  const okPct = Math.round((ok / total) * 100);
-  const rlPct = Math.round((rateLimit / total) * 100);
-  const errPct = Math.round((error / total) * 100);
+  const okPct = Math.round((ok / denominator) * 100);
+  const rlPct = Math.round((rateLimit / denominator) * 100);
+  const errPct = Math.round((error / denominator) * 100);
+  const otherPct = Math.round((other / denominator) * 100);
 
   return (
     <div
@@ -126,6 +129,29 @@ export function RequestStatusCard({
             <div
               className="h-full rounded-full bg-rose-500 transition-all duration-500"
               style={{ width: `${Math.max(2, errPct)}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-slate-500/20 bg-slate-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                Other
+              </span>
+              <span className="font-medium text-neutral-800 dark:text-slate-200">Other Responses</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-neutral-900 dark:text-white tabular-nums">
+                {other.toLocaleString()}
+              </span>
+              <span className="text-neutral-400 dark:text-slate-500">({otherPct}%)</span>
+            </div>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
+            <div
+              className="h-full rounded-full bg-slate-500 transition-all duration-500"
+              style={{ width: `${Math.max(2, otherPct)}%` }}
             />
           </div>
         </div>
