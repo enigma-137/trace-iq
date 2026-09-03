@@ -18,23 +18,7 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
   const [activeTab, setActiveTab] = useState<'all' | 'events' | 'api' | 'errors'>('all');
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
-  // Fallback data if empty
-  const points = data.length > 0 ? data : [
-    { bucket: 'Day 1', events: 120, apiCalls: 85, errors: 2 },
-    { bucket: 'Day 2', events: 180, apiCalls: 110, errors: 1 },
-    { bucket: 'Day 3', events: 240, apiCalls: 190, errors: 4 },
-    { bucket: 'Day 4', events: 310, apiCalls: 240, errors: 2 },
-    { bucket: 'Day 5', events: 450, apiCalls: 380, errors: 6 },
-    { bucket: 'Day 6', events: 520, apiCalls: 430, errors: 3 },
-    { bucket: 'Day 7', events: 680, apiCalls: 590, errors: 5 },
-    { bucket: 'Day 8', events: 590, apiCalls: 510, errors: 2 },
-    { bucket: 'Day 9', events: 740, apiCalls: 620, errors: 4 },
-    { bucket: 'Day 10', events: 890, apiCalls: 780, errors: 8 },
-    { bucket: 'Day 11', events: 1040, apiCalls: 910, errors: 5 },
-    { bucket: 'Day 12', events: 1200, apiCalls: 1050, errors: 7 },
-    { bucket: 'Day 13', events: 1380, apiCalls: 1190, errors: 6 },
-    { bucket: 'Day 14', events: 1540, apiCalls: 1340, errors: 9 }
-  ];
+  const points = data;
 
   const maxEvents = Math.max(...points.map((p) => p.events), 10);
   const maxApi = Math.max(...points.map((p) => p.apiCalls), 10);
@@ -263,11 +247,13 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
         </div>
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-400 dark:text-slate-500">
-        <span>{points[0]?.bucket ?? '14d ago'}</span>
-        <span>{points[Math.floor(points.length / 2)]?.bucket ?? '7d ago'}</span>
-        <span>{points[points.length - 1]?.bucket ?? 'Today'}</span>
-      </div>
+      {points.length > 0 ? (
+        <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-400 dark:text-slate-500">
+          <span>{points[0].bucket}</span>
+          <span>{points[Math.floor(points.length / 2)].bucket}</span>
+          <span>{points[points.length - 1].bucket}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -152,6 +152,7 @@ export interface OverviewResponse {
   topCountries: Array<{ name: string; total: number }>;
   topReferrers: Array<{ domain: string; visitors: number; views: number }>;
   sparkline: TrendPoint[];
+  observabilitySeries: Array<{ bucket: string; events: number; apiCalls: number; errors: number }>;
   apiTelemetry?: ApiTelemetryOverview;
   topErrors?: ErrorIssueOverview[];
   funnelSummary?: FunnelOverview;
@@ -235,7 +236,8 @@ export class AnalyticsService {
         topDevices: [],
         topCountries: [],
         topReferrers: [],
-        sparkline: []
+        sparkline: [],
+        observabilitySeries: []
       };
     }
 
@@ -271,11 +273,22 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const sparklineRows = await this.database.query<{ bucket: string; total: number }>(
+    const sparklineRows = await this.database.query<{
+      bucket: string;
+      total: number;
+      api_calls: number;
+      errors: number;
+    }>(
       `
         SELECT
           to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
-          count(*)::int AS total
+          count(*)::int AS total,
+          count(*) FILTER (
+            WHERE event_name = '$api_request' OR properties->>'durationMs' IS NOT NULL
+          )::int AS api_calls,
+          count(*) FILTER (
+            WHERE event_name = '$exception' OR event_name = '$error'
+          )::int AS errors
         FROM events
         WHERE project_id = $1 AND occurred_at >= now() - interval '14 days'
         GROUP BY 1
@@ -506,7 +519,18 @@ export class AnalyticsService {
 
     const to = new Date();
     const from = new Date(to.getTime() - 14 * DAY_MS);
-    const sparkline = this.zeroFill(this.generateBuckets(from, to, 'day'), sparklineRows.rows);
+    const buckets14 = this.generateBuckets(from, to, 'day');
+    const sparkline = this.zeroFill(buckets14, sparklineRows.rows);
+    const observabilityRows = new Map(sparklineRows.rows.map((row) => [row.bucket, row]));
+    const observabilitySeries = buckets14.map((bucket) => {
+      const row = observabilityRows.get(bucket);
+      return {
+        bucket,
+        events: Number(row?.total ?? 0),
+        apiCalls: Number(row?.api_calls ?? 0),
+        errors: Number(row?.errors ?? 0)
+      };
+    });
 
     const totals = totalsResult.rows[0];
     const revenue = revenueResult.rows[0];
@@ -520,7 +544,6 @@ export class AnalyticsService {
     const errCount = (apiTel?.error_500 ?? 0) + topErrorsResult.rows.reduce((sum, r) => sum + r.occurrences, 0);
     const errorRate = totalRequests > 0 ? Number(((errCount / totalRequests) * 100).toFixed(2)) : 0;
 
-    const buckets14 = this.generateBuckets(from, to, 'day');
     const latencySeries = totalRequests > 0 ? buckets14.map((bucket) => {
       const base = apiTel?.p50 || 0;
       return {
@@ -571,6 +594,7 @@ export class AnalyticsService {
       topCountries: topCountries.rows,
       topReferrers: topReferrers.rows,
       sparkline,
+      observabilitySeries,
       apiTelemetry: {
         totalRequests,
         p50: apiTel?.p50 || 0,

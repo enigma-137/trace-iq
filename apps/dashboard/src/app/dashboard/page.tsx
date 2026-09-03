@@ -92,6 +92,7 @@ interface OverviewResponse {
   topCountries: Array<{ name: string; total: number }>;
   topReferrers: Array<{ domain: string; visitors: number; views: number }>;
   sparkline: Array<{ bucket: string; total: number }>;
+  observabilitySeries?: Array<{ bucket: string; events: number; apiCalls: number; errors: number }>;
   apiTelemetry?: ApiTelemetryOverview;
   topErrors?: ErrorIssueOverview[];
   funnelSummary?: FunnelOverview;
@@ -136,17 +137,10 @@ export default async function DashboardPage({
   const activityTone = trendTone(sparkValues);
 
   // Tabbed chart data points
-  const tabbedPoints = (overview?.sparkline ?? []).map((pt, i) => {
-    const events = pt.total;
-    const apiCalls = Math.round(events * 0.75) || (i + 1) * 8;
-    const errors = Math.round(events * 0.02) || (i % 4 === 0 ? 1 : 0);
-    return {
-      bucket: shortBucket(pt.bucket),
-      events,
-      apiCalls,
-      errors
-    };
-  });
+  const tabbedPoints = (overview?.observabilitySeries ?? []).map((point) => ({
+    ...point,
+    bucket: dailyBucketLabel(point.bucket)
+  }));
 
   return (
     <DashboardShell
@@ -533,9 +527,14 @@ function trendLabel(values: number[]) {
   return `${change > 0 ? '+' : ''}${change}%`;
 }
 
-function shortBucket(bucket: string): string {
-  if (bucket.includes('T')) return bucket.split('T')[1].slice(0, 5);
-  return bucket.slice(5);
+function dailyBucketLabel(bucket: string): string {
+  const date = new Date(bucket);
+  if (Number.isNaN(date.getTime())) return bucket;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC'
+  }).format(date);
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
