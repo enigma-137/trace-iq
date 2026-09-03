@@ -279,7 +279,7 @@ export default async function DashboardPage({
       </section>
 
       {/* Row 1: Observability Tabbed Trends Chart & Allocation */}
-      <section className="mb-5 grid gap-3 grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
+      <section className="mb-5 grid gap-3 grid-cols-1 lg:grid-cols-[1.6fr_1fr] items-start">
         <OverviewTabbedChart data={tabbedPoints} />
 
         <div className="flex flex-col gap-3">

@@ -157,20 +157,20 @@ export function NowActivityPanel({ projectId }: { projectId?: string | null }) {
       ) : null}
 
       {data && hasActivity ? (
-        <ul className="relative mt-4 divide-y divide-neutral-100 dark:divide-slate-800/80">
-          {data.events.slice(0, 12).map((event) => (
-            <li key={event.id} className="flex items-start gap-3 px-0.5 py-2.5">
+        <ul className="relative mt-3 max-h-72 overflow-y-auto divide-y divide-neutral-100 pr-1 text-xs dark:divide-slate-800/80 [scrollbar-width:thin]">
+          {data.events.slice(0, 10).map((event) => (
+            <li key={event.id} className="flex items-start gap-3 px-0.5 py-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+                <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white">
                   {RESERVED_LABELS[event.eventName] ?? readableEventName(event.eventName)}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-slate-400">
+                <p className="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-slate-400">
                   {event.path || `${event.actor ?? 'anonymous'} (${event.device ?? 'unknown device'})`}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-xs font-medium tabular-nums text-neutral-600 dark:text-slate-300">{relativeTime(event.occurredAt)}</p>
-                {event.country ? <p className="mt-0.5 text-xs text-neutral-400 dark:text-slate-500">{event.country}</p> : null}
+                <p className="text-[11px] font-medium tabular-nums text-neutral-600 dark:text-slate-300">{relativeTime(event.occurredAt)}</p>
+                {event.country ? <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-slate-500">{event.country}</p> : null}
               </div>
             </li>
           ))}

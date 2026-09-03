@@ -178,10 +178,10 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
       </div>
 
       {/* SVG Multi-Series Chart */}
-      <div className="relative mt-4 w-full">
+      <div className="relative mt-4 flex-1 flex flex-col justify-end min-h-[220px] w-full">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-52 overflow-visible"
+          className="w-full h-full min-h-[200px] max-h-72 overflow-visible"
           preserveAspectRatio="none"
         >
           <defs>
