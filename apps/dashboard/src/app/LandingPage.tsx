@@ -230,8 +230,8 @@ const FEATURES: Array<{
     {
       icon: ReplayIcon,
       title: 'Session Replay',
-      body: 'The pipeline abstraction is in place, with DOM snapshotting and playback landing next.',
-      status: 'planned'
+      body: 'Reconstruct real user sessions from privacy-aware DOM events. Control sampling, consent, masking, and retention, then inspect sessions alongside your TraceIQ analytics.',
+      status: 'beta'
     }
   ];
 
