@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { DocsLayout } from './DocsLayout';
 import { CodeBlock } from './CodeBlock';
+import { SessionReplayDocs } from './SessionReplayDocs';
 
 export const docsSections = [
   { id: 'welcome', label: 'Welcome', category: 'Getting started' },
@@ -13,6 +14,7 @@ export const docsSections = [
   { id: 'node', label: 'Node.js SDK', category: 'Server & mobile SDKs' },
   { id: 'react-native', label: 'React Native SDK', category: 'Server & mobile SDKs' },
   { id: 'web-analytics', label: 'Web analytics', category: 'Features' },
+  { id: 'session-replay', label: 'Session Replay', category: 'Features' },
   { id: 'flags', label: 'Feature flags', category: 'Features' },
   { id: 'alerts', label: 'Alerts', category: 'Features' },
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
@@ -661,6 +663,10 @@ $traceiq->shutdown(); // flush before a short-lived process exits`}</Code>
     );
   }
 
+  if (id === 'session-replay') {
+    return <SessionReplayDocs projectId={projectId} apiBaseUrl={apiBaseUrl} />;
+  }
+
   if (id === 'flags') {
     return (
       <Section id="flags" title="Feature flags & remote config">
@@ -1047,6 +1053,7 @@ function verify(rawBody, header, secret) {
             ['Cohorts', 'Saved groups of users defined by the events they did (or didn’t) do, reusable as filters across the product.'],
             ['Users', 'Identified people and their chronological timelines, device, and location.'],
             ['Web analytics', 'Visitors, sessions, bounce rate, top paths, sources, devices, geography, active hours, and frustrating pages.'],
+            ['Session Replay', 'Consent-aware, sanitized rrweb session reconstruction with project sampling, separate retention, and isolated playback.'],
             ['Errors', 'Grouped exceptions with occurrences, affected users, stack traces, and browser/OS breakdown.'],
             ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
             ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook and/or email recipients or notification groups, with per-recipient delivery status.'],
@@ -1081,6 +1088,11 @@ export function PathCardsGrid({ basePath }: { basePath: string }) {
       title: 'Browser Autocapture',
       desc: 'Automatic click tracking, rage clicks, and page view sessions.',
       href: `${basePath}?page=autocapture`
+    },
+    {
+      title: 'Session Replay',
+      desc: 'Consent-aware rrweb capture, privacy controls, retention, and playback.',
+      href: `${basePath}?page=session-replay`
     },
     {
       title: 'Server & Mobile SDKs',
