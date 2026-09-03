@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { DashboardShell } from '../DashboardShell';
+import { withProjectId } from '../nav';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { StatTile } from '@/components/charts/StatTile';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
@@ -129,7 +131,19 @@ export default async function ApiPerformancePage({
 }) {
   const { user, token } = await requireDashboardSession('/dashboard/api-performance');
   const days = firstParam(searchParams.days) ?? '7';
-  const { data, error } = await dashboardGet<ApiPerformanceResponse>(`/v1/dashboard/api-performance?days=${days}`, token);
+  const projectId = firstParam(searchParams.projectId);
+  const apiParams = new URLSearchParams({ days });
+  if (projectId) apiParams.set('projectId', projectId);
+  const { data, error } = await dashboardGet<ApiPerformanceResponse>(
+    `/v1/dashboard/api-performance?${apiParams.toString()}`,
+    token
+  );
+
+  if (!projectId && data?.project?.id) {
+    redirect(`/dashboard/api-performance?${new URLSearchParams({ days, projectId: data.project.id })}`);
+  }
+
+  const canonicalProjectId = data?.project?.id ?? projectId;
 
   const summary = data?.summary;
   const hasData = (summary?.totalRequests ?? 0) > 0;
@@ -137,7 +151,12 @@ export default async function ApiPerformancePage({
   const { columns, connections } = buildApiFlowGraph(data);
 
   return (
-    <DashboardShell active="api-performance" title="API performance" userEmail={user.email}>
+    <DashboardShell
+      active="api-performance"
+      title="API performance"
+      userEmail={user.email}
+      projectId={canonicalProjectId}
+    >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-sm text-neutral-500 dark:text-slate-400">
           Latency, errors, and traffic per endpoint — from <code className="font-mono text-xs">$api_request</code> events
@@ -147,7 +166,7 @@ export default async function ApiPerformancePage({
           {RANGES.map((range) => (
             <Link
               key={range.value}
-              href={`/dashboard/api-performance?days=${range.value}`}
+              href={withProjectId(`/dashboard/api-performance?days=${range.value}`, canonicalProjectId)}
               className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
                 days === range.value
                   ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'

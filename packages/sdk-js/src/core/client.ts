@@ -204,7 +204,6 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.track('$api_request', {
       method,
       path: normalizeApiPath(url, this.getLocation()?.origin),
-      url,
       status,
       durationMs: Math.round(durationMs),
       ok: status >= 200 && status < 400
