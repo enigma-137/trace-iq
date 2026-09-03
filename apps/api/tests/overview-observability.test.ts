@@ -117,6 +117,7 @@ describe('overview observability series', () => {
     expect(summarySql).toContain("properties->>'status' ~ '^[0-9]+$'");
     const tracesSql = db.queryCalls('AS duration_ms')[0].text;
     expect(tracesSql).toContain("event_name = '$api_request'");
+    expect(tracesSql).toContain('LIMIT 5');
     expect(tracesSql).not.toContain('random()');
   });
 });

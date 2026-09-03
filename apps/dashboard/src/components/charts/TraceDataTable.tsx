@@ -25,7 +25,7 @@ export function TraceDataTable({
   className = ''
 }: TraceDataTableProps) {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | '200' | '429' | '500'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | '2xx' | '4xx' | '429' | '5xx'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, e: React.MouseEvent) => {
@@ -45,9 +45,10 @@ export function TraceDataTable({
 
     const matchesStatus =
       statusFilter === 'all' ||
-      (statusFilter === '200' && trace.status >= 200 && trace.status < 300) ||
+      (statusFilter === '2xx' && trace.status >= 200 && trace.status < 300) ||
+      (statusFilter === '4xx' && trace.status >= 400 && trace.status < 500 && trace.status !== 429) ||
       (statusFilter === '429' && trace.status === 429) ||
-      (statusFilter === '500' && trace.status >= 500);
+      (statusFilter === '5xx' && trace.status >= 500);
 
     return matchesSearch && matchesStatus;
   });
@@ -119,8 +120,8 @@ export function TraceDataTable({
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Recent Ingestion & API Traces</h3>
-            <p className="text-xs text-neutral-500 dark:text-slate-400">Live request telemetry stream with execution timings</p>
+            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Latest API Requests</h3>
+            <p className="text-xs text-neutral-500 dark:text-slate-400">Five most recent requests with status and execution time</p>
           </div>
         </div>
 
@@ -148,7 +149,7 @@ export function TraceDataTable({
           </svg>
           <input
             type="text"
-            placeholder="Search by Trace ID or path..."
+            placeholder="Search by request ID or endpoint..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 w-full rounded-md border border-neutral-200 bg-white pl-8 pr-3 text-xs placeholder:text-neutral-400 focus:border-blue-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
@@ -157,7 +158,7 @@ export function TraceDataTable({
 
         <div className="flex items-center gap-1 text-xs">
           <span className="text-neutral-500 dark:text-slate-400 mr-1 font-medium">Status:</span>
-          {(['all', '200', '429', '500'] as const).map((s) => (
+          {(['all', '2xx', '4xx', '429', '5xx'] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -179,9 +180,10 @@ export function TraceDataTable({
         <table className="w-full text-left text-xs">
           <thead className="border-b border-neutral-200/80 bg-neutral-50/80 text-neutral-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
             <tr>
-              <th className="px-5 py-2.5 font-semibold">Trace ID</th>
+              <th className="px-5 py-2.5 font-semibold">Request ID</th>
               <th className="px-3 py-2.5 font-semibold">Status</th>
-              <th className="px-3 py-2.5 font-semibold">Method & Endpoint</th>
+              <th className="px-3 py-2.5 font-semibold">Method</th>
+              <th className="px-3 py-2.5 font-semibold">Endpoint</th>
               <th className="px-3 py-2.5 font-semibold">Duration</th>
               <th className="px-3 py-2.5 font-semibold">Time</th>
               <th className="px-5 py-2.5 text-right font-semibold">Action</th>
@@ -190,8 +192,8 @@ export function TraceDataTable({
           <tbody className="divide-y divide-neutral-100 dark:divide-slate-800/60 text-neutral-700 dark:text-slate-300">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-neutral-400 dark:text-slate-500">
-                  No matching telemetry traces found.
+                <td colSpan={7} className="py-8 text-center text-neutral-400 dark:text-slate-500">
+                  No matching API requests found.
                 </td>
               </tr>
             ) : (
@@ -229,9 +231,10 @@ export function TraceDataTable({
 
                   <td className="px-3 py-3 whitespace-nowrap">{getStatusBadge(trace.status)}</td>
 
+                  <td className="px-3 py-3 whitespace-nowrap">{getMethodBadge(trace.method)}</td>
+
                   <td className="px-3 py-3">
-                    <div className="flex items-center gap-2 max-w-sm truncate">
-                      {getMethodBadge(trace.method)}
+                    <div className="flex max-w-sm items-center gap-2 truncate">
                       <span className="font-mono text-neutral-900 dark:text-white truncate" title={trace.path}>
                         {trace.path}
                       </span>

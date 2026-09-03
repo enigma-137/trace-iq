@@ -505,7 +505,7 @@ export class AnalyticsService {
             AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
             AND properties->>'status' ~ '^[0-9]+$'
           ORDER BY occurred_at DESC
-          LIMIT 8
+          LIMIT 5
         `,
         [project.id]
       ).catch(() => ({ rows: [] })),
