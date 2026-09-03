@@ -105,6 +105,12 @@ interface WebReferrersResponse {
   referrers: Array<{ domain: string; visitors: number; views: number }>;
 }
 
+interface TrendResponse {
+  series: Array<{
+    points: Array<{ bucket: string; total: number }>;
+  }>;
+}
+
 const cardClass =
   'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
@@ -132,12 +138,36 @@ export default async function DashboardPage({
     dashboardReferrers = webReferrers?.referrers ?? [];
   }
 
+  let observabilitySeries = overview?.observabilitySeries ?? [];
+  if (canonicalProjectId && observabilitySeries.length === 0) {
+    const trendPath = (event: string) => {
+      const params = new URLSearchParams({
+        event,
+        interval: 'day',
+        days: '14',
+        projectId: canonicalProjectId
+      });
+      return `/v1/dashboard/insights/trends?${params.toString()}`;
+    };
+    const [apiRequests, exceptions, errors] = await Promise.all([
+      dashboardGet<TrendResponse>(trendPath('$api_request'), token),
+      dashboardGet<TrendResponse>(trendPath('$exception'), token),
+      dashboardGet<TrendResponse>(trendPath('$error'), token)
+    ]);
+    observabilitySeries = mergeObservabilitySeries(
+      overview?.sparkline ?? [],
+      apiRequests.data?.series[0]?.points ?? [],
+      exceptions.data?.series[0]?.points ?? [],
+      errors.data?.series[0]?.points ?? []
+    );
+  }
+
   const sparkValues = overview?.sparkline.map((point) => point.total) ?? [];
   const activityDelta = trendLabel(sparkValues);
   const activityTone = trendTone(sparkValues);
 
   // Tabbed chart data points
-  const tabbedPoints = (overview?.observabilitySeries ?? []).map((point) => ({
+  const tabbedPoints = observabilitySeries.map((point) => ({
     ...point,
     bucket: dailyBucketLabel(point.bucket)
   }));
@@ -535,6 +565,24 @@ function dailyBucketLabel(bucket: string): string {
     day: 'numeric',
     timeZone: 'UTC'
   }).format(date);
+}
+
+function mergeObservabilitySeries(
+  events: Array<{ bucket: string; total: number }>,
+  apiRequests: Array<{ bucket: string; total: number }>,
+  exceptions: Array<{ bucket: string; total: number }>,
+  errors: Array<{ bucket: string; total: number }>
+): NonNullable<OverviewResponse['observabilitySeries']> {
+  const apiByBucket = new Map(apiRequests.map((point) => [point.bucket, point.total]));
+  const exceptionsByBucket = new Map(exceptions.map((point) => [point.bucket, point.total]));
+  const errorsByBucket = new Map(errors.map((point) => [point.bucket, point.total]));
+
+  return events.map((point) => ({
+    bucket: point.bucket,
+    events: point.total,
+    apiCalls: apiByBucket.get(point.bucket) ?? 0,
+    errors: (exceptionsByBucket.get(point.bucket) ?? 0) + (errorsByBucket.get(point.bucket) ?? 0)
+  }));
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
