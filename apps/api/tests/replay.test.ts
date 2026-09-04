@@ -95,6 +95,7 @@ function canaryEvent(timestamp = Date.now()) {
     { tagName: 'p', textContent: `password=${CANARIES.text}` },
     { tagName: 'a', attributes: { href: `https://${CANARIES.credentials}:pw@example.test/path?token=${CANARIES.query}#${CANARIES.fragment}` } },
     { tagName: 'img', attributes: { src: `https://example.test/a?api_key=${CANARIES.query}`, rr_src: `https://example.test/b#${CANARIES.fragment}` } },
+    { tagName: 'link', attributes: { _cssText: `.card{display:grid;color:red;background:url(https://example.test/css?token=${CANARIES.css})}` } },
     { tagName: 'form', attributes: { action: `https://example.test/login?auth_code=${CANARIES.query}`, formaction: `https://example.test/go#${CANARIES.fragment}` } },
     { tagName: 'div', attributes: { style: `background:url(https://example.test/pixel?secret=${CANARIES.css}#${CANARIES.fragment})`,
       filter: `u\\72l(https://example.test/escaped?token=${CANARIES.query})`, rr_dataURL: `data:image/png,${CANARIES.hidden}` } },
@@ -111,6 +112,8 @@ describe('Session Replay security', () => {
     });
     const persisted = gunzipSync([...storage.objects.values()][0]).toString('utf8');
     for (const canary of Object.values(CANARIES)) expect(persisted).not.toContain(canary);
+    expect(persisted).toContain('display:grid');
+    expect(persisted).toContain('background:none');
     expect(callOrder).toEqual(['db.reserve', 'storage.put', 'db.finalize']);
   });
 
@@ -217,6 +220,37 @@ describe('Session Replay security', () => {
     expect(projected).not.toContain('example.test');
     expect(projected).not.toContain(CANARIES.query);
     expect(projected).toContain('data:,');
+  });
+
+  it('preserves safe inline CSS while removing stylesheet network references', () => {
+    const source = [{ type: 2, timestamp: 1, data: { node: {
+      tagName: 'link', attributes: { _cssText: `@import "https://styles.example/base.css";
+.card{display:grid;color:rgb(10,20,30);background-image:url("https://images.example/pixel?token=${CANARIES.query}")}
+@font-face{font-family:ReplayFont;src:u\\72l(https://fonts.example/font.woff2)}
+.escaped{border:1px solid red;background:u\\
+rl(https://escaped.example/pixel)}` }, childNodes: []
+    } } }];
+
+    const persisted = sanitizeReplayEvents(source, 'balanced');
+    const persistedJson = JSON.stringify(persisted);
+    expect(persistedJson).toContain('display:grid');
+    expect(persistedJson).toContain('color:rgb(10,20,30)');
+    expect(persistedJson).toContain('background-image:none');
+    expect(persistedJson).toContain('src:none');
+    expect(persistedJson).toContain('border:1px solid red');
+    expect(persistedJson).not.toContain('@import');
+    expect(persistedJson).not.toContain('styles.example');
+    expect(persistedJson).not.toContain('images.example');
+    expect(persistedJson).not.toContain('fonts.example');
+    expect(persistedJson).not.toContain('escaped.example');
+    expect(persistedJson).not.toContain(CANARIES.query);
+
+    const projectedJson = JSON.stringify(isolateReplayEventsForPlayback(persisted));
+    expect(projectedJson).toContain('display:grid');
+    expect(projectedJson).toContain('color:rgb(10,20,30)');
+    expect(projectedJson).not.toContain('styles.example');
+    expect(projectedJson).not.toContain('images.example');
+    expect(projectedJson).not.toContain('fonts.example');
   });
 
   it('blocks iframe contents unless both explicit and same-origin SDK markers are present', () => {

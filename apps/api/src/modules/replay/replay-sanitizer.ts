@@ -127,7 +127,7 @@ function sanitizeAttributes(attributes: JsonObject, privacyMode: ReplayPrivacyMo
     else if (URL_LIST_ATTRIBUTES.has(normalized) && typeof child === 'string') next[key] = child.split(/\s+/).map(scrubUrl).join(' ');
     else if ((normalized === 'srcset' || normalized === 'imagesrcset') && typeof child === 'string') next[key] = scrubSrcSet(child);
     else if (CSS_URL_ATTRIBUTES.has(normalized) && typeof child === 'string') next[key] = scrubCssUrls(child);
-    else if (normalized === 'style' && typeof child === 'string') next[key] = scrubCssUrls(scrubObviousSecrets(child));
+    else if (CSS_KEYS.has(normalized) && typeof child === 'string') next[key] = scrubCssUrls(child);
     else next[key] = sanitizeValue(child, privacyMode, 'attributes', depth + 1);
   }
   if ('srcdoc' in next) next.srcdoc = '';
@@ -185,19 +185,153 @@ function scrubSrcSet(value: string) {
 
 function scrubCssUrls(value: string) {
   const scrubbed = scrubObviousSecrets(value);
-  return hasCssNetworkReference(scrubbed) ? '[redacted-css-url]' : scrubbed;
+  return neutralizeCssNetworkReferences(scrubbed);
 }
 
 function neutralizeCss(value: string) {
-  return hasCssNetworkReference(value) ? '' : value;
+  return neutralizeCssNetworkReferences(value);
+}
+
+/**
+ * Keeps non-network CSS intact while making every resource-bearing construct
+ * inert. If an escaped or malformed construct survives the targeted rewrite,
+ * the final audit fails closed and drops the CSS string.
+ */
+function neutralizeCssNetworkReferences(value: string) {
+  let output = '';
+  let cursor = 0;
+  let index = 0;
+
+  while (index < value.length) {
+    if (value[index] === '/' && value[index + 1] === '*') {
+      index = skipCssComment(value, index);
+      continue;
+    }
+    if (value[index] === '"' || value[index] === "'") {
+      index = skipCssString(value, index);
+      continue;
+    }
+
+    const identifierStart = value[index] === '@' ? index + 1 : index;
+    const identifierEnd = readCssIdentifierEnd(value, identifierStart);
+    if (identifierEnd === identifierStart) {
+      index += 1;
+      continue;
+    }
+
+    const identifier = decodeCssIdentifier(value.slice(identifierStart, identifierEnd)).toLowerCase();
+    if (value[index] === '@' && identifier === 'import') {
+      const end = findCssStatementEnd(value, identifierEnd);
+      output += `${value.slice(cursor, index)}/* traceiq: import removed */`;
+      cursor = end;
+      index = end;
+      continue;
+    }
+
+    const openParen = skipCssWhitespace(value, identifierEnd);
+    if (value[openParen] === '(' && isCssNetworkFunction(identifier)) {
+      const end = findCssFunctionEnd(value, openParen);
+      output += `${value.slice(cursor, index)}none`;
+      cursor = end;
+      index = end;
+      continue;
+    }
+    index = identifierEnd;
+  }
+
+  output += value.slice(cursor);
+  return hasCssNetworkReference(output) ? '' : output;
+}
+
+function isCssNetworkFunction(identifier: string) {
+  return identifier === 'url' || identifier === 'src' || identifier === 'image-set'
+    || identifier === '-webkit-image-set' || identifier === 'image';
+}
+
+function readCssIdentifierEnd(value: string, start: number) {
+  let index = start;
+  while (index < value.length) {
+    const char = value[index];
+    if (/[a-z0-9_-]/i.test(char)) {
+      index += 1;
+      continue;
+    }
+    if (char !== '\\') break;
+    index += 1;
+    const hex = value.slice(index).match(/^[0-9a-f]{1,6}/i)?.[0];
+    if (hex) {
+      index += hex.length;
+      if (/\s/.test(value[index] ?? '')) index += 1;
+    } else if (index < value.length) index += 1;
+  }
+  return index;
+}
+
+function decodeCssIdentifier(value: string) {
+  return value
+    .replace(/\\(?:\r\n|[\n\r\f])/g, '')
+    .replace(/\\([0-9a-f]{1,6})\s?|\\(.)/gi, (_match, hex, escaped) => decodeCssEscape(hex, escaped));
+}
+
+function skipCssWhitespace(value: string, start: number) {
+  let index = start;
+  while (/\s/.test(value[index] ?? '')) index += 1;
+  return index;
+}
+
+function skipCssComment(value: string, start: number) {
+  const end = value.indexOf('*/', start + 2);
+  return end === -1 ? value.length : end + 2;
+}
+
+function skipCssString(value: string, start: number) {
+  const quote = value[start];
+  let index = start + 1;
+  while (index < value.length) {
+    if (value[index] === '\\') index += 2;
+    else if (value[index] === quote) return index + 1;
+    else index += 1;
+  }
+  return value.length;
+}
+
+function findCssFunctionEnd(value: string, openParen: number) {
+  let depth = 1;
+  let index = openParen + 1;
+  while (index < value.length) {
+    if (value[index] === '/' && value[index + 1] === '*') index = skipCssComment(value, index);
+    else if (value[index] === '"' || value[index] === "'") index = skipCssString(value, index);
+    else if (value[index] === '(') { depth += 1; index += 1; }
+    else if (value[index] === ')') {
+      depth -= 1;
+      index += 1;
+      if (depth === 0) return index;
+    } else index += 1;
+  }
+  return value.length;
+}
+
+function findCssStatementEnd(value: string, start: number) {
+  let depth = 0;
+  let index = start;
+  while (index < value.length) {
+    if (value[index] === '/' && value[index + 1] === '*') index = skipCssComment(value, index);
+    else if (value[index] === '"' || value[index] === "'") index = skipCssString(value, index);
+    else if (value[index] === '(') { depth += 1; index += 1; }
+    else if (value[index] === ')') { depth = Math.max(0, depth - 1); index += 1; }
+    else if (value[index] === ';' && depth === 0) return index + 1;
+    else index += 1;
+  }
+  return value.length;
 }
 
 function hasCssNetworkReference(value: string) {
   const normalized = value
     .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\\(?:\r\n|[\n\r\f])/g, '')
     .replace(/\\([0-9a-f]{1,6})\s?|\\(.)/gi, (_match, hex, escaped) => decodeCssEscape(hex, escaped))
     .toLowerCase();
-  return /@import|(?:url|image-set|src)\s*\(/.test(normalized);
+  return /@import|(?:url|image-set|image|src)\s*\(/.test(normalized);
 }
 
 function decodeCssEscape(hex: string | undefined, escaped: string | undefined) {

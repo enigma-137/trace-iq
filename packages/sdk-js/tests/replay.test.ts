@@ -3,9 +3,11 @@ import { ReplayRecorder, sampleSession } from '../src/core/replay';
 import { sanitizeTransportEvent } from '../src/core/replay-privacy';
 
 const rrweb = vi.hoisted(() => ({
-  options: undefined as undefined | { emit: (event: unknown) => void; maskInputOptions: Record<string, boolean>; blockSelector: string },
+  options: undefined as undefined | { emit: (event: unknown) => void; maskInputOptions: Record<string, boolean>;
+    blockSelector: string; inlineStylesheet: boolean; inlineImages: boolean },
   synchronousEvent: undefined as unknown,
-  record: vi.fn((options: { emit: (event: unknown) => void; maskInputOptions: Record<string, boolean>; blockSelector: string }) => {
+  record: vi.fn((options: { emit: (event: unknown) => void; maskInputOptions: Record<string, boolean>;
+    blockSelector: string; inlineStylesheet: boolean; inlineImages: boolean }) => {
     rrweb.options = options;
     if (rrweb.synchronousEvent) options.emit(rrweb.synchronousEvent);
     return vi.fn();
@@ -22,6 +24,7 @@ function recorderEvent() {
     { tagName: 'p', textContent: `password=${CANARIES[1]}` },
     { tagName: 'a', attributes: { href: `https://${CANARIES[4]}:pw@example.test/?token=${CANARIES[2]}#${CANARIES[3]}`,
       style: `background:u\\72l(https://example.test/?token=${CANARIES[2]})`, rr_dataURL: `data:image/png,${CANARIES[0]}` } },
+    { tagName: 'link', attributes: { _cssText: `.card{display:grid;color:red;background:url(https://example.test/a?token=${CANARIES[2]})}` } },
     { tagName: 'iframe', attributes: { src: `https://example.test/?token=${CANARIES[2]}` }, childNodes: [{ textContent: CANARIES[1] }] }
   ] } }] } };
 }
@@ -92,6 +95,8 @@ describe('ReplayRecorder security gates', () => {
     await expect(recorder.start()).resolves.toBe(true);
     expect(rrweb.options?.maskInputOptions.hidden).toBe(true);
     expect(rrweb.options?.blockSelector).toContain('iframe:not([data-traceiq-replay-safe-frame="true"])');
+    expect(rrweb.options?.inlineStylesheet).toBe(true);
+    expect(rrweb.options?.inlineImages).toBe(false);
     rrweb.options?.emit(recorderEvent());
     recorder.stop();
     await vi.waitFor(() => expect(chunks.length).toBe(1));
@@ -144,6 +149,9 @@ describe('ReplayRecorder security gates', () => {
   it('recursively sanitizes an event before transport in Balanced mode', () => {
     const serialized = JSON.stringify(sanitizeTransportEvent(recorderEvent(), 'balanced'));
     for (const canary of CANARIES) expect(serialized).not.toContain(canary);
+    expect(serialized).toContain('display:grid');
+    expect(serialized).toContain('color:red');
+    expect(serialized).toContain('background:none');
   });
 
   it('prevents recording attempts until revoked consent is explicitly granted again', async () => {

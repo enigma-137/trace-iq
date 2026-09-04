@@ -135,6 +135,9 @@ export class ReplayRecorder {
           blockSelector: joinSelectors(BUILTIN_BLOCK, config.blockSelectors, this.options.blockSelectors),
           // Ignore suppresses interaction events only. It is never a privacy boundary.
           ignoreSelector: joinSelectors(['[data-traceiq-ignore]'], config.ignoreSelectors, this.options.ignoreSelectors),
+          // Preserve readable same-origin CSS in the snapshot. Images stay URL-based
+          // and are neutralized by the playback projection instead of being inlined.
+          inlineStylesheet: true, inlineImages: false,
           recordCanvas: false, recordCrossOriginIframes: false, collectFonts: false, checkoutEveryNms: 30_000,
           slimDOMOptions: { script: true, comment: true, headMetaDescKeywords: true, headMetaSocial: true,
             headMetaRobots: true, headMetaHttpEquiv: true, headMetaAuthorship: true, headMetaVerification: true }
