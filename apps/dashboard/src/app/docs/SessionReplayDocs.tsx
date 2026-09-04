@@ -97,7 +97,7 @@ export function SessionReplayDocs({
           items={[
             [
               "Browser SDK",
-              "Use traceiq-sdk-js 0.1.1 or later. Replay is not provided by the Node.js or React Native SDKs.",
+              "Use traceiq-sdk-js 0.1.2 or later. Replay is not provided by the Node.js or React Native SDKs.",
             ],
             [
               "Browser runtime",
@@ -135,7 +135,7 @@ export function SessionReplayDocs({
           . Keep the conservative defaults—Strict privacy and required
           consent—while validating your integration.
         </ReplayP>
-        <ReplayCode lang="bash">npm install traceiq-sdk-js@^0.1.1</ReplayCode>
+        <ReplayCode lang="bash">npm install traceiq-sdk-js@^0.1.2</ReplayCode>
         <ReplayCode>{`import { traceiq } from 'traceiq-sdk-js';
 
 traceiq.initialize({
