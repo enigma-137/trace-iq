@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { DashboardShell } from '../DashboardShell';
 import { withProjectId } from '../nav';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
+import { SDK_VERSIONS } from '@/lib/sdkVersions';
 import { StatTile } from '@/components/charts/StatTile';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
 
@@ -71,7 +72,7 @@ function buildApiFlowGraph(data?: ApiPerformanceResponse | null): { columns: Col
       title: 'Clients & SDKs',
       subtitle: 'Ingestion entry points',
       nodes: [
-        { id: 'c-web', title: 'Browser SDK', description: 'Autocapture & SPA telemetry', countBadge: '65%', status: 'healthy', tags: ['js', 'v0.1.0'] },
+        { id: 'c-web', title: 'Browser SDK', description: 'Autocapture & SPA telemetry', countBadge: '65%', status: 'healthy', tags: ['js', `v${SDK_VERSIONS.javascript}`] },
         { id: 'c-middleware', title: 'Node.js Express / Next', description: 'Server middleware hooks', countBadge: '25%', status: 'healthy', tags: ['node', 'http'] },
         { id: 'c-python', title: 'Python SDK / FastAPI', description: 'Backend service traces', countBadge: '10%', status: 'info', tags: ['python'] }
       ]

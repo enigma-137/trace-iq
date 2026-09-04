@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { DocsLayout } from './DocsLayout';
 import { CodeBlock } from './CodeBlock';
 import { SessionReplayDocs } from './SessionReplayDocs';
+import { SDK_VERSIONS } from '@/lib/sdkVersions';
 
 export const docsSections = [
   { id: 'welcome', label: 'Welcome', category: 'Getting started' },
@@ -337,8 +338,11 @@ curl http://127.0.0.1:4000/health`}</Code>
   if (id === 'quickstart') {
     return (
       <Section id="quickstart" title="Quickstart">
-        <P>Install the SDK and initialize it with your project credentials (from Settings).</P>
-        <Code lang="bash">{`npm install traceiq-sdk-js`}</Code>
+        <P>
+          Install the latest browser SDK (currently <Mono>v{SDK_VERSIONS.javascript}</Mono>) and initialize it with
+          your project credentials from Settings.
+        </P>
+        <Code lang="bash">{`npm install traceiq-sdk-js@latest`}</Code>
         <Code lang="ts">{snippet}</Code>
         <P>
           That&apos;s it — events start flowing to <Mono>Events</Mono> within seconds. Grab your write key from{' '}
@@ -480,7 +484,7 @@ traceiq.capture({ event: 'transfer_started', properties: { amount: 5000, currenc
         </P>
         <Code lang="bash">{`pip install traceiq-py`}</Code>
         <P>
-          Package links: <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://pypi.org/project/traceiq-py/0.1.0/" target="_blank" rel="noreferrer">PyPI</a>,{' '}
+          Package links: <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href={`https://pypi.org/project/traceiq-py/${SDK_VERSIONS.python}/`} target="_blank" rel="noreferrer">PyPI</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://crates.io/crates/traceiq" target="_blank" rel="noreferrer">crates.io</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-sdk-js" target="_blank" rel="noreferrer">npm (JS SDK)</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-react-native" target="_blank" rel="noreferrer">npm (React Native)</a>,{' '}
@@ -554,7 +558,7 @@ traceiq.capture("transfer_started", userId = "user_123",
         </P>
         <Code lang="toml">{`# Cargo.toml
 [dependencies]
-traceiq = "0.1.0"`}</Code>
+traceiq = "${SDK_VERSIONS.rust}"`}</Code>
         <Code lang="rust">{`use traceiq::Client;
 
 let mut traceiq = Client::new("${projectId}", "YOUR_WRITE_KEY");

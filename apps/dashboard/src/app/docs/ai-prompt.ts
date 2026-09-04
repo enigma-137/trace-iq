@@ -1,6 +1,8 @@
 // Static data for the docs "Ask AI" prompt builder. Everything here is pure data
 // so the modal can compose a detailed prompt entirely on the client — no API call.
 
+import { SDK_VERSIONS } from '@/lib/sdkVersions';
+
 export type AiLanguageId = 'javascript' | 'python' | 'rust' | 'php' | 'react-native' | 'swift' | 'mcp' | 'other';
 
 export type AiFeatureId =
@@ -36,7 +38,7 @@ export const AI_LANGUAGES: AiLanguage[] = [
     id: 'javascript',
     label: 'JavaScript',
     blurb: 'Browser SDK — single script, under 25 KB',
-    install: 'npm install traceiq-sdk-js',
+    install: 'npm install traceiq-sdk-js@latest',
     init: `import { traceiq } from 'traceiq-sdk-js';
 
 traceiq.initialize({
@@ -122,12 +124,12 @@ traceiq = Client(
     id: 'rust',
     label: 'Rust',
     blurb: 'Queued, batched client with a background flush thread',
-    install: '# Cargo.toml\ntraceiq = "0.1.0"',
+    install: `# Cargo.toml\ntraceiq = "${SDK_VERSIONS.rust}"`,
     init: `use traceiq::Client;
 
 let mut traceiq = Client::new("YOUR_PROJECT_ID", "YOUR_WRITE_KEY");`,
     steps: [
-      'Add `traceiq = "0.1.0"` to your Cargo.toml.',
+      `Add \`traceiq = "${SDK_VERSIONS.rust}"\` to your Cargo.toml.`,
       'Create a `Client` with your project id and write key.',
       'Events queue internally and flush in batches from a background thread.',
       'Call `shutdown()` before exit to flush anything still buffered.'

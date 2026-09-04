@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { SDK_VERSIONS } from "@/lib/sdkVersions";
 import { CodeBlock } from "./CodeBlock";
 
 interface SessionReplayDocsProps {
@@ -13,45 +14,33 @@ export function SessionReplayDocs({
 }: SessionReplayDocsProps) {
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:p-8">
-        <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-violet-500/10 blur-3xl dark:bg-cyan-500/10" />
-        <div className="relative z-10">
-          <span className="inline-flex rounded-full border border-violet-500/20 px-3 py-1 font-mono text-xs font-semibold text-violet-700 dark:border-cyan-400/20 dark:text-cyan-300">
-            Browser SDK · rrweb event streams
-          </span>
-          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
-            Session Replay
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-600 dark:text-slate-300 sm:text-base">
-            Reconstruct how a browser session unfolded without recording a
-            video. TraceIQ captures a sanitized rrweb event stream, stores it
-            with separate retention controls, and plays it back from the Replays
-            workspace.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/dashboard/settings/replay"
-              className="inline-flex h-9 items-center rounded-lg bg-neutral-900 px-4 text-xs font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            >
-              Open replay settings
-            </Link>
-            <a
-              href="#replay-quickstart"
-              className="inline-flex h-9 items-center rounded-lg border border-neutral-300 px-4 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              Start integration
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <Callout tone="warning" title="Privacy starts in your application">
-        Session Replay can contain personal data from the DOM. TraceIQ applies
-        conservative masking and two sanitization passes, but you remain
-        responsible for your notice, lawful basis or consent, selector review,
-        retention choice, and data-subject process. Masking is a risk control,
-        not a guarantee of legal compliance.
-      </Callout>
+      <ReplaySection id="session-replay" title="Session Replay">
+        <ReplayP>
+          Reconstruct how a browser session unfolded without recording a video.
+          TraceIQ captures a sanitized rrweb event stream, stores it with
+          separate retention controls, and plays it back from the Replays
+          workspace.
+        </ReplayP>
+        <Callout tone="info" title="Start with the JavaScript Quickstart">
+          This guide builds on the existing browser integration. Complete the{" "}
+          <Link
+            className="font-semibold underline underline-offset-4"
+            href="/docs?page=quickstart"
+          >
+            JavaScript installation guide
+          </Link>{" "}
+          first and make sure you are using the current browser SDK (v
+          {SDK_VERSIONS.javascript}) or later. Then return here to add only the
+          Replay-specific configuration.
+        </Callout>
+        <Callout tone="warning" title="Privacy starts in your application">
+          Session Replay can contain personal data from the DOM. TraceIQ applies
+          conservative masking and two sanitization passes, but you remain
+          responsible for your notice, lawful basis or consent, selector review,
+          retention choice, and data-subject process. Masking is a risk control,
+          not a guarantee of legal compliance.
+        </Callout>
+      </ReplaySection>
 
       <ReplaySection id="replay-overview" title="What Session Replay does">
         <ReplayP>
@@ -97,7 +86,7 @@ export function SessionReplayDocs({
           items={[
             [
               "Browser SDK",
-              "Use traceiq-sdk-js 0.1.2 or later. Replay is not provided by the Node.js or React Native SDKs.",
+              `Use traceiq-sdk-js ${SDK_VERSIONS.javascript} or later. Replay is not provided by the Node.js or React Native SDKs.`,
             ],
             [
               "Browser runtime",
@@ -123,9 +112,10 @@ export function SessionReplayDocs({
         />
       </ReplaySection>
 
-      <ReplaySection id="replay-quickstart" title="Quickstart">
+      <ReplaySection id="replay-enable" title="Enable Replay">
         <ReplayP>
-          First enable replay for the intended project under{" "}
+          After completing the JavaScript Quickstart, enable replay for the
+          intended project under{" "}
           <Link
             className="font-semibold text-blue-600 hover:underline dark:text-cyan-400"
             href="/dashboard/settings/replay"
@@ -133,9 +123,10 @@ export function SessionReplayDocs({
             Session Replay settings
           </Link>
           . Keep the conservative defaults—Strict privacy and required
-          consent—while validating your integration.
+          consent—while validating your integration. Merge the replay block
+          below into your existing <ReplayMono>initialize()</ReplayMono> call;
+          do not initialize the SDK a second time.
         </ReplayP>
-        <ReplayCode lang="bash">npm install traceiq-sdk-js@^0.1.2</ReplayCode>
         <ReplayCode>{`import { traceiq } from 'traceiq-sdk-js';
 
 traceiq.initialize({

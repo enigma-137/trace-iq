@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 
 // TODO: point these at the real repo once it is public.
 // const GITHUB_URL = 'https://github.com';
-// const VERSION = 'v0.1.0';
 
 // Shared focus treatment. The page is near-black, so the ring needs an offset
 // in the same colour to read as a ring rather than a smear.
