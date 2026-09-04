@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import type { ReplayListItem } from '@/features/replay/types';
+import { ReplayDeleteButton } from './ReplayDeleteButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,17 +40,22 @@ export default async function ReplaysPage({ searchParams }: {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] uppercase tracking-wider text-neutral-500 dark:border-slate-800 dark:bg-slate-900/70">
-              <tr><th className="px-4 py-3">Visitor</th><th>Entry page</th><th>Started</th><th>Duration</th><th>Device</th><th>Location</th><th>Size</th><th /></tr>
+              <tr><th className="px-4 py-3">Visitor</th><th>Entry page</th><th>Started</th><th>Duration</th><th>Device</th><th>Location</th><th>Size</th><th className="px-4 text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-slate-900">
               {(data?.replays ?? []).map((replay) => (
                 <tr key={replay.id}>
                   <td className="px-4 py-3"><p className="max-w-52 truncate font-semibold">{replay.identity}</p><p className="font-mono text-[10px] text-neutral-400">{replay.sessionId}</p></td>
-                  <td className="max-w-60 truncate">{replay.entryPage ?? 'â€”'}</td>
+                  <td className="max-w-60 truncate">{replay.entryPage ?? '—'}</td>
                   <td>{formatDate(replay.startedAt)}</td><td>{formatDuration(replay.durationMs)}</td>
-                  <td>{[replay.deviceType, replay.browser].filter(Boolean).join(' Â· ') || 'â€”'}</td><td>{replay.country ?? 'â€”'}</td>
+                  <td>{[replay.deviceType, replay.browser].filter(Boolean).join(' · ') || '—'}</td><td>{replay.country ?? '—'}</td>
                   <td>{formatBytes(replay.compressedSizeBytes)}</td>
-                  <td className="px-4 text-right"><Link className="font-semibold text-blue-600 hover:underline" href={`/dashboard/replays/${encodeURIComponent(replay.id)}?projectId=${encodeURIComponent(project?.id ?? searchParams.projectId ?? '')}`}>Watch replay</Link></td>
+                  <td className="px-4 text-right">
+                    <div className="flex items-start justify-end gap-4">
+                      <Link className="font-semibold text-blue-600 hover:underline" href={`/dashboard/replays/${encodeURIComponent(replay.id)}?projectId=${encodeURIComponent(project?.id ?? searchParams.projectId ?? '')}`}>Watch replay</Link>
+                      <ReplayDeleteButton replayId={replay.id} projectId={project?.id ?? searchParams.projectId} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
