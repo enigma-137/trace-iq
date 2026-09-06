@@ -7,7 +7,7 @@ import { buildOtpAuthUri, formatTotpSecret, useMfaStatus, type RegisteredFactor 
 import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 import { readApiError } from '@/lib/api-error';
-import { isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
+import { createOtpSubmissionGuard, isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
 
 type EnrollResponse = {
   id: string;
@@ -192,7 +192,7 @@ function EnabledState({
   const [isRemoving, setIsRemoving] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [code, setCode] = useState('');
-  const removalInFlight = useRef(false);
+  const removalSubmissionGuard = useRef(createOtpSubmissionGuard()).current;
   const codeInputRef = useRef<HTMLInputElement>(null);
 
   function handleRemove(event: FormEvent<HTMLFormElement>) {
@@ -210,9 +210,8 @@ function EnabledState({
       onError('Enter the 6-digit code from your authenticator app.');
       return;
     }
-    if (removalInFlight.current) return;
+    if (!removalSubmissionGuard.tryStart()) return;
 
-    removalInFlight.current = true;
     setIsRemoving(true);
     let removed = false;
     try {
@@ -236,7 +235,7 @@ function EnabledState({
     } catch (error) {
       onError(await readApiError(error, 'Could not remove two-factor authentication.'));
     } finally {
-      removalInFlight.current = false;
+      removalSubmissionGuard.finish();
       setIsRemoving(false);
       if (!removed) {
         window.requestAnimationFrame(() => {
@@ -370,17 +369,21 @@ function EnabledState({
 function SetupFlow({
   account,
   onVerified,
-  onError
+  onError,
+  onCodeChange
 }: {
   account: string;
   onVerified: (message: string) => void;
   onError: (message: string) => void;
+  onCodeChange: () => void;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [enroll, setEnroll] = useState<EnrollResponse | null>(null);
   const [code, setCode] = useState('');
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const verificationSubmissionGuard = useRef(createOtpSubmissionGuard()).current;
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
   async function handleEnroll() {
     setIsEnrolling(true);
@@ -394,31 +397,52 @@ function SetupFlow({
     setCode('');
   }
 
-  async function handleVerify(event: FormEvent<HTMLFormElement>) {
+  function handleVerify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!enroll || code.trim().length < 6) {
+    void verifyCode(code);
+  }
+
+  async function verifyCode(rawCode: string) {
+    const normalizedCode = normalizeOtpCode(rawCode);
+    if (!enroll || !isCompleteOtpCode(normalizedCode)) {
       onError('Enter the 6-digit code from your authenticator app.');
       return;
     }
+    if (!verificationSubmissionGuard.tryStart()) return;
 
     setIsVerifying(true);
-    const challenge = await supabase.auth.mfa.challenge({ factorId: enroll.id });
-    if (challenge.error) {
+    let verified = false;
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId: enroll.id });
+      if (challenge.error) throw challenge.error;
+      const verify = await supabase.auth.mfa.verify({
+        factorId: enroll.id,
+        challengeId: challenge.data.id,
+        code: normalizedCode
+      });
+      if (verify.error) throw verify.error;
+
+      verified = true;
+      onVerified('Two-factor authentication enabled.');
+    } catch (error) {
+      onError(await readApiError(error, 'Could not verify the authenticator code.'));
+    } finally {
+      verificationSubmissionGuard.finish();
       setIsVerifying(false);
-      onError(challenge.error.message);
-      return;
+      if (!verified) {
+        window.requestAnimationFrame(() => {
+          codeInputRef.current?.focus();
+          codeInputRef.current?.select();
+        });
+      }
     }
-    const verify = await supabase.auth.mfa.verify({
-      factorId: enroll.id,
-      challengeId: challenge.data.id,
-      code: code.trim()
-    });
-    setIsVerifying(false);
-    if (verify.error) {
-      onError(verify.error.message);
-      return;
-    }
-    onVerified('Two-factor authentication enabled.');
+  }
+
+  function handleCodeChange(value: string) {
+    const normalizedCode = normalizeOtpCode(value);
+    setCode(normalizedCode);
+    onCodeChange();
+    if (isCompleteOtpCode(normalizedCode)) void verifyCode(normalizedCode);
   }
 
   const otpauthUri = enroll ? buildOtpAuthUri(enroll.totp.secret, account) : null;
@@ -518,14 +542,17 @@ function SetupFlow({
           <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="totpCode">
             Verification code
             <input
+              ref={codeInputRef}
               className={inputClass}
               id="totpCode"
               value={code}
-              onChange={(event) => setCode(event.target.value)}
+              onChange={(event) => handleCodeChange(event.target.value)}
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
+              pattern="[0-9]*"
               placeholder="123456"
+              disabled={isVerifying}
               autoFocus
             />
           </label>

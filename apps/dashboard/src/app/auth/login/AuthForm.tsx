@@ -8,7 +8,7 @@ import { safeRedirectPath } from '@/lib/utils';
 import { clearPendingInvite, peekPendingInvite } from '@/lib/pending-invite';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import { isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
+import { createOtpSubmissionGuard, isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
 
 type AuthMode = 'signin' | 'signup';
 type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
@@ -34,7 +34,7 @@ export function AuthForm() {
   const [mfaCode, setMfaCode] = useState('');
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [pendingSuccessMessage, setPendingSuccessMessage] = useState('Signed in successfully.');
-  const mfaVerificationInFlight = useRef(false);
+  const mfaSubmissionGuard = useRef(createOtpSubmissionGuard()).current;
   const mfaInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = useMemo(() => {
@@ -204,9 +204,8 @@ export function AuthForm() {
       await reportAuthFailure('Enter the 6-digit code from your authenticator app.', 'Verification failed');
       return;
     }
-    if (mfaVerificationInFlight.current) return;
+    if (!mfaSubmissionGuard.tryStart()) return;
 
-    mfaVerificationInFlight.current = true;
     setIsSubmitting(true);
     setStatus(null);
     let verified = false;
@@ -235,7 +234,7 @@ export function AuthForm() {
     } catch (error) {
       await reportAuthFailure(error, 'Verification failed', 'Could not verify your code. Please try again.');
     } finally {
-      mfaVerificationInFlight.current = false;
+      mfaSubmissionGuard.finish();
       setIsSubmitting(false);
       if (!verified) {
         window.requestAnimationFrame(() => {
