@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { DashboardDialog } from '../DashboardDialog';
 import { FunnelForm } from './FunnelForm';
-import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
 
 interface FunnelItem {
   id: string;
@@ -28,68 +27,6 @@ export function FunnelsClientView({ funnels, eventNames }: FunnelsClientViewProp
     const q = searchQuery.toLowerCase().trim();
     return funnels.filter((f) => f.name.toLowerCase().includes(q));
   }, [funnels, searchQuery]);
-
-  // Demo Signup to Purchase Funnel Pipeline Graph data
-  const demoFlowColumns: ColumnGroup[] = [
-    {
-      id: 'entry',
-      title: '1. Inbound Entry',
-      subtitle: 'User Traffic Acquisition',
-      nodes: [
-        { id: 'en-direct', title: 'Direct Landing', description: 'Typed URL or bookmark', countBadge: '3,450', status: 'healthy', tags: ['direct'] },
-        { id: 'en-seo', title: 'Organic Search', description: 'Google / Bing discovery', countBadge: '2,180', status: 'healthy', tags: ['seo'] },
-        { id: 'en-ad', title: 'Ad Campaign / Referral', description: 'Paid promo links', countBadge: '940', status: 'info', tags: ['campaign'] }
-      ]
-    },
-    {
-      id: 'signup',
-      title: '2. Registration Steps',
-      subtitle: 'Account Creation Funnel',
-      nodes: [
-        { id: 'su-view', title: 'sign_up_start', description: 'Visited signup page', countBadge: '5,820', status: 'healthy', tags: ['step 1'] },
-        { id: 'su-submit', title: 'sign_up_submit', description: 'Form credentials submitted', countBadge: '4,110', status: 'healthy', tags: ['step 2'] },
-        { id: 'su-verify', title: 'email_verified', description: 'OTP / Magic link confirmed', countBadge: '3,780', status: 'healthy', tags: ['step 3'] }
-      ]
-    },
-    {
-      id: 'checkout',
-      title: '3. Checkout Steps',
-      subtitle: 'Monetization Sequence',
-      nodes: [
-        { id: 'ck-pricing', title: 'pricing_viewed', description: 'Inspected subscription plans', countBadge: '2,840', status: 'healthy', tags: ['step 4'] },
-        { id: 'ck-payment', title: 'payment_info_entered', description: 'Added card / Stripe details', countBadge: '1,920', status: 'warning', tags: ['step 5'] },
-        { id: 'ck-coupon', title: 'promo_code_applied', description: 'Discount code entered', countBadge: '680', status: 'info', tags: ['step 6'] }
-      ]
-    },
-    {
-      id: 'outcomes',
-      title: '4. Final Conversion',
-      subtitle: 'Revenue & Retained Users',
-      nodes: [
-        { id: 'out-complete', title: 'purchase_completed', description: 'Transaction processed', countBadge: '1,540', status: 'healthy', tags: ['converted'] },
-        { id: 'out-active', title: 'subscription_active', description: 'Recurring billing enabled', countBadge: '1,280', status: 'healthy', tags: ['mrr'] },
-        { id: 'out-drop', title: 'abandoned_checkout', description: 'Session exited before pay', countBadge: '380', status: 'critical', tags: ['drop-off'] }
-      ]
-    }
-  ];
-
-  const demoFlowConnections: ConnectionFlow[] = [
-    { fromId: 'en-direct', toId: 'su-view', status: 'healthy' },
-    { fromId: 'en-seo', toId: 'su-view', status: 'healthy' },
-    { fromId: 'en-ad', toId: 'su-view', status: 'info' },
-
-    { fromId: 'su-view', toId: 'su-submit', status: 'healthy' },
-    { fromId: 'su-submit', toId: 'su-verify', status: 'healthy' },
-
-    { fromId: 'su-verify', toId: 'ck-pricing', status: 'healthy' },
-    { fromId: 'ck-pricing', toId: 'ck-payment', status: 'warning' },
-    { fromId: 'ck-payment', toId: 'ck-coupon', status: 'info' },
-
-    { fromId: 'ck-payment', toId: 'out-complete', status: 'healthy' },
-    { fromId: 'ck-coupon', toId: 'out-complete', status: 'healthy' },
-    { fromId: 'out-complete', toId: 'out-active', status: 'healthy' },
-    { fromId: 'ck-payment', toId: 'out-drop', status: 'critical' }
-  ];
 
   return (
     <div className="flex flex-col gap-8">
@@ -209,15 +146,6 @@ export function FunnelsClientView({ funnels, eventNames }: FunnelsClientViewProp
         <FunnelForm eventNames={eventNames} onSuccess={() => setIsCreateOpen(false)} />
       </DashboardDialog>
 
-      {/* Interactive SVG Conversion Flow Graph (Bottom Section) */}
-      <section className="mt-4">
-        <SvgNodeFlowGraph
-          title="Conversion Funnel Pipeline Architecture (Demo Flow)"
-          subtitle="Live interactive simulation of a 4-stage user onboarding and payment conversion sequence"
-          columns={demoFlowColumns}
-          connections={demoFlowConnections}
-        />
-      </section>
     </div>
   );
 }

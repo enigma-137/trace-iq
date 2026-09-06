@@ -263,6 +263,11 @@ export function SvgNodeFlowGraph({
             .animate-dash-flow {
               animation: svgDashFlow 1.6s linear infinite;
             }
+            @media (prefers-reduced-motion: reduce) {
+              .animate-dash-flow {
+                animation: none;
+              }
+            }
           `}</style>
 
           {/* Render Bezier Paths */}
@@ -319,7 +324,7 @@ export function SvgNodeFlowGraph({
         </svg>
 
         {/* Card Columns Layout */}
-        <div className="relative z-20 grid h-full gap-8 md:grid-flow-col md:auto-cols-[clamp(190px,19vw,320px)] md:justify-between md:gap-10">
+        <div className="svg-node-flow-columns relative z-20 grid h-full gap-8 md:grid-flow-col md:auto-cols-[clamp(190px,19vw,320px)] md:justify-between md:gap-10">
           {columns.map((col) => (
             <div key={col.id} className="flex flex-col gap-3">
               {/* Column Header */}

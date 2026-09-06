@@ -3,6 +3,7 @@ import { DashboardShell } from '../../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { formatCount } from '@/lib/metrics';
 import { FunnelChart } from '@/components/charts/FunnelChart';
+import { FunnelEventFlow } from '@/components/charts/FunnelEventFlow';
 import { FunnelAiSummary } from './FunnelAiSummary';
 import { FunnelDebugPanel, type FunnelDebugData } from './FunnelDebugPanel';
 
@@ -189,6 +190,8 @@ export default async function FunnelResultsPage({
               }}
             />
           </section>
+
+          <FunnelEventFlow steps={data.steps} funnelId={params.id} days={days} />
 
           <FunnelAiSummary funnelId={params.id} days={days} />
 

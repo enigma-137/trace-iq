@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image';
 import { useState } from 'react';
 import {
   ArrowUpRight,
@@ -15,6 +16,7 @@ import {
   Zap
 } from 'lucide-react';
 import GlobeHero from '@/components/globe-hero';
+import { LandingApiFlow } from '@/components/LandingApiFlow';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 
 const navItems = [
@@ -164,46 +166,39 @@ export default function Page() {
       </section>
 
       {/* Product preview */}
-      <section className="traceiq-frame mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-36" id="product">
+      <section className="traceiq-frame mx-auto max-w-[1200px] px-5 py-24 sm:px-8 lg:py-36" id="product">
         <div className="section-kicker">01 / Inside TraceIQ</div>
         <div className="intro-grid">
           <h2>Traffic, behavior, and health.<br /><em>One inspectable view.</em></h2>
           <p>Start with visitors and referrers, follow real session paths, then connect conversion behavior to errors, API latency, feature flags, and alerts.</p>
         </div>
-        <div className="mt-10 overflow-hidden rounded-xl border border-white/10 bg-[#08090b] shadow-2xl shadow-black/40" aria-label="TraceIQ dashboard preview using sample data">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-2"><span className="size-2 rounded-full bg-emerald-400" /><span className="font-mono text-[11px] text-zinc-400">Dashboard overview</span></div>
-            <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] text-zinc-500">Sample data · 30 days</span>
+        <figure className="product-shot product-shot-primary">
+          <div className="product-shot-bar">
+            <span><i /> Product overview</span>
+            <span>Real TraceIQ interface</span>
           </div>
-          <div className="grid gap-px bg-white/10 sm:grid-cols-4">
-            {[
-              ['12,480', 'Page views'],
-              ['4,218', 'Visitors'],
-              ['36.8%', 'Bounce rate'],
-              ['2m 41s', 'Visit duration']
-            ].map(([value, label]) => <div key={label} className="bg-[#0b0c0f] px-4 py-4"><strong className="block text-xl text-white">{value}</strong><span className="mt-1 block text-[11px] text-zinc-500">{label}</span></div>)}
+          <Image
+            src="/product/traceiq-overview.png"
+            alt="TraceIQ overview showing ingestion health, product metrics, activity trends, a live event stream, and event volume"
+            width={1460}
+            height={1078}
+            sizes="(max-width: 1100px) calc(100vw - 40px), 996px"
+            className="product-shot-image"
+          />
+          <figcaption>See product behavior, system health, and incoming activity in one place.</figcaption>
+        </figure>
+
+        <div className="product-detail">
+          <div className="product-detail-copy">
+            <span className="product-detail-label">API performance</span>
+            <h3>Follow every request through the stack.</h3>
           </div>
-          <div className="grid gap-px bg-white/10 lg:grid-cols-[1.7fr_1fr]">
-            <div className="bg-[#090a0c] p-5">
-              <div className="mb-5 flex items-center justify-between"><span className="text-xs font-semibold text-zinc-300">Visitors and page views</span><span className="font-mono text-[10px] text-zinc-600">AUG 01—30</span></div>
-              <svg viewBox="0 0 640 190" className="h-auto w-full" role="img" aria-label="Sample traffic trend">
-                {[35, 75, 115, 155].map((y) => <line key={y} x1="0" y1={y} x2="640" y2={y} stroke="rgba(255,255,255,.07)" />)}
-                <path d="M0 154 C45 138 72 146 112 119 S184 130 226 92 S297 112 338 70 S405 90 450 48 S529 78 575 43 S617 47 640 28" fill="none" stroke="#3b82f6" strokeWidth="3" />
-                <path d="M0 171 C48 162 82 166 119 151 S185 158 229 135 S300 145 342 118 S408 130 452 103 S526 117 577 94 S617 91 640 75" fill="none" stroke="#22c55e" strokeWidth="2" opacity=".8" />
-              </svg>
-              <div className="mt-3 flex gap-5 text-[10px] text-zinc-500"><span><i className="mr-1.5 inline-block size-2 rounded-full bg-blue-500" />Page views</span><span><i className="mr-1.5 inline-block size-2 rounded-full bg-green-500" />Visitors</span></div>
-            </div>
-            <div className="bg-[#090a0c] p-5">
-              <span className="text-xs font-semibold text-zinc-300">Top referrers</span>
-              <div className="mt-5 space-y-4">
-                {[
-                  ['Direct', '1,842', '100%'],
-                  ['google.com', '683', '37%'],
-                  ['github.com', '391', '21%'],
-                  ['t.co', '148', '8%']
-                ].map(([label, value, width]) => <div key={label}><div className="mb-1.5 flex justify-between text-[11px]"><span className="text-zinc-400">{label}</span><span className="font-mono text-zinc-600">{value}</span></div><div className="h-1 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-blue-500" style={{ width }} /></div></div>)}
-              </div>
-            </div>
+          <div className="product-shot product-shot-secondary product-flow-preview">
+            <LandingApiFlow />
+          </div>
+          <div className="product-detail-footer">
+            <p>Compare traffic, errors, and latency, then inspect how requests move from your SDKs through processing and storage.</p>
+            <a className="quiet-link" href="/waitlist">Explore TraceIQ <ArrowUpRight size={14} /></a>
           </div>
         </div>
       </section>
