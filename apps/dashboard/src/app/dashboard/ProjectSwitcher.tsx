@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Box, Check, ChevronDown, Plus } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import CubeIcon from '@hugeicons/core-free-icons/CubeIcon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { setActiveOrganizationId, useOrganization, useOrganizations } from '@/lib/organization';
 
 const PANEL_WIDTH = 288;
@@ -87,14 +91,14 @@ export function ProjectSwitcher({ projectId, organizationId }: ProjectSwitcherPr
         title={currentName !== '—' ? `Switch project — ${currentName}` : undefined}
         className="inline-flex h-10 items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 text-left transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800"
       >
-        <Box className="size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+        <HugeiconsIcon icon={CubeIcon} size={16} strokeWidth={1.8} className="shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
         <span className="min-w-0">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Current project
           </span>
           <span className="block max-w-[12rem] truncate text-sm font-semibold text-neutral-900 dark:text-white">{currentName}</span>
         </span>
-        <ChevronDown className="size-4 shrink-0 text-neutral-400 dark:text-slate-500" />
+        <HugeiconsIcon icon={ArrowDown01Icon} size={16} strokeWidth={1.8} className="shrink-0 text-neutral-400 dark:text-slate-500" aria-hidden="true" />
       </button>
 
       {open && anchor
@@ -136,12 +140,12 @@ export function ProjectSwitcher({ projectId, organizationId }: ProjectSwitcherPr
                               isCurrent ? 'bg-blue-50/60 dark:bg-slate-900/70' : ''
                             }`}
                           >
-                            <Box className="size-4 shrink-0 text-neutral-400 dark:text-slate-500" />
+                            <HugeiconsIcon icon={CubeIcon} size={16} strokeWidth={1.8} className="shrink-0 text-neutral-400 dark:text-slate-500" aria-hidden="true" />
                             <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900 dark:text-white">
                               {project.name}
                             </span>
                             {isCurrent ? (
-                              <Check className="size-4 shrink-0 text-blue-600 dark:text-blue-400" aria-label="Current project" />
+                              <HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={1.9} className="shrink-0 text-blue-600 dark:text-blue-400" aria-label="Current project" />
                             ) : null}
                           </button>
                         </li>
@@ -157,7 +161,7 @@ export function ProjectSwitcher({ projectId, organizationId }: ProjectSwitcherPr
                       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-200 dark:hover:bg-slate-900"
                       onClick={handleCreateProject}
                     >
-                      <Plus className="size-4" />
+                      <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.9} aria-hidden="true" />
                       New project
                     </button>
                   ) : null}

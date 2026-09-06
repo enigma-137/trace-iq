@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Logout02Icon from '@hugeicons/core-free-icons/Logout02Icon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 interface SignOutButtonProps {
@@ -33,21 +35,13 @@ export function SignOutButton({ iconOnly = false }: SignOutButtonProps) {
       title="Sign out"
       aria-label="Sign out"
     >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      <HugeiconsIcon
+        icon={Logout02Icon}
+        size={16}
+        strokeWidth={1.8}
         className={iconOnly ? '' : 'mr-1.5'}
-      >
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-        <polyline points="16 17 21 12 16 7" />
-        <line x1="21" y1="12" x2="9" y2="12" />
-      </svg>
+        aria-hidden="true"
+      />
       {!iconOnly && <span>Sign out</span>}
     </button>
   );

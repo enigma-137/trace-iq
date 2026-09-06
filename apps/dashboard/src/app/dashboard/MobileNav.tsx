@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
 import { NavIcon } from './NavIcon';
 import { SignOutButton } from './SignOutButton';
 import { ThemeToggle } from './ThemeToggle';
@@ -53,7 +56,7 @@ export function MobileNav({
         aria-expanded={open}
         className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900 lg:hidden"
       >
-        <Menu className="size-5" />
+        <HugeiconsIcon icon={Menu01Icon} size={20} strokeWidth={1.8} aria-hidden="true" />
       </button>
 
       {/* Portaled to <body> so the header's backdrop-blur (which creates a
@@ -80,7 +83,7 @@ export function MobileNav({
                   aria-label="Close navigation menu"
                   className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white"
                 >
-                  <X className="size-4" />
+                  <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} aria-hidden="true" />
                 </button>
               </div>
 
@@ -116,10 +119,7 @@ export function MobileNav({
                       {item.label}
                       {item.key === 'settings' && showMfaWarning ? (
                         <span className="ml-auto inline-flex text-amber-500" title="Two-factor authentication is not enabled yet">
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="m10.3 3.9-8.2 14a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0Z" />
-                            <path d="M12 9v4M12 17h.01" />
-                          </svg>
+                          <HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.9} aria-hidden="true" />
                         </span>
                       ) : null}
                     </Link>

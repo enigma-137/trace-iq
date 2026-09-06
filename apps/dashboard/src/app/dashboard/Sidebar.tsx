@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import SidebarLeftIcon from '@hugeicons/core-free-icons/SidebarLeftIcon';
+import SidebarRightIcon from '@hugeicons/core-free-icons/SidebarRightIcon';
 import { NavIcon } from './NavIcon';
 import { ThemeToggle } from './ThemeToggle';
 import { SignOutButton } from './SignOutButton';
@@ -71,19 +75,12 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="9" y1="3" x2="9" y2="21" />
-              <path d="m12 9 3 3-3 3" />
-            </svg>
-          ) : (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="9" y1="3" x2="9" y2="21" />
-              <path d="m14 15-3-3 3-3" />
-            </svg>
-          )}
+          <HugeiconsIcon
+            icon={collapsed ? SidebarRightIcon : SidebarLeftIcon}
+            size={17}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
         </button>
       </div>
 
@@ -175,10 +172,7 @@ function WarningIcon({ collapsed, title }: { collapsed: boolean; title: string }
       role="img"
       aria-label={title}
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m10.3 3.9-8.2 14a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0Z" />
-        <path d="M12 9v4M12 17h.01" />
-      </svg>
+      <HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.9} aria-hidden="true" />
     </span>
   );
 }

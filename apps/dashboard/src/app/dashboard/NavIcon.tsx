@@ -1,63 +1,54 @@
-const PATHS: Record<string, string> = {
-  // Overview — home
-  overview: 'M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5',
-  // Web analytics — globe
-  web: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3 12h18M12 3c2.5 2.5 3.5 6 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-6-3.5-9s1-6.5 3.5-9Z',
-  // Insights — trending line
-  insights: 'M4 19V5M4 19h16M7 15l3-4 3 2 4-6',
-  // Dashboards — columns / layout
-  dashboards: 'M4 4h7v7H4ZM13 4h7v3h-7ZM13 9h7v11h-7ZM4 13h7v7H4Z',
-  // Events — activity list
-  events: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
-  // Funnels — funnel
-  funnels: 'M3 5h18l-7 8v6l-4 2v-8L3 5Z',
-  // Retention — history / return-over-time
-  retention: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M12 7v5l4 2',
-  // Cohorts — stacked layers / groups
-  cohorts: 'M12 2 2 7l10 5 10-5-10-5ZM2 17l10 5 10-5M2 12l10 5 10-5',
-  // Alerts — bell
-  alerts: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
-  // Feature flags — flag on a pole
-  flags: 'M5 21V4M5 4h11l-2.5 4L16 12H5',
-  // Webhooks — interlocking arcs (relay)
-  webhooks:
-    'M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2M6 17l3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06M12 6l3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8',
-  // Export — download to disk
-  export: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
-  // Achievements — trophy
-  achievements:
-    'M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z',
-  // Users — people
-  users: 'M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM21 20v-1a4 4 0 0 0-3-3.87M16.5 4.13a4 4 0 0 1 0 7.75',
-  // Replays â€” play inside a session frame
-  replays: 'M4 4h16v16H4V4Zm6 4 6 4-6 4V8Z',
-  // Errors — alert triangle
-  errors: 'M12 3 2 20h20L12 3ZM12 9v5M12 17.5h.01',
-  // API performance — gauge / speedometer
-  'api-performance': 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM13.4 10.6 17 7M4 18a9 9 0 1 1 16 0',
-  // Docs — book
-  docs: 'M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5ZM18 3v18',
-  // Settings — gear
-  settings:
-    'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19.4 13a7.8 7.8 0 0 0 0-2l2-1.5-2-3.5-2.4 1a7.8 7.8 0 0 0-1.7-1L14.9 3H9.1l-.4 2.5a7.8 7.8 0 0 0-1.7 1l-2.4-1-2 3.5L2.6 11a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7.8 7.8 0 0 0 1.7 1l.4 2.5h5.8l.4-2.5a7.8 7.8 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5Z'
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import AnalyticsUpIcon from '@hugeicons/core-free-icons/AnalyticsUpIcon';
+import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
+import ChampionIcon from '@hugeicons/core-free-icons/ChampionIcon';
+import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
+import DashboardSpeed01Icon from '@hugeicons/core-free-icons/DashboardSpeed01Icon';
+import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01Icon';
+import Download04Icon from '@hugeicons/core-free-icons/Download04Icon';
+import Flag02Icon from '@hugeicons/core-free-icons/Flag02Icon';
+import FunnelIcon from '@hugeicons/core-free-icons/FunnelIcon';
+import Globe02Icon from '@hugeicons/core-free-icons/Globe02Icon';
+import Home01Icon from '@hugeicons/core-free-icons/Home01Icon';
+import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
+import Notification02Icon from '@hugeicons/core-free-icons/Notification02Icon';
+import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
+import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
+import VideoReplayIcon from '@hugeicons/core-free-icons/VideoReplayIcon';
+import WebhookIcon from '@hugeicons/core-free-icons/WebhookIcon';
+
+const ICONS: Record<string, IconSvgElement> = {
+  overview: Home01Icon,
+  web: Globe02Icon,
+  insights: AnalyticsUpIcon,
+  dashboards: DashboardSquare01Icon,
+  events: Activity01Icon,
+  funnels: FunnelIcon,
+  retention: Clock03Icon,
+  cohorts: Layers01Icon,
+  users: UserGroupIcon,
+  replays: VideoReplayIcon,
+  'api-performance': DashboardSpeed01Icon,
+  errors: Alert02Icon,
+  alerts: Notification02Icon,
+  flags: Flag02Icon,
+  webhooks: WebhookIcon,
+  achievements: ChampionIcon,
+  export: Download04Icon,
+  settings: Settings02Icon,
+  docs: BookOpen02Icon
 };
 
 export function NavIcon({ name }: { name: string }) {
-  const d = PATHS[name] ?? PATHS.overview;
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <HugeiconsIcon
+      icon={ICONS[name] ?? Home01Icon}
+      size={18}
+      strokeWidth={1.8}
       className="shrink-0"
-      aria-hidden
-    >
-      <path d={d} />
-    </svg>
+      aria-hidden="true"
+    />
   );
 }

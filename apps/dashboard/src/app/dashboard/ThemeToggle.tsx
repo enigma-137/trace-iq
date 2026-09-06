@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Moon02Icon from '@hugeicons/core-free-icons/Moon02Icon';
+import Sun03Icon from '@hugeicons/core-free-icons/Sun03Icon';
 
 type Theme = 'light' | 'dark';
 
@@ -46,45 +49,12 @@ export function ThemeToggle() {
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >
-  {theme === "dark" ? (
-    // Sun Icon
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="M4.93 4.93l1.41 1.41" />
-      <path d="M17.66 17.66l1.41 1.41" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="M4.93 19.07l1.41-1.41" />
-      <path d="M17.66 6.34l1.41-1.41" />
-    </svg>
-  ) : (
-    // Moon Icon
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12.79A9 9 0 1 1 11.21 3c0 .28-.01.56-.01.84A7.95 7.95 0 0 0 20.16 12c.28 0 .56-.01.84-.01z" />
-    </svg>
-  )}
-</button>
+      <HugeiconsIcon
+        icon={theme === 'dark' ? Sun03Icon : Moon02Icon}
+        size={18}
+        strokeWidth={1.8}
+        aria-hidden="true"
+      />
+    </button>
   );
 }

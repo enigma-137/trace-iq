@@ -3,7 +3,12 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Box, Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import CubeIcon from '@hugeicons/core-free-icons/CubeIcon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { OrganizationSummary, setActiveOrganizationId, useOrganization, useOrganizations } from '@/lib/organization';
 
@@ -168,7 +173,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                 <p className="text-[10px] text-neutral-400 dark:text-slate-400">Switch organization</p>
               </div>
             </div>
-            <ChevronDown className="size-4 shrink-0 text-neutral-400 dark:text-slate-500" />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} strokeWidth={1.8} className="shrink-0 text-neutral-400 dark:text-slate-500" aria-hidden="true" />
           </>
         ) : (
           <span className="text-xs font-semibold text-white">{currentInitial}</span>
@@ -227,9 +232,9 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                             onClick={() => setExpandedOrg(isExpanded ? null : org.id)}
                           >
                             {isExpanded ? (
-                              <ChevronDown className="size-4" />
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={16} strokeWidth={1.8} aria-hidden="true" />
                             ) : (
-                              <ChevronRight className="size-4" />
+                              <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} aria-hidden="true" />
                             )}
                           </button>
                           <button
@@ -257,7 +262,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                               </span>
                             </span>
                             {isCurrent ? (
-                              <Check className="size-4 shrink-0 text-blue-600 dark:text-blue-400" aria-label="Current organization" />
+                              <HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={1.9} className="shrink-0 text-blue-600 dark:text-blue-400" aria-label="Current organization" />
                             ) : null}
                           </button>
                         </div>
@@ -275,7 +280,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                                     onClick={() => handleSelectProject(org, project)}
                                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-neutral-700 transition hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-900"
                                   >
-                                    <Box className="size-3.5 shrink-0 text-neutral-400 dark:text-slate-500" />
+                                    <HugeiconsIcon icon={CubeIcon} size={14} strokeWidth={1.8} className="shrink-0 text-neutral-400 dark:text-slate-500" aria-hidden="true" />
                                     <span className="min-w-0 flex-1 truncate">{project.name}</span>
                                   </button>
                                 </li>
@@ -294,7 +299,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                                   }}
                                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-900"
                                 >
-                                  <Plus className="size-3.5" />
+                                  <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.9} aria-hidden="true" />
                                   Add project
                                 </button>
                               </li>
@@ -362,7 +367,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                       setError(null);
                     }}
                   >
-                    <Plus className="size-4" />
+                    <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.9} aria-hidden="true" />
                     Add organization
                   </button>
                 )}
