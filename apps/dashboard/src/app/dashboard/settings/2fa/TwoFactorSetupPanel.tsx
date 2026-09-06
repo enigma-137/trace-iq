@@ -322,14 +322,17 @@ function EnabledState({
             <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400" htmlFor="removeTotpCode">
               Current verification code
               <input
+                ref={codeInputRef}
                 className={inputClass}
                 id="removeTotpCode"
                 value={code}
-                onChange={(event) => setCode(event.target.value)}
+                onChange={(event) => handleCodeChange(event.target.value)}
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
+                pattern="[0-9]*"
                 placeholder="123456"
+                disabled={isRemoving}
                 autoFocus
               />
             </label>
