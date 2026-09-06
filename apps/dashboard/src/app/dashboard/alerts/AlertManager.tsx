@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Select, Combobox, Checkbox } from '@traceiq/ui';
 import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/SegmentFilters';
+import { DashboardDialog } from '../DashboardDialog';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -116,6 +119,8 @@ export function AlertManager({
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, string>>({});
+  const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const needsProperty = measure === 'sum' || measure === 'avg';
   const isPercent = CONDITIONS.find((c) => c.value === condition)?.percent ?? false;
@@ -209,11 +214,24 @@ export function AlertManager({
     }
   }
 
-  async function remove(alert: Alert) {
-    setBusyId(alert.id);
-    const response = await authFetch(`/v1/dashboard/alerts/${alert.id}`, { method: 'DELETE' });
-    setBusyId(null);
-    if (response?.ok) router.refresh();
+  async function remove() {
+    if (!alertToDelete || busyId) return;
+    setBusyId(alertToDelete.id);
+    setDeleteError(null);
+    try {
+      const response = await authFetch(`/v1/dashboard/alerts/${alertToDelete.id}`, { method: 'DELETE' });
+      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
+      toast.success(`Alert "${alertToDelete.name}" was deleted.`, { title: 'Alert deleted' });
+      setAlertToDelete(null);
+      router.refresh();
+    } catch (caughtError) {
+      const message = await readApiError(caughtError, 'Could not delete the alert.');
+      setError(message);
+      setDeleteError(message);
+      toast.error(message, { title: 'Alert deletion failed' });
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function toggleGroup(id: string) {
@@ -420,7 +438,15 @@ export function AlertManager({
                       <button className={toolbarBtn} onClick={() => toggle(alert)} disabled={busyId === alert.id}>
                         {alert.enabled ? 'Disable' : 'Enable'}
                       </button>
-                      <button className={deleteBtn} onClick={() => remove(alert)} disabled={busyId === alert.id} aria-label="Delete alert">
+                      <button
+                        className={deleteBtn}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setAlertToDelete(alert);
+                        }}
+                        disabled={busyId === alert.id}
+                        aria-label="Delete alert"
+                      >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                           <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
                         </svg>
@@ -454,6 +480,41 @@ export function AlertManager({
           )}
         </section>
       </div>
+      <DashboardDialog
+        open={Boolean(alertToDelete)}
+        title="Delete alert?"
+        description="This permanently removes the alert and stops its future evaluations and notifications."
+        onClose={() => {
+          if (!busyId) setAlertToDelete(null);
+        }}
+        footer={
+          <>
+            <button type="button" className={toolbarBtn} disabled={Boolean(busyId)} onClick={() => setAlertToDelete(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={Boolean(busyId)}
+              onClick={() => void remove()}
+            >
+              {busyId ? 'Deleting…' : 'Delete alert'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <p className="text-sm text-neutral-600 dark:text-slate-400">
+            <span className="font-semibold text-neutral-900 dark:text-white">{alertToDelete?.name}</span>
+            {' '}will be permanently removed.
+          </p>
+          {deleteError ? (
+            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+        </div>
+      </DashboardDialog>
     </div>
   );
 }
@@ -498,6 +559,8 @@ function NotificationGroupsPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmails, setEditEmails] = useState('');
+  const [groupToDelete, setGroupToDelete] = useState<NotificationGroup | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function startEdit(group: NotificationGroup) {
     setEditingId(group.id);
@@ -548,11 +611,24 @@ function NotificationGroupsPanel({
     refresh();
   }
 
-  async function removeGroup(group: NotificationGroup) {
-    setBusy(group.id);
-    const response = await authFetch(`/v1/dashboard/notification-groups/${group.id}`, { method: 'DELETE' });
-    setBusy(null);
-    if (response?.ok) refresh();
+  async function removeGroup() {
+    if (!groupToDelete || busy) return;
+    setBusy(groupToDelete.id);
+    setDeleteError(null);
+    try {
+      const response = await authFetch(`/v1/dashboard/notification-groups/${groupToDelete.id}`, { method: 'DELETE' });
+      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
+      toast.success(`Notification group "${groupToDelete.name}" was deleted.`, { title: 'Notification group deleted' });
+      setGroupToDelete(null);
+      refresh();
+    } catch (caughtError) {
+      const message = await readApiError(caughtError, 'Could not delete the notification group.');
+      setError(message);
+      setDeleteError(message);
+      toast.error(message, { title: 'Notification group deletion failed' });
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
@@ -642,7 +718,15 @@ function NotificationGroupsPanel({
                     <button className={toolbarBtn} onClick={() => startEdit(group)} disabled={busy === group.id}>
                       Edit
                     </button>
-                    <button className={deleteBtn} onClick={() => removeGroup(group)} disabled={busy === group.id} aria-label={`Delete group ${group.name}`}>
+                    <button
+                      className={deleteBtn}
+                      onClick={() => {
+                        setDeleteError(null);
+                        setGroupToDelete(group);
+                      }}
+                      disabled={busy === group.id}
+                      aria-label={`Delete group ${group.name}`}
+                    >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
                       </svg>
@@ -654,6 +738,41 @@ function NotificationGroupsPanel({
           </ul>
         )}
       </div>
+      <DashboardDialog
+        open={Boolean(groupToDelete)}
+        title="Delete notification group?"
+        description="Alerts using this group will no longer notify its members. The alerts themselves are not deleted."
+        onClose={() => {
+          if (!busy) setGroupToDelete(null);
+        }}
+        footer={
+          <>
+            <button type="button" className={toolbarBtn} disabled={Boolean(busy)} onClick={() => setGroupToDelete(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={Boolean(busy)}
+              onClick={() => void removeGroup()}
+            >
+              {busy ? 'Deleting…' : 'Delete group'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <p className="text-sm text-neutral-600 dark:text-slate-400">
+            <span className="font-semibold text-neutral-900 dark:text-white">{groupToDelete?.name}</span>
+            {' '}will be permanently removed.
+          </p>
+          {deleteError ? (
+            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+        </div>
+      </DashboardDialog>
     </section>
   );
 }

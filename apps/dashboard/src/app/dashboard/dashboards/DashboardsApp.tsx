@@ -7,6 +7,8 @@ import { DashboardDialog } from '../DashboardDialog';
 import { Checkbox } from '@traceiq/ui';
 import { dashboardToUrl, dashboardSummary, type DashboardDefinition, type DashboardView } from './types';
 import { TrendChart } from '@/components/charts/TrendChart';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -63,6 +65,7 @@ export function DashboardsApp({
   const [editShared, setEditShared] = useState(false);
   const [deleting, setDeleting] = useState<DashboardView | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [compareStates, setCompareStates] = useState<CompareState[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +74,8 @@ export function DashboardsApp({
   const [sharePermissions, setSharePermissions] = useState<string[]>(['summary', 'chart']);
   const [shareExpiryDays, setShareExpiryDays] = useState('30');
   const [createdShareUrl, setCreatedShareUrl] = useState('');
+  const [shareToRevoke, setShareToRevoke] = useState<PublicShare | null>(null);
+  const [shareRevokeError, setShareRevokeError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const projectQuery = projectId ? `?projectId=${projectId}` : '';
@@ -104,10 +109,26 @@ export function DashboardsApp({
     setCreatedShareUrl(`${window.location.origin}/share/${created.token}`);
   }
 
-  async function revokeShare(shareId: string) {
-    if (!sharing) return;
-    const response = await authFetch(`/v1/dashboard/dashboards/${sharing.id}/shares/${shareId}${projectQuery}`, { method: 'DELETE' });
-    if (response?.ok) await openShare(sharing); else setError(await readError(response));
+  async function revokeShare() {
+    if (!sharing || !shareToRevoke || busy) return;
+    setBusy(true);
+    setShareRevokeError(null);
+    try {
+      const response = await authFetch(`/v1/dashboard/dashboards/${sharing.id}/shares/${shareToRevoke.id}${projectQuery}`, { method: 'DELETE' });
+      if (!response?.ok) {
+        throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
+      }
+      setShareToRevoke(null);
+      toast.success('The public dashboard link was revoked.', { title: 'Public link revoked' });
+      await openShare(sharing);
+    } catch (caughtError) {
+      const message = await readApiError(caughtError, 'Could not revoke the public dashboard link.');
+      setError(message);
+      setShareRevokeError(message);
+      toast.error(message, { title: 'Link revocation failed' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
@@ -159,17 +180,26 @@ export function DashboardsApp({
   }
 
   async function confirmDelete() {
-    if (!deleting) return;
+    if (!deleting || isDeleting) return;
     setError(null);
+    setDeleteError(null);
     setIsDeleting(true);
-    const response = await authFetch(`/v1/dashboard/dashboards/${deleting.id}${projectQuery}`, { method: 'DELETE' });
-    setIsDeleting(false);
-    if (response?.ok) {
+    try {
+      const response = await authFetch(`/v1/dashboard/dashboards/${deleting.id}${projectQuery}`, { method: 'DELETE' });
+      if (!response?.ok) {
+        throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
+      }
       setCompareIds((ids) => ids.filter((id) => id !== deleting.id));
+      toast.success(`Dashboard "${deleting.name}" was deleted.`, { title: 'Dashboard deleted' });
       setDeleting(null);
       await refresh();
-    } else {
-      setError(await readError(response));
+    } catch (caughtError) {
+      const message = await readApiError(caughtError, 'Could not delete the dashboard.');
+      setError(message);
+      setDeleteError(message);
+      toast.error(message, { title: 'Dashboard deletion failed' });
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -323,7 +353,14 @@ export function DashboardsApp({
                         <button className={toolbarBtn} onClick={() => void openShare(dashboard)}>
                           Public link
                         </button>
-                        <button className={deleteBtn} onClick={() => setDeleting(dashboard)} aria-label="Delete dashboard">
+                        <button
+                          className={deleteBtn}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleting(dashboard);
+                          }}
+                          aria-label="Delete dashboard"
+                        >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
                           </svg>
@@ -380,7 +417,7 @@ export function DashboardsApp({
       ) : null}
 
       <DashboardDialog
-        open={Boolean(sharing)}
+        open={Boolean(sharing) && !shareToRevoke}
         title="Public dashboard link"
         description="Create revocable, read-only links with only the permissions selected below."
         onClose={() => { if (!busy) { setSharing(null); setCreatedShareUrl(''); } }}
@@ -394,8 +431,33 @@ export function DashboardsApp({
             <select className={inputClass} value={shareExpiryDays} onChange={(event) => setShareExpiryDays(event.target.value)}><option value="1">1 day</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="">Never</option></select>
           </label>
           {createdShareUrl ? <div className="rounded border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Copy this link now—the secret is shown only once.</p><div className="mt-2 flex gap-2"><input readOnly className={inputClass} value={createdShareUrl} /><button className={toolbarBtn} onClick={() => void navigator.clipboard.writeText(createdShareUrl)}>Copy</button></div></div> : null}
-          <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Active links</p>{shares.length === 0 ? <p className="text-sm text-neutral-500">No active public links.</p> : <div className="grid gap-2">{shares.map((share) => <div key={share.id} className="flex items-center justify-between gap-3 rounded border border-neutral-200 p-3 text-xs dark:border-slate-700"><div><p className="font-semibold">{share.permissions.join(', ')}</p><p className="mt-1 text-neutral-500">{share.expiresAt ? `Expires ${new Date(share.expiresAt).toLocaleString()}` : 'Never expires'}{share.lastAccessedAt ? ` · last opened ${new Date(share.lastAccessedAt).toLocaleString()}` : ' · never opened'}</p></div><button className={deleteBtn} onClick={() => void revokeShare(share.id)} aria-label="Revoke public link">×</button></div>)}</div>}</div>
+          <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Active links</p>{shares.length === 0 ? <p className="text-sm text-neutral-500">No active public links.</p> : <div className="grid gap-2">{shares.map((share) => <div key={share.id} className="flex items-center justify-between gap-3 rounded border border-neutral-200 p-3 text-xs dark:border-slate-700"><div><p className="font-semibold">{share.permissions.join(', ')}</p><p className="mt-1 text-neutral-500">{share.expiresAt ? `Expires ${new Date(share.expiresAt).toLocaleString()}` : 'Never expires'}{share.lastAccessedAt ? ` · last opened ${new Date(share.lastAccessedAt).toLocaleString()}` : ' · never opened'}</p></div><button className={deleteBtn} onClick={() => { setShareRevokeError(null); setShareToRevoke(share); }} aria-label="Revoke public link">×</button></div>)}</div>}</div>
         </div>
+      </DashboardDialog>
+
+      <DashboardDialog
+        open={Boolean(shareToRevoke)}
+        title="Revoke public link?"
+        description="Anyone using this link will immediately lose access to the shared dashboard."
+        onClose={() => {
+          if (!busy) setShareToRevoke(null);
+        }}
+        footer={
+          <>
+            <button type="button" className={secondaryBtn} disabled={busy} onClick={() => setShareToRevoke(null)}>
+              Cancel
+            </button>
+            <button type="button" className={dangerBtn} disabled={busy} onClick={() => void revokeShare()}>
+              {busy ? 'Revoking…' : 'Revoke link'}
+            </button>
+          </>
+        }
+      >
+        {shareRevokeError ? (
+          <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+            {shareRevokeError}
+          </p>
+        ) : null}
       </DashboardDialog>
 
       <DashboardDialog
@@ -442,9 +504,16 @@ export function DashboardsApp({
           </>
         }
       >
-        <p className="text-sm text-neutral-600 dark:text-slate-400">
-          <span className="font-semibold text-neutral-900 dark:text-white">{deleting?.name}</span> will be removed.
-        </p>
+        <div className="grid gap-3">
+          <p className="text-sm text-neutral-600 dark:text-slate-400">
+            <span className="font-semibold text-neutral-900 dark:text-white">{deleting?.name}</span> will be removed.
+          </p>
+          {deleteError ? (
+            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+        </div>
       </DashboardDialog>
     </div>
   );

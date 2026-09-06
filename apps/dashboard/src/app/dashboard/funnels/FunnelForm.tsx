@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Combobox } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -28,6 +30,7 @@ export function FunnelForm({ eventNames, funnel, onSuccess }: FunnelFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const observedEvents = useMemo(() => new Map(eventNames.map((entry) => [entry.eventName, entry])), [eventNames]);
 
@@ -115,29 +118,28 @@ export function FunnelForm({ eventNames, funnel, onSuccess }: FunnelFormProps) {
   }
 
   async function handleDelete() {
-    if (!funnel) return;
+    if (!funnel || isDeleting) return;
     setIsDeleting(true);
-    const token = await getToken();
-    if (!token) {
-      setError('Your dashboard session expired. Sign in again.');
-      setIsDeleting(false);
-      return;
-    }
+    setDeleteError(null);
 
     try {
+      const token = await getToken();
+      if (!token) throw new Error('Your dashboard session expired. Sign in again.');
       const response = await fetch(`${apiBaseUrl}/v1/dashboard/funnels/${funnel.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!response.ok) {
-        setError(await readError(response));
-        setIsDeleting(false);
-        return;
-      }
+      if (!response.ok) throw new Error(await readError(response));
+      setIsDeleteOpen(false);
+      toast.success(`Funnel "${funnel.name}" was deleted.`, { title: 'Funnel deleted' });
       router.push('/dashboard/funnels');
       router.refresh();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete funnel.');
+    } catch (caughtError) {
+      const message = await readApiError(caughtError, 'Could not delete funnel.');
+      setError(message);
+      setDeleteError(message);
+      toast.error(message, { title: 'Funnel deletion failed' });
+    } finally {
       setIsDeleting(false);
     }
   }
@@ -219,7 +221,10 @@ export function FunnelForm({ eventNames, funnel, onSuccess }: FunnelFormProps) {
           <button
             type="button"
             className="ml-auto h-10 rounded-md border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:bg-slate-950 dark:text-red-400 dark:hover:bg-red-950/30"
-            onClick={() => setIsDeleteOpen(true)}
+            onClick={() => {
+              setDeleteError(null);
+              setIsDeleteOpen(true);
+            }}
             disabled={isDeleting}
           >
             Delete funnel
@@ -256,9 +261,16 @@ export function FunnelForm({ eventNames, funnel, onSuccess }: FunnelFormProps) {
             </>
           }
         >
-          <p className="text-sm text-neutral-600 dark:text-slate-400">
-            The funnel <span className="font-semibold text-neutral-900 dark:text-white">{funnel?.name}</span> will be removed.
-          </p>
+          <div className="grid gap-3">
+            <p className="text-sm text-neutral-600 dark:text-slate-400">
+              The funnel <span className="font-semibold text-neutral-900 dark:text-white">{funnel?.name}</span> will be removed.
+            </p>
+            {deleteError ? (
+              <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
+          </div>
         </DashboardDialog>
       ) : null}
     </form>

@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { peekPendingInvite } from '@/lib/pending-invite';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 /**
  * Mounted in the root layout so it runs on every page. If a session exists and
@@ -25,17 +27,36 @@ export function PendingInviteRestorer() {
     try {
       supabase = createSupabaseBrowserClient();
     } catch {
+      toast.error('Authentication is not configured. Sign in again after the dashboard configuration is fixed.', {
+        title: 'Invite sign-in unavailable'
+      });
       return;
     }
 
     let cancelled = false;
 
     (async () => {
-      const {
-        data: { session }
-      } = await supabase!.auth.getSession();
-      if (!cancelled && session?.access_token) {
-        router.replace(`/invite/${encodeURIComponent(token)}`);
+      try {
+        const {
+          data: { session },
+          error
+        } = await supabase!.auth.getSession();
+        if (cancelled) return;
+        if (error) {
+          toast.error(await readApiError(error, 'Could not restore your invitation session. Please sign in again.'), {
+            title: 'Invite session failed'
+          });
+          return;
+        }
+        if (session?.access_token) {
+          router.replace(`/invite/${encodeURIComponent(token)}`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(await readApiError(error, 'Could not restore your invitation session. Please sign in again.'), {
+            title: 'Invite session failed'
+          });
+        }
       }
     })();
 

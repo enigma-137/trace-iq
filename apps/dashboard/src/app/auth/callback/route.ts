@@ -8,15 +8,22 @@ export async function GET(request: NextRequest) {
   const next = safeRedirectPath(searchParams.get('next'), '/dashboard');
 
   if (code) {
-    const supabase = createSupabaseServerClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      const needsStepUp = !aalError && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
-      if (needsStepUp) {
-        return NextResponse.redirect(`${origin}/auth/login?next=${encodeURIComponent(next)}`);
+    try {
+      const supabase = createSupabaseServerClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error) {
+        const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalError) {
+          return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+        }
+        const needsStepUp = aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
+        if (needsStepUp) {
+          return NextResponse.redirect(`${origin}/auth/login?next=${encodeURIComponent(next)}`);
+        }
+        return NextResponse.redirect(`${origin}${next}`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+    } catch {
+      return NextResponse.redirect(`${origin}/auth/auth-code-error`);
     }
   } else if (searchParams.has('access_token')) {
     // OAuth/confirmation flows using the implicit grant may return the token in

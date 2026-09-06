@@ -76,6 +76,21 @@ html {
   }
 }
 
+@keyframes traceiq-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.traceiq-toast {
+  animation: traceiq-toast-in 180ms ease-out;
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
@@ -89,6 +104,10 @@ html {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .traceiq-toast {
+    animation: none;
   }
 
   .animate-float,

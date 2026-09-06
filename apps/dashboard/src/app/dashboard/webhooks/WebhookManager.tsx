@@ -3,6 +3,9 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { DashboardDialog } from '../DashboardDialog';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -214,6 +217,8 @@ function WebhookRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function update(patch: Record<string, unknown>) {
     setBusy(true);
@@ -223,10 +228,22 @@ function WebhookRow({
   }
 
   async function remove() {
+    if (busy) return;
     setBusy(true);
-    const response = await authFetch(`/v1/dashboard/webhooks/${webhook.id}`, { method: 'DELETE' });
-    setBusy(false);
-    if (response?.ok) onChanged();
+    setDeleteError(null);
+    try {
+      const response = await authFetch(`/v1/dashboard/webhooks/${webhook.id}`, { method: 'DELETE' });
+      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
+      setDeleteOpen(false);
+      toast.success(`Webhook "${webhook.name}" was deleted.`, { title: 'Webhook deleted' });
+      onChanged();
+    } catch (error) {
+      const message = await readApiError(error, 'Could not delete the webhook.');
+      setDeleteError(message);
+      toast.error(message, { title: 'Webhook deletion failed' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function test() {
@@ -279,13 +296,56 @@ function WebhookRow({
           <button className={toolbarBtn} disabled={busy} onClick={() => update({ enabled: !webhook.enabled })}>
             {webhook.enabled ? 'Disable' : 'Enable'}
           </button>
-          <button className={deleteBtn} disabled={busy} onClick={remove} aria-label="Delete webhook">
+          <button
+            className={deleteBtn}
+            disabled={busy}
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+            aria-label="Delete webhook"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
             </svg>
           </button>
         </div>
       </div>
+      <DashboardDialog
+        open={deleteOpen}
+        title="Delete webhook?"
+        description="TraceIQ will stop delivering events to this endpoint. Existing delivery history is not changed."
+        onClose={() => {
+          if (!busy) setDeleteOpen(false);
+        }}
+        footer={
+          <>
+            <button type="button" className={toolbarBtn} disabled={busy} onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={busy}
+              onClick={() => void remove()}
+            >
+              {busy ? 'Deleting…' : 'Delete webhook'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <p className="text-sm text-neutral-600 dark:text-slate-400">
+            <span className="font-semibold text-neutral-900 dark:text-white">{webhook.name}</span>
+            {' '}will be permanently removed.
+          </p>
+          {deleteError ? (
+            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+        </div>
+      </DashboardDialog>
     </li>
   );
 }

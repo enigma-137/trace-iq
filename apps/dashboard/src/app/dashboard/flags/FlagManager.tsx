@@ -4,6 +4,9 @@ import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Checkbox, Select } from '@traceiq/ui';
+import { DashboardDialog } from '../DashboardDialog';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -24,6 +27,8 @@ type FlagTarget = {
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
   value: string | number | boolean;
 };
+
+type FlagConfirmation = 'delete' | 'clear-targeting' | 'clear-payload';
 
 const OPERATORS: Array<{ value: FlagTarget['operator']; label: string }> = [
   { value: 'eq', label: '=' },
@@ -306,6 +311,8 @@ function FlagRow({
   const [targeting, setTargeting] = useState<FlagTarget[]>(flag.targeting);
   const [targetingError, setTargetingError] = useState<string | null>(null);
   const [targetingDirty, setTargetingDirty] = useState(false);
+  const [confirmation, setConfirmation] = useState<FlagConfirmation | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
   async function update(patch: Record<string, unknown>) {
     setBusy(true);
@@ -347,17 +354,44 @@ function FlagRow({
     if (response && !response.ok) setTargetingError(await readError(response));
   }
 
-  function clearTargeting() {
-    setTargeting([]);
-    setTargetingError(null);
-    void update({ targeting: [] });
-  }
-
-  async function remove() {
+  async function confirmDestructiveAction() {
+    if (!confirmation || busy) return;
     setBusy(true);
-    const response = await authFetch(`/v1/dashboard/flags/${flag.id}`, { method: 'DELETE' });
-    setBusy(false);
-    if (response?.ok) onChanged();
+    setConfirmationError(null);
+    try {
+      const isDelete = confirmation === 'delete';
+      const patch = confirmation === 'clear-targeting'
+        ? { targeting: [] }
+        : confirmation === 'clear-payload'
+          ? { payload: null }
+          : null;
+      const response = await authFetch(`/v1/dashboard/flags/${flag.id}`, {
+        method: isDelete ? 'DELETE' : 'PUT',
+        ...(patch ? { body: JSON.stringify(patch) } : {})
+      });
+      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
+
+      if (confirmation === 'clear-targeting') {
+        setTargeting([]);
+        setTargetingError(null);
+        setTargetingDirty(false);
+        toast.success(`Targeting for "${flag.name}" was cleared.`, { title: 'Flag targeting cleared' });
+      } else if (confirmation === 'clear-payload') {
+        setPayloadText('');
+        setPayloadError(null);
+        toast.success(`Payload for "${flag.name}" was cleared.`, { title: 'Flag payload cleared' });
+      } else {
+        toast.success(`Flag "${flag.name}" was deleted.`, { title: 'Flag deleted' });
+      }
+      setConfirmation(null);
+      onChanged();
+    } catch (caughtError) {
+      const message = await readApiError(caughtError, 'Could not complete this flag change.');
+      setConfirmationError(message);
+      toast.error(message, { title: confirmation === 'delete' ? 'Flag deletion failed' : 'Flag update failed' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -421,7 +455,15 @@ function FlagRow({
           <button className={toolbarBtn} disabled={busy} onClick={() => update({ enabled: !flag.enabled })}>
             {flag.enabled ? 'Disable' : 'Enable'}
           </button>
-          <button className={deleteBtn} disabled={busy} onClick={remove} aria-label="Delete flag">
+          <button
+            className={deleteBtn}
+            disabled={busy}
+            onClick={() => {
+              setConfirmationError(null);
+              setConfirmation('delete');
+            }}
+            aria-label="Delete flag"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
             </svg>
@@ -457,7 +499,14 @@ function FlagRow({
               Save targeting
             </button>
             {hasTargeting ? (
-              <button className={toolbarBtn} disabled={busy} onClick={clearTargeting}>
+              <button
+                className={toolbarBtn}
+                disabled={busy}
+                onClick={() => {
+                  setConfirmationError(null);
+                  setConfirmation('clear-targeting');
+                }}
+              >
                 Clear
               </button>
             ) : null}
@@ -493,9 +542,8 @@ function FlagRow({
                 className={toolbarBtn}
                 disabled={busy}
                 onClick={() => {
-                  setPayloadText('');
-                  setPayloadError(null);
-                  void update({ payload: null });
+                  setConfirmationError(null);
+                  setConfirmation('clear-payload');
                 }}
               >
                 Clear
@@ -505,6 +553,46 @@ function FlagRow({
           </div>
         </div>
       </details>
+      <DashboardDialog
+        open={Boolean(confirmation)}
+        title={confirmation === 'delete' ? 'Delete flag?' : confirmation === 'clear-targeting' ? 'Clear flag targeting?' : 'Clear flag payload?'}
+        description={
+          confirmation === 'delete'
+            ? 'This permanently removes the flag. SDK evaluations using its key will fall back to their default value.'
+            : confirmation === 'clear-targeting'
+              ? 'This removes every targeting rule and makes the flag apply according to its rollout percentage alone.'
+              : 'This permanently removes the remote-config payload from this flag.'
+        }
+        onClose={() => {
+          if (!busy) setConfirmation(null);
+        }}
+        footer={
+          <>
+            <button type="button" className={toolbarBtn} disabled={busy} onClick={() => setConfirmation(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={busy}
+              onClick={() => void confirmDestructiveAction()}
+            >
+              {busy ? 'Working…' : confirmation === 'delete' ? 'Delete flag' : 'Clear configuration'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <p className="text-sm text-neutral-600 dark:text-slate-400">
+            This change affects <span className="font-semibold text-neutral-900 dark:text-white">{flag.name}</span>.
+          </p>
+          {confirmationError ? (
+            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              {confirmationError}
+            </p>
+          ) : null}
+        </div>
+      </DashboardDialog>
     </li>
   );
 }

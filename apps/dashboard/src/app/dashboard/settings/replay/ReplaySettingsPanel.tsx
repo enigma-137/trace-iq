@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
+import { DashboardDialog } from '../../DashboardDialog';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 type PrivacyMode = 'strict' | 'balanced' | 'custom';
@@ -15,6 +17,8 @@ export function ReplaySettingsPanel({ projectId }: { projectId?: string }) {
   const [settings, setSettings] = useState<Settings>();
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [privacyDialogOpen, setPrivacyDialogOpen] = useState(false);
+  const [privacyError, setPrivacyError] = useState('');
   useEffect(() => { void load(); }, [projectId]);
 
   async function token() { return (await supabase.auth.getSession()).data.session?.access_token; }
@@ -25,15 +29,47 @@ export function ReplaySettingsPanel({ projectId }: { projectId?: string }) {
     const body = await response.json() as Response; setData(body); setSettings(body.settings);
   }
   async function save(event: FormEvent) {
-    event.preventDefault(); if (!settings) return;
-    if ((settings.privacyMode === 'custom' || !settings.requireConsent) && !window.confirm(
-      'This configuration weakens TraceIQ privacy defaults. Confirm that your masking rules, notice, and consent basis have been reviewed.'
-    )) return;
-    setSaving(true); setMessage(''); const access=await token();
-    if (!access) { setSaving(false); return setMessage('Your dashboard session expired.'); }
-    const response=await fetch(`${apiBaseUrl}/v1/dashboard/replays/settings`, { method:'PATCH', headers:{Authorization:`Bearer ${access}`,'content-type':'application/json'}, body:JSON.stringify({...settings,projectId:data?.project.id ?? projectId,acknowledgePrivacyRisk:settings.privacyMode==='custom'||!settings.requireConsent}) });
-    setSaving(false); if (!response.ok) return setMessage(await readApiError(response));
-    const body=await response.json() as {settings:Settings}; setSettings(body.settings); setMessage('Replay settings saved.');
+    event.preventDefault();
+    if (!settings) return;
+    if (settings.privacyMode === 'custom' || !settings.requireConsent) {
+      setPrivacyError('');
+      setPrivacyDialogOpen(true);
+      return;
+    }
+    await persistSettings(false);
+  }
+
+  async function persistSettings(fromPrivacyDialog: boolean) {
+    if (!settings || saving) return;
+    setSaving(true);
+    setMessage('');
+    setPrivacyError('');
+    try {
+      const access = await token();
+      if (!access) throw new Error('Your dashboard session expired. Sign in again.');
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/replays/settings`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${access}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...settings,
+          projectId: data?.project.id ?? projectId,
+          acknowledgePrivacyRisk: settings.privacyMode === 'custom' || !settings.requireConsent
+        })
+      });
+      if (!response.ok) throw new Error(await readApiError(response));
+      const body = await response.json() as { settings: Settings };
+      setSettings(body.settings);
+      setMessage('Replay settings saved.');
+      if (fromPrivacyDialog) setPrivacyDialogOpen(false);
+      toast.success('Replay settings were saved.', { title: 'Replay settings updated' });
+    } catch (error) {
+      const nextMessage = await readApiError(error, 'Replay settings could not be saved.');
+      setMessage(nextMessage);
+      if (fromPrivacyDialog) setPrivacyError(nextMessage);
+      toast.error(nextMessage, { title: 'Replay settings failed' });
+    } finally {
+      setSaving(false);
+    }
   }
   if (!settings) return <p className="py-8 text-sm text-neutral-500">{message || 'Loading replay settingsâ€¦'}</p>;
   return (
@@ -60,6 +96,44 @@ export function ReplaySettingsPanel({ projectId }: { projectId?: string }) {
       </section>
       {message?<p className="text-sm">{message}</p>:null}
       <button type="submit" disabled={saving} className="w-fit rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60 dark:bg-white dark:text-black">{saving?'Savingâ€¦':'Save replay settings'}</button>
+      <DashboardDialog
+        open={privacyDialogOpen}
+        title="Confirm replay privacy changes"
+        description="This configuration weakens TraceIQ privacy defaults. Confirm that your masking rules, privacy notice, and consent basis have been reviewed."
+        onClose={() => {
+          if (!saving) setPrivacyDialogOpen(false);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              disabled={saving}
+              onClick={() => setPrivacyDialogOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-amber-600 px-4 text-sm font-bold text-white transition hover:bg-amber-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={saving}
+              onClick={() => void persistSettings(true)}
+            >
+              {saving ? 'Saving…' : 'Confirm and save'}
+            </button>
+          </>
+        }
+      >
+        {privacyError ? (
+          <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+            {privacyError}
+          </p>
+        ) : (
+          <p className="text-sm leading-6 text-neutral-600 dark:text-slate-400">
+            Custom masking and consent settings affect what may be recorded. Verify this configuration before enabling it for users.
+          </p>
+        )}
+      </DashboardDialog>
     </form>
   );
 }

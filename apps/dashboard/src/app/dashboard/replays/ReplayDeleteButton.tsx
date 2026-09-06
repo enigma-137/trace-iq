@@ -3,6 +3,9 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { DashboardDialog } from '../DashboardDialog';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -17,11 +20,12 @@ export function ReplayDeleteButton({
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function deleteReplay() {
-    if (isDeleting || !window.confirm('Delete this replay permanently? Its stored replay chunks cannot be recovered.')) return;
+    if (isDeleting) return;
 
     setError(null);
     setIsDeleting(true);
@@ -43,12 +47,17 @@ export function ReplayDeleteButton({
           credentials: 'omit',
         },
       );
-      if (!response.ok) throw new Error(await readError(response));
+      if (!response.ok) throw new Error(await readApiError(response, 'Replay could not be deleted.'));
 
+      setIsOpen(false);
+      toast.success('The replay and its stored chunks were deleted.', { title: 'Replay deleted' });
       if (redirectTo) router.push(redirectTo);
       router.refresh();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Replay could not be deleted.');
+      const message = await readApiError(deleteError, 'Replay could not be deleted.');
+      setError(message);
+      toast.error(message, { title: 'Replay deletion failed' });
+    } finally {
       setIsDeleting(false);
     }
   }
@@ -59,25 +68,47 @@ export function ReplayDeleteButton({
         type="button"
         className="font-semibold text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400"
         disabled={isDeleting}
-        onClick={() => void deleteReplay()}
+        onClick={() => {
+          setError(null);
+          setIsOpen(true);
+        }}
       >
-        {isDeleting ? 'Deleting…' : 'Delete'}
+        Delete
       </button>
-      {error ? (
-        <p className="max-w-56 text-right text-xs leading-4 text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <DashboardDialog
+        open={isOpen}
+        title="Delete replay?"
+        description="This permanently deletes the replay and its stored chunks. It cannot be recovered."
+        onClose={() => {
+          if (!isDeleting) setIsOpen(false);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              disabled={isDeleting}
+              onClick={() => setIsOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={isDeleting}
+              onClick={() => void deleteReplay()}
+            >
+              {isDeleting ? 'Deleting…' : 'Delete replay'}
+            </button>
+          </>
+        }
+      >
+        {error ? (
+          <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </DashboardDialog>
     </div>
   );
-}
-
-async function readError(response: Response) {
-  try {
-    const body = (await response.json()) as { message?: string | string[]; error?: string };
-    if (Array.isArray(body.message)) return body.message.join(' ');
-    return body.message || body.error || `Replay could not be deleted (${response.status}).`;
-  } catch {
-    return `Replay could not be deleted (${response.status}).`;
-  }
 }

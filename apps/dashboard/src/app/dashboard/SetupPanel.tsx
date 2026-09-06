@@ -8,6 +8,7 @@ import { DashboardDialog } from './DashboardDialog';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { Skeleton } from '@/components/Skeleton';
 import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 
 interface SetupResponse {
   hasSetup: boolean;
@@ -74,21 +75,25 @@ export function SetupPanel({
   async function loadSetup() {
     setIsLoading(true);
     setStatus(null);
-    const token = await getAccessToken();
-    if (!token) {
-      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Project settings unavailable');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/setup${setupQuery}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) {
+        reportPanelFailure(await readApiError(response), 'Project settings unavailable');
+        return;
+      }
+      const nextSetup = (await response.json()) as SetupResponse;
+      setSetup(nextSetup);
+      setSetupOrgName(nextSetup.organization?.name ?? '');
+    } catch (error) {
+      reportPanelFailure(await readApiError(error, 'Could not load project settings. Please try again.'), 'Project settings unavailable');
+    } finally {
       setIsLoading(false);
-      return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/setup${setupQuery}`, { headers: { Authorization: `Bearer ${token}` } });
-    setIsLoading(false);
-    if (!response.ok) {
-      setStatus({ tone: 'error', message: await readApiError(response) });
-      return;
-    }
-    const nextSetup = (await response.json()) as SetupResponse;
-    setSetup(nextSetup);
-    setSetupOrgName(nextSetup.organization?.name ?? '');
   }
 
   async function handleRenameOrganization(event: FormEvent<HTMLFormElement>) {
@@ -99,103 +104,143 @@ export function SetupPanel({
     }
     setIsRenamingOrg(true);
     setStatus(null);
-    const token = await getAccessToken();
-    if (!token) {
-      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Organization update failed');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/setup/organization`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationName: trimmed })
+      });
+      if (!response.ok) {
+        reportPanelFailure(await readApiError(response), 'Organization update failed');
+        return;
+      }
+      setSetup((current) => (current ? { ...current, organization: { ...current.organization!, name: trimmed } } : current));
+      setSetupOrgName(trimmed);
+      setStatus({ tone: 'success', message: 'Organization name updated.' });
+    } catch (error) {
+      reportPanelFailure(await readApiError(error, 'Could not update the organization. Please try again.'), 'Organization update failed');
+    } finally {
       setIsRenamingOrg(false);
-      return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/setup/organization`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ organizationName: trimmed })
-    });
-    setIsRenamingOrg(false);
-    if (!response.ok) {
-      setStatus({ tone: 'error', message: await readApiError(response) });
-      return;
-    }
-    setSetup((current) => (current ? { ...current, organization: { ...current.organization!, name: trimmed } } : current));
-    setSetupOrgName(trimmed);
-    setStatus({ tone: 'success', message: 'Organization name updated.' });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setStatus(null);
-    const token = await getAccessToken();
-    if (!token) {
-      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        reportProjectFailure('Your dashboard session expired. Sign in again.');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/setup/bootstrap${setupQuery}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationName, projectName })
+      });
+      if (!response.ok) {
+        reportProjectFailure(await readApiError(response));
+        return;
+      }
+      setSetup((await response.json()) as SetupResponse);
+      reportProjectSuccess('Project created. Copy your write key now — it is shown once.');
+    } catch (error) {
+      reportProjectFailure(await readApiError(error, 'Could not create the project. Please try again.'));
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/setup/bootstrap${setupQuery}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ organizationName, projectName })
-    });
-    setIsSubmitting(false);
-    if (!response.ok) {
-      setStatus({ tone: 'error', message: await readApiError(response) });
-      return;
-    }
-    setSetup((await response.json()) as SetupResponse);
-    setStatus({ tone: 'success', message: 'Project created. Copy your write key now — it is shown once.' });
   }
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!setup?.organization?.id) return;
+    if (!setup?.organization?.id) {
+      reportProjectFailure('Choose an organization before creating a project.');
+      return;
+    }
     setIsCreatingProject(true);
     setStatus(null);
-    const token = await getAccessToken();
-    if (!token) {
-      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        reportProjectFailure('Your dashboard session expired. Sign in again.');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: setup.organization.id,
+          projectName: newProjectName.trim() || 'Web App'
+        })
+      });
+      if (!response.ok) {
+        reportProjectFailure(await readApiError(response));
+        return;
+      }
+      const created = (await response.json()) as SetupResponse;
+      setCreatedProject(created);
+      setNewProjectOpen(false);
+      setNewProjectName('Web App');
+      reportProjectSuccess(
+        `Project "${created.project?.name ?? 'Web App'}" created. Copy the write key now — it is shown once.`
+      );
+    } catch (error) {
+      reportProjectFailure(await readApiError(error, 'Could not create the project. Please try again.'));
+    } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  function reportProjectFailure(message: string) {
+    setStatus({ tone: 'error', message });
+    if (/plan limit for projects|project limit|settings\s*→\s*billing/i.test(message)) {
+      toast.warning(message, { title: 'Project limit reached' });
       return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        organizationId: setup.organization.id,
-        projectName: newProjectName.trim() || 'Web App'
-      })
-    });
-    setIsCreatingProject(false);
-    if (!response.ok) {
-      setStatus({ tone: 'error', message: await readApiError(response) });
-      return;
-    }
-    const created = (await response.json()) as SetupResponse;
-    setCreatedProject(created);
-    setNewProjectOpen(false);
-    setNewProjectName('Web App');
-    setStatus({ tone: 'success', message: `Project "${created.project?.name ?? 'Web App'}" created. Copy the write key now — it is shown once.` });
+    toast.error(message, { title: 'Project creation failed' });
+  }
+
+  function reportPanelFailure(message: string, title: string) {
+    setStatus({ tone: 'error', message });
+    toast.error(message, { title });
+  }
+
+  function reportProjectSuccess(message: string) {
+    setStatus({ tone: 'success', message });
+    toast.success(message, { title: 'Project created' });
   }
 
   async function handleRegenerateWriteKey() {
     setIsRegenerating(true);
     setStatus(null);
-    const token = await getAccessToken();
-    if (!token) {
-      setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Key regeneration failed');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/setup/write-key/regenerate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        reportPanelFailure(await readApiError(response), 'Key regeneration failed');
+        return;
+      }
+      setSetup((await response.json()) as SetupResponse);
+      setIsRegenerateDialogOpen(false);
+      setStatus({ tone: 'success', message: 'New write key generated. Copy it now; it will be hidden later.' });
+    } catch (error) {
+      reportPanelFailure(await readApiError(error, 'Could not regenerate the write key. Please try again.'), 'Key regeneration failed');
+    } finally {
       setIsRegenerating(false);
-      return;
     }
-    const response = await fetch(`${apiBaseUrl}/v1/setup/write-key/regenerate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setIsRegenerating(false);
-    if (!response.ok) {
-      setStatus({ tone: 'error', message: await readApiError(response) });
-      return;
-    }
-    setSetup((await response.json()) as SetupResponse);
-    setIsRegenerateDialogOpen(false);
-    setStatus({ tone: 'success', message: 'New write key generated. Copy it now; it will be hidden later.' });
   }
 
   return (

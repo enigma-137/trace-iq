@@ -1,11 +1,13 @@
 'use client';
 
-import { FormEvent, ReactNode, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { buildOtpAuthUri, formatTotpSecret, useMfaStatus, type RegisteredFactor } from '@/lib/mfa';
 import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
+import { readApiError } from '@/lib/api-error';
+import { isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
 
 type EnrollResponse = {
   id: string;
@@ -44,6 +46,7 @@ export function TwoFactorSetupPanel({ userEmail }: { userEmail?: string | null }
             void refresh();
           }}
           onError={(message) => setStatus({ tone: 'error', message })}
+          onCodeChange={() => setStatus(null)}
         />
       ) : (
         <SetupFlow
@@ -53,6 +56,7 @@ export function TwoFactorSetupPanel({ userEmail }: { userEmail?: string | null }
             void refresh();
           }}
           onError={(message) => setStatus({ tone: 'error', message })}
+          onCodeChange={() => setStatus(null)}
         />
       )}
     </section>

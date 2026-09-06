@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { AuthCodeErrorToast } from './AuthCodeErrorToast';
 
 export default function AuthCodeErrorPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-white px-5 text-neutral-950 dark:bg-black dark:text-neutral-50">
+      <AuthCodeErrorToast />
       <section className="grid w-full max-w-sm gap-4 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400 dark:text-neutral-500">
           Sign-in failed

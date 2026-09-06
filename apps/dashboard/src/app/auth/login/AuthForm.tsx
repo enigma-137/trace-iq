@@ -1,14 +1,18 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { safeRedirectPath } from '@/lib/utils';
 import { clearPendingInvite, peekPendingInvite } from '@/lib/pending-invite';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
+import { isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
 
 type AuthMode = 'signin' | 'signup';
 type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
+type AuthStatus = { tone: 'success' | 'error'; message: string };
 
 export function AuthForm() {
   const router = useRouter();
@@ -23,10 +27,15 @@ export function AuthForm() {
   const [stage, setStage] = useState<AuthStage>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<string | null>(missingConfig ? 'Supabase env vars are missing.' : null);
+  const [status, setStatus] = useState<AuthStatus | null>(
+    missingConfig ? { tone: 'error', message: 'Supabase env vars are missing.' } : null
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [pendingSuccessMessage, setPendingSuccessMessage] = useState('Signed in successfully.');
+  const mfaVerificationInFlight = useRef(false);
+  const mfaInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = useMemo(() => {
     if (missingConfig) {
@@ -55,11 +64,20 @@ export function AuthForm() {
     });
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (cancelled || !data.session) {
-        return;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (error) {
+          await reportAuthFailure(error, 'Session check failed', 'Could not restore your session. Please sign in again.');
+          return;
+        }
+        if (!data.session) return;
+        await decideNextStep(true);
+      } catch (error) {
+        if (!cancelled) {
+          await reportAuthFailure(error, 'Session check failed', 'Could not restore your session. Please sign in again.');
+        }
       }
-      await decideNextStep(true);
     })();
 
     return () => {
@@ -73,37 +91,51 @@ export function AuthForm() {
     event.preventDefault();
 
     if (!supabase) {
-      setStatus('Add Supabase env vars, then restart the dashboard.');
+      await reportAuthFailure(
+        'Add Supabase env vars, then restart the dashboard.',
+        mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed'
+      );
       return;
     }
 
     setIsSubmitting(true);
     setStatus(null);
+    try {
+      const authResult =
+        mode === 'signin'
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                emailRedirectTo: `${window.location.origin}/auth/login?next=${encodeURIComponent(effectiveNext)}`
+              }
+            });
 
-    const authResult =
-      mode === 'signin'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/auth/login?next=${encodeURIComponent(effectiveNext)}`
-            }
-          });
+      if (authResult.error) {
+        await reportAuthFailure(
+          authResult.error,
+          mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed',
+          mode === 'signin' ? 'Could not sign you in. Please try again.' : 'Could not create your account. Please try again.'
+        );
+        return;
+      }
 
-    setIsSubmitting(false);
+      if (mode === 'signup' && !authResult.data.session) {
+        reportAuthSuccess('Check your email to confirm this account, then sign in.', 'Account created');
+        return;
+      }
 
-    if (authResult.error) {
-      setStatus(authResult.error.message);
-      return;
+      await decideNextStep(false, mode === 'signin' ? 'Signed in successfully.' : 'Account created successfully.');
+    } catch (error) {
+      await reportAuthFailure(
+        error,
+        mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed',
+        mode === 'signin' ? 'Could not sign you in. Please try again.' : 'Could not create your account. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (mode === 'signup' && !authResult.data.session) {
-      setStatus('Check your email to confirm this account, then sign in.');
-      return;
-    }
-
-    await decideNextStep();
   }
 
   /**
@@ -112,98 +144,154 @@ export function AuthForm() {
    * - User has no factor and this is a fresh sign-in → recommend enabling 2FA (can decline).
    * - Revisits with an existing session (skipSetupPrompt) or already at AAL2 → dashboard.
    */
-  async function decideNextStep(skipSetupPrompt = false) {
+  async function decideNextStep(skipSetupPrompt = false, successMessage?: string) {
     if (!supabase) {
+      if (successMessage) reportAuthSuccess(successMessage, 'Welcome to TraceIQ');
       router.push(effectiveNext);
       router.refresh();
       return;
     }
 
     const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsChallenge = !aalError && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
+    if (aalError) {
+      await reportAuthFailure(aalError, 'Authentication check failed', 'Could not verify your authentication level. Please try again.');
+      return;
+    }
+    const needsChallenge = aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
 
     if (!needsChallenge) {
-      if (!aalError && aal?.currentLevel === 'aal1' && !skipSetupPrompt) {
+      if (aal?.currentLevel === 'aal1' && !skipSetupPrompt) {
+        if (successMessage) reportAuthSuccess(successMessage, 'Welcome to TraceIQ');
         setStage('setup-prompt');
         return;
       }
+      if (successMessage) reportAuthSuccess(successMessage, 'Welcome to TraceIQ');
       router.push(effectiveNext);
       router.refresh();
       return;
     }
 
     const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-    const factor = !factorsError ? factors?.all.find((item) => item.status === 'verified') : undefined;
+    if (factorsError) {
+      await reportAuthFailure(factorsError, '2FA unavailable', 'Could not load your 2FA method. Please try again.');
+      return;
+    }
+    const factor = factors?.all.find((item) => item.status === 'verified');
 
     if (!factor) {
-      setStatus('Could not load your 2FA method. Please try again.');
+      await reportAuthFailure('Could not load your 2FA method. Please try again.', '2FA unavailable');
       return;
     }
 
+    if (successMessage) setPendingSuccessMessage(successMessage);
     setMfaFactorId(factor.id);
     setStage('mfa-challenge');
   }
 
-  async function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    void verifyMfaCode(mfaCode);
+  }
 
+  async function verifyMfaCode(rawCode: string) {
     if (!supabase || !mfaFactorId) {
+      await reportAuthFailure('Your 2FA session is unavailable. Start the sign-in again.', 'Verification failed');
       return;
     }
 
-    if (mfaCode.trim().length < 6) {
-      setStatus('Enter the 6-digit code from your authenticator app.');
+    const code = normalizeOtpCode(rawCode);
+    if (!isCompleteOtpCode(code)) {
+      await reportAuthFailure('Enter the 6-digit code from your authenticator app.', 'Verification failed');
       return;
     }
+    if (mfaVerificationInFlight.current) return;
 
+    mfaVerificationInFlight.current = true;
     setIsSubmitting(true);
     setStatus(null);
+    let verified = false;
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+      if (challenge.error) {
+        await reportAuthFailure(challenge.error, 'Verification failed', 'Could not start 2FA verification. Please try again.');
+        return;
+      }
 
-    const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
-    if (challenge.error) {
+      const verify = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challenge.data.id,
+        code
+      });
+
+      if (verify.error) {
+        await reportAuthFailure(verify.error, 'Verification failed', 'That code could not be verified. Please try again.');
+        return;
+      }
+
+      verified = true;
+      reportAuthSuccess(pendingSuccessMessage, 'Welcome to TraceIQ');
+      router.push(effectiveNext);
+      router.refresh();
+    } catch (error) {
+      await reportAuthFailure(error, 'Verification failed', 'Could not verify your code. Please try again.');
+    } finally {
+      mfaVerificationInFlight.current = false;
       setIsSubmitting(false);
-      setStatus(challenge.error.message);
-      return;
+      if (!verified) {
+        window.requestAnimationFrame(() => {
+          mfaInputRef.current?.focus();
+          mfaInputRef.current?.select();
+        });
+      }
     }
+  }
 
-    const verify = await supabase.auth.mfa.verify({
-      factorId: mfaFactorId,
-      challengeId: challenge.data.id,
-      code: mfaCode.trim()
-    });
-
-    setIsSubmitting(false);
-
-    if (verify.error) {
-      setStatus(verify.error.message);
-      return;
-    }
-
-    router.push(effectiveNext);
-    router.refresh();
+  function handleMfaCodeChange(value: string) {
+    const code = normalizeOtpCode(value);
+    setMfaCode(code);
+    if (status?.tone === 'error') setStatus(null);
+    if (isCompleteOtpCode(code)) void verifyMfaCode(code);
   }
 
   async function handleOAuth(provider: 'github' | 'gitlab') {
+    const providerName = provider === 'github' ? 'GitHub' : 'GitLab';
     if (!supabase) {
-      setStatus('Add Supabase env vars, then restart the dashboard.');
+      await reportAuthFailure('Add Supabase env vars, then restart the dashboard.', `${providerName} sign-in failed`);
       return;
     }
 
     setIsSubmitting(true);
     setStatus(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(effectiveNext)}`
+        }
+      });
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(effectiveNext)}`
+      if (error) {
+        await reportAuthFailure(error, `${providerName} sign-in failed`, `Could not continue with ${providerName}. Please try again.`);
+        return;
       }
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      setStatus(error.message);
+      toast.success(`Opening ${providerName} to continue sign-in…`, { title: 'Redirecting' });
+    } catch (error) {
+      await reportAuthFailure(error, `${providerName} sign-in failed`, `Could not continue with ${providerName}. Please try again.`);
+    } finally {
+      setIsSubmitting(false);
     }
+  }
+
+  async function reportAuthFailure(source: unknown, title: string, fallback?: string) {
+    const message = await readApiError(source, fallback);
+    setStatus({ tone: 'error', message });
+    toast.error(message, { title });
+    return message;
+  }
+
+  function reportAuthSuccess(message: string, title: string) {
+    setStatus({ tone: 'success', message });
+    toast.success(message, { title });
   }
 
   const inputClass =
@@ -393,8 +481,14 @@ export function AuthForm() {
               </div>
 
               {status ? (
-                <p className="mt-5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-2.5 text-sm text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
-                  {status}
+                <p
+                  className={`mt-5 rounded-lg border px-3 py-2.5 text-sm ${
+                    status.tone === 'error'
+                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
+                  }`}
+                >
+                  {status.message}
                 </p>
               ) : null}
 
@@ -448,6 +542,7 @@ export function AuthForm() {
                   Authenticator code
                 </label>
                 <input
+                  ref={mfaInputRef}
                   className={inputClass}
                   id="mfaCode"
                   name="mfaCode"
@@ -457,7 +552,9 @@ export function AuthForm() {
                   placeholder="123456"
                   value={mfaCode}
                   maxLength={6}
-                  onChange={(event) => setMfaCode(event.target.value)}
+                  pattern="[0-9]*"
+                  onChange={(event) => handleMfaCodeChange(event.target.value)}
+                  disabled={isSubmitting}
                   required
                   autoFocus
                 />
@@ -473,7 +570,7 @@ export function AuthForm() {
 
               {status ? (
                 <p className="mt-5 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                  {status}
+                  {status.message}
                 </p>
               ) : null}
             </form>
