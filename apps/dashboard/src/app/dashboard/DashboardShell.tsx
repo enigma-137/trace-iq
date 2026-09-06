@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
+import { DashboardPlanBadge, DashboardPlanProvider } from './DashboardPlan';
 
 interface DashboardShellProps {
   active: string;
@@ -15,8 +16,9 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
   const localMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="flex min-h-screen w-full">
+    <DashboardPlanProvider projectId={projectId}>
+      <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
+        <div className="flex min-h-screen w-full">
         <Sidebar active={active} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
 
         <section className="min-w-0 flex-1">
@@ -29,9 +31,12 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
                   {/* <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-slate-500">
                     Dashboard
                   </p> */}
-                  <h1 id="dashboard-title" className="mt-0.5 truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                    {title}
-                  </h1>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <h1 id="dashboard-title" className="truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+                      {title}
+                    </h1>
+                    <DashboardPlanBadge />
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -49,7 +54,8 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
             {children}
           </div>
         </section>
-      </div>
-    </main>
+        </div>
+      </main>
+    </DashboardPlanProvider>
   );
 }

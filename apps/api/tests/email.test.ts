@@ -60,6 +60,22 @@ describe('EmailService.send', () => {
     expect(body.to).toEqual(['good@b.co']);
   });
 
+  it('passes a stable idempotency key to Resend when supplied', async () => {
+    process.env.RESEND_API_KEY = 're_test';
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const service = new EmailService();
+    await service.send({
+      to: ['owner@example.com'], subject: 'Welcome', html: '<p>Welcome</p>',
+      idempotencyKey: 'traceiq-pro-welcome-sub_1'
+    });
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      'Idempotency-Key': 'traceiq-pro-welcome-sub_1'
+    });
+  });
+
   it('returns ok:false with a status when Resend rejects', async () => {
     process.env.RESEND_API_KEY = 're_test';
     vi.stubGlobal(

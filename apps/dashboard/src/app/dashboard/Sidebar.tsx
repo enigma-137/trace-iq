@@ -12,6 +12,7 @@ import { SignOutButton } from './SignOutButton';
 import { OrganizationSwitcher } from './OrganizationSwitcher';
 import { navItems, bottomNavItems, navLinkClass, withProjectId } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
+import { DashboardPlanBadge } from './DashboardPlan';
 
 
 interface SidebarProps {
@@ -62,8 +63,9 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
           <img className="h-7 w-7 shrink-0 dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
           <img className="hidden h-7 w-7 shrink-0 dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
           {expanded && (
-            <span className="truncate text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
-              TraceIQ
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-lg font-bold tracking-tight text-neutral-900 dark:text-white">TraceIQ</span>
+              <DashboardPlanBadge />
             </span>
           )}
         </Link>

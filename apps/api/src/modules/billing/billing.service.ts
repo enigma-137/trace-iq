@@ -5,6 +5,7 @@ import { appConfig } from '../../config/app.config';
 import { DatabaseService, QueryExecutor } from '../../database/database.service';
 import { CLOUD_BILLING_POLICY } from './plan-catalog';
 import { BachsClient, BachsSubscription } from './bachs.client';
+import { EmailService, isValidEmail } from '../emails/email.service';
 
 export interface BachsEvent {
   id: string;
@@ -44,6 +45,14 @@ interface SubscriptionRow extends QueryResultRow {
   subscription_change_status: 'pending' | 'failed' | null;
 }
 
+interface WelcomeDeliveryRow extends QueryResultRow {
+  id: string;
+  organization_name: string;
+  provider_subscription_id: string;
+  recipient: string;
+  billing_period: BillingPeriod | null;
+}
+
 @Injectable()
 export class BillingService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(BillingService.name);
@@ -51,11 +60,15 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
   constructor(
     private readonly database: DatabaseService,
     private readonly bachs: BachsClient,
-    @Optional() private readonly config: Pick<typeof appConfig, 'deploymentMode' | 'bachs'> = appConfig
+    @Optional() private readonly config: Pick<typeof appConfig, 'deploymentMode' | 'bachs'> = appConfig,
+    @Optional() private readonly email?: EmailService
   ) {}
 
   onApplicationBootstrap() {
     if (this.config.deploymentMode !== 'cloud') return;
+    void this.retryPendingWelcomeEmails().catch((error) => {
+      this.logger.error('Billing welcome email retry failed.', error instanceof Error ? error.stack : error);
+    });
     const configured = Number(process.env.BILLING_RECONCILIATION_INTERVAL_MS ?? 21_600_000);
     const interval = Number.isFinite(configured) ? Math.max(configured, 60_000) : 21_600_000;
     this.reconciliationTimer = setInterval(() => void this.reconcile().catch((error) => {
@@ -225,16 +238,22 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       const checkoutSubscription = event.type === 'checkout.completed'
         ? await this.subscriptionForCompletedCheckout(event)
         : null;
+      let welcomeDeliveryId: string | null = null;
       await this.database.transaction(async (client) => {
         if (event.type === 'checkout.completed') {
-          await this.applyCompletedCheckout(client, event, checkoutSubscription);
+          welcomeDeliveryId = await this.applyCompletedCheckout(client, event, checkoutSubscription);
         } else if (event.type.startsWith('customer.subscription.')) {
-          await this.upsertSubscription(client, event);
+          welcomeDeliveryId = await this.upsertSubscription(client, event);
         } else if (this.isSubscriptionChangePaymentFailure(event)) {
           await this.applySubscriptionChangePaymentFailure(client, event);
         }
         await client.query(`UPDATE billing_webhook_events SET processing_status = 'processed', processed_at = now() WHERE provider = 'bachs' AND provider_event_id = $1`, [event.id]);
       });
+      if (welcomeDeliveryId) {
+        await this.deliverWelcomeEmail(welcomeDeliveryId).catch((error) => {
+          this.logger.error('Could not deliver the Pro welcome email.', error instanceof Error ? error.stack : error);
+        });
+      }
       return { processed: true, duplicate: false };
     } catch (error) {
       await this.database.query(`UPDATE billing_webhook_events SET processing_status = 'failed', error = $2 WHERE provider = 'bachs' AND provider_event_id = $1`, [event.id, error instanceof Error ? error.message : 'Unknown error']);
@@ -257,10 +276,11 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       }, true));
       reconciled += 1;
     }
+    await this.retryPendingWelcomeEmails();
     return { reconciled };
   }
 
-  private async upsertSubscription(executor: QueryExecutor, event: BachsEvent, reconciliation = false): Promise<void> {
+  private async upsertSubscription(executor: QueryExecutor, event: BachsEvent, reconciliation = false): Promise<string | null> {
     const data = event.data as BachsSubscription;
     const subscriptionId = data.subscription_id ?? data.id;
     let organizationId = typeof data.metadata?.organization_id === 'string' ? data.metadata.organization_id : null;
@@ -277,8 +297,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
         const existing = await executor.query<{ organization_id: string }>(`SELECT organization_id FROM subscriptions WHERE provider = 'bachs' AND provider_subscription_id = $1`, [subscriptionId]);
         if (!existing.rows[0]) throw new BadRequestException('Cannot reconcile an unmapped Bachs subscription.');
         data.metadata = { ...data.metadata, organization_id: existing.rows[0].organization_id };
-        await this.upsertSubscription(executor, event, true);
-        return;
+        return this.upsertSubscription(executor, event, true);
       }
       throw new BadRequestException('Bachs subscription is missing TraceIQ organization metadata.');
     }
@@ -291,7 +310,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       ? new Date(new Date(event.created_at).getTime() + CLOUD_BILLING_POLICY.failedPaymentGraceDays * 86_400_000).toISOString()
       : null;
     await this.lockSubscriptionChange(executor, organizationId);
-    await executor.query(`
+    const upserted = await executor.query(`
       INSERT INTO billing_customers (organization_id, provider, provider_customer_id)
       VALUES ($1, 'bachs', $2)
       ON CONFLICT (organization_id, provider) DO UPDATE SET provider_customer_id = EXCLUDED.provider_customer_id, updated_at = now()
@@ -380,12 +399,23 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       WHERE $17::boolean
         OR subscriptions.provider_event_created_at IS NULL
         OR subscriptions.provider_event_created_at <= EXCLUDED.provider_event_created_at
+      RETURNING provider_subscription_id
     `, [
       `sub_${randomUUID()}`, organizationId, subscriptionId, productId, billingPeriod, data.status,
       data.currency ?? null, data.amount ?? null, data.current_period_start ?? null, data.current_period_end ?? null,
       data.cancel_at_period_end ?? false, data.canceled_at ?? null, graceEnd, event.created_at,
       JSON.stringify(metadata), event.type === 'customer.subscription.updated' && !reconciliation, reconciliation
     ]);
+    if (!this.email || reconciliation || event.type !== 'customer.subscription.created'
+      || !['active', 'trialing'].includes(data.status) || upserted.rowCount === 0) {
+      return null;
+    }
+    return this.enqueueWelcomeEmail(executor, {
+      organizationId,
+      subscriptionId,
+      billingPeriod,
+      providerEmail: data.customer.email
+    });
   }
 
   private isSubscriptionChangePaymentFailure(event: BachsEvent) {
@@ -435,7 +465,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     return subscription;
   }
 
-  private async applyCompletedCheckout(executor: QueryExecutor, event: BachsEvent, subscription: BachsSubscription | null) {
+  private async applyCompletedCheckout(executor: QueryExecutor, event: BachsEvent, subscription: BachsSubscription | null): Promise<string | null> {
     const data = event.data as BachsCheckoutCompleted;
     const mapping = await executor.query<{ organization_id: string }>(`
       SELECT organization_id FROM billing_checkout_sessions
@@ -466,10 +496,93 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       `, [organizationId, data.customer.customer_id]);
     }
     if (subscription) {
-      await this.upsertSubscription(executor, {
+      return this.upsertSubscription(executor, {
         id: event.id, type: 'customer.subscription.created', created_at: event.created_at, data: subscription
       });
     }
+    return null;
+  }
+
+  private async enqueueWelcomeEmail(executor: QueryExecutor, input: {
+    organizationId: string;
+    subscriptionId: string;
+    billingPeriod: BillingPeriod | null;
+    providerEmail?: string;
+  }): Promise<string | null> {
+    let recipient = input.providerEmail?.trim().toLowerCase() ?? '';
+    if (!isValidEmail(recipient)) {
+      const owner = await executor.query<{ email: string | null }>(`
+        SELECT email FROM organization_members
+        WHERE organization_id = $1 AND role = 'owner' AND email IS NOT NULL
+        ORDER BY created_at ASC LIMIT 1
+      `, [input.organizationId]);
+      recipient = owner.rows[0]?.email?.trim().toLowerCase() ?? '';
+    }
+    if (!isValidEmail(recipient)) return null;
+    const delivery = await executor.query<{ id: string }>(`
+      INSERT INTO billing_email_deliveries (
+        id, organization_id, provider, provider_subscription_id,
+        email_kind, recipient, billing_period
+      ) VALUES ($1, $2, 'bachs', $3, 'pro_welcome', $4, $5)
+      ON CONFLICT (provider, provider_subscription_id, email_kind) DO NOTHING
+      RETURNING id
+    `, [`bem_${randomUUID()}`, input.organizationId, input.subscriptionId, recipient, input.billingPeriod]);
+    return delivery.rows[0]?.id ?? null;
+  }
+
+  private async retryPendingWelcomeEmails(limit = 25) {
+    if (!this.email) return;
+    const pending = await this.database.query<{ id: string }>(`
+      SELECT id FROM billing_email_deliveries
+      WHERE (status IN ('pending', 'failed') AND next_attempt_at <= now())
+        OR (status = 'sending' AND attempted_at < now() - interval '15 minutes')
+      ORDER BY created_at ASC LIMIT $1
+    `, [limit]);
+    for (const row of pending.rows) {
+      await this.deliverWelcomeEmail(row.id).catch((error) => {
+        this.logger.error(`Billing welcome email ${row.id} failed.`, error instanceof Error ? error.stack : error);
+      });
+    }
+  }
+
+  private async deliverWelcomeEmail(deliveryId: string) {
+    if (!this.email) return;
+    const claimed = await this.database.query<WelcomeDeliveryRow>(`
+      UPDATE billing_email_deliveries d SET
+        status = 'sending', attempt_count = attempt_count + 1,
+        attempted_at = now(), updated_at = now(), error = NULL
+      FROM organizations o
+      WHERE d.id = $1 AND d.organization_id = o.id
+        AND ((d.status IN ('pending', 'failed') AND d.next_attempt_at <= now())
+          OR (d.status = 'sending' AND d.attempted_at < now() - interval '15 minutes'))
+      RETURNING d.id, o.name AS organization_name, d.provider_subscription_id,
+        d.recipient, d.billing_period
+    `, [deliveryId]);
+    const delivery = claimed.rows[0];
+    if (!delivery) return;
+    const dashboardUrl = `${this.dashboardReturnBaseUrl()}/dashboard/settings/billing`;
+    const result = await this.email.send({
+      to: [delivery.recipient],
+      subject: 'Welcome to TraceIQ Pro',
+      html: buildProWelcomeEmail({
+        organizationName: delivery.organization_name,
+        billingPeriod: delivery.billing_period,
+        dashboardUrl
+      }),
+      idempotencyKey: `traceiq-pro-welcome-${delivery.provider_subscription_id}`
+    });
+    if (result.ok) {
+      await this.database.query(`
+        UPDATE billing_email_deliveries SET status = 'sent', sent_at = now(),
+          updated_at = now(), error = NULL WHERE id = $1
+      `, [deliveryId]);
+      return;
+    }
+    await this.database.query(`
+      UPDATE billing_email_deliveries SET status = 'failed', error = $2,
+        next_attempt_at = now() + interval '15 minutes', updated_at = now()
+      WHERE id = $1
+    `, [deliveryId, (result.failure ?? 'Unknown email delivery failure').slice(0, 500)]);
   }
 
   private requireCloud() {
@@ -536,4 +649,41 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     }
     return url.toString().replace(/\/+$/, '');
   }
+}
+
+export function buildProWelcomeEmail(input: {
+  organizationName: string;
+  billingPeriod: BillingPeriod | null;
+  dashboardUrl: string;
+}) {
+  const organization = escapeHtml(input.organizationName || 'Your organization');
+  const interval = input.billingPeriod === 'yearly'
+    ? '$190/year'
+    : input.billingPeriod === 'monthly' ? '$19/month' : 'your selected billing interval';
+  const dashboardUrl = escapeHtml(input.dashboardUrl);
+  return `<!doctype html>
+<html lang="en">
+  <body style="margin:0;background:#f5f7fb;color:#111827;font-family:Arial,sans-serif">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px;background:#f5f7fb">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
+          <tr><td style="padding:32px">
+            <p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">TraceIQ Pro</p>
+            <h1 style="margin:0 0 16px;font-size:28px;line-height:1.2">Welcome to Pro.</h1>
+            <p style="margin:0 0 16px;color:#4b5563;font-size:16px;line-height:1.65">Your Pro subscription for <strong>${organization}</strong> is active at <strong>${interval}</strong>.</p>
+            <p style="margin:0 0 24px;color:#4b5563;font-size:16px;line-height:1.65">You now have higher limits for events, projects, team members, retention, and Ask TraceIQ funnel explanations.</p>
+            <a href="${dashboardUrl}" style="display:inline-block;border-radius:8px;background:#2563eb;color:#ffffff;padding:12px 18px;text-decoration:none;font-size:14px;font-weight:700">Open TraceIQ</a>
+            <p style="margin:28px 0 0;color:#6b7280;font-size:13px;line-height:1.6">Thanks for supporting TraceIQ. We are glad to have you with us.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  })[character] ?? character);
 }

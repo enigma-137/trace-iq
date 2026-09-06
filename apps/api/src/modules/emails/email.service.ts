@@ -19,6 +19,7 @@ export class EmailService {
     to: string[];
     subject: string;
     html: string;
+    idempotencyKey?: string;
   }): Promise<{ ok: boolean; failure?: string }> {
     if (!this.configured) {
       return { ok: false, failure: 'RESEND_API_KEY not configured' };
@@ -31,12 +32,14 @@ export class EmailService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${this.apiKey}`,
+        'content-type': 'application/json'
+      };
+      if (args.idempotencyKey) headers['Idempotency-Key'] = args.idempotencyKey;
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'content-type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           from: this.from,
           to,

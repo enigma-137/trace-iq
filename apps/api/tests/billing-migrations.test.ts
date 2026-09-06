@@ -32,4 +32,14 @@ describe('billing migration boundaries', () => {
     expect(sql).toContain('subscriptions_pending_change_idx');
     expect(sql).not.toContain('ADD COLUMN IF NOT EXISTS billing_period');
   });
+
+  it('adds an idempotent, retryable billing email outbox in migration 0031', () => {
+    const sql = migration('0031_billing_email_deliveries.sql');
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS billing_email_deliveries');
+    expect(sql).toContain("CHECK (email_kind IN ('pro_welcome'))");
+    expect(sql).toContain('UNIQUE (provider, provider_subscription_id, email_kind)');
+    expect(sql).toContain('billing_email_deliveries_retry_idx');
+    expect(sql).not.toContain('ALTER TABLE subscriptions');
+  });
 });

@@ -70,14 +70,12 @@ export function LandingOverviewDemo() {
     <div className="landing-overview-demo dark">
       <div className="landing-overview-titlebar">
         <div>
-          <span className="landing-overview-live-dot" />
-          <strong>Overview</strong>
+
+          {/* <strong>Overview</strong> */}
         </div>
-        <span>Interactive sample data</span>
       </div>
 
       <section className="landing-overview-story" aria-label="Sample activity summary">
-        <p><strong>Demo Workspace</strong> saw a big jump in activity, with 393 events in the past 24 hours.</p>
         <div className="landing-overview-facts" onMouseLeave={() => setActiveFact(0)}>
           {STORY_FACTS.map((fact, index) => (
             <button
@@ -93,16 +91,16 @@ export function LandingOverviewDemo() {
           ))}
         </div>
         <p id="landing-overview-fact-detail" className="landing-overview-fact-detail" aria-live="polite">
-          {STORY_FACTS[activeFact].detail}
+       <span className="landing-overview-live-dot" />   {STORY_FACTS[activeFact].detail}
         </p>
       </section>
 
-      <section className="landing-overview-availability" aria-label="Ingestion status">
+      {/* <section className="landing-overview-availability" aria-label="Ingestion status">
         <div><span className="landing-overview-live-dot" /><p><small>Ingestion</small><strong>Healthy</strong></p></div>
         <p><small>Last event</small><strong>moments ago</strong></p>
         <p><small>Last hour</small><strong>80</strong></p>
         <p><small>Last 24 hours</small><strong>390</strong></p>
-      </section>
+      </section> */}
 
       <section className="landing-overview-kpis" aria-label="Sample product metrics">
         <PaceStatTile title="Total Events" value={3990} badge="+20%" badgeTone="green" badgeIcon="up" description="390 last 24h" />

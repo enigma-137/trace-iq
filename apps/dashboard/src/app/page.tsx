@@ -175,7 +175,6 @@ export default function Page() {
         <div className="product-shot product-shot-primary">
           <div className="product-shot-bar">
             <span><i /> Product overview</span>
-            <span>Interactive demo</span>
           </div>
           <LandingOverviewDemo />
           <p className="product-shot-caption">See product behavior, system health, and incoming activity in one place.</p>

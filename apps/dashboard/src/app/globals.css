@@ -1194,7 +1194,7 @@ input {
 .traceiq-site .landing-overview-demo {
   padding: clamp(14px, 2.5vw, 28px);
   background:
-    radial-gradient(circle at 88% 4%, rgba(59, 130, 246, 0.08), transparent 24%),
+    radial-gradient(circle at 88% 4%, rgba(19, 19, 20, 0.08), transparent 24%),
     #08090b;
   color: #f8fafc;
 }

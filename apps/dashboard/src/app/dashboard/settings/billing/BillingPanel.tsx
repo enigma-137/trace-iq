@@ -212,7 +212,12 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
         </div>
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <UsageMeter label="Events this month" value={entitlements.usage.events} limit={entitlements.limits.events} />
-          <UsageMeter label="AI insights this month" value={entitlements.usage.aiInsights} limit={entitlements.limits.aiInsights} />
+          <UsageMeter
+            label="AI funnel explanations this month"
+            value={entitlements.usage.aiInsights}
+            limit={entitlements.limits.aiInsights}
+            help="One unit is used when an eligible Ask TraceIQ funnel explanation reaches AI generation. Insufficient-data responses do not use your allowance."
+          />
           <UsageMeter label="Projects" value={entitlements.usage.projects} limit={entitlements.limits.projects} overLimit={entitlements.overLimit.projects} />
           <UsageMeter label="Team members" value={entitlements.usage.members} limit={entitlements.limits.members} overLimit={entitlements.overLimit.members} />
         </div>
@@ -224,13 +229,13 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       <div className="grid gap-4 lg:grid-cols-2">
         <PlanCard
           name="Free" price="$0" description="For evaluating TraceIQ and smaller projects."
-          features={['50K events/month', '1 project', '1 member', '30-day retention', '5 AI insights/month', 'Public dashboards']}
+          features={['50K events/month', '1 project', '1 member', '30-day retention', '5 AI funnel explanations/month', 'Public dashboards']}
           current={!pro}
         />
         <PlanCard
           name="Pro" price={proPrice} secondaryPrice={!hasNonterminalSubscription ? '$190/year' : undefined}
           description={hasNonterminalSubscription && !billingPeriod ? 'Billing interval is syncing from Bachs.' : 'For growing products and teams.'}
-          features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 AI insights/month', 'Public dashboards']}
+          features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 AI funnel explanations/month', 'Public dashboards']}
           current={pro}
           actions={pro ? (
             <div className={`grid gap-2 ${billingPeriod === 'monthly' ? 'sm:grid-cols-2' : ''}`}>
@@ -264,7 +269,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   );
 }
 
-function UsageMeter({ label, value, limit, overLimit = false }: { label: string; value: number; limit: number | null; overLimit?: boolean }) {
+function UsageMeter({ label, value, limit, overLimit = false, help }: { label: string; value: number; limit: number | null; overLimit?: boolean; help?: string }) {
   const pct = percentage(value, limit);
   const danger = overLimit || pct >= 100;
   const warning = !danger && pct >= 70;
@@ -272,6 +277,7 @@ function UsageMeter({ label, value, limit, overLimit = false }: { label: string;
   return <div>
     <div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="font-medium text-neutral-700 dark:text-slate-300">{label}</span><span className={`tabular-nums ${danger ? 'font-semibold text-red-600 dark:text-red-400' : 'text-neutral-500 dark:text-slate-400'}`}>{value.toLocaleString()} / {limit === null ? 'Unlimited' : limit.toLocaleString()}</span></div>
     <div className="h-2 overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800"><div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
+    {help ? <p className="mt-1.5 text-xs leading-5 text-neutral-500 dark:text-slate-400">{help}</p> : null}
     {overLimit ? <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">Excess resource is read-only until usage is within the plan limit.</p> : null}
   </div>;
 }

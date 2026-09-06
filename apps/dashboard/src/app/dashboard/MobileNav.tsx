@@ -13,6 +13,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { OrganizationSwitcher } from './OrganizationSwitcher';
 import { bottomNavItems, navItems, navLinkClass, withProjectId } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
+import { DashboardPlanBadge } from './DashboardPlan';
 
 export function MobileNav({
   active,
@@ -76,6 +77,7 @@ export function MobileNav({
                   <img className="h-8 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
                   <img className="hidden h-8 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
                   <span className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">TraceIQ</span>
+                  <DashboardPlanBadge />
                 </Link>
                 <button
                   type="button"
