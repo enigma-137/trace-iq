@@ -180,57 +180,78 @@ function DotIcon({ className }: { className?: string }) {
 function EnabledState({
   factor,
   onDisabled,
-  onError
+  onError,
+  onCodeChange
 }: {
   factor: RegisteredFactor | null;
   onDisabled: (message: string) => void;
   onError: (message: string) => void;
+  onCodeChange: () => void;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [code, setCode] = useState('');
+  const removalInFlight = useRef(false);
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleRemove(event: FormEvent<HTMLFormElement>) {
+  function handleRemove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    void removeWithCode(code);
+  }
+
+  async function removeWithCode(rawCode: string) {
     if (!factor) {
       onError('Authenticator factor not found. Refresh and try again.');
       return;
     }
-    if (code.trim().length < 6) {
+    const normalizedCode = normalizeOtpCode(rawCode);
+    if (!isCompleteOtpCode(normalizedCode)) {
       onError('Enter the 6-digit code from your authenticator app.');
       return;
     }
+    if (removalInFlight.current) return;
 
+    removalInFlight.current = true;
     setIsRemoving(true);
+    let removed = false;
+    try {
+      // Unenroll requires an AAL2 session, so confirm the factor with a fresh
+      // challenge first (upgrades this session), then remove it.
+      const challenge = await supabase.auth.mfa.challenge({ factorId: factor.id });
+      if (challenge.error) throw challenge.error;
+      const verify = await supabase.auth.mfa.verify({
+        factorId: factor.id,
+        challengeId: challenge.data.id,
+        code: normalizedCode
+      });
+      if (verify.error) throw verify.error;
+      const unenroll = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      if (unenroll.error) throw unenroll.error;
 
-    // unenroll requires an AAL2 session, so confirm the factor with a fresh
-    // challenge first (upgrades this session), then remove it.
-    const challenge = await supabase.auth.mfa.challenge({ factorId: factor.id });
-    if (challenge.error) {
+      removed = true;
+      setIsConfirmOpen(false);
+      setCode('');
+      onDisabled('Two-factor authentication disabled.');
+    } catch (error) {
+      onError(await readApiError(error, 'Could not remove two-factor authentication.'));
+    } finally {
+      removalInFlight.current = false;
       setIsRemoving(false);
-      onError(challenge.error.message);
-      return;
+      if (!removed) {
+        window.requestAnimationFrame(() => {
+          codeInputRef.current?.focus();
+          codeInputRef.current?.select();
+        });
+      }
     }
-    const verify = await supabase.auth.mfa.verify({
-      factorId: factor.id,
-      challengeId: challenge.data.id,
-      code: code.trim()
-    });
-    if (verify.error) {
-      setIsRemoving(false);
-      onError(verify.error.message);
-      return;
-    }
-    const unenroll = await supabase.auth.mfa.unenroll({ factorId: factor.id });
-    setIsRemoving(false);
-    if (unenroll.error) {
-      onError(unenroll.error.message);
-      return;
-    }
-    setIsConfirmOpen(false);
-    setCode('');
-    onDisabled('Two-factor authentication disabled.');
+  }
+
+  function handleCodeChange(value: string) {
+    const normalizedCode = normalizeOtpCode(value);
+    setCode(normalizedCode);
+    onCodeChange();
+    if (isCompleteOtpCode(normalizedCode)) void removeWithCode(normalizedCode);
   }
 
   return (
