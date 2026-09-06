@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image';
 import { useState } from 'react';
 import {
   ArrowUpRight,
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import GlobeHero from '@/components/globe-hero';
 import { LandingApiFlow } from '@/components/LandingApiFlow';
+import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 
 const navItems = [
@@ -172,21 +172,14 @@ export default function Page() {
           <h2>Traffic, behavior, and health.<br /><em>One inspectable view.</em></h2>
           <p>Start with visitors and referrers, follow real session paths, then connect conversion behavior to errors, API latency, feature flags, and alerts.</p>
         </div>
-        <figure className="product-shot product-shot-primary">
+        <div className="product-shot product-shot-primary">
           <div className="product-shot-bar">
             <span><i /> Product overview</span>
-            <span>Real TraceIQ interface</span>
+            <span>Interactive demo</span>
           </div>
-          <Image
-            src="/product/traceiq-overview.png"
-            alt="TraceIQ overview showing ingestion health, product metrics, activity trends, a live event stream, and event volume"
-            width={1460}
-            height={1078}
-            sizes="(max-width: 1100px) calc(100vw - 40px), 996px"
-            className="product-shot-image"
-          />
-          <figcaption>See product behavior, system health, and incoming activity in one place.</figcaption>
-        </figure>
+          <LandingOverviewDemo />
+          <p className="product-shot-caption">See product behavior, system health, and incoming activity in one place.</p>
+        </div>
 
         <div className="product-detail">
           <div className="product-detail-copy">
