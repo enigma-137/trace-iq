@@ -85,11 +85,11 @@ describe('Bachs billing integration', () => {
     expect(query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock(hashtext($1))', ['org_1:billingSubscriptionChange']);
   });
 
-  it('keeps monthly state after PATCH acceptance until a subscription webhook confirms yearly', async () => {
+  it('schedules monthly to yearly for renewal and finalizes only after invoice.paid then subscription.updated', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('SELECT id,provider_subscription_id')) return queryResult(1, [{
         id: 'sub_local', provider_subscription_id: 'sub_bachs_1', provider_product_id: 'prod_monthly',
-        billing_period: 'monthly', status: 'active'
+        billing_period: 'monthly', status: 'active', current_period_end: '2026-09-30T08:00:00Z'
       }]);
       return queryResult();
     });
@@ -100,17 +100,18 @@ describe('Bachs billing integration', () => {
     const bachs = {
       createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(),
       updateSubscription: vi.fn().mockResolvedValue({
-        subscription_id: 'sub_bachs_1', status: 'active', payment_status: 'Processing'
+        subscription_id: 'sub_bachs_1', status: 'active', product_id: 'prod_monthly'
       })
     };
     const service = new BillingService(database as never, bachs as never, cloudConfig);
 
     await expect(service.upgradeToYearly('org_1')).resolves.toMatchObject({
-      changed: true, billingPeriod: 'monthly', upgradeStatus: 'pending', subscriptionStatus: 'active'
+      changed: true, billingPeriod: 'monthly', changeStatus: 'scheduled',
+      effectiveAt: '2026-09-30T08:00:00Z', subscriptionStatus: 'active'
     });
     expect(bachs.updateSubscription).toHaveBeenCalledWith(
       'sub_bachs_1',
-      { product_id: 'prod_yearly', proration_behavior: 'invoice_now' },
+      { product_id: 'prod_yearly' },
       'traceiq:sub_bachs_1:pro-yearly'
     );
     expect(bachs.createCheckout).not.toHaveBeenCalled();
@@ -119,23 +120,27 @@ describe('Bachs billing integration', () => {
     expect(pendingUpdate?.[1]).toEqual(['sub_local', 'prod_yearly', expect.any(String)]);
 
     await service.processWebhook({
-      id: 'evt_upgrade_payment_processing',
-      type: 'payment.processing',
-      created_at: '2026-09-02T11:59:00Z',
+      id: 'evt_renewal_invoice_paid',
+      type: 'invoice.paid',
+      created_at: '2026-09-30T08:00:00Z',
       data: {
-        subscription_id: 'sub_bachs_1', status: 'Processing',
-        billing_reason: 'Subscription Update',
-        description: 'Remaining time on new plan + Unused time on previous plan'
+        subscription_id: 'sub_bachs_1', status: 'Paid',
+        billing_reason: 'Subscription Cycle'
       }
     });
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
 
     await service.processWebhook({
       ...subscriptionEvent,
-      id: 'evt_upgrade_confirmed',
+      id: 'evt_yearly_renewal_confirmed',
       type: 'customer.subscription.updated',
-      created_at: '2026-09-02T12:00:00Z',
-      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+      created_at: '2026-09-30T08:00:01Z',
+      data: {
+        ...subscriptionEvent.data,
+        product_id: 'prod_yearly', amount: '190.00',
+        current_period_start: '2026-09-30T08:00:00Z',
+        current_period_end: '2027-09-30T08:00:00Z'
+      }
     });
     const confirmedUpsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
     expect(confirmedUpsert?.[1]).toEqual(expect.arrayContaining(['sub_bachs_1', 'prod_yearly', 'yearly', '190.00', true]));
@@ -155,7 +160,7 @@ describe('Bachs billing integration', () => {
     const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn() };
     const service = new BillingService(database as never, bachs as never, cloudConfig);
 
-    await expect(service.upgradeToYearly('org_1')).rejects.toThrow(/already pending/);
+    await expect(service.upgradeToYearly('org_1')).rejects.toThrow(/already scheduled/);
     expect(bachs.updateSubscription).not.toHaveBeenCalled();
   });
 
@@ -173,7 +178,8 @@ describe('Bachs billing integration', () => {
     const service = new BillingService(database as never, bachs as never, cloudConfig);
 
     await expect(service.upgradeToYearly('org_1')).resolves.toEqual({
-      changed: false, billingPeriod: 'yearly', upgradeStatus: null, subscriptionStatus: 'active'
+      changed: false, billingPeriod: 'yearly', changeStatus: null,
+      effectiveAt: null, subscriptionStatus: 'active'
     });
     expect(bachs.updateSubscription).not.toHaveBeenCalled();
   });
@@ -253,36 +259,33 @@ describe('Bachs billing integration', () => {
     expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '190.00']));
   });
 
-  it('marks a pending yearly change failed without changing the monthly subscription state', async () => {
-    const query = vi.fn(async (sql: string) => {
-      if (sql.includes('INSERT INTO billing_webhook_events')) return queryResult(1);
-      if (sql.includes('SELECT organization_id FROM subscriptions')) {
-        return queryResult(1, [{ organization_id: 'org_1' }]);
-      }
-      return queryResult();
-    });
-    const database = {
-      query,
-      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
-    };
-    const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn() };
-    const service = new BillingService(database as never, bachs as never, cloudConfig);
+  it('keeps the scheduled change pending and applies normal grace state when renewal payment fails', async () => {
+    const { service, query } = makeService();
 
     await expect(service.processWebhook({
-      id: 'evt_upgrade_payment_failed',
-      type: 'payment.failed',
-      created_at: '2026-09-02T12:01:00Z',
+      id: 'evt_renewal_payment_failed',
+      type: 'invoice.payment_failed',
+      created_at: '2026-09-30T08:00:00Z',
       data: {
         subscription_id: 'sub_bachs_1', status: 'Failed',
-        billing_reason: 'Subscription Update',
-        description: 'Remaining time on new plan + Unused time on previous plan'
+        billing_reason: 'Subscription Cycle'
       }
     })).resolves.toEqual({ processed: true, duplicate: false });
-
-    const failedUpdate = query.mock.calls.find(([sql]) => String(sql).includes("subscription_change_status = 'failed'"));
-    expect(failedUpdate?.[1]).toEqual(['sub_bachs_1', '2026-09-02T12:01:00Z']);
-    expect(String(failedUpdate?.[0])).toContain("subscription_change_status = 'pending'");
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO subscriptions'))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("subscription_change_status = 'failed'"))).toBe(false);
+
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_renewal_past_due',
+      type: 'customer.subscription.updated',
+      created_at: '2026-09-30T08:00:01Z',
+      data: { ...subscriptionEvent.data, status: 'past_due', product_id: 'prod_monthly' }
+    });
+
+    const subscriptionUpdate = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(subscriptionUpdate?.[1]).toEqual(expect.arrayContaining(['prod_monthly', 'monthly', 'past_due']));
+    expect(subscriptionUpdate?.[1]?.[12]).toBe('2026-10-07T08:00:01.000Z');
+    expect(String(subscriptionUpdate?.[0])).toContain('ELSE subscriptions.subscription_change_status');
   });
 
   it('does not let invoice.paid independently invent yearly subscription state', async () => {
@@ -293,7 +296,7 @@ describe('Bachs billing integration', () => {
       created_at: '2026-09-02T12:01:00Z',
       data: {
         subscription_id: 'sub_bachs_1', status: 'Paid',
-        billing_reason: 'Subscription Update'
+        billing_reason: 'Subscription Cycle'
       }
     })).resolves.toEqual({ processed: true, duplicate: false });
 
@@ -372,6 +375,22 @@ describe('Bachs billing integration', () => {
     const upserts = query.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
     expect(upserts[0][1]).toEqual(expect.arrayContaining(['active', true]));
     expect(upserts[1][1]).toEqual(expect.arrayContaining(['canceled', '2026-09-30T08:00:00Z']));
+  });
+
+  it('clears a scheduled interval change when a signed provider update cancels renewal', async () => {
+    const { service, query } = makeService();
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_cancel_with_scheduled_change',
+      type: 'customer.subscription.updated',
+      created_at: '2026-09-03T08:00:00Z',
+      data: { ...subscriptionEvent.data, cancel_at_period_end: true }
+    });
+
+    const upsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(upsert?.[1]).toEqual(expect.arrayContaining(['prod_monthly', 'monthly', true]));
+    expect(String(upsert?.[0])).toContain('OR EXCLUDED.cancel_at_period_end');
+    expect(String(upsert?.[0])).toContain("OR EXCLUDED.status IN ('canceled', 'unpaid')");
   });
 
   it('acknowledges duplicate provider events without applying them twice', async () => {

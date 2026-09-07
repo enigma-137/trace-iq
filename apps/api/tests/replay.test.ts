@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
@@ -30,7 +30,11 @@ class MemoryStorage implements ReplayStorage {
   delete = vi.fn(async (key: string) => { this.objects.delete(key); });
 }
 
-function makeService({ enabled = true, existingChunk }: { enabled?: boolean; existingChunk?: { content_sha256: string; storage_key: string } } = {}) {
+function makeService({ enabled = true, sampleRate = 1, matchedFunnelIds = ['fnl_onboarding'],
+  triggerEventNames = ['onboarding_started'], existingChunk }: {
+  enabled?: boolean; sampleRate?: number; matchedFunnelIds?: string[]; triggerEventNames?: string[];
+  existingChunk?: { content_sha256: string; storage_key: string };
+} = {}) {
   const now = Date.now();
   const replay = {
     id: 'rpl_test', organization_id: 'org_a', project_id: 'proj_a', session_id: 'sess_a',
@@ -42,8 +46,17 @@ function makeService({ enabled = true, existingChunk }: { enabled?: boolean; exi
   let reservation: Record<string, unknown> | undefined;
   const callOrder: string[] = [];
   const db = mockDatabase((text, values) => {
-    if (text.includes('FROM replay_settings')) return rows([{ enabled, sampleRate: 1, maxDurationSeconds: 600,
-      retentionDays: 30, privacyMode: 'balanced', requireConsent: false, maskSelectors: [], blockSelectors: [], ignoreSelectors: [] }]);
+    if (text.includes('FROM replay_settings')) return rows([{ enabled, sampleRate, maxDurationSeconds: 600,
+      retentionDays: 30, privacyMode: 'balanced', requireConsent: false, maskSelectors: [], blockSelectors: [], ignoreSelectors: [],
+      selectedFunnelIds: matchedFunnelIds }]);
+    if (text.includes('FROM replay_setting_funnels rsf') && text.includes('JOIN events e')) {
+      return rows(matchedFunnelIds.map((id) => ({ id })));
+    }
+    if (text.includes('FROM replay_setting_funnels rsf')) {
+      return rows(matchedFunnelIds.map((id, index) => ({
+        id, name: `Flow ${index + 1}`, trigger_event_name: triggerEventNames[index] ?? triggerEventNames[0]
+      })));
+    }
     if (text.includes('pg_advisory_xact_lock')) return empty();
     if (text.includes('INSERT INTO sessions')) return affected(1);
     if (text.includes('SELECT s.id,s.user_id,s.anonymous_id,u.external_id')) {
@@ -82,7 +95,8 @@ function makeService({ enabled = true, existingChunk }: { enabled?: boolean; exi
   const uploadToken = tokens.sign({
     projectId: 'proj_a', organizationId: 'org_a', sessionId: 'sess_a', anonymousId: 'anon_a',
     consentGranted: false, requireConsent: false, privacyMode: 'balanced', maxDurationSeconds: 600,
-    maxChunks: 3_000, maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000
+    maxChunks: 3_000, maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000,
+    matchedFunnelIds
   }, 300).token;
   const service = new ReplayService(db as never, events as never, projects as never, entitlements as never, tokens, storage);
   return { service, db, storage, projects, entitlements, tokens, uploadToken, replay, callOrder };
@@ -158,6 +172,16 @@ describe('Session Replay security', () => {
     expect(storage.assertReady).not.toHaveBeenCalled();
   });
 
+  it('does not delete or hide historical replay metadata when a downgrade blocks new recording', async () => {
+    const { service, db, entitlements } = makeService();
+    entitlements.assertReplayAvailable.mockRejectedValue(new ForbiddenException('Session Replay is available on Pro.'));
+
+    await expect(service.list({ id: 'owner' }, { projectId: 'proj_a' })).resolves.toMatchObject({
+      project: { id: 'proj_a' }, replays: []
+    });
+    expect(db.queryCalls(/DELETE FROM session_replays|UPDATE session_replays SET status='deleting'/)).toHaveLength(0);
+  });
+
   it('issues a short-lived grant bound to project, session, identity, consent, and limits', async () => {
     const { service, tokens } = makeService();
     const grant = await service.authorizeUpload('write_key', {
@@ -168,7 +192,89 @@ describe('Session Replay security', () => {
     expect(new Date(grant.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(300_000);
     expect(claims).toMatchObject({ projectId: 'proj_a', organizationId: 'org_a', sessionId: 'sess_a',
       anonymousId: 'anon_a', consentGranted: true, maxChunks: 3_000,
-      maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000 });
+      maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000,
+      matchedFunnelIds: ['fnl_onboarding'] });
+  });
+
+  it('returns page-view and custom first-step triggers without exposing selected funnel IDs to the browser', async () => {
+    const { service } = makeService({
+      matchedFunnelIds: ['fnl_pages', 'fnl_checkout'],
+      triggerEventNames: ['$page', 'checkout_started']
+    });
+    const config = await service.getRecorderConfig('write_key', 'proj_a');
+
+    expect(config).toMatchObject({ enabled: true, flowTriggerEventNames: ['$page', 'checkout_started'] });
+    expect(config).not.toHaveProperty('selectedFunnelIds');
+  });
+
+  it('never enables recorder config when no flow is selected', async () => {
+    const { service } = makeService({ matchedFunnelIds: [] });
+    await expect(service.getRecorderConfig('write_key', 'proj_a')).resolves.toMatchObject({
+      enabled: false, flowTriggerEventNames: []
+    });
+  });
+
+  it('applies deterministic sampling server-side before storage initialization', async () => {
+    const { service, storage } = makeService({ sampleRate: 0 });
+    await expect(service.authorizeUpload('write_key', {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', consentGranted: true
+    })).rejects.toThrow(/sample rate/);
+    expect(storage.assertReady).not.toHaveBeenCalled();
+  });
+
+  it('associates multiple matching flows with one replay session instead of creating duplicates', async () => {
+    const { service, db, tokens } = makeService({
+      matchedFunnelIds: ['fnl_onboarding', 'fnl_checkout'],
+      triggerEventNames: ['onboarding_started', 'checkout_started']
+    });
+    const token = tokens.sign({
+      projectId: 'proj_a', organizationId: 'org_a', sessionId: 'sess_a', anonymousId: 'anon_a',
+      consentGranted: false, requireConsent: false, privacyMode: 'balanced', maxDurationSeconds: 600,
+      maxChunks: 3_000, maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000,
+      matchedFunnelIds: ['fnl_onboarding', 'fnl_checkout']
+    }, 300).token;
+
+    await service.ingestChunk(token, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 0, events: [canaryEvent()]
+    });
+
+    expect(db.queryCalls(/INSERT INTO session_replay_funnels/)[0].values).toEqual([
+      'rpl_test', 'proj_a', ['fnl_onboarding', 'fnl_checkout']
+    ]);
+    expect(db.queryCalls(/INSERT INTO session_replays/)).toHaveLength(0);
+  });
+
+  it('rejects selected funnel IDs that do not belong to the active project', async () => {
+    const { service } = makeService();
+    await expect(service.updateSettings({ id: 'owner' }, 'proj_a', {
+      selectedFunnelIds: ['fnl_other_project']
+    }, true)).rejects.toThrow(/do not belong to this project/);
+  });
+
+  it('invalidates an issued grant when the selected funnel is deleted or its first step no longer matches', async () => {
+    const matches = ['fnl_onboarding'];
+    const { service, uploadToken } = makeService({ matchedFunnelIds: matches });
+    matches.splice(0, matches.length);
+
+    await expect(service.ingestChunk(uploadToken, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 0, events: [canaryEvent()]
+    })).rejects.toThrow(/no longer matches a selected Replay flow/);
+  });
+
+  it('associates only still-current matches when one flow in a multi-flow grant is removed', async () => {
+    const { service, db, tokens } = makeService({ matchedFunnelIds: ['fnl_checkout'] });
+    const token = tokens.sign({
+      projectId: 'proj_a', organizationId: 'org_a', sessionId: 'sess_a', anonymousId: 'anon_a',
+      consentGranted: false, requireConsent: false, privacyMode: 'balanced', maxDurationSeconds: 600,
+      maxChunks: 3_000, maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000,
+      matchedFunnelIds: ['fnl_deleted', 'fnl_checkout']
+    }, 300).token;
+
+    await service.ingestChunk(token, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 0, events: [canaryEvent()]
+    });
+
+    expect(db.queryCalls(/INSERT INTO session_replay_funnels/)[0].values[2]).toEqual(['fnl_checkout']);
   });
 
   it('requires explicit acknowledgement before weakening privacy controls', async () => {
@@ -311,13 +417,23 @@ rl(https://escaped.example/pixel)}` }, childNodes: []
     await expect(service.delete({ id: 'owner' }, 'missing', 'proj_a')).rejects.toThrow(/not found|could not be deleted/);
   });
 
-  it('keeps Cloud replay unavailable until an explicit entitlement override exists', async () => {
+  it('makes Cloud replay available to Pro without requiring an explicit allow override', async () => {
     const db = mockDatabase((text) => text.includes('entitlement_overrides') ? empty() : rows([{
       plan_key: 'pro', status: 'active', grace_period_ends_at: null, subscription_updated_at: null,
       projects: '1', members: '1', events: '0', ai_insights: '0', replay_sessions: '0', replay_storage_bytes: '0'
     }]));
     const entitlements = new EntitlementService(db as never, { deploymentMode: 'cloud' });
-    await expect(entitlements.assertReplayAvailable('org_a')).rejects.toThrow(/not enabled/);
+    await expect(entitlements.assertReplayAvailable('org_a')).resolves.toMatchObject({
+      plan: 'pro', features: { sessionReplay: true }
+    });
+  });
+
+  it('rejects authorization when this session has not entered a selected flow', async () => {
+    const { service, storage } = makeService({ matchedFunnelIds: [] });
+    await expect(service.authorizeUpload('write_key', {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', consentGranted: true
+    })).rejects.toThrow(/has not entered a selected Replay flow/);
+    expect(storage.assertReady).not.toHaveBeenCalled();
   });
 
   it('caps optional Supabase signed URLs at one minute and validates object keys', async () => {
@@ -337,6 +453,15 @@ rl(https://escaped.example/pixel)}` }, childNodes: []
     } finally {
       fetchMock.mockRestore();
     }
+  });
+
+  it('defines additive project-confined flow targeting with non-destructive funnel deletion', async () => {
+    const migration = await readFile(join(process.cwd(), 'migrations', '0032_replay_funnel_targeting.sql'), 'utf8');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS replay_setting_funnels');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS session_replay_funnels');
+    expect(migration).toMatch(/FOREIGN KEY \(funnel_id, project_id\) REFERENCES funnels\(id, project_id\) ON DELETE CASCADE/);
+    expect(migration).toMatch(/FOREIGN KEY \(replay_id, project_id\) REFERENCES session_replays\(id, project_id\) ON DELETE CASCADE/);
+    expect(migration).not.toMatch(/DROP TABLE|DELETE FROM funnels|UPDATE funnels/i);
   });
 });
 

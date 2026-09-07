@@ -24,7 +24,30 @@ describe('BachsClient', () => {
     );
   });
 
-  it('changes an existing subscription product with immediate proration and idempotency', async () => {
+  it('schedules a billing-interval product change without requesting proration', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      subscription_id: 'sub_1', customer: { customer_id: 'cust_1' },
+      product_id: 'prod_monthly', status: 'active'
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new BachsClient(config).updateSubscription(
+      'sub_1',
+      { product_id: 'prod_yearly' },
+      'traceiq:sub_1:pro-yearly'
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://sandbox-api.bachs.io/v1/subscriptions/sub_1',
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: expect.objectContaining({ 'Idempotency-Key': 'traceiq:sub_1:pro-yearly' }),
+        body: JSON.stringify({ product_id: 'prod_yearly' })
+      })
+    );
+  });
+
+  it('preserves explicit immediate proration for same-interval product changes', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       subscription_id: 'sub_1', customer: { customer_id: 'cust_1' },
       product_id: 'prod_yearly', status: 'active'

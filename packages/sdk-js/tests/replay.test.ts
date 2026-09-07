@@ -31,7 +31,8 @@ function recorderEvent() {
 
 function configResponse() {
   return new Response(JSON.stringify({ enabled: true, sampleRate: 1, maxDurationSeconds: 60, privacyMode: 'balanced',
-    requireConsent: true, maskSelectors: [], blockSelectors: [], ignoreSelectors: [] }), { status: 200 });
+    requireConsent: true, maskSelectors: [], blockSelectors: [], ignoreSelectors: [],
+    flowTriggerEventNames: ['onboarding_started'] }), { status: 200 });
 }
 
 beforeEach(() => {
@@ -93,6 +94,9 @@ describe('ReplayRecorder security gates', () => {
     const recorder = new ReplayRecorder('https://api.example', { enabled: true },
       () => ({ projectId: 'proj', writeKey: 'write-key', sessionId: 'sess', anonymousId: 'anon' }), () => true, vi.fn());
     await expect(recorder.start()).resolves.toBe(true);
+    expect(rrweb.record).not.toHaveBeenCalled();
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(1));
     expect(rrweb.options?.maskInputOptions.hidden).toBe(true);
     expect(rrweb.options?.blockSelector).toContain('iframe:not([data-traceiq-replay-safe-frame="true"])');
     expect(rrweb.options?.inlineStylesheet).toBe(true);
@@ -121,6 +125,8 @@ describe('ReplayRecorder security gates', () => {
     const recorder = new ReplayRecorder('https://api.example', { enabled: true },
       () => ({ projectId: 'proj', writeKey: 'write-key', sessionId: 'sess', anonymousId: 'anon' }), () => true, vi.fn());
     await recorder.start();
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(1));
     recorder.stop();
     await vi.waitFor(() => expect(chunks.length).toBe(1));
     for (const canary of CANARIES) expect(chunks[0]).not.toContain(canary);
@@ -138,6 +144,8 @@ describe('ReplayRecorder security gates', () => {
     const recorder = new ReplayRecorder('https://api.example', { enabled: true },
       () => ({ projectId: 'proj', writeKey: 'write-key', sessionId: 'sess', anonymousId: 'anon' }), () => true, vi.fn());
     await recorder.start();
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(1));
     rrweb.options?.emit(recorderEvent());
     recorder.stop();
     recorder.revokeConsent();
@@ -162,5 +170,45 @@ describe('ReplayRecorder security gates', () => {
     recorder.revokeConsent();
     await expect(recorder.start()).resolves.toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('stays armed without importing rrweb until a selected flow event is accepted', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/config')) return configResponse();
+      if (url.includes('/authorize')) return new Response(JSON.stringify({
+        token: 'upload-token', expiresAt: new Date(Date.now() + 300_000).toISOString()
+      }), { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const recorder = new ReplayRecorder('https://api.example', { enabled: true },
+      () => ({ projectId: 'proj', writeKey: 'key', sessionId: 'sess' }), () => true, vi.fn());
+
+    await expect(recorder.start()).resolves.toBe(true);
+    recorder.eventAccepted('unrelated_event');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(rrweb.record).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/authorize'))).toBe(false);
+  });
+
+  it('keeps the configured maximum duration as the recording stop boundary', async () => {
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/config')) return configResponse();
+      if (url.includes('/authorize')) return new Response(JSON.stringify({
+        token: 'upload-token', expiresAt: new Date(Date.now() + 300_000).toISOString()
+      }), { status: 200 });
+      return new Response('{}', { status: 200 });
+    }));
+    const recorder = new ReplayRecorder('https://api.example', { enabled: true },
+      () => ({ projectId: 'proj', writeKey: 'key', sessionId: 'sess' }), () => true, vi.fn());
+
+    await recorder.start();
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(1));
+
+    expect(timeoutSpy.mock.calls.some((call) => call[1] === 60_000)).toBe(true);
+    recorder.stop({ discard: true });
   });
 });

@@ -404,6 +404,11 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
       if (!response.ok) {
         this.debug(`TraceIQ event rejected with ${response.status}.`);
+      } else {
+        // Replay flow eligibility is evaluated only after TraceIQ accepted the
+        // event, allowing the API to prove the session entered a selected
+        // funnel instead of trusting an SDK-supplied funnel identifier.
+        this.replayRecorder?.eventAccepted(eventName);
       }
     } catch (error) {
       this.debug('TraceIQ event delivery failed.', error);

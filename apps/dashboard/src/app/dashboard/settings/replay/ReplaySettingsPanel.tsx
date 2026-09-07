@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { DashboardDialog } from '../../DashboardDialog';
@@ -8,8 +9,9 @@ import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 type PrivacyMode = 'strict' | 'balanced' | 'custom';
-interface Settings { enabled:boolean; sampleRate:number; maxDurationSeconds:number; retentionDays:number; privacyMode:PrivacyMode; requireConsent:boolean; maskSelectors:string[]; blockSelectors:string[]; ignoreSelectors:string[]; }
-interface Response { settings: Settings; entitlement: { available:boolean; limits: Record<string, number|null> }; project:{id:string}; }
+interface Settings { enabled:boolean; sampleRate:number; maxDurationSeconds:number; retentionDays:number; privacyMode:PrivacyMode; requireConsent:boolean; maskSelectors:string[]; blockSelectors:string[]; ignoreSelectors:string[]; selectedFunnelIds:string[]; }
+interface ReplayFunnel { id:string; name:string; triggerEventName:string; }
+interface Response { settings: Settings; funnels:ReplayFunnel[]; entitlement: { available:boolean; plan:string; limits: Record<string, number|null> }; project:{id:string}; }
 
 export function ReplaySettingsPanel({ projectId }: { projectId?: string }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -72,16 +74,36 @@ export function ReplaySettingsPanel({ projectId }: { projectId?: string }) {
     }
   }
   if (!settings) return <p className="py-8 text-sm text-neutral-500">{message || 'Loading replay settingsâ€¦'}</p>;
+  const activeProjectId = data?.project.id ?? projectId;
   return (
     <form onSubmit={save} className="mt-6 grid max-w-4xl gap-5">
-      {!data?.entitlement.available ? <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Session Replay is not enabled for this TraceIQ Cloud organization. An operator entitlement is required before recording can be switched on.</div> : null}
+      {!data?.entitlement.available ? <div className="rounded-md border border-neutral-300 p-4 text-sm text-neutral-700 dark:border-slate-700 dark:text-slate-300">
+        {data?.entitlement.plan === 'pro' ? 'Session Replay is temporarily unavailable for this organization. Contact TraceIQ support.' : <>Session Replay is available on Pro. <Link className="font-semibold text-blue-600 hover:underline" href={`/dashboard/settings/billing${activeProjectId ? `?projectId=${encodeURIComponent(activeProjectId)}` : ''}`}>View upgrade options</Link>.</>}
+      </div> : null}
       <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <Toggle label="Session Replay" description="Off by default. rrweb is not loaded by the SDK while this is off." checked={settings.enabled} disabled={!data?.entitlement.available} onChange={enabled=>setSettings({...settings,enabled})}/>
+        <Toggle label="Session Replay" description="Off by default. rrweb is not loaded until a selected flow begins." checked={settings.enabled} disabled={!data?.entitlement.available || settings.selectedFunnelIds.length===0} onChange={enabled=>setSettings({...settings,enabled})}/>
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <NumberField label="Sample rate (%)" min={0} max={100} value={settings.sampleRate*100} onChange={value=>setSettings({...settings,sampleRate:value/100})}/>
           <NumberField label="Maximum duration (seconds)" min={1} max={14400} value={settings.maxDurationSeconds} onChange={value=>setSettings({...settings,maxDurationSeconds:value})}/>
           <NumberField label="Retention (days)" min={1} max={3650} value={settings.retentionDays} onChange={value=>setSettings({...settings,retentionDays:value})}/>
         </div>
+      </section>
+      <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        <h2 className="font-semibold">Flows to record</h2>
+        <p className="mt-1 text-sm text-neutral-500">Choose the product journeys Session Replay may capture. Recording starts when an accepted event matches the current first step of a selected funnel.</p>
+        {(data?.funnels.length ?? 0) === 0 ? (
+          <p className="mt-4 rounded-md border border-neutral-200 p-4 text-sm text-neutral-600 dark:border-slate-800 dark:text-slate-400">
+            No funnels exist for this project. <Link className="font-semibold text-blue-600 hover:underline" href={`/dashboard/funnels${activeProjectId ? `?projectId=${encodeURIComponent(activeProjectId)}` : ''}`}>Create a funnel</Link> before enabling Replay.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {data?.funnels.map((funnel)=><label key={funnel.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-neutral-200 p-3 dark:border-slate-800"><input type="checkbox" className="mt-0.5 size-4" checked={settings.selectedFunnelIds.includes(funnel.id)} disabled={!data.entitlement.available} onChange={event=>{
+              const selectedFunnelIds=event.target.checked?[...settings.selectedFunnelIds,funnel.id]:settings.selectedFunnelIds.filter(id=>id!==funnel.id);
+              setSettings({...settings,selectedFunnelIds,enabled:selectedFunnelIds.length===0?false:settings.enabled});
+            }}/><span><span className="block text-sm font-medium">{funnel.name}</span><span className="mt-0.5 block font-mono text-xs text-neutral-500">Starts with {funnel.triggerEventName}</span></span></label>)}
+          </div>
+        )}
+        {settings.selectedFunnelIds.length===0?<p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Select at least one flow before recording can begin. Zero selected flows never means record everything.</p>:null}
       </section>
       <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
         <h2 className="font-semibold">Privacy mode</h2><p className="mt-1 text-sm text-neutral-500">All modes mask every form input and permanently block known credential and payment surfaces before events leave the page.</p>

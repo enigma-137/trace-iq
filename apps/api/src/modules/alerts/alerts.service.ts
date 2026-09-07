@@ -8,6 +8,7 @@ import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/m
 import { EmailService, toUniqueEmails } from '../emails/email.service';
 import { NotificationGroupsService } from './notification-groups.service';
 import { assertSafeFetchUrl } from '../../common/url';
+import { EntitlementService } from '../billing/entitlement.service';
 
 type AlertCondition = 'above' | 'below' | 'drops_by' | 'spikes_by';
 const ALLOWED_CONDITIONS: AlertCondition[] = ['above', 'below', 'drops_by', 'spikes_by'];
@@ -36,6 +37,7 @@ type AlertRow = {
   last_status: string;
   last_value: number | null;
   last_evaluated_at: string | null;
+  organization_id?: string;
 };
 
 export interface CreateAlertRequest {
@@ -70,7 +72,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     private readonly database: DatabaseService,
     private readonly projects: ProjectsService,
     private readonly groups: NotificationGroupsService,
-    private readonly email: EmailService
+    private readonly email: EmailService,
+    private readonly entitlements: EntitlementService
   ) {}
 
   onModuleInit(): void {
@@ -89,8 +92,9 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   async list(user: DashboardUser, projectId?: string) {
     const project = await this.projects.resolveActiveProject(user, projectId);
     if (!project) {
-      return { project: null, alerts: [], recentEvents: [] };
+      return { project: null, alerts: [], recentEvents: [], notificationGroups: [], entitlement: null };
     }
+    const entitlement = await this.entitlements.getSnapshot(project.organizationId);
 
     const alerts = await this.database.query<AlertRow & { last_value: number | null; last_evaluated_at: string | null }>(
       `SELECT * FROM alerts WHERE project_id = $1 ORDER BY created_at DESC`,
@@ -173,12 +177,14 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         name: row.name,
         memberEmails: row.member_emails ?? []
       })),
-      recentEvents: events.rows
+      recentEvents: events.rows,
+      entitlement: { available: entitlement.features.alerts, plan: entitlement.plan }
     };
   }
 
   async create(user: DashboardUser, body: CreateAlertRequest) {
     const project = await this.projects.requireWritableProject(user, body.projectId);
+    await this.entitlements.assertAlertsAvailable(project.organizationId);
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) throw new BadRequestException('Alert name is required.');
@@ -255,6 +261,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
 
   async setEnabled(user: DashboardUser, id: string, enabled: boolean, projectId?: string) {
     const project = await this.projects.requireWritableProject(user, projectId);
+    if (enabled) await this.entitlements.assertAlertsAvailable(project.organizationId);
     const result = await this.database.query(
       `UPDATE alerts SET enabled = $3, last_status = 'pending', updated_at = now() WHERE id = $1 AND project_id = $2`,
       [id, project.id, enabled]
@@ -273,6 +280,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   // Manually evaluate one alert and return what it would report (no firing / webhook).
   async test(user: DashboardUser, id: string, projectId?: string): Promise<EvaluationResult> {
     const project = await this.projects.requireActiveProject(user, projectId);
+    await this.entitlements.assertAlertsAvailable(project.organizationId);
     const result = await this.database.query<AlertRow>(`SELECT * FROM alerts WHERE id = $1 AND project_id = $2`, [
       id,
       project.id
@@ -285,6 +293,9 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   // -- Evaluation ---------------------------------------------------------
 
   async evaluateAlert(alert: AlertRow, opts: { persist: boolean; notify: boolean }): Promise<EvaluationResult> {
+    if (opts.persist || opts.notify) {
+      await this.entitlements.assertAlertsAvailable(await this.alertOrganizationId(alert));
+    }
     const now = new Date();
     const windowMs = alert.window_hours * 60 * 60 * 1000;
     const currentFrom = new Date(now.getTime() - windowMs);
@@ -326,10 +337,11 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     try {
       const due = await this.database.query<AlertRow>(
         `
-          SELECT * FROM alerts
-          WHERE enabled = true
-            AND (last_evaluated_at IS NULL OR last_evaluated_at < now() - ($1 || ' minutes')::interval)
-          ORDER BY last_evaluated_at ASC NULLS FIRST
+          SELECT a.*,p.organization_id FROM alerts a
+          JOIN projects p ON p.id=a.project_id
+          WHERE a.enabled = true
+            AND (a.last_evaluated_at IS NULL OR a.last_evaluated_at < now() - ($1 || ' minutes')::interval)
+          ORDER BY a.last_evaluated_at ASC NULLS FIRST
           LIMIT 100
         `,
         [String(RE_EVAL_MINUTES)]
@@ -396,12 +408,16 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     previous: number | null,
     message: string
   ): Promise<void> {
+    // Recheck immediately before outbound delivery so a downgrade racing an
+    // evaluation cannot consume TraceIQ-managed email or webhook capacity.
+    await this.entitlements.assertAlertsAvailable(await this.alertOrganizationId(alert));
     const subject = `TraceIQ alert fired: ${alert.name}`;
     const html = buildAlertEmail(alert, value, previous, message);
     const recipients = await this.resolveRecipients(alert);
 
     // One event row per (channel, recipient) so the UI can show intended + result.
     if (recipients.length > 0) {
+      await this.entitlements.assertAlertsAvailable(await this.alertOrganizationId(alert));
       const sent = await this.email.send({ to: recipients, subject, html });
       for (const recipient of recipients) {
         if (sent.ok) {
@@ -414,6 +430,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (alert.webhook_url) {
+      await this.entitlements.assertAlertsAvailable(await this.alertOrganizationId(alert));
       await this.notifyWebhook(alert, eventId, value, previous, message);
     }
   }
@@ -422,6 +439,18 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     const fresh = await this.groups.resolveMembers(alert.notification_group_ids ?? [], alert.project_id);
     // Explicit recipients saved on the alert, unioned with the current group members.
     return toUniqueEmails([...(alert.email_recipients ?? []), ...fresh]);
+  }
+
+  private async alertOrganizationId(alert: AlertRow): Promise<string> {
+    if (alert.organization_id) return alert.organization_id;
+    const result = await this.database.query<{ organization_id: string }>(
+      'SELECT organization_id FROM projects WHERE id=$1 LIMIT 1',
+      [alert.project_id]
+    );
+    const organizationId = result.rows[0]?.organization_id;
+    if (!organizationId) throw new NotFoundException('Alert project was not found.');
+    alert.organization_id = organizationId;
+    return organizationId;
   }
 
   private async recordDelivery(

@@ -34,6 +34,7 @@ interface AlertsResponse {
   }>;
   notificationGroups: Array<{ id: string; name: string; memberEmails: string[] }>;
   recentEvents: Array<{ id: string; alertName: string; value: number | null; message: string; triggeredAt: string }>;
+  entitlement: { available: boolean; plan: string } | null;
 }
 
 interface EventNamesResponse {
@@ -68,6 +69,7 @@ export default async function AlertsPage() {
         recentEvents={data?.recentEvents ?? []}
         eventNames={eventNames}
         notificationGroups={data?.notificationGroups ?? []}
+        alertsAvailable={data?.entitlement?.available !== false}
       />
     </DashboardShell>
   );

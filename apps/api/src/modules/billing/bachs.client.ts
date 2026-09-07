@@ -22,11 +22,14 @@ export class BachsClient {
 
   updateSubscription(
     subscriptionId: string,
-    body: { product_id: string; proration_behavior: 'invoice_now' },
+    body: BachsSubscriptionProductUpdate,
     idempotencyKey: string
   ) {
-    // A 2xx response acknowledges the change request; Bachs may still be
-    // processing its proration payment, so this payload is not subscription truth.
+    // A 2xx response only acknowledges the request. For a billing-interval
+    // change Bachs schedules the target product for renewal when
+    // proration_behavior is omitted; the synchronous payload is not
+    // subscription truth. Same-interval price changes may still opt into an
+    // explicit proration behavior.
     return this.request<unknown>(
       'PATCH', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, body, idempotencyKey
     );
@@ -61,6 +64,11 @@ export class BachsClient {
       clearTimeout(timeout);
     }
   }
+}
+
+export interface BachsSubscriptionProductUpdate {
+  product_id: string;
+  proration_behavior?: 'invoice_now' | 'next_cycle' | 'none';
 }
 
 export interface BachsCheckoutSession {

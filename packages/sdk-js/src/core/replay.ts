@@ -5,6 +5,7 @@ type RrwebEvent = { type: number; timestamp: number; data?: unknown };
 interface RecorderConfig {
   enabled: boolean; sampleRate: number; maxDurationSeconds: number; privacyMode: TraceIQReplayPrivacyMode;
   requireConsent: boolean; maskSelectors: string[]; blockSelectors: string[]; ignoreSelectors: string[];
+  flowTriggerEventNames: string[];
 }
 interface ReplayIdentity { projectId: string; writeKey: string; sessionId: string; anonymousId?: string; userId?: string; }
 interface UploadGrant { token: string; expiresAt: string; }
@@ -38,6 +39,9 @@ export class ReplayRecorder {
   private startedAt?: Date;
   private config?: RecorderConfig;
   private starting?: { epoch: number; promise: Promise<boolean> };
+  private activating?: { epoch: number; promise: Promise<boolean> };
+  private armedEpoch?: number;
+  private acceptedEventNames: string[] = [];
   private lifecycleInstalled = false;
   private consentRevoked = false;
   private lifecycleEpoch = 0;
@@ -58,7 +62,7 @@ export class ReplayRecorder {
 
   start(): Promise<boolean> {
     if (this.consentRevoked) return Promise.resolve(false);
-    if (this.stopRrweb) return Promise.resolve(true);
+    if (this.stopRrweb || this.armedEpoch === this.lifecycleEpoch) return Promise.resolve(true);
     const epoch = this.lifecycleEpoch;
     if (this.starting?.epoch === epoch) return this.starting.promise;
     const promise = this.startInternal(epoch).finally(() => {
@@ -91,6 +95,22 @@ export class ReplayRecorder {
     this.discardPending();
   }
 
+  eventAccepted(eventName: string) {
+    if (typeof eventName !== 'string' || !eventName) return;
+    this.acceptedEventNames.push(eventName);
+    if (this.acceptedEventNames.length > 50) this.acceptedEventNames.shift();
+    const epoch = this.lifecycleEpoch;
+    if (!this.config?.flowTriggerEventNames.includes(eventName) || !this.isCurrent(epoch)) return;
+    if (this.stopRrweb) {
+      // The next upload grant will include every selected flow that the server
+      // can now prove this session entered. The active recorder is reused.
+      this.grant = undefined;
+      this.grantIdentity = undefined;
+      return;
+    }
+    if (this.armedEpoch === epoch) void this.activate(epoch);
+  }
+
   private async startInternal(epoch: number): Promise<boolean> {
     if (typeof window === 'undefined' || !this.isCurrent(epoch)) return false;
     const identity = this.identity();
@@ -103,19 +123,50 @@ export class ReplayRecorder {
       if (!this.isCurrent(epoch) || !response?.ok) return false;
       const config = await response.json() as RecorderConfig;
       if (!this.isCurrent(epoch) || !config.enabled) return false;
+      if (!Array.isArray(config.flowTriggerEventNames) || config.flowTriggerEventNames.length === 0) return false;
       const consentRequired = config.requireConsent || this.options.requireConsent === true;
       if (consentRequired && !this.hasConsent()) return false;
       const sampleRate = Math.min(config.sampleRate, this.validRate(this.options.sampleRate) ?? 1);
       if (!sampleSession(identity.sessionId, sampleRate)) return false;
+      this.config = config;
+      this.armedEpoch = epoch;
+      this.installLifecycle();
+      if (this.acceptedEventNames.some((eventName) => config.flowTriggerEventNames.includes(eventName))) {
+        return this.activate(epoch);
+      }
+      return true;
+    } finally {
+      this.requests.delete(controller);
+    }
+  }
+
+  private activate(epoch: number): Promise<boolean> {
+    if (this.stopRrweb) return Promise.resolve(true);
+    if (this.activating?.epoch === epoch) return this.activating.promise;
+    const promise = this.activateInternal(epoch).finally(() => {
+      if (this.activating?.epoch === epoch) this.activating = undefined;
+    });
+    this.activating = { epoch, promise };
+    return promise;
+  }
+
+  private async activateInternal(epoch: number): Promise<boolean> {
+    const config = this.config;
+    const identity = this.identity();
+    if (!config || !identity || this.armedEpoch !== epoch || !this.isCurrent(epoch)) return false;
+    const consentRequired = config.requireConsent || this.options.requireConsent === true;
+    if (consentRequired && !this.hasConsent()) return false;
+    const controller = this.trackRequest();
+    try {
       const grant = await this.requestUploadGrant(identity, config, epoch, controller.signal);
       if (!grant || !this.isCurrent(epoch, consentRequired)) return false;
       const { record } = await import('@rrweb/record');
       if (!this.isCurrent(epoch, consentRequired)) return false;
-      this.config = config;
       this.grant = grant;
       this.grantIdentity = identityKey(identity);
       this.startedAt = new Date();
       this.buffer = [];
+      this.sequence = 0;
       if (!this.isCurrent(epoch, consentRequired)) return false;
       // rrweb's runtime indexes this map by the actual input type, although its
       // public type currently omits `hidden`. Keeping it here closes that gap.
@@ -153,7 +204,6 @@ export class ReplayRecorder {
       if (!this.stopRrweb) { this.stopCapture(); return false; }
       this.flushTimer = setInterval(() => void this.flush(false, epoch), FLUSH_INTERVAL_MS);
       this.durationTimer = setTimeout(() => this.stop(), config.maxDurationSeconds * 1_000);
-      this.installLifecycle();
       return true;
     } finally {
       this.requests.delete(controller);
@@ -259,6 +309,7 @@ export class ReplayRecorder {
     this.stopRrweb?.();
     this.stopRrweb = undefined;
     this.recordingEpoch = undefined;
+    this.armedEpoch = undefined;
     for (const frame of this.safeFrames) frame.removeAttribute('data-traceiq-replay-safe-frame');
     this.safeFrames = [];
     for (const cleanup of this.safeFrameCleanups) cleanup();
@@ -271,6 +322,7 @@ export class ReplayRecorder {
 
   private discardPending() {
     this.buffer = [];
+    this.acceptedEventNames = [];
     this.grant = undefined;
     this.grantIdentity = undefined;
     for (const request of this.requests) request.abort();

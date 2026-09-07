@@ -11,6 +11,7 @@ export type ReplayLimit =
   | 'replayMaxSampleRatePercent'
   | 'replayMaxRetentionDays'
   | 'replayMaxDurationSeconds';
+export type CloudFeature = 'sessionReplay' | 'alerts';
 
 export interface EntitlementSnapshot {
   deploymentMode: 'self_hosted' | 'cloud';
@@ -26,11 +27,12 @@ export interface EntitlementSnapshot {
       status: 'pending' | 'failed';
       targetBillingPeriod: 'monthly' | 'yearly';
       requestedAt: string;
+      effectiveAt: string | null;
       failureCode: string | null;
     } | null;
   } | null;
   limits: Record<LimitedResource | ReplayLimit | 'retentionDays', number | null>;
-  features: { publicDashboards: boolean; sessionReplay: boolean };
+  features: { publicDashboards: boolean; sessionReplay: boolean; alerts: boolean };
   usage: Record<LimitedResource | 'replaySessions' | 'replayStorageBytes', number>;
   overLimit: { projects: boolean; members: boolean };
 }
@@ -72,7 +74,7 @@ export class EntitlementService {
           replaySessions: null, replayStorageBytes: null, replayMaxSampleRatePercent: null,
           replayMaxRetentionDays: null, replayMaxDurationSeconds: null
         },
-        features: { publicDashboards: true, sessionReplay: true },
+        features: { publicDashboards: true, sessionReplay: true, alerts: true },
         usage: { events: 0, projects: 0, members: 0, aiInsights: 0, replaySessions: 0, replayStorageBytes: 0 },
         overLimit: { projects: false, members: false }
       };
@@ -128,8 +130,8 @@ export class EntitlementService {
       events: limit('events', plan.limits.eventsPerMonth), projects: limit('projects', plan.limits.projects),
       members: limit('members', plan.limits.members), retentionDays: limit('retentionDays', plan.limits.retentionDays),
       aiInsights: limit('aiInsights', plan.limits.aiInsightsPerMonth),
-      // Product allowances are intentionally unset. TraceIQ Cloud operators can
-      // enable/cap replay through entitlement_overrides once pricing is decided.
+      // Product allowances are intentionally unset. Operators may still cap
+      // Replay separately without having to grant its base Pro capability.
       replaySessions: limit('replaySessions', null), replayStorageBytes: limit('replayStorageBytes', null),
       replayMaxSampleRatePercent: limit('replayMaxSampleRatePercent', null),
       replayMaxRetentionDays: limit('replayMaxRetentionDays', null),
@@ -149,11 +151,16 @@ export class EntitlementService {
             status: row.subscription_change_status,
             targetBillingPeriod: row.subscription_change_target_billing_period,
             requestedAt: row.subscription_change_requested_at,
+            effectiveAt: row.current_period_end ?? null,
             failureCode: row.subscription_change_failure_code ?? null
           } : null
       } : null,
       limits,
-      features: { publicDashboards: true, sessionReplay: overrides.get('sessionReplay') === 1 }, usage,
+      features: {
+        publicDashboards: true,
+        sessionReplay: planKey === 'pro' && overrides.get('sessionReplay') !== 0,
+        alerts: planKey === 'pro' && overrides.get('alerts') !== 0
+      }, usage,
       overLimit: {
         projects: limits.projects !== null && usage.projects > limits.projects,
         members: limits.members !== null && usage.members > limits.members
@@ -239,14 +246,11 @@ export class EntitlementService {
   }
 
   async assertReplayAvailable(organizationId: string, executor: QueryExecutor = this.database) {
-    const snapshot = await this.getSnapshot(organizationId, executor);
-    if (snapshot.deploymentMode === 'cloud' && !snapshot.features.sessionReplay) {
-      throw new ForbiddenException({
-        code: 'ENTITLEMENT_REQUIRED', resource: 'sessionReplay', plan: snapshot.plan,
-        message: 'Session Replay is not enabled for this Cloud organization.'
-      });
-    }
-    return snapshot;
+    return this.assertFeatureAvailable(organizationId, 'sessionReplay', executor);
+  }
+
+  async assertAlertsAvailable(organizationId: string, executor: QueryExecutor = this.database) {
+    return this.assertFeatureAvailable(organizationId, 'alerts', executor);
   }
 
   async assertReplayCapacity(organizationId: string, bytes: number, newSession: boolean, executor: QueryExecutor = this.database) {
@@ -305,6 +309,22 @@ export class EntitlementService {
       return (graceEnd ? new Date(graceEnd).getTime() : fallbackGraceEnd) > Date.now();
     }
     return false;
+  }
+
+  private async assertFeatureAvailable(
+    organizationId: string,
+    feature: CloudFeature,
+    executor: QueryExecutor
+  ) {
+    const snapshot = await this.getSnapshot(organizationId, executor);
+    if (snapshot.deploymentMode === 'cloud' && !snapshot.features[feature]) {
+      const label = feature === 'sessionReplay' ? 'Session Replay' : 'Alerts';
+      throw new ForbiddenException({
+        code: 'ENTITLEMENT_REQUIRED', resource: feature, plan: snapshot.plan,
+        message: `${label} is available on Pro.`
+      });
+    }
+    return snapshot;
   }
 
   private async loadOverrides(organizationId: string, executor: QueryExecutor) {

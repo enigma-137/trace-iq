@@ -27,6 +27,7 @@ describe('EntitlementService', () => {
 
     expect(snapshot.plan).toBe('self_hosted');
     expect(snapshot.limits.events).toBeNull();
+    expect(snapshot.features).toMatchObject({ sessionReplay: true, alerts: true });
     expect(database.query).not.toHaveBeenCalled();
   });
 
@@ -38,7 +39,7 @@ describe('EntitlementService', () => {
     expect(snapshot).toMatchObject({
       plan: 'free',
       limits: { events: 50_000, projects: 1, members: 1, retentionDays: 30, aiInsights: 5 },
-      features: { publicDashboards: true }
+      features: { publicDashboards: true, sessionReplay: false, alerts: false }
     });
   });
 
@@ -52,6 +53,32 @@ describe('EntitlementService', () => {
     expect(snapshot.plan).toBe('pro');
     expect(snapshot.limits.projects).toBe(20);
     expect(snapshot.limits.events).toBe(1_000_000);
+    expect(snapshot.features).toMatchObject({ sessionReplay: true, alerts: true });
+  });
+
+  it('uses zero-valued feature overrides only as Cloud Pro emergency kill switches', async () => {
+    const database = { query: vi.fn()
+      .mockResolvedValueOnce(result([{ ...freeRow, plan_key: 'pro', status: 'active' }]))
+      .mockResolvedValueOnce(result([
+        { entitlement_key: 'sessionReplay', value: 0 },
+        { entitlement_key: 'alerts', value: 0 }
+      ])) };
+    const snapshot = await new EntitlementService(database as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+
+    expect(snapshot.plan).toBe('pro');
+    expect(snapshot.features).toMatchObject({ sessionReplay: false, alerts: false });
+  });
+
+  it('keeps legacy positive Replay overrides harmless for Pro and unable to grant Free', async () => {
+    const proDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([{ ...freeRow, plan_key: 'pro', status: 'active' }]))
+      .mockResolvedValueOnce(result([{ entitlement_key: 'sessionReplay', value: 1 }])) };
+    const freeDb = { query: vi.fn()
+      .mockResolvedValueOnce(result([freeRow]))
+      .mockResolvedValueOnce(result([{ entitlement_key: 'sessionReplay', value: 1 }])) };
+
+    expect((await new EntitlementService(proDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1')).features.sessionReplay).toBe(true);
+    expect((await new EntitlementService(freeDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1')).features.sessionReplay).toBe(false);
   });
 
   it('keeps past-due Pro during the seven-day grace period and downgrades after it expires', async () => {
@@ -102,13 +129,19 @@ describe('EntitlementService', () => {
         ...freeRow, plan_key: 'pro', status: 'active', provider_product_id: 'prod_monthly',
         billing_period: 'monthly', subscription_change_status: 'pending',
         subscription_change_target_billing_period: 'yearly',
-        subscription_change_requested_at: '2026-09-02T12:00:00Z'
+        subscription_change_requested_at: '2026-09-02T12:00:00Z',
+        current_period_end: '2026-09-30T08:00:00Z'
       }]))
       .mockResolvedValueOnce(result([])) };
     const pending = await new EntitlementService(pendingDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
+    expect(pending.plan).toBe('pro');
+    expect(pending.subscription?.status).toBe('active');
     expect(pending.subscription).toMatchObject({
       billingPeriod: 'monthly',
-      billingChange: { status: 'pending', targetBillingPeriod: 'yearly', failureCode: null }
+      billingChange: {
+        status: 'pending', targetBillingPeriod: 'yearly',
+        effectiveAt: '2026-09-30T08:00:00Z', failureCode: null
+      }
     });
 
     const failedDb = { query: vi.fn()
@@ -123,7 +156,10 @@ describe('EntitlementService', () => {
     const failed = await new EntitlementService(failedDb as never, { deploymentMode: 'cloud' }).getSnapshot('org_1');
     expect(failed.subscription).toMatchObject({
       billingPeriod: 'monthly',
-      billingChange: { status: 'failed', targetBillingPeriod: 'yearly', failureCode: 'payment_failed' }
+      billingChange: {
+        status: 'failed', targetBillingPeriod: 'yearly',
+        effectiveAt: null, failureCode: 'payment_failed'
+      }
     });
   });
 

@@ -20,6 +20,7 @@ interface Entitlements {
       status: 'pending' | 'failed';
       targetBillingPeriod: 'monthly' | 'yearly';
       requestedAt: string;
+      effectiveAt: string | null;
       failureCode: string | null;
     } | null;
   } | null;
@@ -32,7 +33,7 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<'monthly' | 'yearly' | 'upgrade-yearly' | 'portal' | null>(null);
+  const [busy, setBusy] = useState<'monthly' | 'yearly' | 'schedule-yearly' | 'portal' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -80,20 +81,6 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [billingResult, loadEntitlements]);
 
-  const upgradeConfirmationPending = entitlements?.subscription?.billingChange?.status === 'pending';
-  useEffect(() => {
-    if (!upgradeConfirmationPending) return;
-    let attempts = 0;
-    const timer = setInterval(() => {
-      attempts += 1;
-      void loadEntitlements().catch((caught) => {
-        setError(caught instanceof Error ? caught.message : 'Could not refresh the pending billing change.');
-      });
-      if (attempts >= 15) clearInterval(timer);
-    }, 2_000);
-    return () => clearInterval(timer);
-  }, [loadEntitlements, upgradeConfirmationPending]);
-
   async function beginCheckout(period: 'monthly' | 'yearly') {
     setBusy(period);
     setError(null);
@@ -137,8 +124,8 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
     }
   }
 
-  async function upgradeToYearly() {
-    setBusy('upgrade-yearly');
+  async function scheduleYearlyBilling() {
+    setBusy('schedule-yearly');
     setError(null);
     setNotice(null);
     try {
@@ -150,10 +137,14 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
         body: JSON.stringify({ projectId })
       });
       if (!response.ok) throw new Error(await readError(response));
-      await loadEntitlements();
-      setNotice('Bachs accepted the yearly upgrade. The prorated payment is processing.');
+      const result = (await response.json()) as { effectiveAt?: string | null };
+      const refreshed = await loadEntitlements();
+      const effectiveAt = refreshed.subscription?.billingChange?.effectiveAt ?? result.effectiveAt ?? null;
+      const scheduled = refreshed.subscription?.billingChange?.status === 'pending'
+        && refreshed.subscription.billingChange.targetBillingPeriod === 'yearly';
+      setNotice(scheduled ? null : scheduledYearlyMessage(effectiveAt));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not upgrade to yearly billing.');
+      setError(caught instanceof Error ? caught.message : 'Could not schedule yearly billing.');
     } finally {
       setBusy(null);
     }
@@ -170,9 +161,9 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
   const pro = entitlements.plan === 'pro';
   const billingPeriod = entitlements.subscription?.billingPeriod ?? null;
   const billingChange = entitlements.subscription?.billingChange ?? null;
-  const yearlyUpgradePending = billingChange?.status === 'pending'
+  const yearlyChangeScheduled = billingChange?.status === 'pending'
     && billingChange.targetBillingPeriod === 'yearly';
-  const yearlyUpgradeFailed = billingChange?.status === 'failed'
+  const yearlyChangeFailed = billingChange?.status === 'failed'
     && billingChange.targetBillingPeriod === 'yearly';
   const hasNonterminalSubscription = ['trialing', 'active', 'past_due', 'paused']
     .includes(entitlements.subscription?.status ?? '');
@@ -192,8 +183,8 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       {billingResult === 'success' && pro ? <BillingMessage tone="success">Your organization is now on Pro.</BillingMessage> : null}
       {billingResult === 'cancelled' ? <BillingMessage tone="info">Checkout was cancelled. Your current plan was not changed.</BillingMessage> : null}
       {notice ? <BillingMessage tone="info">{notice}</BillingMessage> : null}
-      {yearlyUpgradePending ? <BillingMessage tone="info">Upgrading to yearly… Your monthly plan remains active while Bachs processes the prorated payment.</BillingMessage> : null}
-      {yearlyUpgradeFailed ? <BillingMessage tone="error">The yearly upgrade payment failed. Your monthly plan remains active; retry the upgrade or manage your payment method.</BillingMessage> : null}
+      {yearlyChangeScheduled ? <BillingMessage tone="info">{scheduledYearlyMessage(billingChange.effectiveAt)}</BillingMessage> : null}
+      {yearlyChangeFailed ? <BillingMessage tone="error">The scheduled yearly billing change could not be completed. Your monthly plan remains active; retry the change or manage your billing details.</BillingMessage> : null}
       {error ? <BillingMessage tone="error">{error}</BillingMessage> : null}
 
       {warningThreshold ? (
@@ -243,9 +234,9 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
                 {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage plan
               </button>
               {billingPeriod === 'monthly' ? (
-                <button className={primaryButton} disabled={busy !== null || yearlyUpgradePending} onClick={() => void upgradeToYearly()}>
-                  {busy === 'upgrade-yearly' || yearlyUpgradePending ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {yearlyUpgradePending ? 'Upgrading to yearly…' : yearlyUpgradeFailed ? 'Retry yearly upgrade' : 'Upgrade to yearly'}
+                <button className={primaryButton} disabled={busy !== null || yearlyChangeScheduled} onClick={() => void scheduleYearlyBilling()}>
+                  {busy === 'schedule-yearly' ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {yearlyChangeScheduled ? 'Yearly billing scheduled' : yearlyChangeFailed ? 'Retry yearly change' : 'Switch to yearly at renewal'}
                 </button>
               ) : null}
             </div>
@@ -284,6 +275,17 @@ function UsageMeter({ label, value, limit, overLimit = false, help }: { label: s
 
 function percentage(value: number, limit: number | null) {
   return limit && limit > 0 ? value / limit * 100 : 0;
+}
+
+function scheduledYearlyMessage(effectiveAt: string | null) {
+  const effectiveTime = effectiveAt ? Date.parse(effectiveAt) : Number.NaN;
+  if (!Number.isFinite(effectiveTime)) {
+    return 'Yearly billing scheduled. Your plan will switch to yearly on your next renewal.';
+  }
+  const renewalDate = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric'
+  }).format(new Date(effectiveTime));
+  return `Yearly billing scheduled. Your plan will switch to yearly on ${renewalDate}.`;
 }
 
 function PlanCard({ name, price, secondaryPrice, description, features, current, actions }: { name: string; price: string; secondaryPrice?: string; description: string; features: string[]; current: boolean; actions?: React.ReactNode }) {

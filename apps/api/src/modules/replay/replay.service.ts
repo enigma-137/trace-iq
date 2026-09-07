@@ -35,6 +35,12 @@ interface SessionIdentityRow extends QueryResultRow {
   id: string; user_id: string | null; anonymous_id: string | null; external_id: string | null;
 }
 
+interface ReplayFunnelRow extends QueryResultRow {
+  id: string;
+  name: string;
+  trigger_event_name: string;
+}
+
 @Injectable()
 export class ReplayService {
   private readonly logger = new Logger(ReplayService.name);
@@ -54,7 +60,14 @@ export class ReplayService {
     const settings = await this.loadSettings(safeProjectId);
     const entitlement = await this.entitlements.getSnapshot(auth.organization_id);
     const available = entitlement.deploymentMode === 'self_hosted' || entitlement.features.sessionReplay;
-    return { ...settings, enabled: settings.enabled && available, entitlementAvailable: available };
+    const selectedFunnels = await this.loadSelectedFunnels(safeProjectId);
+    const { selectedFunnelIds: _selectedFunnelIds, ...recorderSettings } = settings;
+    return {
+      ...recorderSettings,
+      enabled: settings.enabled && available && selectedFunnels.length > 0,
+      entitlementAvailable: available,
+      flowTriggerEventNames: [...new Set(selectedFunnels.map((funnel) => funnel.trigger_event_name))]
+    };
   }
 
   async authorizeUpload(writeKey: string, input: AuthorizeReplayUploadRequest) {
@@ -70,6 +83,13 @@ export class ReplayService {
       throw new ForbiddenException('Replay consent is required before an upload token can be issued.');
     }
     await this.assertSessionIdentity(projectId, sessionId, anonymousId, userId);
+    if (!sampleSession(sessionId, settings.sampleRate)) {
+      throw new ForbiddenException('This session was not selected by the Replay sample rate.');
+    }
+    const matchedFunnelIds = await this.loadMatchedFunnelIds(projectId, sessionId);
+    if (matchedFunnelIds.length === 0) {
+      throw new ForbiddenException('This session has not entered a selected Replay flow.');
+    }
     await this.storage.assertReady();
     return this.tokens.sign({
       projectId, organizationId: auth.organization_id, sessionId, anonymousId, userId,
@@ -79,7 +99,8 @@ export class ReplayService {
       maxDurationSeconds: settings.maxDurationSeconds,
       maxChunks: REPLAY_LIMITS.maxChunksPerReplay,
       maxCompressedBytes: REPLAY_LIMITS.maxReplayBytes,
-      maxUncompressedBytes: REPLAY_LIMITS.maxReplayUncompressedBytes
+      maxUncompressedBytes: REPLAY_LIMITS.maxReplayUncompressedBytes,
+      matchedFunnelIds
     }, REPLAY_LIMITS.uploadTokenSeconds);
   }
 
@@ -88,7 +109,7 @@ export class ReplayService {
     const sequence = this.sequence(input.sequence);
     const receivedAt = new Date();
     const settings = await this.loadSettings(claims.projectId);
-    this.assertTokenStillAllowed(claims, settings);
+    await this.assertTokenStillAllowed(claims, settings);
     await this.entitlements.assertReplayAvailable(claims.organizationId);
 
     const decoded = this.decodeEvents(input);
@@ -108,14 +129,19 @@ export class ReplayService {
 
     const prepared = await this.database.transaction(async (client) => {
       await this.lockSession(client, claims.projectId, claims.sessionId);
+      await this.lockReplaySettings(client, claims.projectId);
+      const currentSettings = await this.loadSettings(claims.projectId, client);
+      const activeMatchedFunnelIds = await this.assertTokenStillAllowed(claims, currentSettings, client);
+      const currentDurationSeconds = Math.min(currentSettings.maxDurationSeconds, claims.maxDurationSeconds);
+      this.validateEventTimes(bounds, receivedAt, currentDurationSeconds);
       const session = await this.ensureSession(client, claims, bounds.first);
-      const candidate = await this.ensureReplay(client, claims, session, settings, bounds.first);
+      const candidate = await this.ensureReplay(client, claims, session, currentSettings, bounds.first, activeMatchedFunnelIds);
       await this.lockReplay(client, candidate.id);
       const replayResult = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [candidate.id]);
       const replay = replayResult.rows[0];
       if (!replay) throw new NotFoundException('Replay no longer exists.');
       this.assertReplayWritable(replay, receivedAt);
-      if (bounds.last.getTime() - new Date(replay.started_at).getTime() > authorizedDurationSeconds * 1_000) {
+      if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000) {
         throw new BadRequestException('Replay exceeds the project maximum duration.');
       }
       const existing = await client.query<ChunkRow>(`
@@ -151,11 +177,19 @@ export class ReplayService {
       await this.storage.put(prepared.chunk.storage_key, compressed, { contentType: 'application/gzip', ifNoneMatch: true });
       objectStored = true;
       await this.database.transaction(async (client) => {
+        await this.lockReplaySettings(client, claims.projectId);
+        const currentSettings = await this.loadSettings(claims.projectId, client);
+        await this.assertTokenStillAllowed(claims, currentSettings, client);
+        const currentDurationSeconds = Math.min(currentSettings.maxDurationSeconds, claims.maxDurationSeconds);
+        this.validateEventTimes(bounds, new Date(), currentDurationSeconds);
         await this.lockReplay(client, prepared.replay.id);
         const replayResult = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [prepared.replay.id]);
         const replay = replayResult.rows[0];
         if (!replay) throw new NotFoundException('Replay no longer exists.');
         this.assertReplayWritable(replay, new Date());
+        if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000) {
+          throw new BadRequestException('Replay exceeds the project maximum duration.');
+        }
         const chunkResult = await client.query<ChunkRow>(`
           SELECT id,sequence,storage_key,content_sha256,status,event_count,compressed_size_bytes,uncompressed_size_bytes
           FROM replay_chunks WHERE id=$1 AND replay_id=$2 AND deleted_at IS NULL FOR UPDATE
@@ -196,12 +230,15 @@ export class ReplayService {
   async complete(uploadToken: string, input: { projectId?: string; sessionId?: string; anonymousId?: string; userId?: string; endedAt?: string }) {
     const claims = this.verifyInputClaims(uploadToken, input);
     const settings = await this.loadSettings(claims.projectId);
-    this.assertTokenStillAllowed(claims, settings);
+    await this.assertTokenStillAllowed(claims, settings);
     await this.entitlements.assertReplayAvailable(claims.organizationId);
     const receivedAt = new Date();
     this.validateClaimedTimestamp(input.endedAt, receivedAt, 'endedAt');
     await this.database.transaction(async (client) => {
       await this.lockSession(client, claims.projectId, claims.sessionId);
+      await this.lockReplaySettings(client, claims.projectId);
+      const currentSettings = await this.loadSettings(claims.projectId, client);
+      const activeMatchedFunnelIds = await this.assertTokenStillAllowed(claims, currentSettings, client);
       const candidate = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL LIMIT 1', [claims.projectId, claims.sessionId]);
       if (!candidate.rows[0]) return;
       await this.lockReplay(client, candidate.rows[0].id);
@@ -209,8 +246,13 @@ export class ReplayService {
       const replay = result.rows[0];
       if (!replay) return;
       this.assertReplayWritable(replay, receivedAt);
+      await client.query(`
+        INSERT INTO session_replay_funnels(replay_id,project_id,funnel_id)
+        SELECT $1,$2,unnest($3::text[])
+        ON CONFLICT(replay_id,funnel_id) DO NOTHING
+      `, [replay.id, claims.projectId, activeMatchedFunnelIds]);
       const maximumEnd = new Date(new Date(replay.started_at).getTime()
-        + Math.min(settings.maxDurationSeconds, claims.maxDurationSeconds) * 1_000);
+        + Math.min(currentSettings.maxDurationSeconds, claims.maxDurationSeconds) * 1_000);
       const authoritativeEnd = receivedAt < maximumEnd ? receivedAt : maximumEnd;
       await client.query(`
         UPDATE session_replays SET status='complete',ended_at=GREATEST(COALESCE(ended_at,$2),$2),
@@ -231,11 +273,18 @@ export class ReplayService {
         r.ended_at AS "endedAt",r.duration_ms::float8 AS "durationMs",r.event_count AS "eventCount",
         r.chunk_count AS "chunkCount",r.compressed_size_bytes::float8 AS "compressedSizeBytes",
         r.privacy_mode AS "privacyMode",r.status,r.expires_at AS "expiresAt",
+        COALESCE(mf.flows,'[]'::json) AS "matchedFlows",
         COALESCE(e.context->'page'->>'url',e.context->'page'->>'path') AS "entryPage",
         e.device_info->>'deviceType' AS "deviceType",e.device_info->>'browser' AS "browser",
         e.network_info->>'country' AS "country"
       FROM session_replays r
       LEFT JOIN users u ON u.id=r.user_id AND u.project_id=r.project_id
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object('id',f.id,'name',f.name) ORDER BY f.name) AS flows
+        FROM session_replay_funnels rf
+        JOIN funnels f ON f.id=rf.funnel_id AND f.project_id=rf.project_id
+        WHERE rf.replay_id=r.id AND rf.project_id=r.project_id
+      ) mf ON true
       LEFT JOIN LATERAL (SELECT context,device_info,network_info FROM events
         WHERE project_id=r.project_id AND session_id=r.session_id ORDER BY occurred_at LIMIT 1) e ON true
       WHERE r.project_id=$1 AND r.deleted_at IS NULL
@@ -293,9 +342,11 @@ export class ReplayService {
   async getSettings(user: DashboardUser, projectId?: string) {
     const project = await this.projects.requireActiveProject(user, projectId);
     const settings = await this.loadSettings(project.id);
+    const funnels = await this.loadAvailableFunnels(project.id);
     const entitlement = await this.entitlements.getSnapshot(project.organizationId);
-    return { project, settings, entitlement: {
+    return { project, settings, funnels, entitlement: {
       available: entitlement.deploymentMode === 'self_hosted' || entitlement.features.sessionReplay,
+      plan: entitlement.plan,
       limits: { sessionsPerMonth: entitlement.limits.replaySessions, storageBytesPerMonth: entitlement.limits.replayStorageBytes,
         maxSampleRatePercent: entitlement.limits.replayMaxSampleRatePercent, maxRetentionDays: entitlement.limits.replayMaxRetentionDays,
         maxDurationSeconds: entitlement.limits.replayMaxDurationSeconds }
@@ -307,20 +358,40 @@ export class ReplayService {
     this.assertCanManage(project);
     const current = await this.loadSettings(project.id);
     const next = this.validateSettings({ ...current, ...input });
+    if (next.enabled && next.selectedFunnelIds.length === 0) {
+      throw new BadRequestException('Select at least one flow before recording can begin.');
+    }
     if ((next.privacyMode === 'custom' || !next.requireConsent) && !acknowledgePrivacyRisk) throw new BadRequestException('Explicit privacy-risk acknowledgement is required for Custom masking or consent-free recording.');
     await this.entitlements.assertReplaySettings(project.organizationId, next);
     if (next.enabled) await this.storage.assertReady();
-    await this.database.query(`
-      INSERT INTO replay_settings (project_id,enabled,sample_rate,max_duration_seconds,retention_days,privacy_mode,require_consent,mask_selectors,block_selectors,ignore_selectors)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-      ON CONFLICT(project_id) DO UPDATE SET enabled=EXCLUDED.enabled,sample_rate=EXCLUDED.sample_rate,
-        max_duration_seconds=EXCLUDED.max_duration_seconds,retention_days=EXCLUDED.retention_days,
-        privacy_mode=EXCLUDED.privacy_mode,require_consent=EXCLUDED.require_consent,
-        mask_selectors=EXCLUDED.mask_selectors,block_selectors=EXCLUDED.block_selectors,
-        ignore_selectors=EXCLUDED.ignore_selectors,updated_at=now()
-    `, [project.id, next.enabled, next.sampleRate, next.maxDurationSeconds, next.retentionDays,
-      next.privacyMode, next.requireConsent, next.maskSelectors, next.blockSelectors, next.ignoreSelectors]);
-    return { project, settings: next };
+    await this.database.transaction(async (client) => {
+      await this.lockReplaySettings(client, project.id);
+      const validFunnels = await client.query<{ id: string }>(
+        'SELECT id FROM funnels WHERE project_id=$1 AND id=ANY($2::text[]) FOR SHARE',
+        [project.id, next.selectedFunnelIds]
+      );
+      if (validFunnels.rows.length !== next.selectedFunnelIds.length) {
+        throw new BadRequestException('One or more selected flows do not belong to this project.');
+      }
+      await client.query(`
+        INSERT INTO replay_settings (project_id,enabled,sample_rate,max_duration_seconds,retention_days,privacy_mode,require_consent,mask_selectors,block_selectors,ignore_selectors)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        ON CONFLICT(project_id) DO UPDATE SET enabled=EXCLUDED.enabled,sample_rate=EXCLUDED.sample_rate,
+          max_duration_seconds=EXCLUDED.max_duration_seconds,retention_days=EXCLUDED.retention_days,
+          privacy_mode=EXCLUDED.privacy_mode,require_consent=EXCLUDED.require_consent,
+          mask_selectors=EXCLUDED.mask_selectors,block_selectors=EXCLUDED.block_selectors,
+          ignore_selectors=EXCLUDED.ignore_selectors,updated_at=now()
+      `, [project.id, next.enabled, next.sampleRate, next.maxDurationSeconds, next.retentionDays,
+        next.privacyMode, next.requireConsent, next.maskSelectors, next.blockSelectors, next.ignoreSelectors]);
+      await client.query('DELETE FROM replay_setting_funnels WHERE project_id=$1', [project.id]);
+      if (next.selectedFunnelIds.length > 0) {
+        await client.query(`
+          INSERT INTO replay_setting_funnels(project_id,funnel_id)
+          SELECT $1,unnest($2::text[])
+        `, [project.id, next.selectedFunnelIds]);
+      }
+    });
+    return { project, settings: next, funnels: await this.loadAvailableFunnels(project.id) };
   }
 
   async delete(user: DashboardUser, replayId: string, projectId?: string, reason = 'manual') {
@@ -428,15 +499,64 @@ export class ReplayService {
     return { deleted };
   }
 
-  private async loadSettings(projectId: string): Promise<ReplaySettings> {
-    const result = await this.database.query<any>(`
+  private async loadSettings(
+    projectId: string,
+    executor: QueryExecutor = this.database
+  ): Promise<ReplaySettings> {
+    const result = await executor.query<any>(`
       SELECT enabled,sample_rate::float8 AS "sampleRate",max_duration_seconds AS "maxDurationSeconds",
         retention_days AS "retentionDays",privacy_mode AS "privacyMode",require_consent AS "requireConsent",
-        mask_selectors AS "maskSelectors",block_selectors AS "blockSelectors",ignore_selectors AS "ignoreSelectors"
+        mask_selectors AS "maskSelectors",block_selectors AS "blockSelectors",ignore_selectors AS "ignoreSelectors",
+        COALESCE((SELECT array_agg(rsf.funnel_id ORDER BY rsf.funnel_id)
+          FROM replay_setting_funnels rsf WHERE rsf.project_id=replay_settings.project_id),ARRAY[]::text[]) AS "selectedFunnelIds"
       FROM replay_settings WHERE project_id=$1
     `, [projectId]);
     return result.rows[0] ?? { enabled: false, sampleRate: 0.1, maxDurationSeconds: 600, retentionDays: 30,
-      privacyMode: 'strict', requireConsent: true, maskSelectors: [], blockSelectors: [], ignoreSelectors: [] };
+      privacyMode: 'strict', requireConsent: true, maskSelectors: [], blockSelectors: [], ignoreSelectors: [], selectedFunnelIds: [] };
+  }
+
+  private async loadAvailableFunnels(projectId: string) {
+    const result = await this.database.query<ReplayFunnelRow>(`
+      SELECT f.id,f.name,fs.event_name AS trigger_event_name
+      FROM funnels f
+      JOIN funnel_steps fs ON fs.funnel_id=f.id AND fs.step_order=0
+      WHERE f.project_id=$1
+      ORDER BY f.created_at DESC,f.id
+    `, [projectId]);
+    return result.rows.map((row) => ({ id: row.id, name: row.name, triggerEventName: row.trigger_event_name }));
+  }
+
+  private async loadSelectedFunnels(projectId: string) {
+    const result = await this.database.query<ReplayFunnelRow>(`
+      SELECT f.id,f.name,fs.event_name AS trigger_event_name
+      FROM replay_setting_funnels rsf
+      JOIN funnels f ON f.id=rsf.funnel_id AND f.project_id=rsf.project_id
+      JOIN funnel_steps fs ON fs.funnel_id=f.id AND fs.step_order=0
+      WHERE rsf.project_id=$1
+      ORDER BY f.id
+    `, [projectId]);
+    return result.rows;
+  }
+
+  private async loadMatchedFunnelIds(
+    projectId: string,
+    sessionId: string,
+    executor: QueryExecutor = this.database
+  ) {
+    const result = await executor.query<{ id: string }>(`
+      SELECT f.id
+      FROM replay_setting_funnels rsf
+      JOIN funnels f ON f.id=rsf.funnel_id AND f.project_id=rsf.project_id
+      JOIN funnel_steps fs ON fs.funnel_id=f.id AND fs.step_order=0
+      WHERE rsf.project_id=$1
+        AND EXISTS (
+          SELECT 1 FROM events e
+          WHERE e.project_id=rsf.project_id AND e.session_id=$2 AND e.event_name=fs.event_name
+        )
+      ORDER BY f.id
+      FOR KEY SHARE OF rsf,f,fs
+    `, [projectId, sessionId]);
+    return result.rows.map((row) => row.id);
   }
 
   private decodeEvents(input: IngestReplayChunkRequest): unknown {
@@ -484,17 +604,33 @@ export class ReplayService {
     return session;
   }
 
-  private async ensureReplay(executor: QueryExecutor, claims: ReplayUploadClaims, session: SessionIdentityRow, settings: ReplaySettings, startedAt: Date) {
+  private async ensureReplay(
+    executor: QueryExecutor,
+    claims: ReplayUploadClaims,
+    session: SessionIdentityRow,
+    settings: ReplaySettings,
+    startedAt: Date,
+    matchedFunnelIds: string[]
+  ) {
     const existing = await executor.query<ReplayRow>('SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL LIMIT 1', [claims.projectId, session.id]);
-    if (existing.rows[0]) return existing.rows[0];
-    const id = `rpl_${randomUUID()}`;
-    const prefix = [claims.organizationId, claims.projectId, session.id].map((part) => this.pathSegment(part)).join('/');
-    const result = await executor.query<ReplayRow>(`
-      INSERT INTO session_replays(id,organization_id,project_id,session_id,user_id,anonymous_id,started_at,storage_prefix,recording_version,privacy_mode,expires_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()+($11::int*interval '1 day')) RETURNING *
-    `, [id, claims.organizationId, claims.projectId, session.id, session.user_id, session.anonymous_id, startedAt,
-      prefix, REPLAY_FORMAT_VERSION, settings.privacyMode, settings.retentionDays]);
-    return result.rows[0];
+    let replay = existing.rows[0];
+    if (!replay) {
+      const id = `rpl_${randomUUID()}`;
+      const prefix = [claims.organizationId, claims.projectId, session.id].map((part) => this.pathSegment(part)).join('/');
+      const result = await executor.query<ReplayRow>(`
+        INSERT INTO session_replays(id,organization_id,project_id,session_id,user_id,anonymous_id,started_at,storage_prefix,recording_version,privacy_mode,expires_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()+($11::int*interval '1 day')) RETURNING *
+      `, [id, claims.organizationId, claims.projectId, session.id, session.user_id, session.anonymous_id, startedAt,
+        prefix, REPLAY_FORMAT_VERSION, settings.privacyMode, settings.retentionDays]);
+      replay = result.rows[0];
+    }
+    if (!replay) throw new Error('Replay could not be created.');
+    await executor.query(`
+      INSERT INTO session_replay_funnels(replay_id,project_id,funnel_id)
+      SELECT $1,$2,unnest($3::text[])
+      ON CONFLICT(replay_id,funnel_id) DO NOTHING
+    `, [replay.id, claims.projectId, matchedFunnelIds]);
+    return replay;
   }
 
   private verifyInputClaims(token: string, input: { projectId?: string; sessionId?: string; anonymousId?: string; userId?: string }) {
@@ -506,10 +642,23 @@ export class ReplayService {
     return claims;
   }
 
-  private assertTokenStillAllowed(claims: ReplayUploadClaims, settings: ReplaySettings) {
+  private async assertTokenStillAllowed(
+    claims: ReplayUploadClaims,
+    settings: ReplaySettings,
+    executor: QueryExecutor = this.database
+  ) {
     if (!settings.enabled || claims.privacyMode !== settings.privacyMode || claims.requireConsent !== settings.requireConsent || (settings.requireConsent && !claims.consentGranted)) {
       throw new ForbiddenException('Replay upload token no longer matches project privacy settings.');
     }
+    if (!sampleSession(claims.sessionId, settings.sampleRate)) {
+      throw new ForbiddenException('Replay upload token no longer matches the project sample rate.');
+    }
+    const matched = await this.loadMatchedFunnelIds(claims.projectId, claims.sessionId, executor);
+    const activeMatchedFunnelIds = claims.matchedFunnelIds.filter((id) => matched.includes(id));
+    if (activeMatchedFunnelIds.length === 0) {
+      throw new ForbiddenException('Replay upload token no longer matches a selected Replay flow.');
+    }
+    return activeMatchedFunnelIds;
   }
 
   private assertReplayWritable(replay: ReplayRow, now: Date) {
@@ -542,14 +691,22 @@ export class ReplayService {
   private validateSettings(settings: ReplaySettings): ReplaySettings {
     const privacyMode = ['strict', 'balanced', 'custom'].includes(settings.privacyMode) ? settings.privacyMode : 'strict';
     const selectors = (items: unknown) => Array.isArray(items) ? items.filter((item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 200).slice(0, 50) : [];
+    const requestedFunnelIds = Array.isArray(settings.selectedFunnelIds) ? settings.selectedFunnelIds : [];
+    if (requestedFunnelIds.length > 100 || requestedFunnelIds.some((id) =>
+      typeof id !== 'string' || !/^fnl_[A-Za-z0-9_-]{1,156}$/.test(id.trim()))) {
+      throw new BadRequestException('selectedFunnelIds contains an invalid flow identifier.');
+    }
+    const selectedFunnelIds = [...new Set(requestedFunnelIds.map((id) => id.trim()))];
     return { enabled: settings.enabled === true, sampleRate: this.number(settings.sampleRate, 0, 1, 'sampleRate'),
       maxDurationSeconds: this.number(settings.maxDurationSeconds, 1, REPLAY_LIMITS.maxDurationSeconds, 'maxDurationSeconds', true),
       retentionDays: this.number(settings.retentionDays, 1, 3650, 'retentionDays', true), privacyMode: privacyMode as ReplayPrivacyMode,
       requireConsent: settings.requireConsent !== false, maskSelectors: selectors(settings.maskSelectors),
-      blockSelectors: selectors(settings.blockSelectors), ignoreSelectors: selectors(settings.ignoreSelectors) };
+      blockSelectors: selectors(settings.blockSelectors), ignoreSelectors: selectors(settings.ignoreSelectors),
+      selectedFunnelIds };
   }
 
   private lockSession(executor: QueryExecutor, projectId: string, sessionId: string) { return executor.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`replay:${projectId}:${sessionId}`]); }
+  private lockReplaySettings(executor: QueryExecutor, projectId: string) { return executor.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`replay-settings:${projectId}`]); }
   private lockReplay(executor: QueryExecutor, replayId: string) { return executor.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`replay-id:${replayId}`]); }
   private assertCanManage(project: ResolvedProject) { if (project.role !== 'owner' && project.role !== 'admin') throw new ForbiddenException('Project admin access is required.'); }
   private chunkKey(prefix: string, sequence: number, digest: string) { return `${prefix}/${String(sequence).padStart(6, '0')}-${digest.slice(0, 12)}.json.gz`; }
@@ -562,4 +719,15 @@ export class ReplayService {
   private number(value: unknown, min: number, max: number, field: string, integer=false) { const n=Number(value); if (!Number.isFinite(n) || n<min || n>max || (integer&&!Number.isInteger(n))) throw new BadRequestException(`${field} is invalid.`); return n; }
   private clamp(value: string|undefined, fallback:number,min:number,max:number) { const n=Number(value); return Number.isFinite(n) ? Math.min(max,Math.max(min,Math.trunc(n))) : fallback; }
   private eventBounds(events: Record<string, unknown>[]) { const times=events.map((event) => Number(event.timestamp)).filter(Number.isFinite); return { first:new Date(Math.min(...times)), last:new Date(Math.max(...times)) }; }
+}
+
+export function sampleSession(sessionId: string, rate: number) {
+  if (rate <= 0) return false;
+  if (rate >= 1) return true;
+  let hash = 2166136261;
+  for (let index = 0; index < sessionId.length; index += 1) {
+    hash ^= sessionId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0x1_0000_0000 < rate;
 }

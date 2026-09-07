@@ -102,7 +102,7 @@ export function SessionReplayDocs({
             ],
             [
               "Cloud availability",
-              "TraceIQ Cloud also requires Session Replay to be available for the organization. A disabled checkbox and entitlement banner mean the feature is unavailable; a Free or Pro plan name alone does not imply replay access.",
+              "TraceIQ Cloud includes Session Replay with Pro and blocks it on Free. A Pro organization is entitled automatically, but an owner/admin must still select flows and switch recording on. An emergency operator kill switch may still disable it.",
             ],
             [
               "Self-hosting",
@@ -193,6 +193,11 @@ traceiq.grantReplayConsent();`}</ReplayCode>
               "Prevents rrweb import and start until grantReplayConsent() is called. Client code may add this gate but cannot bypass a required server policy.",
             ],
             [
+              "Flows to record",
+              "None",
+              "Select at least one existing project funnel. Recording starts only after an accepted event matches its current first step; zero selections always means record nothing.",
+            ],
+            [
               "Custom selectors",
               "None",
               "Additional CSS selectors for masking, blocking, or interaction suppression. Invalid selectors are ignored by the recorder.",
@@ -205,6 +210,15 @@ traceiq.grantReplayConsent();`}</ReplayCode>
           attempt. Reload or deliberately start a new browser recording to fetch
           changed configuration. Retention changes do not rewrite the expiry of
           existing replays.
+        </Callout>
+        <Callout tone="info" title="Flow matching and pre-trigger context">
+          Replay reuses funnel event-name semantics. A <ReplayMono>$page</ReplayMono>{" "}
+          first step matches accepted page events, while a custom first step matches
+          that custom event. Route-specific conditions require a route event already
+          represented in the funnel model. TraceIQ does not collect a background DOM
+          buffer before the match; rrweb is imported only after the qualifying event.
+          Once started, one bounded replay continues for the session, and matching
+          additional selected funnels associates them with that same replay.
         </Callout>
       </ReplaySection>
 
@@ -632,7 +646,7 @@ if (!recording) {
             [
               "No replays appear",
               "One of the start gates failed.",
-              "Confirm dashboard enablement, Cloud availability, replay.enabled, consent, a rate above zero, and that the SDK uses the selected project ID/write key.",
+              "Confirm dashboard enablement, Cloud Pro availability, at least one selected funnel, an accepted event matching its current first step, replay.enabled, consent, a rate above zero, and the selected project ID/write key.",
             ],
             [
               "startReplay() returns false",
@@ -642,7 +656,7 @@ if (!recording) {
             [
               "Cloud checkbox is disabled",
               "Feature unavailable.",
-              "The organization does not currently have Session Replay availability. SDK code cannot bypass that server-side gate.",
+              "The organization must be on Cloud Pro and must not have an emergency Replay kill switch. SDK code cannot bypass that server-side gate.",
             ],
             [
               "Authorize returns an identity error",

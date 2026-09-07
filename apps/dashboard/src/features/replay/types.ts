@@ -24,4 +24,5 @@ export interface ReplayListItem {
   deviceType: string | null;
   browser: string | null;
   country: string | null;
+  matchedFlows: Array<{ id: string; name: string }>;
 }

@@ -45,7 +45,13 @@ export default async function ReplaysPage({ searchParams }: {
             <tbody className="divide-y divide-neutral-100 dark:divide-slate-900">
               {(data?.replays ?? []).map((replay) => (
                 <tr key={replay.id}>
-                  <td className="px-4 py-3"><p className="max-w-52 truncate font-semibold">{replay.identity}</p><p className="font-mono text-[10px] text-neutral-400">{replay.sessionId}</p></td>
+                  <td className="px-4 py-3">
+                    <p className="max-w-52 truncate font-semibold">{replay.identity}</p>
+                    <p className="font-mono text-[10px] text-neutral-400">{replay.sessionId}</p>
+                    <p className="mt-1 max-w-52 truncate text-[11px] text-neutral-500" title={replay.matchedFlows.map((flow) => flow.name).join(', ')}>
+                      {replay.matchedFlows.length > 0 ? `Flows: ${replay.matchedFlows.map((flow) => flow.name).join(', ')}` : 'Flow no longer available'}
+                    </p>
+                  </td>
                   <td className="max-w-60 truncate">{replay.entryPage ?? '—'}</td>
                   <td>{formatDate(replay.startedAt)}</td><td>{formatDuration(replay.durationMs)}</td>
                   <td>{[replay.deviceType, replay.browser].filter(Boolean).join(' · ') || '—'}</td><td>{replay.country ?? '—'}</td>

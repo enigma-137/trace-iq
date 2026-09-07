@@ -11,7 +11,7 @@ export class ReplayTokenService {
     const issuedAt = Math.floor(Date.now() / 1_000);
     const payload: ReplayUploadClaims = {
       ...claims,
-      version: 1,
+      version: 2,
       tokenId: randomUUID(),
       issuedAt,
       expiresAt: issuedAt + lifetimeSeconds
@@ -35,7 +35,9 @@ export class ReplayTokenService {
       throw new UnauthorizedException('Replay upload token is malformed.');
     }
     const now = Math.floor(Date.now() / 1_000);
-    if (claims.version !== 1 || !claims.tokenId || !claims.projectId || !claims.organizationId || !claims.sessionId
+    if (claims.version !== 2 || !claims.tokenId || !claims.projectId || !claims.organizationId || !claims.sessionId
+      || !Array.isArray(claims.matchedFunnelIds) || claims.matchedFunnelIds.length === 0
+      || claims.matchedFunnelIds.some((id) => typeof id !== 'string' || !/^fnl_[A-Za-z0-9_-]{1,156}$/.test(id))
       || !Number.isInteger(claims.issuedAt) || !Number.isInteger(claims.expiresAt)
       || claims.issuedAt > now + 30 || claims.expiresAt <= now) {
       throw new UnauthorizedException('Replay upload token is expired or invalid.');

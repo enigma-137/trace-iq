@@ -755,6 +755,9 @@ await traceiq.loadFeatureFlags({ plan: 'pro', country: 'US' });
           </a>
           .
         </P>
+        <P>
+          Alerts are included with TraceIQ Cloud Pro. Cloud Free keeps existing alert definitions visible but pauses evaluation and delivery; upgrading resumes normal use. Self-hosted installations do not require TraceIQ billing and continue to use their configured email and webhook infrastructure.
+        </P>
         <P>A alert watches one event with a measure (count, unique users, sum/avg of a numeric property):</P>
         <Bullets
           items={[

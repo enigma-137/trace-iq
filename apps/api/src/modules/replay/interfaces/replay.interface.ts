@@ -15,6 +15,7 @@ export interface ReplaySettings {
   maskSelectors: string[];
   blockSelectors: string[];
   ignoreSelectors: string[];
+  selectedFunnelIds: string[];
 }
 
 export interface IngestReplayChunkRequest {
@@ -39,7 +40,7 @@ export interface AuthorizeReplayUploadRequest {
 }
 
 export interface ReplayUploadClaims {
-  version: 1;
+  version: 2;
   tokenId: string;
   projectId: string;
   organizationId: string;
@@ -53,6 +54,7 @@ export interface ReplayUploadClaims {
   maxChunks: number;
   maxCompressedBytes: number;
   maxUncompressedBytes: number;
+  matchedFunnelIds: string[];
   issuedAt: number;
   expiresAt: number;
 }

@@ -8,6 +8,7 @@ import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/Segm
 import { DashboardDialog } from '../DashboardDialog';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import Link from 'next/link';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -94,12 +95,14 @@ export function AlertManager({
   alerts,
   recentEvents,
   eventNames,
-  notificationGroups
+  notificationGroups,
+  alertsAvailable
 }: {
   alerts: Alert[];
   recentEvents: AlertEvent[];
   eventNames: string[];
   notificationGroups: NotificationGroup[];
+  alertsAvailable: boolean;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -240,7 +243,13 @@ export function AlertManager({
 
   return (
     <div className="grid gap-6">
-      <form
+      {!alertsAvailable ? (
+        <div className="rounded-md border border-neutral-300 p-4 text-sm text-neutral-700 dark:border-slate-700 dark:text-slate-300">
+          Alerts are available on Pro. Existing alert definitions are preserved, but evaluation and delivery are paused.{' '}
+          <Link className="font-semibold text-blue-600 hover:underline" href="/dashboard/settings/billing">View upgrade options</Link>.
+        </div>
+      ) : null}
+      {alertsAvailable ? <form
         className="grid gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950"
         onSubmit={handleSubmit}
       >
@@ -368,7 +377,7 @@ export function AlertManager({
             {isSubmitting ? 'Saving…' : 'Create alert'}
           </button>
         </div>
-      </form>
+      </form> : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="grid gap-6">
@@ -384,7 +393,7 @@ export function AlertManager({
                   <li key={alert.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <StatusBadge status={alert.enabled ? alert.lastStatus : 'disabled'} />
+                        <StatusBadge status={!alertsAvailable ? 'pro_required' : alert.enabled ? alert.lastStatus : 'disabled'} />
                         <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{alert.name}</p>
                       </div>
                       <p className="mt-1 truncate font-mono text-xs text-neutral-500 dark:text-slate-400">{summarize(alert)}</p>
@@ -421,7 +430,7 @@ export function AlertManager({
                         </ul>
                       ) : null}
                       <p className="mt-1 text-xs text-neutral-400 dark:text-slate-500">
-                        {alert.lastValue !== null
+                        {!alertsAvailable ? 'Inactive because Alerts require Pro' : alert.lastValue !== null
                           ? `Last value ${Math.round(alert.lastValue).toLocaleString()} · checked ${formatDate(alert.lastEvaluatedAt)}`
                           : 'Not evaluated yet · runs automatically within a few minutes'}
                       </p>
@@ -432,10 +441,10 @@ export function AlertManager({
                       ) : null}
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <button className={toolbarBtn} onClick={() => test(alert)} disabled={busyId === alert.id}>
+                      <button className={toolbarBtn} onClick={() => test(alert)} disabled={!alertsAvailable || busyId === alert.id}>
                         {busyId === alert.id ? '…' : 'Test'}
                       </button>
-                      <button className={toolbarBtn} onClick={() => toggle(alert)} disabled={busyId === alert.id}>
+                      <button className={toolbarBtn} onClick={() => toggle(alert)} disabled={!alertsAvailable || busyId === alert.id}>
                         {alert.enabled ? 'Disable' : 'Enable'}
                       </button>
                       <button
@@ -458,7 +467,7 @@ export function AlertManager({
             )}
           </section>
 
-          <NotificationGroupsPanel groups={notificationGroups} authFetch={authFetch} refresh={() => router.refresh()} />
+          <NotificationGroupsPanel groups={notificationGroups} authFetch={authFetch} refresh={() => router.refresh()} readOnly={!alertsAvailable} />
         </div>
 
         <section className="h-fit rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
@@ -545,11 +554,13 @@ function DeliveryDot({ status }: { status: string }) {
 function NotificationGroupsPanel({
   groups,
   authFetch,
-  refresh
+  refresh,
+  readOnly
 }: {
   groups: NotificationGroup[];
   authFetch: (path: string, init: RequestInit) => Promise<Response | null>;
   refresh: () => void;
+  readOnly: boolean;
 }) {
   const [name, setName] = useState('');
   const [emails, setEmails] = useState('');
@@ -641,7 +652,7 @@ function NotificationGroupsPanel({
           A saved list of emails you can attach to any alert (creating one here makes it appear in the New alert form).
         </p>
 
-        <form className="grid gap-2" onSubmit={handleCreate}>
+        {!readOnly ? <form className="grid gap-2" onSubmit={handleCreate}>
           <input
             className={inputClass}
             value={name}
@@ -665,7 +676,7 @@ function NotificationGroupsPanel({
           >
             {isSaving ? 'Saving…' : 'Create group'}
           </button>
-        </form>
+        </form> : <p className="text-sm text-neutral-500 dark:text-slate-400">Notification groups are read-only while Alerts are unavailable.</p>}
 
         {groups.length === 0 ? (
           <p className="text-sm text-neutral-500 dark:text-slate-500">No groups yet.</p>
@@ -714,7 +725,7 @@ function NotificationGroupsPanel({
                       {group.memberEmails.length} {group.memberEmails.length === 1 ? 'member' : 'members'} · {group.memberEmails.join(', ')}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  {!readOnly ? <div className="flex shrink-0 items-center gap-2">
                     <button className={toolbarBtn} onClick={() => startEdit(group)} disabled={busy === group.id}>
                       Edit
                     </button>
@@ -731,7 +742,7 @@ function NotificationGroupsPanel({
                         <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
                       </svg>
                     </button>
-                  </div>
+                  </div> : null}
                 </li>
               )
             )}
@@ -782,9 +793,10 @@ function StatusBadge({ status }: { status: string }) {
     triggered: 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950',
     ok: 'border border-neutral-300 text-neutral-500 dark:border-slate-700 dark:text-slate-400',
     pending: 'border border-neutral-200 text-neutral-400 dark:border-slate-800 dark:text-slate-500',
-    disabled: 'border border-neutral-200 text-neutral-300 dark:border-slate-800 dark:text-slate-600'
+    disabled: 'border border-neutral-200 text-neutral-300 dark:border-slate-800 dark:text-slate-600',
+    pro_required: 'border border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300'
   };
-  const label = status === 'triggered' ? 'Firing' : status === 'ok' ? 'OK' : status === 'disabled' ? 'Off' : 'Pending';
+  const label = status === 'triggered' ? 'Firing' : status === 'ok' ? 'OK' : status === 'disabled' ? 'Off' : status === 'pro_required' ? 'Pro required' : 'Pending';
   return (
     <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${map[status] ?? map.pending}`}>
       {label}

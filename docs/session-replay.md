@@ -1,6 +1,8 @@
 # Session Replay
 
-TraceIQ Session Replay records rrweb event streams; it never creates video files. The feature is disabled by default and uses this flow:
+TraceIQ Session Replay records rrweb event streams; it never creates video files. The feature is disabled by default. On TraceIQ Cloud it is available to Pro organizations and unavailable on Free; self-hosted installations do not require billing. Availability does not turn recording on. The project switch, at least one selected funnel, SDK opt-in, consent policy, deterministic sampling, and server authorization must all pass.
+
+The recording path is:
 
 `Browser SDK -> rrweb -> transport sanitizer -> short-lived upload grant -> replay API -> server sanitizer -> private object storage`
 
@@ -30,6 +32,16 @@ When consent is required, rrweb is not imported or initialized before `grantRepl
 
 Customers remain responsible for determining a lawful basis, notices, consent requirements, retention, and data-subject handling. Masking does not by itself make a deployment compliant with GDPR, CCPA, or any other law.
 
+## Flow targeting
+
+Replay settings select existing project funnels; TraceIQ does not maintain a second replay-only flow definition. A browser session becomes eligible when a normal analytics event has been accepted by the API and its event name matches the current first step of a selected funnel. Only then does the SDK request a short-lived upload grant and import/start rrweb. Funnel IDs are never trusted from the browser: the API derives matching IDs from stored project/session events and current project-confined funnel definitions.
+
+The current funnel model matches event names. A `$page` first step therefore targets accepted page events, and a custom first step targets that custom event. Route-specific targeting requires the route to be represented by an existing funnel-compatible event; funnel steps do not currently store property/path predicates.
+
+Zero selected funnels means record nothing. No DOM pre-trigger buffer is collected: before a qualifying event, the SDK retains only a bounded list of the last 50 accepted event names to bridge configuration timing. Once activated, one replay continues coherently for the existing browser session until maximum duration, explicit stop, unload lifecycle, or consent revocation. Matching more selected funnels refreshes the server-derived grant and adds associations to the same replay; it does not start duplicate recorders or chunk streams.
+
+Editing a selected funnel takes effect through its current first step. A token is rechecked on every chunk and completion, so a stale match cannot continue after an edit. Deleting a funnel cascades only its selection/match associations; existing replay payloads keep their normal retention lifecycle.
+
 ## Storage
 
 Replay storage is selected with `REPLAY_STORAGE_DRIVER=filesystem|supabase`. Self-hosted and local processes default to `filesystem`; TraceIQ Cloud defaults to `supabase`. Set the driver explicitly in deployed environments to make the intended backend unambiguous.
@@ -44,11 +56,11 @@ Self-hosted operators can lower the built-in safety ceilings with `REPLAY_MAX_RE
 
 ## Required manual setup
 
-1. Review and apply `apps/api/migrations/0028_session_replay.sql` manually in a maintenance window. Do not run it from an application process. The migration has a five-second lock timeout, a five-minute statement timeout, and a preflight that aborts on existing cross-project session/user rows. Its composite indexes on existing parent tables can still consume time and disk; rehearse against a production-sized copy and monitor lock waits before deployment.
+1. Review and apply `apps/api/migrations/0028_session_replay.sql` manually in a maintenance window. Flow targeting also requires additive migration `0032_replay_funnel_targeting.sql`; it preserves replay settings, funnels, and replay payloads while adding project-confined selection and match tables. Do not run migrations from an application process. Both use bounded lock/statement timeouts; rehearse against a production-sized copy and monitor lock waits before deployment.
 2. In TraceIQ Cloud's Supabase project, create a **private** bucket named by `REPLAY_STORAGE_BUCKET`. Do not add public read policies. The API service role performs object operations after TraceIQ authorization.
 3. Set `REPLAY_STORAGE_DRIVER=supabase`, `SUPABASE_URL`, server-only `SUPABASE_SERVICE_ROLE_KEY`, `REPLAY_STORAGE_BUCKET`, and `REPLAY_UPLOAD_TOKEN_SECRET` (32+ random characters) on Cloud API processes. Never expose server credentials through `NEXT_PUBLIC_*` variables.
 4. For self-hosted mode, set `REPLAY_STORAGE_DRIVER=filesystem`, set and persist `TRACEIQ_REPLAY_STORAGE_DIR`, and ensure the API user can read/write it. No Supabase replay credential is required.
-5. Apply explicit Cloud `entitlement_overrides` before enabling replay. No Free/Pro replay allowance is assumed by this implementation.
+5. In Cloud, verify that the organization resolves to Pro, then let an organization admin select funnels and enable recording. No per-organization `sessionReplay=1` grant is required. A current `sessionReplay=0` override acts as an emergency kill switch; older positive rows remain harmless.
 
 ### Rollback and failed deployment
 
@@ -62,4 +74,4 @@ Ingestion first reserves an `uploading` row, writes the object, and finalizes co
 
 The API uses server receipt time for expiration, bounds browser clock skew, validates event ranges on ingestion and completion, and atomically enforces chunk count plus compressed and expanded replay totals under the replay lock. Gzip expansion has a hard output ceiling. Playback is paginated by chunk and expanded-byte budget. Before returning an event, the API replaces recorded network URLs and CSS imports with inert values; the dashboard replay route adds a restrictive CSP and rrweb's iframe remains sandboxed without script execution. Logs contain replay IDs, sequence numbers, byte counts, and failure categories only—never DOM content or input values.
 
-Cloud entitlements support feature availability, monthly sessions, monthly storage bytes, maximum sample rate, maximum retention, and maximum duration. Self-hosted mode bypasses Cloud billing while retaining the safety and storage limits.
+Cloud Pro includes Replay availability; Cloud Free cannot enable, authorize, or upload. A Pro-to-Free downgrade immediately stops new authorization and causes every chunk/completion recheck to fail, but it does not delete historical data. Historical access and deletion keep their existing project authorization and retention behavior. Optional overrides can still lower capacity or disable the feature as an emergency control. Self-hosted mode bypasses Cloud billing while retaining the safety and storage limits.

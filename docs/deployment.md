@@ -75,6 +75,19 @@ private. Starting the API with replay disabled does not initialize this backend.
 Missing values produce a configuration error when replay is enabled or an
 enabled project first requests an upload grant.
 
+Flow-targeted Replay requires additive migration
+`0032_replay_funnel_targeting.sql` after the existing replay and billing
+migrations. It adds project-confined funnel selection/match tables and does not
+rewrite existing funnels, replay settings, or replay payloads. Review and apply
+it through the normal migration process before deploying code that reads those
+tables; no automatic production migration is performed by this change.
+
+In TraceIQ Cloud, Session Replay and Alerts resolve automatically from the
+organization plan: Pro has access, Free does not. Self-hosted mode bypasses
+these commercial feature gates. Optional zero-valued `sessionReplay` or
+`alerts` overrides remain emergency kill switches for Cloud Pro organizations;
+positive overrides are not required to provision paid customers.
+
 The API runs a bounded retention sweep every six hours. Self-hosted projects use
 their configured `data_retention_days`; TraceIQ Cloud uses the organization's
 plan entitlement. Set `RETENTION_SWEEP_INTERVAL_MS` to change the cadence. Event

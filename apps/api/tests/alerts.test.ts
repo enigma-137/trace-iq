@@ -21,6 +21,7 @@ type AlertRow = {
   last_status: string;
   last_value: number | null;
   last_evaluated_at: string | null;
+  organization_id?: string;
 };
 
 function makeAlert(overrides: Partial<AlertRow> = {}): AlertRow {
@@ -42,6 +43,7 @@ function makeAlert(overrides: Partial<AlertRow> = {}): AlertRow {
     last_status: 'ok',
     last_value: null,
     last_evaluated_at: null,
+    organization_id: 'org_1',
     ...overrides
   };
 }
@@ -50,6 +52,7 @@ interface Harness {
   db: MockDb;
   email: { send: ReturnType<typeof vi.fn> };
   groups: { resolveMembers: ReturnType<typeof vi.fn> };
+  entitlements: { assertAlertsAvailable: ReturnType<typeof vi.fn>; getSnapshot: ReturnType<typeof vi.fn> };
   service: AlertsService;
 }
 
@@ -66,13 +69,18 @@ function makeService(metricValues: number[], overrides: Partial<AlertRow> = {}):
   const email = { send: vi.fn().mockResolvedValue({ ok: true }) };
   const groups = { resolveMembers: vi.fn().mockResolvedValue([]) };
   const projects = { resolveActiveProject: vi.fn(), requireActiveProject: vi.fn() };
+  const entitlements = {
+    assertAlertsAvailable: vi.fn().mockResolvedValue(undefined),
+    getSnapshot: vi.fn().mockResolvedValue({ plan: 'pro', features: { alerts: true } })
+  };
   const service = new AlertsService(
     db as never,
     projects as never,
     groups as never,
-    email as never
+    email as never,
+    entitlements as never
   );
-  return { db, email, groups, service };
+  return { db, email, groups, entitlements, service };
 }
 
 afterEach(() => {
@@ -173,7 +181,8 @@ describe('AlertsService.evaluateAlert (persist + notify)', () => {
     const email = { send: vi.fn().mockResolvedValue({ ok: false, failure: 'Resend 401' }) };
     const groups = { resolveMembers: vi.fn().mockResolvedValue([]) };
     const projects = { resolveActiveProject: vi.fn(), requireActiveProject: vi.fn() };
-    const service = new AlertsService(db as never, projects as never, groups as never, email as never);
+    const entitlements = { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) };
+    const service = new AlertsService(db as never, projects as never, groups as never, email as never, entitlements as never);
 
     await service.evaluateAlert(makeAlert(), { persist: true, notify: true });
 
@@ -198,7 +207,8 @@ describe('AlertsService.evaluateAlert (persist + notify)', () => {
     const email = { send: vi.fn().mockResolvedValue({ ok: true }) };
     const groups = { resolveMembers: vi.fn().mockResolvedValue(['pager@b.co', 'ops@b.co']) };
     const projects = { resolveActiveProject: vi.fn(), requireActiveProject: vi.fn() };
-    const service = new AlertsService(db as never, projects as never, groups as never, email as never);
+    const entitlements = { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) };
+    const service = new AlertsService(db as never, projects as never, groups as never, email as never, entitlements as never);
 
     const alert = makeAlert({
       email_recipients: ['ops@b.co'],
@@ -209,5 +219,99 @@ describe('AlertsService.evaluateAlert (persist + notify)', () => {
 
     expect(groups.resolveMembers).toHaveBeenCalledWith(['grp_pager'], 'proj_1');
     expect(email.send.mock.calls[0][0].to.sort()).toEqual(['ops@b.co', 'pager@b.co']);
+  });
+
+  it('suppresses evaluation and outbound delivery after a Cloud downgrade', async () => {
+    const { db, email, entitlements, service } = makeService([150]);
+    entitlements.assertAlertsAvailable.mockRejectedValue(new Error('Alerts are available on Pro.'));
+    vi.stubGlobal('fetch', vi.fn());
+
+    await expect(service.evaluateAlert(makeAlert({ webhook_url: 'https://hooks.example.com/alert' }), {
+      persist: true, notify: true
+    })).rejects.toThrow(/available on Pro/);
+
+    expect(db.queryCalls(/FROM events|UPDATE alerts|INSERT INTO alert_events|INSERT INTO alert_deliveries/)).toHaveLength(0);
+    expect(email.send).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rechecks entitlement immediately before managed email when downgrade races delivery', async () => {
+    const { email, entitlements, service } = makeService([150]);
+    entitlements.assertAlertsAvailable
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Alerts are available on Pro.'));
+
+    await expect(service.evaluateAlert(makeAlert(), { persist: true, notify: true }))
+      .rejects.toThrow(/available on Pro/);
+    expect(email.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('AlertsService Cloud feature gates', () => {
+  it('allows a Pro organization to create an alert normally', async () => {
+    const db = mockDatabase(() => affected(1));
+    const entitlements = { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) };
+    const service = new AlertsService(
+      db as never,
+      { requireWritableProject: vi.fn().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1' }) } as never,
+      { resolveMembers: vi.fn().mockResolvedValue([]) } as never,
+      { send: vi.fn() } as never,
+      entitlements as never
+    );
+
+    await expect(service.create({ id: 'usr_1' } as never, {
+      projectId: 'proj_1', name: 'Signups', eventName: 'signup', measure: 'count', condition: 'above', threshold: 10
+    })).resolves.toMatchObject({ name: 'Signups' });
+    expect(entitlements.assertAlertsAvailable).toHaveBeenCalledWith('org_1');
+    expect(db.queryCalls(/INSERT INTO alerts/)).toHaveLength(1);
+  });
+
+  it('blocks creating and enabling alerts without Pro while still allowing disable', async () => {
+    const db = mockDatabase(() => affected(1));
+    const projects = {
+      requireWritableProject: vi.fn().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1' }),
+      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1' })
+    };
+    const entitlements = {
+      assertAlertsAvailable: vi.fn().mockRejectedValue(new Error('Alerts are available on Pro.'))
+    };
+    const service = new AlertsService(
+      db as never,
+      projects as never,
+      { resolveMembers: vi.fn().mockResolvedValue([]) } as never,
+      { send: vi.fn() } as never,
+      entitlements as never
+    );
+
+    await expect(service.create({ id: 'usr_1' } as never, {
+      projectId: 'proj_1', name: 'Signups', eventName: 'signup', condition: 'above', threshold: 10
+    })).rejects.toThrow(/available on Pro/);
+    await expect(service.setEnabled({ id: 'usr_1' } as never, 'alt_1', true, 'proj_1')).rejects.toThrow(/available on Pro/);
+    await expect(service.setEnabled({ id: 'usr_1' } as never, 'alt_1', false, 'proj_1')).resolves.toEqual({ id: 'alt_1', enabled: false });
+
+    expect(db.queryCalls(/INSERT INTO alerts/)).toHaveLength(0);
+    expect(db.queryCalls(/UPDATE alerts/)).toHaveLength(1);
+  });
+
+  it('keeps downgraded alert definitions but suppresses the background scheduler and managed email', async () => {
+    const alert = makeAlert();
+    const db = mockDatabase((text) => text.includes('SELECT a.*,p.organization_id')
+      ? rows([{ ...alert, organization_id: 'org_1' }])
+      : affected(1));
+    const email = { send: vi.fn() };
+    const entitlements = { assertAlertsAvailable: vi.fn().mockRejectedValue(new Error('Alerts are available on Pro.')) };
+    const service = new AlertsService(
+      db as never,
+      {} as never,
+      { resolveMembers: vi.fn() } as never,
+      email as never,
+      entitlements as never
+    );
+
+    await (service as unknown as { evaluateDueAlerts(): Promise<void> }).evaluateDueAlerts();
+
+    expect(email.send).not.toHaveBeenCalled();
+    expect(db.queryCalls(/DELETE FROM alerts|UPDATE alerts|INSERT INTO alert_events|INSERT INTO alert_deliveries/)).toHaveLength(0);
   });
 });
