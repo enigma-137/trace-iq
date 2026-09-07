@@ -568,7 +568,13 @@ export function AuthForm() {
               </button>
 
               {status ? (
-                <p className="mt-5 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                <p
+                  className={`mt-5 rounded-lg border px-3 py-2.5 text-sm ${
+                    status.tone === 'error'
+                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
+                  }`}
+                >
                   {status.message}
                 </p>
               ) : null}

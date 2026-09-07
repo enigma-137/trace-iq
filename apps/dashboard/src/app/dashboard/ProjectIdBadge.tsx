@@ -23,7 +23,7 @@ export function ProjectIdBadge({ projectId }: { projectId: string }) {
       type="button"
       onClick={handleCopy}
       title={`Click to copy Project ID: #${projectId}`}
-      className="group inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-blue-700 transition hover:border-blue-500/40 hover:bg-blue-500/15 dark:border-blue-400/25 dark:bg-blue-400/15 dark:text-blue-300 dark:hover:border-blue-400/40 dark:hover:bg-blue-400/25"
+      className="group inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-blue-700 transition hover:border-blue-500/40 hover:bg-blue-500/15 dark:border-blue-400/25 dark:text-blue-300 dark:hover:border-blue-400/40 dark:hover:bg-blue-400/25"
     >
       <span className="truncate max-w-[130px] sm:max-w-none">
         #{copied ? 'Copied ID!' : projectId}

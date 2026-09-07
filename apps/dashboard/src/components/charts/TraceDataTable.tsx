@@ -56,27 +56,27 @@ export function TraceDataTable({
   const getStatusBadge = (status: number) => {
     if (status >= 200 && status < 300) {
       return (
-        <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+        <span className="inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
           {status} OK
         </span>
       );
     }
     if (status === 429) {
       return (
-        <span className="inline-flex items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+        <span className="inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-600 dark:text-amber-400">
           429 Rate Limit
         </span>
       );
     }
     if (status >= 400 && status < 500) {
       return (
-        <span className="inline-flex items-center rounded-full border border-orange-500/20 bg-orange-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+        <span className="inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-orange-600 dark:text-orange-400">
           {status} Client Err
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-600 dark:text-rose-400">
         {status} Server Err
       </span>
     );
@@ -84,14 +84,14 @@ export function TraceDataTable({
 
   const getMethodBadge = (method: string) => {
     const colors: Record<string, string> = {
-      GET: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/60',
-      POST: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/60',
-      PUT: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60',
-      DELETE: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/60'
+      GET: 'text-blue-600 dark:text-blue-400',
+      POST: 'text-emerald-600 dark:text-emerald-400 ',
+      PUT: 'text-amber-600 dark:text-amber-400 ',
+      DELETE: 'text-rose-600 dark:text-rose-400 '
     };
     const style = colors[method.toUpperCase()] || 'text-neutral-600 bg-neutral-100 border-neutral-200 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-700';
     return (
-      <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold ${style}`}>
+      <span className={`rounded  px-1.5 py-0.5 font-mono text-[10px] font-bold ${style}`}>
         {method.toUpperCase()}
       </span>
     );
@@ -121,7 +121,7 @@ export function TraceDataTable({
           </div>
           <div>
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Latest API Requests</h3>
-            <p className="text-xs text-neutral-500 dark:text-slate-400">Five most recent requests with status and execution time</p>
+            <p className="text-xs text-neutral-500 dark:text-slate-400">Most recent requests with status and execution time</p>
           </div>
         </div>
 

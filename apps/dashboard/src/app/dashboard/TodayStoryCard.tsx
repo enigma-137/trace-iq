@@ -78,18 +78,17 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   }, [projectId]);
 
   return (
-    <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm transition-all hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-700/80">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.12),transparent_40%)] dark:bg-[radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.20),transparent_40%)]" />
+    <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-transparent p-4 transition-all hover:border-neutral-300 dark:border-slate-800/90 dark:hover:border-slate-700/80 sm:p-5">
       <div className="relative">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-1.5">
               {/* <Sparkles className="size-3.5 text-blue-600 dark:text-blue-400" /> */}
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-500 dark:text-slate-400">
+              <p className="text-[11px] font-normal uppercase tracking-[0.1em] text-neutral-500 dark:text-slate-400">
                 Today&apos;s Story
               </p>
             </div>
-            <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">
+            <p className="mt-0.5 text-sm font-normal text-neutral-700 dark:text-slate-300">
               {story?.project ? `${story.project.organizationName} / ${story.project.name}` : 'Workspace activity summary'}
             </p>
           </div>
@@ -98,7 +97,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
             type="button"
             onClick={() => void load()}
             disabled={isLoading}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 self-start sm:self-auto"
+            className="inline-flex h-8 items-center justify-center gap-1.5 self-start rounded-md border border-neutral-300 bg-transparent px-3 text-xs font-medium text-neutral-700 transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 sm:self-auto"
           >
             <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             <span>{isLoading ? 'Writing…' : 'Refresh'}</span>
@@ -121,7 +120,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
 
         {story ? (
           <div className="mt-3.5">
-            <p className="max-w-3xl text-sm leading-6 font-medium text-neutral-800 dark:text-slate-200">
+            <p className="max-w-3xl text-sm font-normal leading-6 text-neutral-700 dark:text-slate-300">
               {story.narrative}
             </p>
             <div className="mt-3.5 flex flex-wrap gap-2">
@@ -165,14 +164,14 @@ function FactChip({
   title?: string;
 }) {
   const tones = {
-    blue: 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white',
-    green: 'border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500 dark:text-white',
-    red: 'border-red-600 bg-red-600 text-white dark:border-red-500 dark:bg-red-500 dark:text-white',
-    neutral: 'border-neutral-400 bg-neutral-800 text-white dark:border-neutral-600 dark:bg-neutral-100 dark:text-neutral-900'
+    blue: 'border-blue-300 text-blue-700 dark:border-blue-900 dark:text-blue-300',
+    green: 'border-emerald-300 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300',
+    red: 'border-rose-300 text-rose-700 dark:border-rose-900 dark:text-rose-300',
+    neutral: 'border-neutral-300 text-neutral-600 dark:border-slate-700 dark:text-slate-300'
   };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`} title={title}>
-      <span className="opacity-70">{label}</span>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-normal ${tones[tone]}`} title={title}>
+      <span className="opacity-75">{label}</span>
       <span className="font-mono">{value}</span>
     </span>
   );

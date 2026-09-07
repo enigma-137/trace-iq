@@ -18,10 +18,10 @@ export function ActiveAlertsBanner({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border p-3.5 sm:px-4 text-xs ${
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border bg-transparent p-3.5 text-xs sm:px-4 ${
         firing > 0
-          ? 'border-rose-300 bg-rose-50/80 text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200'
-          : 'border-emerald-200 bg-emerald-50/60 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+          ? 'border-rose-300 text-rose-800 dark:border-rose-900/60 dark:text-rose-300'
+          : 'border-neutral-200 text-neutral-700 dark:border-slate-800/90 dark:text-slate-300'
       } ${className}`}
     >
       <div className="flex items-center gap-2.5">
@@ -31,7 +31,7 @@ export function ActiveAlertsBanner({
           }`}
         />
         <div className="flex items-center gap-2">
-          <span className="font-semibold">
+          <span className="font-medium">
             {firing > 0 ? `${firing} alert${firing === 1 ? '' : 's'} currently firing!` : 'All alert rules healthy'}
           </span>
           <span className="text-neutral-500 dark:text-slate-400">
@@ -42,8 +42,8 @@ export function ActiveAlertsBanner({
 
       <Link
         href={projectId ? `/dashboard/alerts?projectId=${projectId}` : '/dashboard/alerts'}
-        className={`inline-flex items-center gap-1 font-semibold underline-offset-4 hover:underline ${
-          firing > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'
+        className={`inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline ${
+          firing > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-neutral-600 dark:text-slate-400'
         }`}
       >
         <span>Manage monitors</span>

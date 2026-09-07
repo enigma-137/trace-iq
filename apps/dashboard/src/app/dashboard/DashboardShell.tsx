@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
-import { DashboardPlanBadge, DashboardPlanProvider } from './DashboardPlan';
+import { DashboardPlanProvider } from './DashboardPlan';
 
 interface DashboardShellProps {
   active: string;
@@ -31,12 +31,9 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
                   {/* <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-slate-500">
                     Dashboard
                   </p> */}
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <h1 id="dashboard-title" className="truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                      {title}
-                    </h1>
-                    <DashboardPlanBadge />
-                  </div>
+                  <h1 id="dashboard-title" className="mt-0.5 truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+                    {title}
+                  </h1>
                 </div>
               </div>
               <div className="flex items-center gap-3">

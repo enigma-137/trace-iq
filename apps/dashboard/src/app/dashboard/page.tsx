@@ -112,7 +112,7 @@ interface TrendResponse {
 }
 
 const cardClass =
-  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'relative overflow-hidden rounded-md border border-neutral-200 bg-transparent p-4 sm:p-5 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 export default async function DashboardPage({
   searchParams
@@ -175,7 +175,7 @@ export default async function DashboardPage({
   return (
     <DashboardShell
       active="overview"
-      title="Overview"
+      title={overview?.project?.organizationName ?? 'Overview'}
       userEmail={user.email}
       projectId={canonicalProjectId}
       organizationId={activeOrganizationId}
@@ -188,18 +188,10 @@ export default async function DashboardPage({
 
       {/* Hero Header Strip */}
       {overview?.project ? (
-        <section className="mb-5 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-900/70 shadow-xs">
+        <section className="mb-5 overflow-hidden rounded-lg border border-neutral-200 bg-transparent dark:border-slate-800 dark:bg-slate-900/70">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-semibold text-neutral-900 dark:text-white">
-                {overview.project.organizationName}
-              </span>
-
-              <span aria-hidden className="text-neutral-300 dark:text-slate-600">
-                /
-              </span>
-
-              <span className="truncate text-neutral-600 dark:text-slate-300">
+              <span className="truncate font-semibold text-neutral-900 dark:text-white">
                 {overview.project.name}
               </span>
 
@@ -207,7 +199,7 @@ export default async function DashboardPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-1.5 rounded-full  px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                 <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
                 <span>All Telemetry Operational</span>
               </div>
@@ -480,13 +472,13 @@ function AvailabilityStrip({ overview }: { overview: OverviewResponse }) {
   const status = availabilityStatus(overview);
   const tone =
     status === 'healthy'
-      ? { dot: 'bg-emerald-500', chip: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300', label: 'Healthy' }
+      ? { dot: 'bg-emerald-500', chip: '  text-emerald-700 dark:text-emerald-300', label: 'Healthy' }
       : status === 'quiet'
-        ? { dot: 'bg-amber-500', chip: 'border-amber-400/20 bg-amber-400/10 text-amber-700 dark:text-amber-300', label: 'Low volume' }
+        ? { dot: 'bg-amber-500', chip: ' text-amber-700 dark:text-amber-300', label: 'Low volume' }
         : { dot: 'bg-neutral-300 dark:bg-slate-600', chip: 'border-neutral-300 bg-neutral-100 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400', label: 'Idle' };
 
   return (
-    <section className="mb-5 grid gap-4 rounded-md border border-neutral-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
+    <section className="mb-5 grid gap-4 rounded-md border border-neutral-200 bg-transparent p-4 sm:p-5 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid-cols-3">
       <div className="flex items-center gap-3">
         <span className={`size-2.5 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
         <div className="min-w-0">
