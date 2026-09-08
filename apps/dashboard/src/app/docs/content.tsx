@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { DocsLayout } from './DocsLayout';
 import { CodeBlock } from './CodeBlock';
 import { SessionReplayDocs } from './SessionReplayDocs';
+import { sdkDocsSections } from './sdk-docs';
 import { SDK_VERSIONS } from '@/lib/sdkVersions';
 
 export const docsSections = [
@@ -12,8 +13,7 @@ export const docsSections = [
   { id: 'config', label: 'Configuration', category: 'Getting started' },
   { id: 'autocapture', label: 'Autocapture', category: 'Getting started' },
   { id: 'self-hosting', label: 'Self-hosting', category: 'Deployment' },
-  { id: 'node', label: 'Node.js SDK', category: 'Server & mobile SDKs' },
-  { id: 'react-native', label: 'React Native SDK', category: 'Server & mobile SDKs' },
+  ...sdkDocsSections,
   { id: 'web-analytics', label: 'Web analytics', category: 'Features' },
   { id: 'session-replay', label: 'Session Replay', category: 'Features' },
   { id: 'flags', label: 'Feature flags', category: 'Features' },
@@ -147,7 +147,7 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
                 <span aria-hidden>→</span>
               </Link>
               <Link
-                href="/docs?page=node"
+                href="/docs?page=javascript"
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Browse SDKs
@@ -179,7 +179,7 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
             items={[
               ['Getting started', 'Quickstart, SDK methods, configuration options, and automatic event capture.'],
               ['Deployment', 'One-command private setup, production topology, authentication modes, backups, migrations, and safe upgrades.'],
-              ['Server & mobile SDKs', 'Node.js and React Native SDKs alongside the browser SDK.'],
+              ['SDKs', 'JavaScript, Flutter, React Native, Node.js, Python, Swift, Kotlin, Rust, and PHP.'],
               ['Features', 'Web analytics, Web Vitals, public sharing, flags, alerts, dashboards, webhooks, and export.'],
               ['Reference', 'Direct REST ingestion over HTTP and the Model Context Protocol (MCP) server copilot.']
             ]}
@@ -412,6 +412,79 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
           ]}
         />
       </Section>
+    );
+  }
+
+  if (id === 'javascript') {
+    return (
+      <div className="space-y-8">
+        <Section id="javascript" title="JavaScript SDK">
+          <P>
+            The browser SDK (currently <Mono>v{SDK_VERSIONS.javascript}</Mono>) tracks events, identities, page
+            views, exceptions, Web Vitals, and optional session replay. It uses the project write key intended for
+            client-side ingestion.
+          </P>
+          <Code lang="bash">{`npm install traceiq-sdk-js@latest`}</Code>
+          <Code lang="ts">{snippet}</Code>
+        </Section>
+        <Section id="javascript-methods" title="Core methods">
+          <Code lang="ts">{`traceiq.identify({ userId: 'user_123', traits: { plan: 'pro' } });
+traceiq.track('checkout_started', { cartValue: 4200, currency: 'NGN' });
+traceiq.page('Checkout');
+traceiq.group({ organizationId: 'org_123', traits: { plan: 'growth' } });
+traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</Code>
+          <P>
+            See Configuration and Autocapture for initialization options, automatic error handling, page views,
+            rage clicks, request timing, Web Vitals, and replay controls.
+          </P>
+        </Section>
+      </div>
+    );
+  }
+
+  if (id === 'flutter') {
+    return (
+      <div className="space-y-8">
+        <Section id="flutter" title="Flutter SDK">
+          <P>
+            <Mono>traceiq_flutter</Mono> supports Android, iOS, web, macOS, Windows, and Linux with persistent
+            anonymous identity, sessions, an offline queue, batching, retries, lifecycle flushing, navigation
+            tracking, and chained Flutter error handlers.
+          </P>
+          <P>
+            Version 0.1.0 is currently prepared in this repository under <Mono>packages/sdk-flutter</Mono>. Until
+            the first pub.dev release, monorepo applications can use a local path dependency.
+          </P>
+          <Code lang="yaml">{`dependencies:
+  traceiq_flutter:
+    path: ../../packages/sdk-flutter`}</Code>
+          <Code lang="dart">{`await TraceIQ.initialize(
+  projectId: '${projectId}',
+  apiKey: 'YOUR_PROJECT_WRITE_KEY',
+  apiUrl: '${apiBaseUrl}',
+);
+
+await TraceIQ.identify('user_123', traits: {'plan': 'pro'});
+await TraceIQ.track('checkout_started', properties: {'cart_value': 4200});
+await TraceIQ.screen('Checkout');
+await TraceIQ.revenue(amount: 3500, currency: 'NGN');`}</Code>
+        </Section>
+        <Section id="flutter-navigation" title="Navigation and errors">
+          <Code lang="dart">{`MaterialApp(
+  navigatorObservers: [TraceIQNavigatorObserver()],
+);
+
+try {
+  await checkout();
+} catch (error, stackTrace) {
+  await TraceIQ.captureException(error, stackTrace);
+}`}</Code>
+          <P>
+            Call <Mono>TraceIQ.reset()</Mono> on logout and <Mono>TraceIQ.setTrackingEnabled(false)</Mono> when
+            consent is withdrawn. Disabling tracking clears the persisted event queue.
+          </P>
+        </Section>
+      </div>
     );
   }
 
@@ -1089,7 +1162,7 @@ export function PathCardsGrid({ basePath }: { basePath: string }) {
     {
       title: 'Install TraceIQ JS',
       desc: 'npm install traceiq-sdk-js and start capturing events in minutes.',
-      href: `${basePath}?page=quickstart`
+      href: `${basePath}?page=javascript`
     },
     {
       title: 'Browser Autocapture',
@@ -1102,9 +1175,9 @@ export function PathCardsGrid({ basePath }: { basePath: string }) {
       href: `${basePath}?page=session-replay`
     },
     {
-      title: 'Server & Mobile SDKs',
-      desc: 'Capture trusted backend events with Node.js and mobile activity with React Native / Expo.',
-      href: `${basePath}?page=node`
+      title: 'All SDK Guides',
+      desc: 'Flutter, React Native, Node.js, Python, Swift, Kotlin, Rust, and PHP integrations.',
+      href: `${basePath}?page=flutter`
     },
     {
       title: 'Feature Flags',

@@ -13,7 +13,7 @@ export interface DocsTocItem {
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'Getting started': <Clock className="size-3.5" />,
   Deployment: <Server className="size-3.5" />,
-  'Server & mobile SDKs': <Terminal className="size-3.5" />,
+  SDKs: <Terminal className="size-3.5" />,
   Features: <BookOpen className="size-3.5" />,
   Reference: <FileCode className="size-3.5" />
 };
