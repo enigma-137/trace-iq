@@ -11,7 +11,7 @@ TraceIQ is an open-source, developer-first product analytics platform for web, m
 - Revocable, permission-scoped public links for saved dashboards
 - Error, rage-click, and API-performance analytics
 - Feature flags, alerts, webhooks, exports, and organization access controls
-- JavaScript, React Native, Node.js, Python, Rust, Swift, Kotlin, and PHP SDKs
+- JavaScript, Flutter, React Native, Node.js, Python, Rust, Swift, Kotlin, and PHP SDKs
 - An optional MCP server for AI clients
 
 ## Architecture
@@ -119,14 +119,16 @@ traceiq.initialize({
 traceiq.track('signup_completed', { plan: 'starter' });
 ```
 
-See the [JavaScript SDK README](packages/sdk-js/README.md) and the other package-specific READMEs for installation details.
+See the [JavaScript SDK README](packages/sdk-js/README.md),
+[Flutter SDK README](packages/sdk-flutter/README.md), and the other
+package-specific READMEs for installation details.
 
 ## Repository layout
 
 ```text
 apps/api/              NestJS API, migrations, and tests
 apps/dashboard/        Next.js dashboard and public documentation UI
-packages/              TypeScript SDKs, shared packages, UI, and MCP server
+packages/              TypeScript/Flutter SDKs, shared packages, UI, and MCP server
 sdks/                  Python, Rust, Swift, and Kotlin SDKs
 src/ and tests/        PHP SDK and tests
 docs/                  Architecture, deployment, and protocol documentation

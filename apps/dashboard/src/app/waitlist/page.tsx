@@ -1,3 +1,13 @@
+import { redirect } from 'next/navigation';
+
+// Waitlist retired at launch — auth lives on the landing page now.
+// Keep the route from 404ing but send everyone to /
+// Remove this file entirely once launch is complete.
+export default function WaitlistPage() {
+  redirect('/');
+}
+
+/*
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -154,3 +164,4 @@ export default function WaitlistPage() {
     </main>
   );
 }
+*/

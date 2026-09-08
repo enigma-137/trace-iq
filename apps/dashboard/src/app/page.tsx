@@ -135,7 +135,7 @@ export default function Page() {
             ))}
           </nav>
           <div className="header-actions">
-            <a className="button button-small" href="/waitlist">Get started <ArrowUpRight size={14} /></a>
+            <a className="button button-small" href="/auth/login">Get started <ArrowUpRight size={14} /></a>
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'}>
               {menuOpen ? <X /> : <Menu />}
             </button>
@@ -150,7 +150,7 @@ export default function Page() {
           <h1>Clarity for<br /><em>complex systems.</em></h1>
           <p>TraceIQ turns page views, custom events, API response data, and errors into a clear map of how your software really works.</p>
           <div className="hero-actions">
-            <a className="button" href="/waitlist">Start tracing <ArrowUpRight size={16} /></a>
+            <a className="button" href="/auth/login">Start tracing <ArrowUpRight size={16} /></a>
             <a className="quiet-link" href="#sandbox"><Play size={14} fill="currentColor" /> See how it works</a>
           </div>
           <div className="hero-note"><span>Open source · self-hosted · inspectable</span><span className="note-line" /></div>
@@ -190,7 +190,7 @@ export default function Page() {
           </div>
           <div className="product-detail-footer">
             <p>Compare traffic, errors, and latency, then inspect how requests move from your SDKs through processing and storage.</p>
-            <a className="quiet-link" href="/waitlist">Explore TraceIQ <ArrowUpRight size={14} /></a>
+            <a className="quiet-link" href="/auth/login">Explore TraceIQ <ArrowUpRight size={14} /></a>
           </div>
         </div>
       </section>
@@ -398,7 +398,7 @@ export default function Page() {
         <div className="cta-glow" />
         <span className="eyebrow"><span className="status-dot" /> Ready when you are</span>
         <h2>See what your<br /><em>systems are saying.</em></h2>
-        <a className="button" href="/waitlist">Get started <ArrowUpRight size={16} /></a>
+        <a className="button" href="/auth/login">Get started <ArrowUpRight size={16} /></a>
       </section>
 
       {/* Footer */}
@@ -411,7 +411,7 @@ export default function Page() {
           </div>
           <div className="footer-links">
             <div><strong>Explore</strong><a href="/docs">Resources</a><a href="/status">Status</a><a href="/pricing">Pricing</a><a href="/blog">Blog</a></div>
-            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/waitlist">Waitlist</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
+            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/auth/login">Get started</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
             <div><strong>Product</strong><a href="#product">Overview</a><a href="/auth/login">Sign in</a></div>
           </div>
         </div>

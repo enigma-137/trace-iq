@@ -1,0 +1,28 @@
+name: traceiq_flutter
+description: Reliable cross-platform Flutter analytics SDK for TraceIQ with batching, persistence, sessions, and error tracking.
+version: 0.1.0
+homepage: https://github.com/enigma-137/trace-iq
+repository: https://github.com/enigma-137/trace-iq/tree/main/packages/sdk-flutter
+issue_tracker: https://github.com/enigma-137/trace-iq/issues
+topics:
+  - analytics
+  - telemetry
+  - observability
+  - product-analytics
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  package_info_plus: ^8.1.2
+  shared_preferences: ^2.3.4
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
