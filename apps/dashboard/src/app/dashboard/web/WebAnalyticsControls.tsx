@@ -82,19 +82,56 @@ export function WebAnalyticsControls({ token, projectId, days, initialFilters, g
       </div>
       <div className="rounded-md border border-neutral-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap gap-2">
-          {filters.map((filter, index) => <div key={index} className="flex gap-1">
-            <select value={filter.field} onChange={(e) => setFilters(filters.map((f, i) => i === index ? { ...f, field: e.target.value } : f))} className="rounded border bg-transparent px-2 py-1 text-sm">{fields.map((field) => <option key={field}>{field}</option>)}</select>
-            <select value={filter.operator} onChange={(e) => setFilters(filters.map((f, i) => i === index ? { ...f, operator: e.target.value as Filter['operator'] } : f))} className="rounded border bg-transparent px-2 py-1 text-sm"><option value="is">is</option><option value="is_not">is not</option><option value="contains">contains</option><option value="is_set">is set</option><option value="is_not_set">is not set</option></select>
-            {!filter.operator.endsWith('_set') && <input value={filter.value ?? ''} onChange={(e) => setFilters(filters.map((f, i) => i === index ? { ...f, value: e.target.value } : f))} className="w-32 rounded border bg-transparent px-2 py-1 text-sm" placeholder="value" />}
-            <button onClick={() => setFilters(filters.filter((_, i) => i !== index))} className="px-2 text-red-500" aria-label="Remove filter">×</button>
+          {filters.map((filter, index) => <div key={index} className="flex items-center gap-1.5">
+            <select
+              value={filter.field}
+              onChange={(e) => setFilters(filters.map((f, i) => i === index ? { ...f, field: e.target.value } : f))}
+              className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
+              {fields.map((field) => (
+                <option key={field} value={field} className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+                  {field}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filter.operator}
+              onChange={(e) => setFilters(filters.map((f, i) => i === index ? { ...f, operator: e.target.value as Filter['operator'] } : f))}
+              className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
+              <option value="is" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">is</option>
+              <option value="is_not" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">is not</option>
+              <option value="contains" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">contains</option>
+              <option value="is_set" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">is set</option>
+              <option value="is_not_set" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">is not set</option>
+            </select>
+            {!filter.operator.endsWith('_set') && (
+              <input
+                value={filter.value ?? ''}
+                onChange={(e) => setFilters(filters.map((f, i) => i === index ? { ...f, value: e.target.value } : f))}
+                className="w-32 rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                placeholder="value"
+              />
+            )}
+            <button
+              onClick={() => setFilters(filters.filter((_, i) => i !== index))}
+              className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-100 hover:text-red-500 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-red-400"
+              aria-label="Remove filter"
+            >
+              ×
+            </button>
           </div>)}
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-          <button onClick={() => setFilters([...filters, { field: 'path', operator: 'is', value: '' }])} className="rounded border px-3 py-1.5">+ Filter</button>
-          <button onClick={() => navigate(filters)} className="rounded bg-neutral-900 px-3 py-1.5 text-white dark:bg-white dark:text-black">Apply</button>
-          <button onClick={() => { setFilters([]); navigate([]); }} className="rounded border px-3 py-1.5">Clear</button>
-          <button onClick={savePreset} className="rounded border px-3 py-1.5">Save preset</button>
-          {Object.entries(presets).map(([presetName, preset]) => <button key={presetName} onClick={() => { setFilters(preset); navigate(preset); }} className="rounded border border-blue-300 px-3 py-1.5 text-blue-700 dark:text-blue-300">{presetName}</button>)}
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <button onClick={() => setFilters([...filters, { field: 'path', operator: 'is', value: '' }])} className="rounded border border-slate-300 bg-slate-50 px-3 py-1.5 font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 transition-colors">+ Filter</button>
+          <button onClick={() => navigate(filters)} className="rounded bg-neutral-900 px-3 py-1.5 font-medium text-white shadow-sm hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200 transition-colors">Apply</button>
+          <button onClick={() => { setFilters([]); navigate([]); }} className="rounded border border-slate-300 bg-slate-50 px-3 py-1.5 font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 transition-colors">Clear</button>
+          <button onClick={savePreset} className="rounded border border-slate-300 bg-slate-50 px-3 py-1.5 font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80 transition-colors">Save preset</button>
+          {Object.entries(presets).map(([presetName, preset]) => (
+            <button key={presetName} onClick={() => { setFilters(preset); navigate(preset); }} className="rounded border border-blue-300/80 bg-blue-50/60 px-3 py-1.5 font-medium text-blue-700 hover:bg-blue-100/70 dark:border-blue-500/30 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors">
+              {presetName}
+            </button>
+          ))}
         </div>
       </div>
     </section>
@@ -103,10 +140,29 @@ export function WebAnalyticsControls({ token, projectId, days, initialFilters, g
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Conversion goals</p><p className="mt-1 text-sm text-neutral-500">Exact page paths or event names.</p></div>
         <form onSubmit={createGoal} className="flex flex-wrap gap-2">
-          <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Goal name" className="rounded border bg-transparent px-3 py-2 text-sm" />
-          <select value={goalType} onChange={(e) => setGoalType(e.target.value as 'page' | 'event')} className="rounded border bg-transparent px-3 py-2 text-sm"><option value="page">Page path</option><option value="event">Event</option></select>
-          <input required value={target} onChange={(e) => setTarget(e.target.value)} placeholder={goalType === 'page' ? '/checkout/success' : 'purchase'} className="rounded border bg-transparent px-3 py-2 text-sm" />
-          <button className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Add goal</button>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Goal name"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+          />
+          <select
+            value={goalType}
+            onChange={(e) => setGoalType(e.target.value as 'page' | 'event')}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="page" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">Page path</option>
+            <option value="event" className="bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100">Event</option>
+          </select>
+          <input
+            required
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            placeholder={goalType === 'page' ? '/checkout/success' : 'purchase'}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+          />
+          <button className="rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors">Add goal</button>
         </form>
       </div>
       {message && <p className="mt-2 text-sm text-red-500">{message}</p>}

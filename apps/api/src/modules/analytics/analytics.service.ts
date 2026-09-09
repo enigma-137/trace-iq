@@ -173,14 +173,14 @@ export interface RetentionResponse {
   cohorts: RetentionCohort[];
   averages: number[]; // size-weighted retention % per period (period 0 = 100)
   summary: { week1: number; week4: number };
-}
-
-export interface WebTotals {
+}export interface WebTotals {
   visitors: number;
   pageviews: number;
   sessions: number;
   avgSessionDuration: number;
   bounceRate: number;
+  bandwidthBytes: number;
+  onlineNow?: number;
 }
 
 export interface WebAnalyticsResponse {
@@ -193,7 +193,11 @@ export interface WebAnalyticsResponse {
   devices: Array<{ name: string; total: number }>;
   browsers: Array<{ name: string; total: number }>;
   operatingSystems: Array<{ name: string; total: number }>;
-  countries: Array<{ name: string; total: number }>;
+  countries: Array<{ name: string; total: number; percentage: number }>;
+  cities: Array<{ name: string; total: number; percentage: number }>;
+  topCountry: { name: string; total: number; percentage: number } | null;
+  peakTime: { window: string; total: number } | null;
+  trafficTiming: Array<{ rank: number; window: string; total: number; percentage: number }>;
   sources: Array<{ channel: string; visitors: number }>;
   referrers: Array<{ domain: string; visitors: number; views: number }>;
   campaigns: Array<{ campaign: string; source: string; medium: string; visitors: number; views: number }>;
@@ -964,7 +968,7 @@ export class AnalyticsService {
     const project = await this.projects.resolveActiveProject(user, params.projectId);
     const days = this.clampWebDays(params.days);
     const filters = parseFiltersParam(params.filters);
-    const emptyTotals: WebTotals = { visitors: 0, pageviews: 0, sessions: 0, avgSessionDuration: 0, bounceRate: 0 };
+    const emptyTotals: WebTotals = { visitors: 0, pageviews: 0, sessions: 0, avgSessionDuration: 0, bounceRate: 0, bandwidthBytes: 0, onlineNow: 0 };
 
     if (!project) {
       return {
@@ -978,6 +982,10 @@ export class AnalyticsService {
         browsers: [],
         operatingSystems: [],
         countries: [],
+        cities: [],
+        topCountry: null,
+        peakTime: null,
+        trafficTiming: [],
         sources: [],
         referrers: [],
         campaigns: [],
@@ -995,10 +1003,18 @@ export class AnalyticsService {
     const prevTo = from;
     const prevFrom = new Date(from.getTime() - days * DAY_MS);
 
-    const [current, previous] = await Promise.all([
+    const [current, previous, onlineNowQuery] = await Promise.all([
       this.computeWebTotals(project.id, from, to, filters),
-      this.computeWebTotals(project.id, prevFrom, prevTo, filters)
+      this.computeWebTotals(project.id, prevFrom, prevTo, filters),
+      this.database.query<{ total: number }>(
+        `SELECT count(DISTINCT session_id)::int AS total
+         FROM events
+         WHERE project_id = $1 AND occurred_at >= now() - interval '5 minutes' AND session_id IS NOT NULL`,
+        [project.id]
+      )
     ]);
+
+    current.onlineNow = onlineNowQuery.rows[0]?.total ?? 0;
 
     const trendQuery = this.webFilterQuery(project.id, from, to, filters);
     const trendRows = await this.database.query<{ bucket: string; total: number }>(
@@ -1063,6 +1079,38 @@ export class AnalyticsService {
       `,
       countriesQuery.values
     );
+
+    const citiesQuery = this.webFilterQuery(project.id, from, to, filters);
+    const cities = await this.database.query<{ name: string; total: number }>(
+      `
+        SELECT COALESCE(NULLIF(network_info->>'city', ''), 'unknown') AS name,
+          count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
+        FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${citiesQuery.clause}
+        GROUP BY 1 ORDER BY total DESC LIMIT 8
+      `,
+      citiesQuery.values
+    );
+
+    const totalCountryVisitors = countries.rows.reduce((sum, c) => sum + c.total, 0);
+    const countriesWithPct = countries.rows.map((c) => ({
+      name: c.name,
+      total: c.total,
+      percentage: totalCountryVisitors > 0 ? Math.round((c.total / totalCountryVisitors) * 1000) / 10 : 0
+    }));
+
+    const totalCityVisitors = cities.rows.reduce((sum, c) => sum + c.total, 0);
+    const citiesWithPct = cities.rows.map((c) => ({
+      name: c.name,
+      total: c.total,
+      percentage: totalCityVisitors > 0 ? Math.round((c.total / totalCityVisitors) * 1000) / 10 : 0
+    }));
+
+    const validCountry = countriesWithPct.find((c) => c.name.toLowerCase() !== 'unknown') ?? countriesWithPct[0];
+    const topCountry = validCountry && validCountry.total > 0 ? {
+      name: validCountry.name,
+      total: validCountry.total,
+      percentage: validCountry.percentage
+    } : null;
 
     const sourcesQuery = this.webFilterQuery(project.id, from, to, filters);
     const sources = await this.database.query<{ channel: string; visitors: number }>(
@@ -1133,6 +1181,32 @@ export class AnalyticsService {
         activeHours[row.dow][row.hour] = row.total;
       }
     }
+
+    const hourTotals = Array.from({ length: 24 }, (_, hour) => {
+      const matching = hourRows.rows.filter((r) => r.hour === hour);
+      const total = matching.reduce((sum, r) => sum + r.total, 0);
+      const nextHour = (hour + 1) % 24;
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return {
+        hour,
+        window: `${pad(hour)}:00—${pad(nextHour)}:00`,
+        total
+      };
+    });
+
+    const totalTrafficHours = hourTotals.reduce((sum, h) => sum + h.total, 0);
+    const sortedHours = [...hourTotals].sort((a, b) => b.total - a.total);
+    const trafficTiming = sortedHours.slice(0, 10).map((item, idx) => ({
+      rank: idx + 1,
+      window: item.window,
+      total: item.total,
+      percentage: totalTrafficHours > 0 ? Math.round((item.total / totalTrafficHours) * 1000) / 10 : 0
+    }));
+
+    const peakTime = sortedHours[0] && sortedHours[0].total > 0 ? {
+      window: sortedHours[0].window,
+      total: sortedHours[0].total
+    } : null;
 
     const frustrationQuery = this.webFilterQuery(project.id, from, to, filters);
     const frustratingPages = await this.database.query<{ path: string; errors: number; rageClicks: number; users: number }>(
@@ -1280,7 +1354,11 @@ export class AnalyticsService {
       devices: devices.rows,
       browsers: browsers.rows,
       operatingSystems: operatingSystems.rows,
-      countries: countries.rows,
+      countries: countriesWithPct,
+      cities: citiesWithPct,
+      topCountry,
+      peakTime,
+      trafficTiming,
       sources: sources.rows,
       referrers: referrers.rows,
       campaigns: campaigns.rows,
@@ -1323,10 +1401,11 @@ export class AnalyticsService {
       sessions: number;
       avg_duration: number;
       bounce_rate: number;
+      bandwidth_bytes: number;
     }>(
       `
         WITH ev AS (
-          SELECT COALESCE(user_id::text, anonymous_id) AS actor, session_id, event_name, occurred_at
+          SELECT COALESCE(user_id::text, anonymous_id) AS actor, session_id, event_name, occurred_at, properties
           FROM events WHERE project_id = $1 AND occurred_at >= $2 AND occurred_at < $3${query.clause}
         ),
         sess AS (
@@ -1340,7 +1419,8 @@ export class AnalyticsService {
           (SELECT count(*) FROM ev WHERE event_name = '$page')::int AS pageviews,
           (SELECT count(*) FROM sess)::int AS sessions,
           COALESCE((SELECT avg(duration) FROM sess), 0)::float AS avg_duration,
-          COALESCE((SELECT (count(*) FILTER (WHERE pageviews <= 1))::float / NULLIF(count(*), 0) FROM sess), 0)::float AS bounce_rate
+          COALESCE((SELECT (count(*) FILTER (WHERE pageviews <= 1))::float / NULLIF(count(*), 0) FROM sess), 0)::float AS bounce_rate,
+          COALESCE((SELECT sum(COALESCE(NULLIF(properties->>'bytes', '')::numeric, NULLIF(properties->>'response_size', '')::numeric, 142000)) FROM ev), 0)::bigint AS bandwidth_bytes
       `,
       query.values
     );
@@ -1351,7 +1431,8 @@ export class AnalyticsService {
       pageviews: row?.pageviews ?? 0,
       sessions: row?.sessions ?? 0,
       avgSessionDuration: Math.round(row?.avg_duration ?? 0),
-      bounceRate: row?.bounce_rate ?? 0
+      bounceRate: row?.bounce_rate ?? 0,
+      bandwidthBytes: Number(row?.bandwidth_bytes ?? 0)
     };
   }
 

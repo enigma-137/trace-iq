@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Activity, RefreshCw } from 'lucide-react';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { TrendChart } from '@/components/charts/TrendChart';
@@ -8,8 +9,9 @@ import { ActiveHoursHeatmap } from '@/components/charts/ActiveHoursHeatmap';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MiniBars } from '@/components/charts/MiniBars';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
+import { TopLocationsCard, getCountryFlag } from '@/components/charts/TopLocationsCard';
+import { TrafficTimingCard } from '@/components/charts/TrafficTimingCard';
 import { WebAnalyticsControls } from './WebAnalyticsControls';
-// import { GeographyGlobe } from '@/components/GeographyGlobe';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,8 @@ interface WebTotals {
   sessions: number;
   avgSessionDuration: number;
   bounceRate: number;
+  bandwidthBytes: number;
+  onlineNow?: number;
 }
 
 interface WebAnalyticsResponse {
@@ -31,7 +35,11 @@ interface WebAnalyticsResponse {
   devices: Array<{ name: string; total: number }>;
   browsers: Array<{ name: string; total: number }>;
   operatingSystems: Array<{ name: string; total: number }>;
-  countries: Array<{ name: string; total: number }>;
+  countries: Array<{ name: string; total: number; percentage: number }>;
+  cities: Array<{ name: string; total: number; percentage: number }>;
+  topCountry: { name: string; total: number; percentage: number } | null;
+  peakTime: { window: string; total: number } | null;
+  trafficTiming: Array<{ rank: number; window: string; total: number; percentage: number }>;
   sources: Array<{ channel: string; visitors: number }>;
   referrers: Array<{ domain: string; visitors: number; views: number }>;
   campaigns: Array<{ campaign: string; source: string; medium: string; visitors: number; views: number }>;
@@ -52,105 +60,33 @@ interface WebAnalyticsResponse {
 
 const RANGES = [
   { value: '1', label: '24h' },
+  { value: '2', label: '48h' },
+  { value: '3', label: '72h' },
   { value: '7', label: '7d' },
-  { value: '30', label: '30d' },
-  { value: '90', label: '90d' }
+  { value: '30', label: '30d' }
 ];
 
 const cardClass =
   'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
-const tableClass = 'mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+const tableClass =
+  'mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function buildWebNavigationFlowGraph(data?: WebAnalyticsResponse | null): { columns: ColumnGroup[]; connections: ConnectionFlow[] } {
-  const topPaths = data?.topPaths?.slice(0, 4) ?? [];
-  const sources = data?.sources?.slice(0, 3) ?? [];
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
 
-  const pathNodes = topPaths.length > 0
-    ? topPaths.map((p, idx) => ({
-        id: `p-${idx}`,
-        title: p.path,
-        description: `${p.views.toLocaleString()} views`,
-        countBadge: p.visitors.toLocaleString(),
-        status: (idx === 0 ? 'healthy' : idx === 1 ? 'info' : 'neutral') as any,
-        tags: ['route']
-      }))
-    : [
-        { id: 'p-0', title: '/', description: '4,520 views', countBadge: '2,890', status: 'healthy' as const, tags: ['landing'] },
-        { id: 'p-1', title: '/pricing', description: '1,840 views', countBadge: '1,210', status: 'healthy' as const, tags: ['pricing'] },
-        { id: 'p-2', title: '/docs', description: '1,120 views', countBadge: '780', status: 'info' as const, tags: ['docs'] },
-        { id: 'p-3', title: '/checkout', description: '640 views', countBadge: '430', status: 'warning' as const, tags: ['app'] }
-      ];
-
-  const sourceNodes = sources.length > 0
-    ? sources.map((s, idx) => ({
-        id: `src-${idx}`,
-        title: s.channel || 'Direct',
-        description: 'Traffic channel referrer',
-        countBadge: s.visitors.toLocaleString(),
-        status: 'healthy' as const,
-        tags: ['acquisition']
-      }))
-    : [
-        { id: 'src-0', title: 'Direct / None', description: 'Typed URL or bookmarks', countBadge: '42%', status: 'healthy' as const, tags: ['direct'] },
-        { id: 'src-1', title: 'Google Organic', description: 'Search engine discovery', countBadge: '35%', status: 'healthy' as const, tags: ['seo'] },
-        { id: 'src-2', title: 'GitHub / Social', description: 'Referrals & developer links', countBadge: '23%', status: 'info' as const, tags: ['referral'] }
-      ];
-
-  const columns: ColumnGroup[] = [
-    {
-      id: 'sources',
-      title: 'Traffic Sources',
-      subtitle: 'Inbound user channels',
-      nodes: sourceNodes
-    },
-    {
-      id: 'entry',
-      title: 'Entry Pages & Routes',
-      subtitle: 'First touch landing paths',
-      nodes: pathNodes
-    },
-    {
-      id: 'apps',
-      title: 'App Features & Actions',
-      subtitle: 'Interactive session behavior',
-      nodes: [
-        { id: 'app-signup', title: 'Account Registration', description: 'Sign up flow initiated', countBadge: '1,140', status: 'healthy', tags: ['auth'] },
-        { id: 'app-demo', title: 'Live Telemetry Demo', description: 'SDK demo playground', countBadge: '820', status: 'healthy', tags: ['interactive'] },
-        { id: 'app-api', title: 'API Key Generation', description: 'Developer console key creation', countBadge: '490', status: 'info', tags: ['dev'] }
-      ]
-    },
-    {
-      id: 'outcomes',
-      title: 'Outcomes & Drop-offs',
-      subtitle: 'Final session resolution',
-      nodes: [
-        { id: 'out-converted', title: 'Active Project Created', description: 'Conversion goal achieved', countBadge: '780', status: 'healthy', tags: ['conversion'] },
-        { id: 'out-retained', title: 'Subscribed to Alert Plan', description: 'Paid plan upgrade', countBadge: '240', status: 'healthy', tags: ['revenue'] },
-        { id: 'out-frustration', title: 'Console Error / Rageclick', description: 'Frustrating user friction', countBadge: '48', status: 'critical', tags: ['drop-off'] }
-      ]
-    }
-  ];
-
-  const connections: ConnectionFlow[] = [
-    { fromId: sourceNodes[0]?.id || 'src-0', toId: pathNodes[0]?.id || 'p-0', status: 'healthy' },
-    { fromId: sourceNodes[1]?.id || 'src-1', toId: pathNodes[0]?.id || 'p-0', status: 'healthy' },
-    { fromId: sourceNodes[2]?.id || 'src-2', toId: pathNodes[2]?.id || 'p-2', status: 'info' },
-
-    { fromId: pathNodes[0]?.id || 'p-0', toId: 'app-signup', status: 'healthy' },
-    { fromId: pathNodes[0]?.id || 'p-0', toId: 'app-demo', status: 'healthy' },
-    { fromId: pathNodes[1]?.id || 'p-1', toId: 'app-signup', status: 'healthy' },
-    { fromId: pathNodes[2]?.id || 'p-2', toId: 'app-api', status: 'info' },
-
-    { fromId: 'app-signup', toId: 'out-converted', status: 'healthy' },
-    { fromId: 'app-demo', toId: 'out-retained', status: 'healthy' },
-    { fromId: 'app-api', toId: 'out-frustration', status: 'critical' }
-  ];
-
-  return { columns, connections };
+function formatCompact(val: number): string {
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}k`;
+  return val.toLocaleString();
 }
 
 function formatVital(metric: string, value: number): string {
@@ -159,7 +95,11 @@ function formatVital(metric: string, value: number): string {
 
 function vitalRating(metric: string, value: number): 'good' | 'needs-improvement' | 'poor' {
   const thresholds: Record<string, [number, number]> = {
-    CLS: [0.1, 0.25], INP: [200, 500], LCP: [2500, 4000], FCP: [1800, 3000], TTFB: [800, 1800]
+    CLS: [0.1, 0.25],
+    INP: [200, 500],
+    LCP: [2500, 4000],
+    FCP: [1800, 3000],
+    TTFB: [800, 1800]
   };
   const [good, poor] = thresholds[metric] ?? [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
   return value <= good ? 'good' : value <= poor ? 'needs-improvement' : 'poor';
@@ -223,21 +163,48 @@ export default async function WebAnalyticsPage({
 
   return (
     <DashboardShell active="web" title="Web analytics" userEmail={user.email} projectId={canonicalProjectId}>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-neutral-500 dark:text-slate-300">
-          {data?.project ? data.project.name : 'No project yet'}
-        </p>
-        <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-          {RANGES.map((range) => (
-            <Link
-              key={range.value}
-              href={withProjectId(`/dashboard/web?days=${range.value}`, canonicalProjectId)}
-              className={`rounded px-3 py-1.5 text-sm font-semibold transition ${days === range.value ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
+      {/* Header Bar with Title, Subtitle, Range Buttons and Refresh */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 pb-4 dark:border-slate-800/80">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-2xl">
+              Web Analytics
+            </h1>
+            <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300">
+              {data?.project ? data.project.name : 'Active Project'}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400 sm:text-sm">
+            Requests, visitors, bandwidth, latency, routes, and response activity.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Time Range Pills */}
+          <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white p-1 shadow-xs dark:border-slate-800 dark:bg-slate-950">
+            {RANGES.map((range) => (
+              <Link
+                key={range.value}
+                href={withProjectId(`/dashboard/web?days=${range.value}`, canonicalProjectId)}
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition sm:px-3 sm:py-1.5 sm:text-sm ${
+                  days === range.value
+                    ? 'bg-purple-600 text-white shadow-xs dark:bg-purple-600 dark:text-white'
+                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
                 }`}
-            >
-              {range.label}
-            </Link>
-          ))}
+              >
+                {range.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Refresh Link/Button */}
+          <Link
+            href={withProjectId(`/dashboard/web?days=${days}`, canonicalProjectId)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-xs transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:text-sm"
+          >
+            <RefreshCw className="h-3.5 w-3.5 text-purple-500" />
+            <span>Refresh</span>
+          </Link>
         </div>
       </div>
 
@@ -247,6 +214,131 @@ export default async function WebAnalyticsPage({
         </section>
       ) : null}
 
+      {/* Top 5 Headline KPI Cards matching reference dashboard */}
+      <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Web metrics headline">
+        {/* Card 1: Visitors */}
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+            Visitors
+          </p>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
+              {formatCompact(cur?.visitors ?? 0)}
+            </p>
+            <span className="rounded-full border border-blue-500/15 bg-blue-500/5 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+              {cur?.pageviews?.toLocaleString()} views
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+            Unique visitors in the last {days === '1' ? '24h' : `${days}d`}
+          </p>
+          <div className="mt-3">
+            <Sparkline points={trendValues.map((total) => ({ total }))} tone="blue" filled className="h-9 w-full" />
+          </div>
+        </div>
+
+        {/* Card 2: Online now */}
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+              Online now
+            </p>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
+              {cur?.onlineNow ?? 0}
+            </p>
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+              Live
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+            Unique sessions in the last 5 minutes
+          </p>
+          <div className="mt-3">
+            <MiniBars values={trendValues.slice(-10)} tone="green" />
+          </div>
+        </div>
+
+        {/* Card 3: Bandwidth */}
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+            Bandwidth
+          </p>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
+              {formatBytes(cur?.bandwidthBytes ?? 0)}
+            </p>
+            <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+              Payloads
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+            Estimated bytes sent and received
+          </p>
+          <div className="mt-3">
+            <MiniBars values={trendValues.slice(-10)} tone="blue" />
+          </div>
+        </div>
+
+        {/* Card 4: Top Country */}
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+            Top Country
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-2xl leading-none">
+              {data?.topCountry ? getCountryFlag(data.topCountry.name) : '🌐'}
+            </span>
+            <p className="truncate text-xl font-bold capitalize tracking-tight text-neutral-900 dark:text-white">
+              {data?.topCountry?.name ?? 'Global'}
+            </p>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+            {data?.topCountry ? `${data.topCountry.percentage.toFixed(1)}% of located traffic` : 'Location data analyzing'}
+          </p>
+          <div className="mt-3">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
+                style={{ width: `${Math.max(10, data?.topCountry?.percentage ?? 10)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 5: Peak Time */}
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+            Peak Time
+          </p>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <p className="font-mono text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
+              {data?.peakTime?.window ?? '11:00—12:00'}
+            </p>
+            <span className="rounded-full border border-pink-500/20 bg-pink-500/10 px-2 py-0.5 text-[10px] font-bold text-pink-700 dark:text-pink-300">
+              UTC
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+            Busiest activity window ({data?.peakTime?.total ?? 0} events)
+          </p>
+          <div className="mt-3">
+            <Sparkline points={trendValues.map((total) => ({ total }))} tone="red" filled className="h-9 w-full" />
+          </div>
+        </div>
+      </section>
+
+      {/* Top Locations & Traffic Timing side-by-side section */}
+      <section className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <TopLocationsCard countries={data?.countries ?? []} cities={data?.cities ?? []} />
+        <TrafficTimingCard timing={data?.trafficTiming ?? []} />
+      </section>
+
       <WebAnalyticsControls
         token={token ?? ''}
         projectId={canonicalProjectId}
@@ -255,37 +347,15 @@ export default async function WebAnalyticsPage({
         goals={data?.goals ?? []}
       />
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <StatWithDelta label="Visitors" value={cur?.visitors ?? 0} prev={prev?.visitors ?? 0} values={trendValues} />
-        <StatWithDelta label="Page views" value={cur?.pageviews ?? 0} prev={prev?.pageviews ?? 0} values={trendValues} chart="bars" />
-        <StatWithDelta label="Sessions" value={cur?.sessions ?? 0} prev={prev?.sessions ?? 0} values={trendValues.slice(-12)} tone="green" />
-        <StatWithDelta
-          label="Session duration"
-          value={cur?.avgSessionDuration ?? 0}
-          prev={prev?.avgSessionDuration ?? 0}
-          values={trendValues.slice(-12)}
-          format="duration"
-          tone="blue"
-          chart="bars"
-        />
-        <StatWithDelta
-          label="Bounce rate"
-          value={cur?.bounceRate ?? 0}
-          prev={prev?.bounceRate ?? 0}
-          values={trendValues.slice(-12)}
-          format="percent"
-          lowerIsBetter
-          tone="red"
-        />
-      </section>
-
+      {/* Unique visitors trend card */}
       <section className={`${cardClass} mb-5`}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_76%_16%,rgba(59,130,246,0.08),transparent_36%)] dark:bg-[radial-gradient(circle_at_76%_16%,rgba(59,130,246,0.16),transparent_36%)]" />
         <div className="relative mb-4 flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Unique visitors
-          </p>
-          <span className="rounded-full border border-blue-500/10 bg-blue-500/5 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+          <div>
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Unique visitors trend</h3>
+            <p className="text-xs text-neutral-500 dark:text-slate-400">Daily unique visitors over selected window</p>
+          </div>
+          <span className="rounded-full border border-blue-500/10 bg-blue-500/5 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
             Last {days === '1' ? '24h' : `${days}d`}
           </span>
         </div>
@@ -298,10 +368,12 @@ export default async function WebAnalyticsPage({
         </div>
       </section>
 
+      {/* Top paths table */}
       <section className={tableClass}>
-        <p className="border-b border-neutral-200 dark:border-slate-800 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-          Top paths
-        </p>
+        <div className="border-b border-neutral-200 px-5 py-3 dark:border-slate-800">
+          <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Top paths</h3>
+          <p className="text-xs text-neutral-500 dark:text-slate-400">Most visited routes by pageviews and visitors</p>
+        </div>
         {(data?.topPaths ?? []).length === 0 ? (
           <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No page views captured yet.</p>
         ) : (
@@ -322,6 +394,7 @@ export default async function WebAnalyticsPage({
         )}
       </section>
 
+      {/* Breakdown cards */}
       <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <Card title="Sources by channel">
           <RankedList items={(data?.sources ?? []).map((s) => ({ label: s.channel, total: s.visitors }))} emptyLabel="No sources yet." />
@@ -343,25 +416,15 @@ export default async function WebAnalyticsPage({
         <Card title="Operating systems">
           <RankedList items={(data?.operatingSystems ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No OS data yet." />
         </Card>
-        <Card title="Geography">
-          <div className="grid gap-4]">
-            {/* <div className="h-[360px] w-full">
-              <GeographyGlobe
-                data={(data?.countries ?? []).map((c) => ({ name: c.name, total: c.total }))}
-                metric="visitors"
-                
-              />
-            </div> */}
-            <div>
-              <RankedList
-                items={(data?.countries ?? []).map((c) => ({ label: c.name, total: c.total }))}
-                emptyLabel="No location data yet."
-              />
-            </div>
-          </div>
+        <Card title="Frustrating pages">
+          <RankedList
+            items={(data?.frustratingPages ?? []).map((item) => ({ label: item.path, total: item.errors + item.rageClicks }))}
+            emptyLabel="No frustration signals yet."
+          />
         </Card>
       </section>
 
+      {/* Session Flow Transition Graph */}
       {sessionGraph.connections.length > 0 ? (
         <section className="mb-6">
           <SvgNodeFlowGraph
@@ -372,71 +435,96 @@ export default async function WebAnalyticsPage({
             legends={[{ label: 'Observed transition', status: 'info', color: '#3b82f6', description: 'Consecutive page views recorded in the same session' }]}
           />
         </section>
-      ) : (
-        <section className={`${cardClass} mb-6`}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400">Session navigation paths</p>
-          <p className="mt-2 text-sm text-neutral-500">No multi-page session transitions were captured in this period.</p>
-        </section>
-      )}
+      ) : null}
 
+      {/* Web Vitals Section */}
       <section className="mb-5">
         <div className="mb-3 flex items-end justify-between gap-3">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400">Web Vitals</p><p className="mt-1 text-sm text-neutral-500">75th percentile field measurements from real visits.</p></div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400">Web Vitals</p>
+            <p className="mt-1 text-sm text-neutral-500">75th percentile field measurements from real visits.</p>
+          </div>
         </div>
-        {(data?.webVitals.metrics ?? []).length === 0 ? <div className={cardClass}><p className="text-sm text-neutral-500">No Web Vitals captured yet. Measurements appear after visitors load a page with the updated browser SDK.</p></div> : <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{data?.webVitals.metrics.map((vital) => {
-            const rating = vitalRating(vital.metric, vital.p75);
-            const tone = rating === 'good' ? 'text-emerald-600 dark:text-emerald-300' : rating === 'poor' ? 'text-red-600 dark:text-red-300' : 'text-amber-600 dark:text-amber-300';
-            return <div key={vital.metric} className={cardClass}><div className="flex items-center justify-between"><p className="font-mono text-xs font-semibold">{vital.metric}</p><span className={`text-[10px] font-semibold uppercase ${tone}`}>{rating.replace('-', ' ')}</span></div><p className={`mt-3 text-2xl font-semibold tabular-nums ${tone}`}>{formatVital(vital.metric, vital.p75)}</p><p className="mt-1 text-xs text-neutral-500">p75 · {vital.count.toLocaleString()} samples</p><div className="mt-3 flex gap-2 text-[10px] tabular-nums"><span className="text-emerald-600">{vital.good} good</span><span className="text-amber-600">{vital.needsImprovement} improve</span><span className="text-red-600">{vital.poor} poor</span></div></div>;
-          })}</div>
-          <div className={`${tableClass} mt-3`}><p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">Vitals by page</p><div className="divide-y divide-neutral-200 dark:divide-slate-800">{data?.webVitals.pages.map((page) => <div key={`${page.path}:${page.metric}`} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_90px_120px_100px]"><span className="truncate font-mono text-sm">{page.path}</span><span className="text-sm font-semibold">{page.metric}</span><span className="text-right text-sm tabular-nums">{formatVital(page.metric, page.p75)}</span><span className="text-right text-sm text-red-600">{page.poor} poor</span></div>)}</div></div>
-        </>}
+        {(data?.webVitals.metrics ?? []).length === 0 ? (
+          <div className={cardClass}>
+            <p className="text-sm text-neutral-500">
+              No Web Vitals captured yet. Measurements appear after visitors load a page with the updated browser SDK.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {data?.webVitals.metrics.map((vital) => {
+                const rating = vitalRating(vital.metric, vital.p75);
+                const tone =
+                  rating === 'good'
+                    ? 'text-emerald-600 dark:text-emerald-300'
+                    : rating === 'poor'
+                      ? 'text-red-600 dark:text-red-300'
+                      : 'text-amber-600 dark:text-amber-300';
+                return (
+                  <div key={vital.metric} className={cardClass}>
+                    <div className="flex items-center justify-between">
+                      <p className="font-mono text-xs font-semibold">{vital.metric}</p>
+                      <span className={`text-[10px] font-semibold uppercase ${tone}`}>{rating.replace('-', ' ')}</span>
+                    </div>
+                    <p className={`mt-3 text-2xl font-semibold tabular-nums ${tone}`}>{formatVital(vital.metric, vital.p75)}</p>
+                    <p className="mt-1 text-xs text-neutral-500">p75 · {vital.count.toLocaleString()} samples</p>
+                    <div className="mt-3 flex gap-2 text-[10px] tabular-nums">
+                      <span className="text-emerald-600">{vital.good} good</span>
+                      <span className="text-amber-600">{vital.needsImprovement} improve</span>
+                      <span className="text-red-600">{vital.poor} poor</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={`${tableClass} mt-3`}>
+              <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">
+                Vitals by page
+              </p>
+              <div className="divide-y divide-neutral-200 dark:divide-slate-800">
+                {data?.webVitals.pages.map((page) => (
+                  <div key={`${page.path}:${page.metric}`} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_90px_120px_100px]">
+                    <span className="truncate font-mono text-sm">{page.path}</span>
+                    <span className="text-sm font-semibold">{page.metric}</span>
+                    <span className="text-right text-sm tabular-nums">{formatVital(page.metric, page.p75)}</span>
+                    <span className="text-right text-sm text-red-600">{page.poor} poor</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
+      {/* UTM Campaigns Table */}
       <section className={tableClass}>
-        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">UTM campaigns</p>
-        {(data?.campaigns ?? []).length === 0 ? <p className="p-5 text-sm text-neutral-500">No tagged campaigns captured yet.</p> :
-          <div className="divide-y divide-neutral-200 dark:divide-slate-800">{data?.campaigns.map((campaign) => <div key={`${campaign.campaign}:${campaign.source}:${campaign.medium}`} className="grid gap-1 px-5 py-3 sm:grid-cols-[1fr_1fr_100px_100px]">
-            <span className="font-semibold">{campaign.campaign}</span><span className="text-sm text-neutral-500">{campaign.source} / {campaign.medium}</span><span className="text-right text-sm tabular-nums">{campaign.visitors} visitors</span><span className="text-right text-sm tabular-nums">{campaign.views} views</span>
-          </div>)}</div>}
+        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">
+          UTM campaigns
+        </p>
+        {(data?.campaigns ?? []).length === 0 ? (
+          <p className="p-5 text-sm text-neutral-500">No tagged campaigns captured yet.</p>
+        ) : (
+          <div className="divide-y divide-neutral-200 dark:divide-slate-800">
+            {data?.campaigns.map((campaign) => (
+              <div key={`${campaign.campaign}:${campaign.source}:${campaign.medium}`} className="grid gap-1 px-5 py-3 sm:grid-cols-[1fr_1fr_100px_100px]">
+                <span className="font-semibold">{campaign.campaign}</span>
+                <span className="text-sm text-neutral-500">{campaign.source} / {campaign.medium}</span>
+                <span className="text-right text-sm tabular-nums">{campaign.visitors} visitors</span>
+                <span className="text-right text-sm tabular-nums">{campaign.views} views</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
+      {/* Active hours heatmap */}
       <section className={`${cardClass} mb-5`}>
         <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
           Active hours (unique visitors, UTC)
         </p>
         <ActiveHoursHeatmap matrix={data?.activeHours ?? Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))} />
-      </section>
-
-      <section className={tableClass}>
-        <div className="border-b border-neutral-200 dark:border-slate-800 px-5 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Frustrating pages
-          </p>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-500">
-            Pages generating errors and rage clicks. Dead-click detection is not captured yet.
-          </p>
-        </div>
-        {(data?.frustratingPages ?? []).length === 0 ? (
-          <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No frustration signals captured yet.</p>
-        ) : (
-          <div className="divide-y divide-neutral-200 dark:divide-slate-800">
-            <div className="hidden grid-cols-[1fr_110px_90px_90px] gap-4 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-500 sm:grid">
-              <span>Path</span>
-              <span className="text-right">Rage clicks</span>
-              <span className="text-right">Errors</span>
-              <span className="text-right">Users</span>
-            </div>
-            {(data?.frustratingPages ?? []).map((p) => (
-              <div key={p.path} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_110px_90px_90px] sm:gap-4">
-                <span className="truncate font-mono text-sm text-neutral-900 dark:text-slate-100">{p.path}</span>
-                <span className="text-sm tabular-nums text-red-600 dark:text-red-300 sm:text-right">{p.rageClicks.toLocaleString()}</span>
-                <span className="text-sm tabular-nums text-red-700 dark:text-red-200 sm:text-right">{p.errors.toLocaleString()}</span>
-                <span className="text-sm tabular-nums text-neutral-500 dark:text-slate-400 sm:text-right">{p.users.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
     </DashboardShell>
   );
@@ -449,76 +537,6 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       {children}
     </div>
   );
-}
-
-function StatWithDelta({
-  label,
-  value,
-  prev,
-  values,
-  format = 'number',
-  lowerIsBetter = false,
-  tone = 'blue',
-  chart = 'line'
-}: {
-  label: string;
-  value: number;
-  prev: number;
-  values: number[];
-  format?: 'number' | 'duration' | 'percent';
-  lowerIsBetter?: boolean;
-  tone?: 'blue' | 'green' | 'red';
-  chart?: 'line' | 'bars';
-}) {
-  const delta = prev > 0 ? ((value - prev) / prev) * 100 : value > 0 ? 100 : 0;
-  const up = delta > 0;
-  const flat = Math.abs(delta) < 0.05;
-  const good = flat || (lowerIsBetter ? !up : up);
-  const deltaTone = flat ? 'blue' : good ? 'green' : 'red';
-
-  return (
-    <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="pointer-events-none absolute inset-0 " />
-      {/* Shine shine, incase you want to add it back  bg-[radial-gradient(circle_at_18%_0%,rgba(59,130,246,0.08),transparent_34%)] dark:bg-[radial-gradient(circle_at_18%_0%,rgba(59,130,246,0.12),transparent_34%)] */}
-      <div className="relative">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">{label}</p>
-        <div className="mt-2 flex items-baseline justify-between gap-3">
-          <p className="text-2xl font-semibold tabular-nums tracking-tight text-neutral-900 dark:text-white">{formatValue(value, format)}</p>
-          <span
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums ${deltaTone === 'green'
-              ? 'border-emerald-400/15 text-emerald-700 dark:text-emerald-300'
-              : deltaTone === 'red'
-                ? 'border-red-400/15 text-red-600 dark:text-red-300'
-                : 'border-blue-500/10 text-blue-700 dark:text-blue-300'
-              }`}
-          >
-            {flat ? 'flat' : `${up ? '+' : '-'}${Math.abs(delta).toFixed(1)}%`}
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-neutral-500 dark:text-slate-500">vs prior</p>
-        <div className="mt-3">
-          {chart === 'bars' ? (
-            <MiniBars values={values} tone={tone} />
-          ) : (
-            <Sparkline points={values.map((total) => ({ total }))} tone={tone} filled className="h-11 w-full" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatValue(value: number, format: 'number' | 'duration' | 'percent'): string {
-  if (format === 'percent') {
-    return `${(value * 100).toFixed(1)}%`;
-  }
-  if (format === 'duration') {
-    const total = Math.round(value);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  }
-  return value.toLocaleString();
 }
 
 function withProjectId(href: string, projectId?: string | null): string {
