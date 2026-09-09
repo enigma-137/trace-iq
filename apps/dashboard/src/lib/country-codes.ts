@@ -455,3 +455,51 @@ export function countryName(code: string): string {
   }
   return code;
 }
+
+const COMMON_COUNTRY_FLAGS: Record<string, string> = {
+  nigeria: '🇳🇬',
+  'united states': '🇺🇸',
+  usa: '🇺🇸',
+  ghana: '🇬🇭',
+  india: '🇮🇳',
+  brazil: '🇧🇷',
+  'united kingdom': '🇬🇧',
+  uk: '🇬🇧',
+  canada: '🇨🇦',
+  germany: '🇩🇪',
+  france: '🇫🇷',
+  kenya: '🇰🇪',
+  'south africa': '🇿🇦',
+  australia: '🇦🇺',
+  netherlands: '🇳🇱',
+  singapore: '🇸🇬',
+  japan: '🇯🇵',
+  china: '🇨🇳'
+};
+
+export function getCountryFlag(name?: string | null): string {
+  if (!name) return '🌐';
+  const clean = name.trim().toLowerCase();
+  if (COMMON_COUNTRY_FLAGS[clean]) return COMMON_COUNTRY_FLAGS[clean];
+
+  if (clean.length === 2 && /^[a-z]{2}$/.test(clean)) {
+    const codePoints = clean
+      .toUpperCase()
+      .split('')
+      .map((char) => 127397 + char.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+  }
+
+  for (const [code, cName] of Object.entries(ALPHA2_TO_NAME)) {
+    if (cName.toLowerCase() === clean) {
+      const codePoints = code
+        .toUpperCase()
+        .split('')
+        .map((char) => 127397 + char.charCodeAt(0));
+      return String.fromCodePoint(...codePoints);
+    }
+  }
+
+  return '🌐';
+}
+

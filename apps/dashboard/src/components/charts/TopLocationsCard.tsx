@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { getCountryFlag } from '@/lib/country-codes';
 
 export interface LocationItem {
   name: string;
@@ -14,41 +15,7 @@ interface TopLocationsCardProps {
   className?: string;
 }
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  nigeria: '🇳🇬',
-  'united states': '🇺🇸',
-  usa: '🇺🇸',
-  ghana: '🇬🇭',
-  india: '🇮🇳',
-  brazil: '🇧🇷',
-  'united kingdom': '🇬🇧',
-  uk: '🇬🇧',
-  canada: '🇨🇦',
-  germany: '🇩🇪',
-  france: '🇫🇷',
-  kenya: '🇰🇪',
-  'south africa': '🇿🇦',
-  australia: '🇦🇺',
-  netherlands: '🇳🇱',
-  singapore: '🇸🇬',
-  japan: '🇯🇵',
-  china: '🇨🇳'
-};
-
-export function getCountryFlag(name: string): string {
-  if (!name) return '🌐';
-  const clean = name.trim().toLowerCase();
-  if (COUNTRY_FLAGS[clean]) return COUNTRY_FLAGS[clean];
-  // Check if it's a 2-letter ISO code
-  if (clean.length === 2 && /^[a-z]{2}$/.test(clean)) {
-    const codePoints = clean
-      .toUpperCase()
-      .split('')
-      .map((char) => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
-  }
-  return '🌐';
-}
+export { getCountryFlag };
 
 function formatVolume(val: number): string {
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;

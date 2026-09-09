@@ -9,8 +9,9 @@ import { ActiveHoursHeatmap } from '@/components/charts/ActiveHoursHeatmap';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MiniBars } from '@/components/charts/MiniBars';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
-import { TopLocationsCard, getCountryFlag } from '@/components/charts/TopLocationsCard';
+import { TopLocationsCard } from '@/components/charts/TopLocationsCard';
 import { TrafficTimingCard } from '@/components/charts/TrafficTimingCard';
+import { getCountryFlag } from '@/lib/country-codes';
 import { WebAnalyticsControls } from './WebAnalyticsControls';
 
 export const dynamic = 'force-dynamic';
@@ -167,9 +168,9 @@ export default async function WebAnalyticsPage({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 pb-4 dark:border-slate-800/80">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-2xl">
+            {/* <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-2xl">
               Web Analytics
-            </h1>
+            </h1> */}
             <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300">
               {data?.project ? data.project.name : 'Active Project'}
             </span>
@@ -186,11 +187,10 @@ export default async function WebAnalyticsPage({
               <Link
                 key={range.value}
                 href={withProjectId(`/dashboard/web?days=${range.value}`, canonicalProjectId)}
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition sm:px-3 sm:py-1.5 sm:text-sm ${
-                  days === range.value
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition sm:px-3 sm:py-1.5 sm:text-sm ${days === range.value
                     ? 'bg-purple-600 text-white shadow-xs dark:bg-purple-600 dark:text-white'
                     : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 {range.label}
               </Link>
