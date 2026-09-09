@@ -5,10 +5,11 @@ import { useState } from 'react';
 interface DonutItem {
   label: string;
   value: number;
+  color?: string;
 }
 
 interface DonutChartProps {
-  items: Array<{ label: string; value: number }>;
+  items: Array<{ label: string; value: number; color?: string }>;
   size?: number;
   thickness?: number;
   centerLabel?: string;
@@ -60,7 +61,7 @@ export function DonutChart({
       dash,
       offset,
       pct,
-      color: PALETTE[i % PALETTE.length]
+      color: item.color ?? PALETTE[i % PALETTE.length]
     };
     offset += dash;
     return segment;

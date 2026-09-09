@@ -18,6 +18,7 @@ import GlobeHero from '@/components/globe-hero';
 import { LandingApiFlow } from '@/components/LandingApiFlow';
 import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
+import { TrustedTeamsSection } from '@/components/TrustedTeams';
 
 const navItems = [
   { label: 'Resources', href: '/docs' },
@@ -159,6 +160,9 @@ export default function Page() {
           <GlobeHero />
         </div>
       </section>
+
+      {/* Trusted by teams */}
+      <TrustedTeamsSection />
 
       {/* Metrics */}
       <section className="metrics mx-auto grid max-w-[1060px] grid-cols-1 border-y border-border px-5 py-6 sm:grid-cols-3 sm:px-0 sm:py-7" aria-label="TraceIQ deployment properties">

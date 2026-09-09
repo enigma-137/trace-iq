@@ -1051,6 +1051,48 @@ input {
   height: 100%;
 }
 
+/* ---------------------------------------------------------------- Trusted by teams ---------------------------------------------------------------- */
+.traceiq-site .trusted-section {
+  border-color: var(--traceiq-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.005) 100%);
+}
+
+.traceiq-site .trusted-label {
+  color: var(--traceiq-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.traceiq-site .trusted-partner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--traceiq-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.traceiq-site .trusted-partner:hover {
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.traceiq-site .trusted-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--traceiq-soft);
+  transition: color 180ms ease;
+}
+
+.traceiq-site .trusted-partner:hover .trusted-logo {
+  color: #ffffff;
+}
+
 /* ---------------------------------------------------------------- Metrics ---------------------------------------------------------------- */
 .traceiq-site .metrics {
   border-color: var(--traceiq-line);
@@ -1355,7 +1397,7 @@ input {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .traceiq-site .landing-overview-main {

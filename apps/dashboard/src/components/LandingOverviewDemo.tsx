@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { DonutChart } from '@/components/charts/DonutChart';
 import { OverviewTabbedChart, type TabbedChartPoint } from '@/components/charts/OverviewTabbedChart';
 import { PaceStatTile } from '@/components/charts/PaceStatTile';
 import { TopEventsList } from '@/components/charts/TopEventsList';
@@ -31,6 +32,24 @@ const TOP_EVENTS = [
   { eventName: '$identify', total: 216 }
 ];
 
+const DEVICES = [
+  { label: 'Windows', value: 2780, color: '#3b82f6' },
+  { label: 'Android', value: 1450, color: '#6366f1' },
+  { label: 'Linux', value: 880, color: '#06b6d4' },
+  { label: 'macOS', value: 630, color: '#10b981' },
+  { label: 'unknown', value: 380, color: '#f59e0b' },
+  { label: 'iOS', value: 180, color: '#ec4899' }
+];
+
+const REFERRERS = [
+  { label: 'Direct / None', value: 2450, color: '#3b82f6' },
+  { label: 'Google Search', value: 1760, color: '#10b981' },
+  { label: 'GitHub', value: 1010, color: '#8b5cf6' },
+  { label: 'Twitter / X', value: 570, color: '#06b6d4' },
+  { label: 'LinkedIn', value: 320, color: '#f59e0b' },
+  { label: 'Product Hunt', value: 190, color: '#ec4899' }
+];
+
 const ACTIVITY = [
   { id: 'activity-1', name: 'Page exited', path: '/dashboard', age: 'now' },
   { id: 'activity-2', name: 'API request', path: '/v1/dashboard/overview', age: '12s' },
@@ -39,19 +58,10 @@ const ACTIVITY = [
   { id: 'activity-5', name: 'Identify', path: '/dashboard', age: '2m' }
 ];
 
-const STORY_FACTS = [
-  { label: 'Today', value: '393', detail: '393 events have arrived in the current reporting day.' },
-  { label: 'Delta', value: '+101%', detail: 'Activity is 101% higher than the previous comparable period.' },
-  { label: 'Users today', value: '17', detail: '17 unique people have been active today.' },
-  { label: 'Top event', value: '$api_request', detail: 'API requests are the most frequent event in this sample.' },
-  { label: 'Active now', value: '1', detail: 'One visitor is active in the last 15 minutes.' }
-];
-
 export function LandingOverviewDemo() {
   const [paused, setPaused] = useState(false);
   const [activityOffset, setActivityOffset] = useState(0);
   const [selectedActivity, setSelectedActivity] = useState(ACTIVITY[0].id);
-  const [activeFact, setActiveFact] = useState(0);
 
   useEffect(() => {
     if (paused) return;
@@ -68,40 +78,7 @@ export function LandingOverviewDemo() {
 
   return (
     <div className="landing-overview-demo dark">
-      <div className="landing-overview-titlebar">
-        <div>
-
-          {/* <strong>Overview</strong> */}
-        </div>
-      </div>
-
-      <section className="landing-overview-story" aria-label="Sample activity summary">
-        <div className="landing-overview-facts" onMouseLeave={() => setActiveFact(0)}>
-          {STORY_FACTS.map((fact, index) => (
-            <button
-              type="button"
-              key={fact.label}
-              className={index === activeFact ? 'is-active' : ''}
-              onMouseEnter={() => setActiveFact(index)}
-              onFocus={() => setActiveFact(index)}
-              aria-describedby="landing-overview-fact-detail"
-            >
-              <span>{fact.label}</span> {fact.value}
-            </button>
-          ))}
-        </div>
-        <p id="landing-overview-fact-detail" className="landing-overview-fact-detail" aria-live="polite">
-       <span className="landing-overview-live-dot" />   {STORY_FACTS[activeFact].detail}
-        </p>
-      </section>
-
-      {/* <section className="landing-overview-availability" aria-label="Ingestion status">
-        <div><span className="landing-overview-live-dot" /><p><small>Ingestion</small><strong>Healthy</strong></p></div>
-        <p><small>Last event</small><strong>moments ago</strong></p>
-        <p><small>Last hour</small><strong>80</strong></p>
-        <p><small>Last 24 hours</small><strong>390</strong></p>
-      </section> */}
-
+      {/* Starting directly with Total Event cards (KPI section) */}
       <section className="landing-overview-kpis" aria-label="Sample product metrics">
         <PaceStatTile title="Total Events" value={3990} badge="+20%" badgeTone="green" badgeIcon="up" description="390 last 24h" />
         <PaceStatTile title="P95 Latency" value="8354.5ms" badge="-32ms" badgeTone="green" badgeIcon="down" description="Avg 8979.3ms" />
@@ -110,7 +87,46 @@ export function LandingOverviewDemo() {
       </section>
 
       <section className="landing-overview-main">
-        <OverviewTabbedChart data={TREND_POINTS} className="landing-overview-trend" />
+        <div className="landing-overview-left flex flex-col gap-3">
+          <OverviewTabbedChart data={TREND_POINTS} className="landing-overview-trend" />
+
+          {/* Two Pie/Donut Charts: Devices & Referrers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <section className="landing-overview-card">
+              <div className="landing-overview-card-header">
+                <strong>Devices (30 days)</strong>
+                <span>6.3k events</span>
+              </div>
+              <div className="pt-2">
+                <DonutChart
+                  items={DEVICES}
+                  size={120}
+                  thickness={18}
+                  centerValue="6.3K"
+                  centerLabel="EVENTS"
+                  className="justify-between"
+                />
+              </div>
+            </section>
+
+            <section className="landing-overview-card">
+              <div className="landing-overview-card-header">
+                <strong>Referrers (30 days)</strong>
+                <span>6.3k events</span>
+              </div>
+              <div className="pt-2">
+                <DonutChart
+                  items={REFERRERS}
+                  size={120}
+                  thickness={18}
+                  centerValue="6.3K"
+                  centerLabel="EVENTS"
+                  className="justify-between"
+                />
+              </div>
+            </section>
+          </div>
+        </div>
 
         <div className="landing-overview-side">
           <section className="landing-overview-card landing-overview-activity">
