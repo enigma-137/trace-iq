@@ -91,9 +91,9 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
                       </span>
                     </div>
                     {/* Visual Progress Bar */}
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800/80">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500 ease-out group-hover:from-purple-400 group-hover:to-pink-400"
+                        className="h-full rounded-full bg-blue-600 dark:bg-blue-500 transition-all duration-500 ease-out"
                         style={{ width: `${relativePct}%` }}
                       />
                     </div>
@@ -126,9 +126,9 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
                       </span>
                     </div>
                     {/* Visual Progress Bar */}
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800/80">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500 ease-out group-hover:from-indigo-400 group-hover:to-purple-400"
+                        className="h-full rounded-full bg-sky-500 dark:bg-sky-400 transition-all duration-500 ease-out"
                         style={{ width: `${relativePct}%` }}
                       />
                     </div>

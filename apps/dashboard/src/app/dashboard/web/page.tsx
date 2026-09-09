@@ -168,10 +168,7 @@ export default async function WebAnalyticsPage({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 pb-4 dark:border-slate-800/80">
         <div>
           <div className="flex items-center gap-2.5">
-            {/* <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-2xl">
-              Web Analytics
-            </h1> */}
-            <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300">
+            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
               {data?.project ? data.project.name : 'Active Project'}
             </span>
           </div>
@@ -187,10 +184,11 @@ export default async function WebAnalyticsPage({
               <Link
                 key={range.value}
                 href={withProjectId(`/dashboard/web?days=${range.value}`, canonicalProjectId)}
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition sm:px-3 sm:py-1.5 sm:text-sm ${days === range.value
-                    ? 'bg-purple-600 text-white shadow-xs dark:bg-purple-600 dark:text-white'
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition sm:px-3 sm:py-1.5 sm:text-sm ${
+                  days === range.value
+                    ? 'bg-blue-600 text-white shadow-xs dark:bg-blue-600 dark:text-white'
                     : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
-                  }`}
+                }`}
               >
                 {range.label}
               </Link>
@@ -202,7 +200,7 @@ export default async function WebAnalyticsPage({
             href={withProjectId(`/dashboard/web?days=${days}`, canonicalProjectId)}
             className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-xs transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:text-sm"
           >
-            <RefreshCw className="h-3.5 w-3.5 text-purple-500" />
+            <RefreshCw className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
             <span>Refresh</span>
           </Link>
         </div>
@@ -214,10 +212,10 @@ export default async function WebAnalyticsPage({
         </section>
       ) : null}
 
-      {/* Top 5 Headline KPI Cards matching reference dashboard */}
+      {/* Top 5 Headline KPI Cards */}
       <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Web metrics headline">
         {/* Card 1: Visitors */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Visitors
           </p>
@@ -225,7 +223,7 @@ export default async function WebAnalyticsPage({
             <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
               {formatCompact(cur?.visitors ?? 0)}
             </p>
-            <span className="rounded-full border border-blue-500/15 bg-blue-500/5 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+            <span className="rounded-full border border-blue-500/15 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
               {cur?.pageviews?.toLocaleString()} views
             </span>
           </div>
@@ -238,7 +236,7 @@ export default async function WebAnalyticsPage({
         </div>
 
         {/* Card 2: Online now */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
               Online now
@@ -265,7 +263,7 @@ export default async function WebAnalyticsPage({
         </div>
 
         {/* Card 3: Bandwidth */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Bandwidth
           </p>
@@ -273,7 +271,7 @@ export default async function WebAnalyticsPage({
             <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
               {formatBytes(cur?.bandwidthBytes ?? 0)}
             </p>
-            <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
               Payloads
             </span>
           </div>
@@ -286,7 +284,7 @@ export default async function WebAnalyticsPage({
         </div>
 
         {/* Card 4: Top Country */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Top Country
           </p>
@@ -304,7 +302,7 @@ export default async function WebAnalyticsPage({
           <div className="mt-3">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
+                className="h-full rounded-full bg-blue-600 dark:bg-blue-500"
                 style={{ width: `${Math.max(10, data?.topCountry?.percentage ?? 10)}%` }}
               />
             </div>
@@ -312,7 +310,7 @@ export default async function WebAnalyticsPage({
         </div>
 
         {/* Card 5: Peak Time */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80">
+        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             Peak Time
           </p>
@@ -320,7 +318,7 @@ export default async function WebAnalyticsPage({
             <p className="font-mono text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
               {data?.peakTime?.window ?? '11:00—12:00'}
             </p>
-            <span className="rounded-full border border-pink-500/20 bg-pink-500/10 px-2 py-0.5 text-[10px] font-bold text-pink-700 dark:text-pink-300">
+            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
               UTC
             </span>
           </div>
@@ -328,7 +326,7 @@ export default async function WebAnalyticsPage({
             Busiest activity window ({data?.peakTime?.total ?? 0} events)
           </p>
           <div className="mt-3">
-            <Sparkline points={trendValues.map((total) => ({ total }))} tone="red" filled className="h-9 w-full" />
+            <Sparkline points={trendValues.map((total) => ({ total }))} tone="blue" filled className="h-9 w-full" />
           </div>
         </div>
       </section>

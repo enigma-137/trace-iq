@@ -16,13 +16,11 @@ interface TrafficTimingCardProps {
 }
 
 const TIMING_PALETTE = [
-  '#a855f7', // purple-500
-  '#ec4899', // pink-500
-  '#8b5cf6', // violet-500
-  '#3b82f6', // blue-500
+  '#2563eb', // blue-600
+  '#0ea5e9', // sky-500
   '#06b6d4', // cyan-500
   '#10b981', // emerald-500
-  '#f59e0b', // amber-500
+  '#6366f1', // indigo-500
   '#64748b'  // slate-500
 ];
 
@@ -44,7 +42,7 @@ export function TrafficTimingCard({ timing = [], className = '' }: TrafficTiming
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}
+      className={`relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900 ${className}`}
     >
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
@@ -56,7 +54,7 @@ export function TrafficTimingCard({ timing = [], className = '' }: TrafficTiming
           </p>
         </div>
         {peakItem && peakItem.total > 0 && (
-          <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+          <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-400">
             Peak: {peakItem.window}
           </span>
         )}
@@ -104,9 +102,9 @@ export function TrafficTimingCard({ timing = [], className = '' }: TrafficTiming
                   </div>
 
                   {/* Visual accent mini-bar */}
-                  <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800/80">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
                     <div
-                      className="h-full rounded-full bg-purple-500/70 transition-all duration-300 group-hover:bg-pink-500"
+                      className="h-full rounded-full bg-blue-600 dark:bg-blue-500 transition-all duration-300"
                       style={{ width: `${relativeBar}%` }}
                     />
                   </div>
