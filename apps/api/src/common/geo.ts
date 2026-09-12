@@ -18,13 +18,21 @@ interface GeoLookupRecord {
  * could spoof it to fake geolocation — and, if the IP is ever used for abuse
  * detection, to bypass blocking entirely.
  */
-export function extractClientIp(forwardedFor?: string, remoteIp?: string): string | undefined {
+export function extractClientIp(forwardedFor?: string, remoteIp?: string, realIp?: string): string | undefined {
   const trustProxyHeaders = process.env.TRUST_PROXY_HEADERS === 'true';
 
-  if (trustProxyHeaders && forwardedFor) {
-    const first = forwardedFor.split(',')[0]?.trim();
-    if (first) {
-      return normalizeIp(first);
+  if (trustProxyHeaders) {
+    if (forwardedFor) {
+      const first = forwardedFor.split(',')[0]?.trim();
+      if (first) {
+        return normalizeIp(first);
+      }
+    }
+    if (realIp) {
+      const trimmed = realIp.trim();
+      if (trimmed) {
+        return normalizeIp(trimmed);
+      }
     }
   }
 

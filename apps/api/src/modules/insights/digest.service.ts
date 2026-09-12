@@ -223,10 +223,12 @@ export class DigestService {
       `
         SELECT project_id, name FROM (
           SELECT project_id,
-            COALESCE(NULLIF(network_info->>'country', ''), 'unknown') AS name,
+            network_info->>'country' AS name,
             row_number() OVER (PARTITION BY project_id ORDER BY count(*) DESC, network_info->>'country' ASC) AS rn
           FROM events
           WHERE project_id = ANY($1) AND occurred_at >= $2 AND occurred_at < $3
+            AND NULLIF(network_info->>'country', '') IS NOT NULL
+            AND network_info->>'country' != 'unknown'
           GROUP BY project_id, network_info->>'country'
         ) ranked
         WHERE rn = 1

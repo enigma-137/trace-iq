@@ -20,7 +20,12 @@ export class EventsController {
         ...body,
         writeKey: headers['x-traceiq-write-key'] ?? body.writeKey
       },
-      { ip, forwardedFor: headers['x-forwarded-for'], headers }
+      {
+        ip,
+        forwardedFor: headers['x-forwarded-for'],
+        realIp: headers['x-real-ip'],
+        headers
+      }
     );
   }
 
@@ -35,6 +40,7 @@ export class EventsController {
     return this.eventsService.ingestBatch(writeKey, body.projectId, body.batch, {
       ip,
       forwardedFor: headers['x-forwarded-for'],
+      realIp: headers['x-real-ip'],
       headers
     });
   }

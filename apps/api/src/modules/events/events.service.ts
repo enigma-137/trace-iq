@@ -13,6 +13,7 @@ type JsonObject = Record<string, unknown>;
 export interface IngestMeta {
   ip?: string;
   forwardedFor?: string;
+  realIp?: string;
   headers?: Record<string, string | undefined>;
 }
 
@@ -651,7 +652,7 @@ export class EventsService {
   }
 
   private buildNetworkInfo(clientNetworkInfo: JsonObject | undefined, meta: IngestMeta): JsonObject {
-    const clientIp = extractClientIp(meta.forwardedFor, meta.ip);
+    const clientIp = extractClientIp(meta.forwardedFor, meta.ip, meta.realIp);
     const geo = resolveGeo(clientIp, meta.headers ?? {});
     // Server-resolved IP + geo win over anything the (untrusted) client sent.
     return {

@@ -315,9 +315,11 @@ export class AnalyticsService {
 
     const topCountries = await this.database.query<{ name: string; total: number }>(
       `
-        SELECT COALESCE(NULLIF(network_info->>'country', ''), 'unknown') AS name, count(*)::int AS total
+        SELECT network_info->>'country' AS name, count(*)::int AS total
         FROM events
         WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
+          AND NULLIF(network_info->>'country', '') IS NOT NULL
+          AND network_info->>'country' != 'unknown'
         GROUP BY 1
         ORDER BY total DESC
         LIMIT 6
@@ -371,7 +373,8 @@ export class AnalyticsService {
       tracesResult,
       frictionResult,
       eventDistResult,
-      sessionMetricsResult
+      sessionMetricsResult,
+      replaysCountResult
     ] = await Promise.all([
       this.database.query<{
         total_requests: number;
@@ -554,7 +557,18 @@ export class AnalyticsService {
           WHERE project_id = $1 AND started_at >= now() - interval '30 days'
         `,
         [project.id]
-      ).catch(() => ({ rows: [{ avg_duration_sec: 0 }] }))
+      ).catch(() => ({ rows: [{ avg_duration_sec: 0 }] })),
+
+      this.database.query<{
+        count: number;
+      }>(
+        `
+          SELECT count(*)::int AS count
+          FROM session_replays
+          WHERE project_id = $1 AND deleted_at IS NULL AND expires_at > now()
+        `,
+        [project.id]
+      ).catch(() => ({ rows: [{ count: 0 }] }))
     ]);
 
     const to = new Date();
@@ -579,6 +593,7 @@ export class AnalyticsService {
     const frictionRow = frictionResult.rows[0] ?? { rage_clicks: 0, dead_clicks: 0, error_sessions: 0 };
     const distRow = eventDistResult.rows[0] ?? { autocapture_count: 0, custom_count: 0 };
     const sessionRow = sessionMetricsResult.rows[0] ?? { avg_duration_sec: 0 };
+    const replaysRow = replaysCountResult.rows[0] ?? { count: 0 };
 
     const totalRequests = apiTel?.total_requests ?? 0;
     const errCount = apiTel?.http_errors ?? 0;
@@ -663,7 +678,7 @@ export class AnalyticsService {
         rageClicks: frictionRow.rage_clicks,
         deadClicks: frictionRow.dead_clicks,
         errorSessions: frictionRow.error_sessions,
-        replaysAvailable: frictionRow.error_sessions > 0 ? frictionRow.error_sessions : (totals?.total_sessions ?? 0)
+        replaysAvailable: Number(replaysRow?.count ?? 0)
       },
       recentTraces,
       alertsSummary: {
@@ -1072,9 +1087,11 @@ export class AnalyticsService {
     const countriesQuery = this.webFilterQuery(project.id, from, to, filters);
     const countries = await this.database.query<{ name: string; total: number }>(
       `
-        SELECT COALESCE(NULLIF(network_info->>'country', ''), 'unknown') AS name,
+        SELECT network_info->>'country' AS name,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
         FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${countriesQuery.clause}
+          AND NULLIF(network_info->>'country', '') IS NOT NULL
+          AND network_info->>'country' != 'unknown'
         GROUP BY 1 ORDER BY total DESC LIMIT 8
       `,
       countriesQuery.values
@@ -1083,9 +1100,11 @@ export class AnalyticsService {
     const citiesQuery = this.webFilterQuery(project.id, from, to, filters);
     const cities = await this.database.query<{ name: string; total: number }>(
       `
-        SELECT COALESCE(NULLIF(network_info->>'city', ''), 'unknown') AS name,
+        SELECT network_info->>'city' AS name,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
         FROM events WHERE project_id = $1 AND event_name = '$page' AND occurred_at >= $2 AND occurred_at < $3${citiesQuery.clause}
+          AND NULLIF(network_info->>'city', '') IS NOT NULL
+          AND network_info->>'city' != 'unknown'
         GROUP BY 1 ORDER BY total DESC LIMIT 8
       `,
       citiesQuery.values

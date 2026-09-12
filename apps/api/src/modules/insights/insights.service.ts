@@ -210,9 +210,11 @@ export class InsightsService {
       ),
       this.database.query<{ name: string; count: number }>(
         `
-          SELECT COALESCE(NULLIF(network_info->>'country', ''), 'unknown') AS name, count(*)::int AS count
+          SELECT network_info->>'country' AS name, count(*)::int AS count
           FROM events
           WHERE project_id = $1 AND occurred_at >= $2
+            AND NULLIF(network_info->>'country', '') IS NOT NULL
+            AND network_info->>'country' != 'unknown'
           GROUP BY 1
           ORDER BY count DESC
           LIMIT 1
