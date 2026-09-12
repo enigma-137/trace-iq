@@ -164,7 +164,7 @@ export class ReplayRecorder {
       if (!this.isCurrent(epoch, consentRequired)) return false;
       this.grant = grant;
       this.grantIdentity = identityKey(identity);
-      this.startedAt = new Date();
+      this.startedAt = undefined;
       this.buffer = [];
       this.sequence = 0;
       if (!this.isCurrent(epoch, consentRequired)) return false;
@@ -212,6 +212,9 @@ export class ReplayRecorder {
 
   private queue(event: RrwebEvent, epoch: number) {
     if (this.recordingEpoch !== epoch || !this.isCurrent(epoch)) return;
+    if (!this.startedAt && typeof event.timestamp === 'number' && Number.isFinite(event.timestamp)) {
+      this.startedAt = new Date(event.timestamp);
+    }
     const safeEvent = sanitizeTransportEvent(event, this.config?.privacyMode ?? 'strict');
     if (safeEvent.type === FULL_SNAPSHOT_TYPE && this.buffer.length) void this.flush(false, epoch);
     this.buffer.push(safeEvent);
@@ -219,7 +222,8 @@ export class ReplayRecorder {
   }
 
   private async flush(keepalive = false, epoch = this.lifecycleEpoch) {
-    if (!this.buffer.length || !this.startedAt || !this.config || !this.isCurrent(epoch)) return;
+    if (!this.buffer.length || !this.config || !this.isCurrent(epoch)) return;
+    this.startedAt ??= new Date(this.buffer[0]?.timestamp ?? Date.now());
     const events = this.buffer;
     this.buffer = [];
     const sequence = this.sequence++;
@@ -265,6 +269,7 @@ export class ReplayRecorder {
         signal: controller.signal
       }).catch(() => undefined);
     } finally {
+      this.startedAt = undefined;
       this.requests.delete(controller);
     }
   }
@@ -323,6 +328,7 @@ export class ReplayRecorder {
   private discardPending() {
     this.buffer = [];
     this.acceptedEventNames = [];
+    this.startedAt = undefined;
     this.grant = undefined;
     this.grantIdentity = undefined;
     for (const request of this.requests) request.abort();

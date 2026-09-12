@@ -5,7 +5,7 @@
  * source of truth for publishing; this file keeps user-facing copy in sync.
  */
 export const SDK_VERSIONS = {
-  javascript: "0.1.4",
+  javascript: "0.1.5",
   python: "0.1.0",
   rust: "0.1.0",
 } as const;

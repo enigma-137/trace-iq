@@ -124,7 +124,18 @@ export class ReplayService {
     const bounds = this.eventBounds(sanitized);
     const authorizedDurationSeconds = Math.min(settings.maxDurationSeconds, claims.maxDurationSeconds);
     this.validateEventTimes(bounds, receivedAt, authorizedDurationSeconds);
-    this.validateClaimedTimestamp(input.startedAt, bounds.first, 'startedAt');
+    const claimedStartedAt = input.startedAt !== undefined ? this.date(input.startedAt) : undefined;
+    if (claimedStartedAt) {
+      if (claimedStartedAt.getTime() > receivedAt.getTime() + REPLAY_LIMITS.clockSkewMs) {
+        throw new BadRequestException('startedAt is outside the permitted server clock-skew window.');
+      }
+      if (claimedStartedAt.getTime() < receivedAt.getTime() - authorizedDurationSeconds * 1_000 - REPLAY_LIMITS.clockSkewMs) {
+        throw new BadRequestException('startedAt precedes the permitted replay window.');
+      }
+      if (bounds.first.getTime() < claimedStartedAt.getTime() - REPLAY_LIMITS.clockSkewMs) {
+        throw new BadRequestException('Replay chunk event timestamps precede the claimed replay start.');
+      }
+    }
     this.validateClaimedTimestamp(input.endedAt, bounds.last, 'endedAt');
 
     const prepared = await this.database.transaction(async (client) => {
@@ -135,13 +146,19 @@ export class ReplayService {
       const currentDurationSeconds = Math.min(currentSettings.maxDurationSeconds, claims.maxDurationSeconds);
       this.validateEventTimes(bounds, receivedAt, currentDurationSeconds);
       const session = await this.ensureSession(client, claims, bounds.first);
-      const candidate = await this.ensureReplay(client, claims, session, currentSettings, bounds.first, activeMatchedFunnelIds);
+      const candidate = await this.ensureReplay(client, claims, session, currentSettings, claimedStartedAt ?? bounds.first, activeMatchedFunnelIds);
       await this.lockReplay(client, candidate.id);
       const replayResult = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [candidate.id]);
       const replay = replayResult.rows[0];
       if (!replay) throw new NotFoundException('Replay no longer exists.');
       this.assertReplayWritable(replay, receivedAt);
-      if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000) {
+      if (claimedStartedAt) {
+        this.validateClaimedTimestamp(claimedStartedAt, new Date(replay.started_at), 'startedAt');
+      }
+      if (bounds.first.getTime() < new Date(replay.started_at).getTime() - REPLAY_LIMITS.clockSkewMs) {
+        throw new BadRequestException('Replay chunk event timestamps precede the authoritative replay start.');
+      }
+      if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000 + REPLAY_LIMITS.clockSkewMs) {
         throw new BadRequestException('Replay exceeds the project maximum duration.');
       }
       const existing = await client.query<ChunkRow>(`
@@ -187,7 +204,7 @@ export class ReplayService {
         const replay = replayResult.rows[0];
         if (!replay) throw new NotFoundException('Replay no longer exists.');
         this.assertReplayWritable(replay, new Date());
-        if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000) {
+        if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000 + REPLAY_LIMITS.clockSkewMs) {
           throw new BadRequestException('Replay exceeds the project maximum duration.');
         }
         const chunkResult = await client.query<ChunkRow>(`
@@ -715,7 +732,7 @@ export class ReplayService {
   private required(value: unknown, field: string) { if (typeof value !== 'string' || !value.trim()) throw new BadRequestException(`${field} is required.`); return value.trim(); }
   private optional(value: unknown) { return typeof value === 'string' && value.trim() ? value.trim().slice(0, 256) : undefined; }
   private sequence(value: unknown) { if (!Number.isInteger(value) || Number(value) < 0 || Number(value) >= REPLAY_LIMITS.maxChunksPerReplay) throw new BadRequestException('sequence is invalid.'); return Number(value); }
-  private date(value: unknown) { const parsed = typeof value === 'string' ? new Date(value) : new Date(Number.NaN); if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Replay timestamp is invalid.'); return parsed; }
+  private date(value: unknown) { const parsed = typeof value === 'string' ? new Date(value) : value instanceof Date ? value : new Date(Number.NaN); if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Replay timestamp is invalid.'); return parsed; }
   private number(value: unknown, min: number, max: number, field: string, integer=false) { const n=Number(value); if (!Number.isFinite(n) || n<min || n>max || (integer&&!Number.isInteger(n))) throw new BadRequestException(`${field} is invalid.`); return n; }
   private clamp(value: string|undefined, fallback:number,min:number,max:number) { const n=Number(value); return Number.isFinite(n) ? Math.min(max,Math.max(min,Math.trunc(n))) : fallback; }
   private eventBounds(events: Record<string, unknown>[]) { const times=events.map((event) => Number(event.timestamp)).filter(Number.isFinite); return { first:new Date(Math.min(...times)), last:new Date(Math.max(...times)) }; }

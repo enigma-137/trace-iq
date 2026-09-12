@@ -211,4 +211,48 @@ describe('ReplayRecorder security gates', () => {
     expect(timeoutSpy.mock.calls.some((call) => call[1] === 60_000)).toBe(true);
     recorder.stop({ discard: true });
   });
+
+  it('flow trigger matches -> authorizes -> starts rrweb -> flushes multiple chunks with consistent startedAt', async () => {
+    const chunkBodies: Array<Record<string, unknown>> = [];
+    const t0 = 1726135000000;
+    const t1 = t0 + 10_000;
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/config')) return configResponse();
+      if (url.includes('/authorize')) return new Response(JSON.stringify({
+        token: 'upload-token-123', expiresAt: new Date(Date.now() + 300_000).toISOString()
+      }), { status: 200 });
+      if (url.includes('/chunks')) {
+        chunkBodies.push(JSON.parse(String(init?.body)));
+        return new Response('{}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const recorder = new ReplayRecorder('https://api.example', { enabled: true },
+      () => ({ projectId: 'proj_a', writeKey: 'wk_test', sessionId: 'sess_test', anonymousId: 'anon_test' }),
+      () => true, vi.fn());
+
+    await recorder.start();
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(1));
+
+    // Emit first event (DOM full snapshot)
+    rrweb.options?.emit({ type: 2, timestamp: t0, data: { node: { tagName: 'div', childNodes: [] } } });
+    await vi.waitFor(() => expect(chunkBodies.length).toBe(1));
+
+    expect(chunkBodies[0].sequence).toBe(0);
+    expect(chunkBodies[0].startedAt).toBe(new Date(t0).toISOString());
+    expect(chunkBodies[0].endedAt).toBe(new Date(t0).toISOString());
+
+    // Emit second event (subsequent mutation 10s later)
+    rrweb.options?.emit({ type: 3, timestamp: t1, data: { source: 0, adds: [] } });
+    recorder.stop();
+    await vi.waitFor(() => expect(chunkBodies.length).toBe(2));
+
+    expect(chunkBodies[1].sequence).toBe(1);
+    expect(chunkBodies[1].startedAt).toBe(new Date(t0).toISOString());
+    expect(chunkBodies[1].endedAt).toBe(new Date(t1).toISOString());
+  });
 });

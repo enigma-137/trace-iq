@@ -455,6 +455,72 @@ rl(https://escaped.example/pixel)}` }, childNodes: []
     }
   });
 
+  it('permits small client/server clock skew on chunk upload', async () => {
+    const { service, uploadToken, replay } = makeService();
+    const skewMs = 15_000;
+    replay.started_at = new Date(Date.now() - skewMs).toISOString();
+    const eventTime = Date.now() - skewMs + 1000;
+    const result = await service.ingestChunk(uploadToken, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 0,
+      startedAt: new Date(Date.now() - skewMs).toISOString(),
+      endedAt: new Date(eventTime).toISOString(),
+      events: [canaryEvent(eventTime)]
+    });
+    expect(result.accepted).toBe(true);
+  });
+
+  it('allows delayed chunk upload within max duration and clock skew window', async () => {
+    const { service, uploadToken, replay } = makeService();
+    const started = Date.now() - 45_000;
+    replay.started_at = new Date(started).toISOString();
+    const eventTime = started + 5_000;
+    const result = await service.ingestChunk(uploadToken, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 0,
+      startedAt: new Date(started).toISOString(),
+      endedAt: new Date(eventTime).toISOString(),
+      events: [canaryEvent(eventTime)]
+    });
+    expect(result.accepted).toBe(true);
+  });
+
+  it('rejects chunk upload when claimed startedAt differs from authoritative replay started_at beyond clock skew', async () => {
+    const { service, uploadToken, replay } = makeService();
+    const now = Date.now();
+    replay.started_at = new Date(now - 1_000).toISOString();
+    await expect(service.ingestChunk(uploadToken, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 1,
+      startedAt: new Date(now - 600_000).toISOString(),
+      endedAt: new Date(now).toISOString(),
+      events: [canaryEvent(now)]
+    })).rejects.toThrow(/startedAt does not match the authoritative replay time window/);
+  });
+
+  it('subsequent chunks with later event timestamps reuse the same authoritative startedAt without shifting replay started_at', async () => {
+    const { service, uploadToken, replay, db } = makeService();
+    const startTime = Date.now() - 30_000;
+    replay.started_at = new Date(startTime).toISOString();
+
+    await service.ingestChunk(uploadToken, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 0,
+      startedAt: new Date(startTime).toISOString(),
+      endedAt: new Date(startTime + 5_000).toISOString(),
+      events: [canaryEvent(startTime + 5_000)]
+    });
+
+    await service.ingestChunk(uploadToken, {
+      projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a', sequence: 1,
+      startedAt: new Date(startTime).toISOString(),
+      endedAt: new Date(startTime + 25_000).toISOString(),
+      events: [canaryEvent(startTime + 25_000)]
+    });
+
+    expect(replay.started_at).toBe(new Date(startTime).toISOString());
+    const updateCalls = db.queryCalls(/UPDATE session_replays/);
+    for (const call of updateCalls) {
+      expect(call.text).not.toContain('started_at=');
+    }
+  });
+
   it('defines additive project-confined flow targeting with non-destructive funnel deletion', async () => {
     const migration = await readFile(join(process.cwd(), 'migrations', '0032_replay_funnel_targeting.sql'), 'utf8');
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS replay_setting_funnels');
