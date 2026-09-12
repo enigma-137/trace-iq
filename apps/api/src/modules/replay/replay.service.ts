@@ -91,8 +91,9 @@ export class ReplayService {
       throw new ForbiddenException('This session has not entered a selected Replay flow.');
     }
     await this.storage.assertReady();
-    return this.tokens.sign({
-      projectId, organizationId: auth.organization_id, sessionId, anonymousId, userId,
+    const replayId = input.replayId ? this.safeId(input.replayId, 'replayId') : `rpl_${randomUUID()}`;
+    const tokenGrant = this.tokens.sign({
+      projectId, organizationId: auth.organization_id, sessionId, replayId, anonymousId, userId,
       consentGranted: input.consentGranted === true,
       requireConsent: settings.requireConsent,
       privacyMode: settings.privacyMode,
@@ -102,6 +103,7 @@ export class ReplayService {
       maxUncompressedBytes: REPLAY_LIMITS.maxReplayUncompressedBytes,
       matchedFunnelIds
     }, REPLAY_LIMITS.uploadTokenSeconds);
+    return { ...tokenGrant, replayId };
   }
 
   async ingestChunk(uploadToken: string, input: IngestReplayChunkRequest) {
@@ -256,10 +258,12 @@ export class ReplayService {
       await this.lockReplaySettings(client, claims.projectId);
       const currentSettings = await this.loadSettings(claims.projectId, client);
       const activeMatchedFunnelIds = await this.assertTokenStillAllowed(claims, currentSettings, client);
-      const candidate = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL LIMIT 1', [claims.projectId, claims.sessionId]);
+      const candidate = claims.replayId
+        ? await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL LIMIT 1', [claims.replayId, claims.projectId])
+        : await client.query<ReplayRow>('SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL ORDER BY started_at DESC LIMIT 1', [claims.projectId, claims.sessionId]);
       if (!candidate.rows[0]) return;
       await this.lockReplay(client, candidate.rows[0].id);
-      const result = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL FOR UPDATE', [claims.projectId, claims.sessionId]);
+      const result = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [candidate.rows[0].id]);
       const replay = result.rows[0];
       if (!replay) return;
       this.assertReplayWritable(replay, receivedAt);
@@ -629,10 +633,23 @@ export class ReplayService {
     startedAt: Date,
     matchedFunnelIds: string[]
   ) {
-    const existing = await executor.query<ReplayRow>('SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL LIMIT 1', [claims.projectId, session.id]);
-    let replay = existing.rows[0];
+    const replayId = claims.replayId;
+    let replay: ReplayRow | undefined;
+    if (replayId) {
+      const existing = await executor.query<ReplayRow>(
+        'SELECT * FROM session_replays WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL LIMIT 1',
+        [replayId, claims.projectId]
+      );
+      replay = existing.rows[0];
+    } else {
+      const existing = await executor.query<ReplayRow>(
+        'SELECT * FROM session_replays WHERE project_id=$1 AND session_id=$2 AND deleted_at IS NULL ORDER BY started_at DESC LIMIT 1',
+        [claims.projectId, session.id]
+      );
+      replay = existing.rows[0];
+    }
     if (!replay) {
-      const id = `rpl_${randomUUID()}`;
+      const id = replayId || `rpl_${randomUUID()}`;
       const prefix = [claims.organizationId, claims.projectId, session.id].map((part) => this.pathSegment(part)).join('/');
       const result = await executor.query<ReplayRow>(`
         INSERT INTO session_replays(id,organization_id,project_id,session_id,user_id,anonymous_id,started_at,storage_prefix,recording_version,privacy_mode,expires_at)

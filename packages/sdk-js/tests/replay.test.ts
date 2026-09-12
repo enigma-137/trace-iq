@@ -255,4 +255,61 @@ describe('ReplayRecorder security gates', () => {
     expect(chunkBodies[1].startedAt).toBe(new Date(t0).toISOString());
     expect(chunkBodies[1].endedAt).toBe(new Date(t1).toISOString());
   });
+
+  it('handles multiple separate recording activations across the same session with distinct replay lifecycles', async () => {
+    const chunkBodies: Array<Record<string, unknown>> = [];
+    let authorizeCount = 0;
+    const t0 = 1726135000000;
+    const t1 = t0 + 600_000; // 10 minutes later
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/config')) return configResponse();
+      if (url.includes('/authorize')) {
+        authorizeCount += 1;
+        return new Response(JSON.stringify({
+          token: `upload-token-${authorizeCount}`,
+          replayId: `rpl_${authorizeCount}`,
+          expiresAt: new Date(Date.now() + 300_000).toISOString()
+        }), { status: 200 });
+      }
+      if (url.includes('/chunks')) {
+        chunkBodies.push(JSON.parse(String(init?.body)));
+        return new Response('{}', { status: 200 });
+      }
+      if (url.includes('/complete')) {
+        return new Response('{}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const recorder = new ReplayRecorder('https://api.example', { enabled: true },
+      () => ({ projectId: 'proj_a', writeKey: 'wk_test', sessionId: 'sess_test', anonymousId: 'anon_test' }),
+      () => true, vi.fn());
+
+    await recorder.start();
+
+    // Activation 1: Flow trigger triggers activation A
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(1));
+
+    rrweb.options?.emit({ type: 2, timestamp: t0, data: { node: { tagName: 'div', childNodes: [] } } });
+    await vi.waitFor(() => expect(chunkBodies.length).toBe(1));
+    expect(chunkBodies[0].sequence).toBe(0);
+    expect(chunkBodies[0].startedAt).toBe(new Date(t0).toISOString());
+
+    // Stop activation 1
+    recorder.stop();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Activation 2: Another flow trigger later in the same session triggers activation B
+    recorder.eventAccepted('onboarding_started');
+    await vi.waitFor(() => expect(rrweb.record).toHaveBeenCalledTimes(2));
+
+    rrweb.options?.emit({ type: 2, timestamp: t1, data: { node: { tagName: 'div', childNodes: [] } } });
+    await vi.waitFor(() => expect(chunkBodies.length).toBe(2));
+    expect(chunkBodies[1].sequence).toBe(0);
+    expect(chunkBodies[1].startedAt).toBe(new Date(t1).toISOString());
+    expect(authorizeCount).toBe(2);
+  });
 });

@@ -8,7 +8,7 @@ interface RecorderConfig {
   flowTriggerEventNames: string[];
 }
 interface ReplayIdentity { projectId: string; writeKey: string; sessionId: string; anonymousId?: string; userId?: string; }
-interface UploadGrant { token: string; expiresAt: string; }
+interface UploadGrant { token: string; expiresAt: string; replayId?: string; }
 
 const MAX_BATCH_EVENTS = 150;
 const MAX_BATCH_BYTES = 450_000;
@@ -48,6 +48,7 @@ export class ReplayRecorder {
   private requests = new Set<AbortController>();
   private grant?: UploadGrant;
   private grantIdentity?: string;
+  private replayId?: string;
   private safeFrames: Element[] = [];
   private safeFrameCleanups: Array<() => void> = [];
   private recordingEpoch?: number;
@@ -75,6 +76,9 @@ export class ReplayRecorder {
   stop({ discard = false }: { discard?: boolean } = {}) {
     const epoch = ++this.lifecycleEpoch;
     this.stopCapture();
+    if (this.config && !this.consentRevoked) {
+      this.armedEpoch = epoch;
+    }
     if (discard) this.discardPending();
     else void this.flush(true, epoch).finally(() => this.complete(epoch));
   }
@@ -91,6 +95,7 @@ export class ReplayRecorder {
   revokeConsent() {
     this.consentRevoked = true;
     this.lifecycleEpoch += 1;
+    this.armedEpoch = undefined;
     this.stopCapture();
     this.discardPending();
   }
@@ -164,6 +169,7 @@ export class ReplayRecorder {
       if (!this.isCurrent(epoch, consentRequired)) return false;
       this.grant = grant;
       this.grantIdentity = identityKey(identity);
+      this.replayId = grant.replayId;
       this.startedAt = undefined;
       this.buffer = [];
       this.sequence = 0;
@@ -265,11 +271,15 @@ export class ReplayRecorder {
         method: 'POST', credentials: 'omit', keepalive: true,
         headers: { 'content-type': 'application/json', 'x-traceiq-replay-token': grant.token },
         body: JSON.stringify({ projectId: identity.projectId, sessionId: identity.sessionId,
+          replayId: this.replayId,
           anonymousId: identity.anonymousId, userId: identity.userId, endedAt: new Date().toISOString() }),
         signal: controller.signal
       }).catch(() => undefined);
     } finally {
       this.startedAt = undefined;
+      this.grant = undefined;
+      this.grantIdentity = undefined;
+      this.replayId = undefined;
       this.requests.delete(controller);
     }
   }
@@ -278,19 +288,21 @@ export class ReplayRecorder {
     const currentIdentity = identityKey(identity);
     if (this.grant && this.grantIdentity === currentIdentity
       && new Date(this.grant.expiresAt).getTime() > Date.now() + 15_000) return this.grant;
-    const grant = await this.requestUploadGrant(identity, config, epoch, signal);
+    const grant = await this.requestUploadGrant(identity, config, epoch, signal, this.replayId);
     if (!grant || !this.isCurrent(epoch)) return undefined;
     this.grant = grant;
     this.grantIdentity = currentIdentity;
+    if (grant.replayId) this.replayId = grant.replayId;
     return grant;
   }
 
-  private async requestUploadGrant(identity: ReplayIdentity, config: RecorderConfig, epoch: number, signal: AbortSignal): Promise<UploadGrant | undefined> {
+  private async requestUploadGrant(identity: ReplayIdentity, config: RecorderConfig, epoch: number, signal: AbortSignal, replayId?: string): Promise<UploadGrant | undefined> {
     if (!this.isCurrent(epoch)) return undefined;
     const response = await fetch(`${this.endpoint}/v1/replays/authorize`, {
       method: 'POST', credentials: 'omit', signal,
       headers: { 'content-type': 'application/json', 'x-traceiq-write-key': identity.writeKey },
       body: JSON.stringify({ projectId: identity.projectId, sessionId: identity.sessionId,
+        replayId: replayId ?? this.replayId,
         anonymousId: identity.anonymousId, userId: identity.userId,
         consentGranted: this.hasConsent() })
     }).catch(() => undefined);
@@ -314,7 +326,6 @@ export class ReplayRecorder {
     this.stopRrweb?.();
     this.stopRrweb = undefined;
     this.recordingEpoch = undefined;
-    this.armedEpoch = undefined;
     for (const frame of this.safeFrames) frame.removeAttribute('data-traceiq-replay-safe-frame');
     this.safeFrames = [];
     for (const cleanup of this.safeFrameCleanups) cleanup();
@@ -331,6 +342,7 @@ export class ReplayRecorder {
     this.startedAt = undefined;
     this.grant = undefined;
     this.grantIdentity = undefined;
+    this.replayId = undefined;
     for (const request of this.requests) request.abort();
     this.requests.clear();
   }

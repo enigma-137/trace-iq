@@ -34,6 +34,7 @@ export interface IngestReplayChunkRequest {
 export interface AuthorizeReplayUploadRequest {
   projectId?: string;
   sessionId?: string;
+  replayId?: string;
   anonymousId?: string;
   userId?: string;
   consentGranted?: boolean;
@@ -45,6 +46,7 @@ export interface ReplayUploadClaims {
   projectId: string;
   organizationId: string;
   sessionId: string;
+  replayId?: string;
   anonymousId?: string;
   userId?: string;
   consentGranted: boolean;

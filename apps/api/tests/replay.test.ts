@@ -529,6 +529,114 @@ rl(https://escaped.example/pixel)}` }, childNodes: []
     expect(migration).toMatch(/FOREIGN KEY \(replay_id, project_id\) REFERENCES session_replays\(id, project_id\) ON DELETE CASCADE/);
     expect(migration).not.toMatch(/DROP TABLE|DELETE FROM funnels|UPDATE funnels/i);
   });
+
+  it('replaces the unique session replay index with a non-unique index permitting multiple replays per session', async () => {
+    const migration = await readFile(join(process.cwd(), 'migrations', '0033_multi_replay_per_session.sql'), 'utf8');
+    expect(migration).toContain('DROP INDEX IF EXISTS session_replays_project_session_active_idx');
+    expect(migration).toContain('CREATE INDEX IF NOT EXISTS session_replays_project_session_active_idx');
+    expect(migration).toMatch(/ON session_replays\(project_id, session_id, started_at DESC\)/);
+    expect(migration).not.toContain('UNIQUE');
+  });
+
+  it('allows multiple replay recording lifecycles within the same analytics session without timestamp collision', async () => {
+    const storedReplays = new Map<string, any>();
+    const storedReservations = new Map<string, any>();
+    const db = mockDatabase((text, values) => {
+      if (text.includes('FROM replay_settings')) {
+        return rows([{ enabled: true, sampleRate: 1, maxDurationSeconds: 600, retentionDays: 30,
+          privacyMode: 'balanced', requireConsent: false, maskSelectors: [], blockSelectors: [], ignoreSelectors: [],
+          selectedFunnelIds: ['fnl_onboarding'] }]);
+      }
+      if (text.includes('FROM replay_setting_funnels rsf')) {
+        return rows([{ id: 'fnl_onboarding', name: 'Onboarding', trigger_event_name: 'onboarding_started' }]);
+      }
+      if (text.includes('pg_advisory_xact_lock')) return empty();
+      if (text.includes('INSERT INTO sessions')) return affected(1);
+      if (text.includes('SELECT s.id,s.user_id,s.anonymous_id,u.external_id')) {
+        return rows([{ id: 'sess_shared', user_id: null, anonymous_id: 'anon_shared', external_id: null }]);
+      }
+      if (text.includes('SELECT * FROM session_replays WHERE id=$1 AND project_id=$2')) {
+        const found = storedReplays.get(values[0]);
+        return found ? rows([found]) : empty();
+      }
+      if (text.includes('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE')) {
+        const found = storedReplays.get(values[0]);
+        return found ? rows([found]) : empty();
+      }
+      if (text.includes('INSERT INTO session_replays')) {
+        const created = {
+          id: values[0], organization_id: values[1], project_id: values[2], session_id: values[3],
+          user_id: values[4], anonymous_id: values[5], started_at: values[6], storage_prefix: values[7],
+          privacy_mode: values[9], chunk_count: 0, event_count: 0, compressed_size_bytes: 0,
+          uncompressed_size_bytes: 0, status: 'recording', deleted_at: null,
+          expires_at: new Date(Date.now() + 86_400_000).toISOString()
+        };
+        storedReplays.set(values[0], created);
+        return rows([created]);
+      }
+      if (text.includes('INSERT INTO session_replay_funnels')) return affected(1);
+      if (text.includes('FROM replay_chunks WHERE replay_id=$1 AND sequence=$2')) return empty();
+      if (text.includes('INSERT INTO replay_chunks')) {
+        const reservation = { id: values[0], replay_id: values[1], sequence: values[2], storage_key: values[3],
+          event_count: values[4], compressed_size_bytes: values[5], uncompressed_size_bytes: values[6],
+          content_sha256: values[7], status: 'uploading' };
+        storedReservations.set(values[0], reservation);
+        return affected(1);
+      }
+      if (text.includes('FROM replay_chunks WHERE id=$1 AND replay_id=$2')) {
+        const found = storedReservations.get(values[0]);
+        return found ? rows([found]) : empty();
+      }
+      if (text.includes("UPDATE replay_chunks SET status='ready'")) return affected(1);
+      if (text.includes('UPDATE session_replays')) return affected(1);
+      return empty();
+    });
+
+    const storage = new MemoryStorage();
+    const events = { authenticateWriteKey: vi.fn(async () => ({ project_id: 'proj_a', organization_id: 'org_a' })) };
+    const projects = { requireActiveProject: vi.fn(), requireWritableProject: vi.fn() };
+    const entitlements = {
+      assertReplayAvailable: vi.fn(async () => ({})), assertReplayCapacity: vi.fn(async () => ({})),
+      recordReplayUsage: vi.fn(async () => undefined), assertReplaySettings: vi.fn(async () => ({})),
+      getSnapshot: vi.fn(async () => ({ deploymentMode: 'self_hosted', features: { sessionReplay: true }, limits: {} }))
+    };
+    const tokens = new ReplayTokenService();
+    const service = new ReplayService(db as never, events as never, projects as never, entitlements as never, tokens, storage);
+
+    const now = Date.now();
+    const t0 = new Date(now - 60_000).toISOString();
+    const grantA = await service.authorizeUpload('write_key', {
+      projectId: 'proj_a', sessionId: 'sess_shared', anonymousId: 'anon_shared', consentGranted: true
+    });
+    expect(grantA.replayId).toBeDefined();
+
+    const resultA = await service.ingestChunk(grantA.token, {
+      projectId: 'proj_a', sessionId: 'sess_shared', anonymousId: 'anon_shared', sequence: 0,
+      startedAt: t0, endedAt: t0, events: [canaryEvent(new Date(t0).getTime())]
+    });
+    expect(resultA.accepted).toBe(true);
+    expect(resultA.replayId).toBe(grantA.replayId);
+
+    // Later, in the same analytics session, activation B starts with a new startedAt (e.g. 50s later)
+    const t1 = new Date(now - 10_000).toISOString();
+    const grantB = await service.authorizeUpload('write_key', {
+      projectId: 'proj_a', sessionId: 'sess_shared', anonymousId: 'anon_shared', consentGranted: true
+    });
+    expect(grantB.replayId).toBeDefined();
+    expect(grantB.replayId).not.toBe(grantA.replayId);
+
+    const resultB = await service.ingestChunk(grantB.token, {
+      projectId: 'proj_a', sessionId: 'sess_shared', anonymousId: 'anon_shared', sequence: 0,
+      startedAt: t1, endedAt: t1, events: [canaryEvent(new Date(t1).getTime())]
+    });
+    expect(resultB.accepted).toBe(true);
+    expect(resultB.replayId).toBe(grantB.replayId);
+    expect(resultB.replayId).not.toBe(resultA.replayId);
+
+    expect(storedReplays.size).toBe(2);
+    expect(new Date(storedReplays.get(grantA.replayId!).started_at).toISOString()).toBe(t0);
+    expect(new Date(storedReplays.get(grantB.replayId!).started_at).toISOString()).toBe(t1);
+  });
 });
 
 describe('Replay sanitizer privacy modes', () => {

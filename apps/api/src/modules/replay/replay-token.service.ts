@@ -36,6 +36,7 @@ export class ReplayTokenService {
     }
     const now = Math.floor(Date.now() / 1_000);
     if (claims.version !== 2 || !claims.tokenId || !claims.projectId || !claims.organizationId || !claims.sessionId
+      || (claims.replayId && (typeof claims.replayId !== 'string' || !/^rpl_[A-Za-z0-9_-]{1,160}$/.test(claims.replayId)))
       || !Array.isArray(claims.matchedFunnelIds) || claims.matchedFunnelIds.length === 0
       || claims.matchedFunnelIds.some((id) => typeof id !== 'string' || !/^fnl_[A-Za-z0-9_-]{1,156}$/.test(id))
       || !Number.isInteger(claims.issuedAt) || !Number.isInteger(claims.expiresAt)
