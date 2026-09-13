@@ -1,4 +1,7 @@
 import React from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Exchange01Icon from '@hugeicons/core-free-icons/Exchange01Icon';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
 
 interface RatioDistributionCardProps {
   title?: string;
@@ -39,9 +42,7 @@ export function RatioDistributionCard({
         <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-100 dark:border-slate-800/70">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
-              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
+              <HugeiconsIcon icon={Exchange01Icon} size={16} />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</h3>
@@ -99,9 +100,7 @@ export function RatioDistributionCard({
         {/* Footer info pill */}
         <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-slate-400">
           <div className="flex items-center gap-1">
-            <svg className="size-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+            <HugeiconsIcon icon={FlashIcon} size={14} className="text-blue-500" />
             <span className="font-medium text-neutral-700 dark:text-slate-300">{footerHighlight}</span>
           </div>
           {total > 0 ? (

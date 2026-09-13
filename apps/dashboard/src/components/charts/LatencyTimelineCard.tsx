@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
 
 export interface LatencyDataPoint {
   bucket: string;
@@ -73,10 +75,7 @@ export function LatencyTimelineCard({
         <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-100 dark:border-slate-800/70">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
-              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="12" r="9" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
-              </svg>
+              <HugeiconsIcon icon={Clock03Icon} size={16} />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Latency Timeline</h3>

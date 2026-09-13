@@ -1,5 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 
 export interface TopErrorItem {
   type: string;
@@ -30,9 +32,7 @@ export function TopErrorsList({
         <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-100 dark:border-slate-800/70">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
-              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              <HugeiconsIcon icon={Alert02Icon} size={16} />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Top Impacting Exceptions</h3>

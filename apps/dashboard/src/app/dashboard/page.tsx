@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import UserMultiple02Icon from '@hugeicons/core-free-icons/UserMultiple02Icon';
 import { DashboardShell } from './DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { compactNumber } from '@/lib/metrics';
@@ -236,11 +241,7 @@ export default async function DashboardPage({
       {/* Top 4 KPI Metric Cards (Pace UI Style) */}
       <section className="mb-5 grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <PaceStatTile
-          icon={
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          }
+          icon={<HugeiconsIcon icon={FlashIcon} size={16} />}
           title="Total Events"
           value={overview?.totals.events ?? 0}
           badge={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
@@ -250,12 +251,7 @@ export default async function DashboardPage({
         />
 
         <PaceStatTile
-          icon={
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="12" cy="12" r="9" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
-            </svg>
-          }
+          icon={<HugeiconsIcon icon={Clock03Icon} size={16} />}
           title="P95 Latency"
           value={overview?.apiTelemetry?.p95 ? `${overview.apiTelemetry.p95}ms` : '--'}
           badge={overview?.apiTelemetry?.p95 ? '-32ms' : undefined}
@@ -265,11 +261,7 @@ export default async function DashboardPage({
         />
 
         <PaceStatTile
-          icon={
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          }
+          icon={<HugeiconsIcon icon={Alert02Icon} size={16} />}
           title="Failure Rate (5xx)"
           value={`${overview?.apiTelemetry?.errorRate ?? 0}%`}
           badge={overview?.topErrors && overview.topErrors.length > 0 ? `+${overview.topErrors.length} types` : '-0%'}
@@ -279,11 +271,7 @@ export default async function DashboardPage({
         />
 
         <PaceStatTile
-          icon={
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          }
+          icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} />}
           title="Identified Profiles"
           value={overview?.totals.users ?? 0}
           suffix="people"

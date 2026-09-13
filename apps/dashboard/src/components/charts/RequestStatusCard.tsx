@@ -1,4 +1,6 @@
 import React from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ServerIcon from '@hugeicons/core-free-icons/ServerIcon';
 
 interface RequestStatusBreakdown {
   ok200: number;
@@ -38,12 +40,7 @@ export function RequestStatusCard({
         <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-100 dark:border-slate-800/70">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
-              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
-                <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
-                <line x1="6" x2="6.01" y1="6" y2="6" />
-                <line x1="6" x2="6.01" y1="18" y2="18" />
-              </svg>
+              <HugeiconsIcon icon={ServerIcon} size={16} />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Request Status</h3>

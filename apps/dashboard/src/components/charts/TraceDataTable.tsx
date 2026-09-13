@@ -2,6 +2,11 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 
 export interface TraceRowItem {
   id: string;
@@ -115,9 +120,7 @@ export function TraceDataTable({
       <div className="flex flex-col gap-3 p-5 pb-4 sm:flex-row sm:items-center sm:justify-between border-b border-neutral-100 dark:border-slate-800/70">
         <div className="flex items-center gap-2.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+            <HugeiconsIcon icon={FlashIcon} size={16} />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Latest API Requests</h3>
@@ -137,16 +140,11 @@ export function TraceDataTable({
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 bg-neutral-50/50 px-5 py-3 dark:border-slate-800/70 dark:bg-slate-950/30">
         <div className="relative w-full max-w-xs">
-          <svg
-            className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
-          </svg>
+          <HugeiconsIcon
+            icon={Search01Icon}
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+          />
           <input
             type="text"
             placeholder="Search by request ID or endpoint..."
@@ -212,15 +210,7 @@ export function TraceDataTable({
                       <span className="truncate max-w-[120px]">
                         {trace.id.startsWith('trc_') ? trace.id.slice(0, 12) + '...' : trace.id.slice(0, 8)}
                       </span>
-                      <svg
-                        className="size-3 opacity-60 transition group-hover/copy:opacity-100"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
+                      <HugeiconsIcon icon={Copy01Icon} size={12} className="opacity-60 transition group-hover/copy:opacity-100" />
                       {copiedId === trace.id && (
                         <span className="text-[10px] font-sans font-bold text-emerald-600 dark:text-emerald-400">
                           Copied!
@@ -262,9 +252,7 @@ export function TraceDataTable({
                       className="inline-flex items-center gap-1 rounded border border-neutral-200 bg-white px-2 py-1 text-[11px] font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                       <span>Inspect</span>
-                      <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
                     </Link>
                   </td>
                 </tr>
