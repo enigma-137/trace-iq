@@ -335,20 +335,46 @@ const FEATURE_GUIDANCE: Record<Exclude<AiFeatureId, 'general'>, string> = {
 
 export function buildAiPrompt(
   language: AiLanguage,
-  feature: AiFeature,
+  features: AiFeature | AiFeature[],
   apiBaseUrl: string
 ): string {
+  const featureList = Array.isArray(features) ? features : [features];
+  const activeFeatures = featureList.filter((f) => f.id !== 'general');
+  const isGeneralOnly = activeFeatures.length === 0;
+
   const init = language.init.split('__API_BASE_URL__').join(apiBaseUrl);
-  const snippet = language.featureSnippets?.[feature.id];
-  const guidance = feature.id === 'general' ? null : snippet ?? FEATURE_GUIDANCE[feature.id];
+
+  const goalText = isGeneralOnly
+    ? 'Set up a clean TraceIQ baseline: install the SDK, initialize it, and capture one event.'
+    : `Implement ${activeFeatures.map((f) => f.label.toLowerCase()).join(', ')} with TraceIQ.`;
+
+  const featureSections: string[] = [];
+
+  if (isGeneralOnly) {
+    featureSections.push('No specific feature requested — the baseline setup above is enough.');
+  } else {
+    activeFeatures.forEach((feat, index) => {
+      const guidance = FEATURE_GUIDANCE[feat.id as Exclude<AiFeatureId, 'general'>];
+      const snippet = language.featureSnippets?.[feat.id];
+
+      const parts = [
+        `### ${index + 1}. ${feat.label}`,
+        guidance ? `Guidance: ${guidance}` : '',
+      ];
+
+      if (snippet) {
+        parts.push('Code snippet:', snippet);
+      }
+
+      featureSections.push(parts.filter(Boolean).join('\n'));
+    });
+  }
 
   const sections = [
     `You are an expert developer helping me integrate TraceIQ into a ${language.label} application.`,
     '',
     'GOAL',
-    feature.id === 'general'
-      ? 'Set up a clean TraceIQ baseline: install the SDK, initialize it, and capture one event.'
-      : `Implement ${feature.label.toLowerCase()} with TraceIQ.`,
+    goalText,
     '',
     'CREDENTIALS (placeholders — the user swaps in real values)',
     '- projectId: YOUR_PROJECT_ID',
@@ -365,7 +391,7 @@ export function buildAiPrompt(
     ...language.steps.map((step, i) => `${i + 1}. ${step}`),
     '',
     'FEATURE IMPLEMENTATION',
-    guidance ?? 'No specific feature requested — the baseline setup above is enough.',
+    featureSections.join('\n\n'),
     '',
     'REFERENCE DOCS',
     ...language.docs.map((doc) => `- ${doc.label}: https://traceiq.run${doc.href}`),
