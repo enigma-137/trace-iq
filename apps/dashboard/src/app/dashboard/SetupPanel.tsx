@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import PlusSignIcon from '@hugeicons/core-free-icons/PlusSignIcon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from './DashboardDialog';
 import { ProjectSwitcher } from './ProjectSwitcher';
@@ -269,7 +270,7 @@ export function SetupPanel({
                 setStatus(null);
               }}
             >
-              <Plus className="size-4" />
+              <HugeiconsIcon icon={PlusSignIcon} size={16} />
               New project
             </button>
           </div>

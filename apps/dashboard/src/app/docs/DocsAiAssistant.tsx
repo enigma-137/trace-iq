@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, Copy, Sparkles, Wand2, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import MagicWand01Icon from '@hugeicons/core-free-icons/MagicWand01Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import {
   AI_FEATURES,
   AI_LANGUAGES,
@@ -77,7 +82,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
         aria-label="Generate an AI setup prompt for TraceIQ"
         className="fixed bottom-5 right-5 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-neutral-900 px-5 text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:bg-neutral-700 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
       >
-        <Wand2 className="size-4" />
+        <HugeiconsIcon icon={MagicWand01Icon} size={16} />
         Copy prompt for AI
       </button>
 
@@ -105,7 +110,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                 aria-label="Close"
                 className="inline-flex size-8 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white"
               >
-                <X className="size-4" />
+                <HugeiconsIcon icon={Cancel01Icon} size={16} />
               </button>
             </div>
 
@@ -131,7 +136,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                         </span>
                         <span className="mt-0.5 block text-xs text-neutral-500 dark:text-slate-400">{lang.blurb}</span>
                       </span>
-                      <ArrowRight className="mt-0.5 size-4 shrink-0 text-neutral-300 transition group-hover:text-blue-500" />
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="mt-0.5 shrink-0 text-neutral-300 transition group-hover:text-blue-500" />
                     </button>
                   ))}
                 </div>
@@ -150,7 +155,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                         <span className="block text-sm font-semibold text-neutral-900 dark:text-white">{feat.label}</span>
                         <span className="mt-0.5 block text-xs text-neutral-500 dark:text-slate-400">{feat.description}</span>
                       </span>
-                      <ArrowRight className="mt-0.5 size-4 shrink-0 text-neutral-300 transition group-hover:text-blue-500" />
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="mt-0.5 shrink-0 text-neutral-300 transition group-hover:text-blue-500" />
                     </button>
                   ))}
                 </div>
@@ -182,7 +187,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                     onClick={copy}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 active:scale-[0.98] dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
                   >
-                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    {copied ? <HugeiconsIcon icon={Tick02Icon} size={16} /> : <HugeiconsIcon icon={Copy01Icon} size={16} />}
                     {copied ? 'Copied!' : 'Copy prompt'}
                   </button>
                 </div>

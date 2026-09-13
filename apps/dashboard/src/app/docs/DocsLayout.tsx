@@ -1,7 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Search } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import { TocNav, type DocsTocItem } from './toc';
 import { OnThisPageToc } from './OnThisPageToc';
 
@@ -31,7 +32,7 @@ export function DocsLayout({
               className="flex w-full items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-500 transition hover:border-neutral-300 hover:bg-neutral-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-slate-700"
             >
               <div className="flex items-center gap-2">
-                <Search className="size-3.5 text-neutral-400 dark:text-slate-500" />
+                <HugeiconsIcon icon={Search01Icon} size={14} className="text-neutral-400 dark:text-slate-500" />
                 <span>Search docs...</span>
               </div>
               <kbd className="rounded border border-neutral-200 bg-white px-1.5 font-mono text-[10px] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">

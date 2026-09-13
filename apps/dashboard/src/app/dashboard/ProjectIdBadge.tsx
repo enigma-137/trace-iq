@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 
 export function ProjectIdBadge({ projectId }: { projectId: string }) {
   const [copied, setCopied] = useState(false);
@@ -29,9 +31,9 @@ export function ProjectIdBadge({ projectId }: { projectId: string }) {
         #{copied ? 'Copied ID!' : projectId}
       </span>
       {copied ? (
-        <Check className="size-3 text-emerald-500 dark:text-emerald-400" />
+        <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2.5} className="text-emerald-500 dark:text-emerald-400" />
       ) : (
-        <Copy className="size-3 text-blue-500/70 transition-opacity group-hover:opacity-100 dark:text-blue-400/70" />
+        <HugeiconsIcon icon={Copy01Icon} size={12} className="text-blue-500/70 transition-opacity group-hover:opacity-100 dark:text-blue-400/70" />
       )}
     </button>
   );

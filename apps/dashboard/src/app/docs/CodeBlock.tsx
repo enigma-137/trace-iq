@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { codeToHtml } from 'shiki';
 
 export function CodeBlock({
@@ -54,12 +56,12 @@ export function CodeBlock({
         >
           {copied ? (
             <>
-              <Check className="size-3.5 text-emerald-400" />
+              <HugeiconsIcon icon={Tick02Icon} size={14} className="text-emerald-400" />
               <span className="text-emerald-400 font-semibold">Copied!</span>
             </>
           ) : (
             <>
-              <Copy className="size-3.5" />
+              <HugeiconsIcon icon={Copy01Icon} size={14} />
               <span>Copy</span>
             </>
           )}

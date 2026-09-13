@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight, BookOpen, Terminal, FileCode, Clock, Server } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
+import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
+import CodeIcon from '@hugeicons/core-free-icons/CodeIcon';
+import ServerIcon from '@hugeicons/core-free-icons/ServerIcon';
+import TerminalIcon from '@hugeicons/core-free-icons/TerminalIcon';
 
 export interface DocsTocItem {
   id: string;
@@ -11,11 +18,11 @@ export interface DocsTocItem {
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  'Getting started': <Clock className="size-3.5" />,
-  Deployment: <Server className="size-3.5" />,
-  SDKs: <Terminal className="size-3.5" />,
-  Features: <BookOpen className="size-3.5" />,
-  Reference: <FileCode className="size-3.5" />
+  'Getting started': <HugeiconsIcon icon={Clock03Icon} size={14} />,
+  Deployment: <HugeiconsIcon icon={ServerIcon} size={14} />,
+  SDKs: <HugeiconsIcon icon={TerminalIcon} size={14} />,
+  Features: <HugeiconsIcon icon={BookOpen02Icon} size={14} />,
+  Reference: <HugeiconsIcon icon={CodeIcon} size={14} />
 };
 
 export function TocNav({
@@ -41,7 +48,7 @@ export function TocNav({
       {categories.map((category) => {
         const items = sections.filter((s) => s.category === category);
         const isCollapsed = collapsed[category];
-        const icon = CATEGORY_ICONS[category] ?? <BookOpen className="size-3.5" />;
+        const icon = CATEGORY_ICONS[category] ?? <HugeiconsIcon icon={BookOpen02Icon} size={14} />;
 
         return (
           <div key={category} className="space-y-1">
@@ -54,7 +61,7 @@ export function TocNav({
                 <span className="text-neutral-400 dark:text-slate-500">{icon}</span>
                 <span>{category}</span>
               </div>
-              {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
+              {isCollapsed ? <HugeiconsIcon icon={ArrowRight01Icon} size={12} /> : <HugeiconsIcon icon={ArrowDown01Icon} size={12} />}
             </button>
 
             {!isCollapsed ? (

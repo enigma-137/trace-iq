@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -51,9 +53,9 @@ export function BillingActivationStatus({ projectId }: { projectId?: string }) {
   }, [projectId, supabase]);
 
   const content = {
-    checking: <><Loader2 className="size-4 animate-spin" /> Confirming Pro activation…</>,
-    active: <><Check className="size-4" /> TraceIQ Pro is active</>,
-    pending: <><Loader2 className="size-4" /> Payment confirmed; activation is still processing. You can continue to the dashboard.</>,
+    checking: <><HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> Confirming Pro activation…</>,
+    active: <><HugeiconsIcon icon={Tick02Icon} size={16} /> TraceIQ Pro is active</>,
+    pending: <><HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> Payment confirmed; activation is still processing. You can continue to the dashboard.</>,
     signed_out: <>Payment confirmed. Sign in to the dashboard to view the active organization plan.</>,
     error: <>Payment confirmed. We couldn’t refresh the plan status, but the webhook will continue processing.</>
   }[state];

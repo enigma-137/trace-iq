@@ -1,6 +1,7 @@
 'use client';
 
-import { Activity } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 
 interface TelemetryGaugeTileProps {
   title?: string;
@@ -48,7 +49,7 @@ export function TelemetryGaugeTile({
       {/* Top Title Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Activity className="size-4 text-neutral-400 dark:text-slate-500" />
+          <HugeiconsIcon icon={Activity01Icon} size={16} className="text-neutral-400 dark:text-slate-500" />
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             {title}
           </p>

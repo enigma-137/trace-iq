@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Activity, RefreshCw } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { TrendChart } from '@/components/charts/TrendChart';
@@ -200,7 +201,7 @@ export default async function WebAnalyticsPage({
             href={withProjectId(`/dashboard/web?days=${days}`, canonicalProjectId)}
             className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-xs transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:text-sm"
           >
-            <RefreshCw className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            <HugeiconsIcon icon={RefreshIcon} size={14} className="text-blue-600 dark:text-blue-400" />
             <span>Refresh</span>
           </Link>
         </div>

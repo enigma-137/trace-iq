@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Layers } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
 
 interface BreakdownItem {
   label: string;
@@ -63,7 +64,7 @@ export function VolumeDistributionTile({
       {/* Title Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Layers className="size-4 text-neutral-400 dark:text-slate-500" />
+          <HugeiconsIcon icon={Layers01Icon} size={16} className="text-neutral-400 dark:text-slate-500" />
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
             {title}
           </p>

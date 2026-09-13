@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const REFRESH_MS = 30_000;
@@ -160,17 +161,17 @@ export default function StatusPage() {
             <div className="status-updated">
               {refreshing ? (
                 <span className="inline-flex items-center gap-2">
-                  <RefreshCw size={13} className="animate-spin" /> refreshing\u2026
+                  <HugeiconsIcon icon={RefreshIcon} size={13} className="animate-spin" /> refreshing…
                 </span>
               ) : (
                 <span>
                   Last checked{' '}
                   <span className="font-mono text-slate-300">
-                    {lastChecked ? new Date(lastChecked).toLocaleTimeString() : '\u2014'}
+                    {lastChecked ? new Date(lastChecked).toLocaleTimeString() : '—'}
                   </span>
                 </span>
               )}
-              <span className="text-slate-500">\u00b7 auto-refreshes every 30s</span>
+              <span className="text-slate-500">· auto-refreshes every 30s</span>
             </div>
             <div className="status-meter" aria-hidden>
               <div key={lastChecked ?? 0} className="status-meter-fill" />
@@ -182,7 +183,7 @@ export default function StatusPage() {
               disabled={refreshing}
               aria-label="Refresh status now"
             >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              <HugeiconsIcon icon={RefreshIcon} size={14} className={refreshing ? 'animate-spin' : ''} />
             </button>
           </div>
         </section>

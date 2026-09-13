@@ -1,7 +1,11 @@
 'use client';
 
 import { ReactNode, useSyncExternalStore } from 'react';
-import { CheckCircle2, CircleX, TriangleAlert, X } from 'lucide-react';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import CancelCircleIcon from '@hugeicons/core-free-icons/CancelCircleIcon';
+import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
 import {
   getServerToastSnapshot,
   getToastSnapshot,
@@ -11,10 +15,10 @@ import {
   type TraceIQToast
 } from '@/lib/toast';
 
-const TONE_STYLES: Record<ToastTone, { icon: typeof CheckCircle2; iconClass: string; title: string }> = {
-  success: { icon: CheckCircle2, iconClass: 'text-emerald-600 dark:text-emerald-400', title: 'Success' },
-  warning: { icon: TriangleAlert, iconClass: 'text-amber-600 dark:text-amber-400', title: 'Attention' },
-  error: { icon: CircleX, iconClass: 'text-red-600 dark:text-red-400', title: 'Something went wrong' }
+const TONE_STYLES: Record<ToastTone, { icon: IconSvgElement; iconClass: string; title: string }> = {
+  success: { icon: CheckmarkCircle02Icon, iconClass: 'text-emerald-600 dark:text-emerald-400', title: 'Success' },
+  warning: { icon: Alert02Icon, iconClass: 'text-amber-600 dark:text-amber-400', title: 'Attention' },
+  error: { icon: CancelCircleIcon, iconClass: 'text-red-600 dark:text-red-400', title: 'Something went wrong' }
 };
 
 export function TraceIQToastProvider({ children }: { children: ReactNode }) {
@@ -47,7 +51,7 @@ function ToastItem({ toastItem }: { toastItem: TraceIQToast }) {
       aria-live={toastItem.tone === 'error' ? 'assertive' : 'polite'}
       aria-atomic="true"
     >
-      <Icon className={`mt-0.5 size-5 shrink-0 ${style.iconClass}`} aria-hidden="true" />
+      <HugeiconsIcon icon={style.icon} size={20} className={`mt-0.5 shrink-0 ${style.iconClass}`} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{toastItem.title ?? style.title}</p>
         <p className="mt-1 break-words text-sm leading-5 text-neutral-600 dark:text-slate-300">{toastItem.message}</p>
@@ -58,7 +62,7 @@ function ToastItem({ toastItem }: { toastItem: TraceIQToast }) {
         aria-label="Dismiss notification"
         onClick={() => toast.dismiss(toastItem.id)}
       >
-        <X className="size-4" aria-hidden="true" />
+        <HugeiconsIcon icon={Cancel01Icon} size={16} aria-hidden="true" />
       </button>
     </article>
   );

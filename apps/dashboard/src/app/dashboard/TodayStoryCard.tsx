@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
 
@@ -99,7 +100,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
             disabled={isLoading}
             className="inline-flex h-8 items-center justify-center gap-1.5 self-start rounded-md border border-neutral-300 bg-transparent px-3 text-xs font-medium text-neutral-700 transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 sm:self-auto"
           >
-            <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <HugeiconsIcon icon={RefreshIcon} size={14} className={isLoading ? 'animate-spin' : ''} />
             <span>{isLoading ? 'Writing…' : 'Refresh'}</span>
           </button>
         </div>

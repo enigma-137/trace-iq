@@ -1,19 +1,17 @@
 'use client'
 
 import { useState } from 'react';
-import {
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  Copy,
-  Code,
-  Menu,
-  MoveUpRight,
-  Play,
-  Terminal,
-  X,
-  Zap
-} from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import CodeIcon from '@hugeicons/core-free-icons/CodeIcon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
+import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
+import TerminalIcon from '@hugeicons/core-free-icons/TerminalIcon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import GlobeHero from '@/components/globe-hero';
 import { LandingApiFlow } from '@/components/LandingApiFlow';
 import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
@@ -136,9 +134,9 @@ export default function Page() {
             ))}
           </nav>
           <div className="header-actions">
-            <a className="button button-small" href="/auth/login">Get started <ArrowUpRight size={14} /></a>
+            <a className="button button-small" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'}>
-              {menuOpen ? <X /> : <Menu />}
+              {menuOpen ? <HugeiconsIcon icon={Cancel01Icon} size={20} /> : <HugeiconsIcon icon={Menu01Icon} size={20} />}
             </button>
           </div>
         </div>
@@ -151,8 +149,8 @@ export default function Page() {
           <h1>Clarity for<br /><em>complex systems.</em></h1>
           <p>TraceIQ turns page views, custom events, API response data, and errors into a clear map of how your software really works.</p>
           <div className="hero-actions">
-            <a className="button" href="/auth/login">Start tracing <ArrowUpRight size={16} /></a>
-            <a className="quiet-link" href="#sandbox"><Play size={14} fill="currentColor" /> See how it works</a>
+            <a className="button" href="/auth/login">Start tracing <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} /></a>
+            <a className="quiet-link" href="#sandbox"><HugeiconsIcon icon={PlayIcon} size={14} fill="currentColor" /> See how it works</a>
           </div>
           <div className="hero-note"><span>Open source · self-hosted · inspectable</span><span className="note-line" /></div>
         </div>
@@ -194,7 +192,7 @@ export default function Page() {
           </div>
           <div className="product-detail-footer">
             <p>Compare traffic, errors, and latency, then inspect how requests move from your SDKs through processing and storage.</p>
-            <a className="quiet-link" href="/auth/login">Explore TraceIQ <ArrowUpRight size={14} /></a>
+            <a className="quiet-link" href="/auth/login">Explore TraceIQ <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
           </div>
         </div>
       </section>
@@ -211,7 +209,7 @@ export default function Page() {
             <div className="window-dots"><i /><i /><i /></div>
             <span className="window-title">traceiq / quickstart</span>
             <button className="copy-button" onClick={copyCode} aria-label="Copy code">
-              {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
+              {copied ? <HugeiconsIcon icon={Tick02Icon} size={14} /> : <HugeiconsIcon icon={Copy01Icon} size={14} />} {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
           <div className="code-window-body">
@@ -226,7 +224,7 @@ export default function Page() {
           </div>
           <div className="code-window-foot">
             <span>traceiq-sdk</span>
-            <a href="/docs">Read the docs <ArrowUpRight size={13} /></a>
+            <a href="/docs">Read the docs <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} /></a>
           </div>
         </div>
         <div className="sdk-pills">
@@ -251,7 +249,7 @@ export default function Page() {
           </div>
           <div className="code-window-foot">
             <span>traceiq-mcp-server</span>
-            <a href="/docs#mcp">MCP docs <ArrowUpRight size={13} /></a>
+            <a href="/docs#mcp">MCP docs <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} /></a>
           </div>
         </div>
         <div className="sdk-pills">
@@ -277,7 +275,7 @@ export default function Page() {
                 <span className="size-3 rounded-full bg-emerald-500/80" />
                 <span className="ml-2 text-xs font-mono text-zinc-500">app/trace-test.ts</span>
               </div>
-              <span className="inline-flex items-center gap-1.5 rounded bg-black/40 px-2 py-0.5 text-[10px] font-mono text-zinc-500"><Code size={12} /> TypeScript</span>
+              <span className="inline-flex items-center gap-1.5 rounded bg-black/40 px-2 py-0.5 text-[10px] font-mono text-zinc-500"><HugeiconsIcon icon={CodeIcon} size={12} /> TypeScript</span>
             </div>
 
             <div className="grid grid-cols-4 border-b border-border text-xs font-mono text-zinc-400">
@@ -298,7 +296,7 @@ export default function Page() {
             <div className="flex items-center justify-between px-5 py-4 border-t border-border">
               <span className="text-xs text-zinc-500 font-mono">SDK simulation ready.</span>
               <button onClick={simulateSDKEvent} className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-50 px-4 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-200 active:scale-95">
-                <Zap size={14} /> Fire event
+                <HugeiconsIcon icon={FlashIcon} size={14} /> Fire event
               </button>
             </div>
           </div>
@@ -307,7 +305,7 @@ export default function Page() {
           <div className="flex flex-col rounded-xl border border-border overflow-hidden min-h-[320px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <Terminal size={14} className="text-zinc-400" />
+                <HugeiconsIcon icon={TerminalIcon} size={14} className="text-zinc-400" />
                 <span className="text-xs font-mono text-zinc-300">TraceIQ Demo Console</span>
               </div>
               <button onClick={() => setLogs([])} className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded border border-border">
@@ -363,7 +361,7 @@ export default function Page() {
           <div className="workflow-copy">
             <h2>Make every<br /><em>millisecond count.</em></h2>
             <p style={{ marginTop: 20 }}>TraceIQ keeps your team in the flow by connecting the tiny details to the big picture.</p>
-            <a className="quiet-link" href="/docs">Explore the platform <MoveUpRight size={15} /></a>
+            <a className="quiet-link" href="/docs">Explore the platform <HugeiconsIcon icon={ArrowUpRight01Icon} size={15} /></a>
           </div>
         </div>
         <div className="workflow-steps">
@@ -388,7 +386,7 @@ export default function Page() {
             {faqs.map(([question, answer], i) => (
               <div className={`faq-item ${openFaq === i ? 'active' : ''}`} key={question}>
                 <button onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  <span>{question}</span><ChevronDown size={18} />
+                  <span>{question}</span><HugeiconsIcon icon={ArrowDown01Icon} size={18} />
                 </button>
                 {openFaq === i && <p>{answer}</p>}
               </div>
@@ -402,7 +400,7 @@ export default function Page() {
         <div className="cta-glow" />
         <span className="eyebrow"><span className="status-dot" /> Ready when you are</span>
         <h2>See what your<br /><em>systems are saying.</em></h2>
-        <a className="button" href="/auth/login">Get started <ArrowUpRight size={16} /></a>
+        <a className="button" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} /></a>
       </section>
 
       {/* Footer */}

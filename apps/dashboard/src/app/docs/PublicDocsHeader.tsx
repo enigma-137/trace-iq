@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import { ThemeToggle } from '../dashboard/ThemeToggle';
 
 export function PublicDocsHeader({ onOpenSearch }: { onOpenSearch?: () => void }) {
@@ -27,7 +28,7 @@ export function PublicDocsHeader({ onOpenSearch }: { onOpenSearch?: () => void }
             className="group flex w-full max-w-md items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-500 transition-all hover:border-neutral-300 hover:bg-neutral-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-900"
           >
             <div className="flex items-center gap-2">
-              <Search className="size-3.5 text-neutral-400 group-hover:text-neutral-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
+              <HugeiconsIcon icon={Search01Icon} size={14} className="text-neutral-400 group-hover:text-neutral-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
               <span>Search docs...</span>
             </div>
             <kbd className="inline-flex items-center gap-0.5 rounded border border-neutral-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-neutral-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">

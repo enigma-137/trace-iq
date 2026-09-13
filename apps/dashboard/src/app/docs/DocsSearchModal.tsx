@@ -3,7 +3,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Search, X, BookOpen, ArrowRight, CornerDownLeft } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import CornerDownLeftIcon from '@hugeicons/core-free-icons/CornerDownLeftIcon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import type { DocsTocItem } from './toc';
 
 interface DocsSearchModalProps {
@@ -111,7 +116,7 @@ export function DocsSearchModal({ isOpen, onClose, sections, basePath }: DocsSea
       <div className="relative w-full max-w-2xl overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         {/* Search Header */}
         <div className="relative flex items-center border-b border-neutral-200 px-4 py-3 dark:border-slate-800">
-          <Search className="size-5 shrink-0 text-neutral-400 dark:text-slate-500" />
+          <HugeiconsIcon icon={Search01Icon} size={20} className="shrink-0 text-neutral-400 dark:text-slate-500" />
           <input
             type="text"
             value={query}
@@ -127,7 +132,7 @@ export function DocsSearchModal({ isOpen, onClose, sections, basePath }: DocsSea
               onClick={() => setQuery('')}
               className="mr-2 rounded p-1 text-neutral-400 hover:text-neutral-600 dark:text-slate-500 dark:hover:text-slate-300"
             >
-              <X className="size-4" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} />
             </button>
           ) : null}
           <button
@@ -163,7 +168,7 @@ export function DocsSearchModal({ isOpen, onClose, sections, basePath }: DocsSea
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`mt-0.5 rounded-md p-1.5 ${isSelected ? 'bg-blue-600 text-white dark:bg-cyan-500 dark:text-slate-950' : 'bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400'}`}>
-                        <BookOpen className="size-4" />
+                        <HugeiconsIcon icon={BookOpen02Icon} size={16} />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -183,10 +188,10 @@ export function DocsSearchModal({ isOpen, onClose, sections, basePath }: DocsSea
                     </div>
                     {isSelected ? (
                       <div className="ml-3 flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-600 dark:text-cyan-400">
-                        <CornerDownLeft className="size-3.5" />
+                        <HugeiconsIcon icon={CornerDownLeftIcon} size={14} />
                       </div>
                     ) : (
-                      <ArrowRight className="ml-3 size-4 shrink-0 text-neutral-300 dark:text-slate-700 opacity-0 group-hover:opacity-100" />
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="ml-3 shrink-0 text-neutral-300 dark:text-slate-700 opacity-0 group-hover:opacity-100" />
                     )}
                   </div>
                 );

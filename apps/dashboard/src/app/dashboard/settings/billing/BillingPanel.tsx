@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, CreditCard, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import CreditCardIcon from '@hugeicons/core-free-icons/CreditCardIcon';
+import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -231,26 +234,26 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
           actions={pro ? (
             <div className={`grid gap-2 ${billingPeriod === 'monthly' ? 'sm:grid-cols-2' : ''}`}>
               <button className={secondaryButton} disabled={busy !== null} onClick={() => void openPortal()}>
-                {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage plan
+                {busy === 'portal' ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={CreditCardIcon} size={16} />} Manage plan
               </button>
               {billingPeriod === 'monthly' ? (
                 <button className={primaryButton} disabled={busy !== null || yearlyChangeScheduled} onClick={() => void scheduleYearlyBilling()}>
-                  {busy === 'schedule-yearly' ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {busy === 'schedule-yearly' ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : null}
                   {yearlyChangeScheduled ? 'Yearly billing scheduled' : yearlyChangeFailed ? 'Retry yearly change' : 'Switch to yearly at renewal'}
                 </button>
               ) : null}
             </div>
           ) : hasNonterminalSubscription ? (
             <button className={secondaryButton} disabled={busy !== null} onClick={() => void openPortal()}>
-              {busy === 'portal' ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />} Manage plan
+              {busy === 'portal' ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={CreditCardIcon} size={16} />} Manage plan
             </button>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               <button className={primaryButton} disabled={busy !== null} onClick={() => void beginCheckout('monthly')}>
-                {busy === 'monthly' ? <Loader2 className="size-4 animate-spin" /> : null} Upgrade monthly
+                {busy === 'monthly' ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : null} Upgrade monthly
               </button>
               <button className={secondaryButton} disabled={busy !== null} onClick={() => void beginCheckout('yearly')}>
-                {busy === 'yearly' ? <Loader2 className="size-4 animate-spin" /> : null} $190 yearly
+                {busy === 'yearly' ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : null} $190 yearly
               </button>
             </div>
           )}
@@ -292,7 +295,7 @@ function PlanCard({ name, price, secondaryPrice, description, features, current,
   return <article className={`rounded-xl border p-5 ${current ? 'border-blue-500 ring-1 ring-blue-500' : 'border-neutral-200 dark:border-slate-800'}`}>
     <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{name}</h3><p className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">{price}</p>{secondaryPrice ? <p className="mt-1 text-sm font-semibold text-neutral-600 dark:text-slate-300">or {secondaryPrice}</p> : null}</div>{current ? <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">Current plan</span> : null}</div>
     <p className="mt-3 text-sm text-neutral-500 dark:text-slate-400">{description}</p>
-    <ul className="my-5 grid gap-2 text-sm text-neutral-700 dark:text-slate-300">{features.map((feature) => <li key={feature} className="flex items-center gap-2"><Check className="size-4 text-blue-600" />{feature}</li>)}</ul>
+    <ul className="my-5 grid gap-2 text-sm text-neutral-700 dark:text-slate-300">{features.map((feature) => <li key={feature} className="flex items-center gap-2"><HugeiconsIcon icon={Tick02Icon} size={16} className="text-blue-600" />{feature}</li>)}</ul>
     {actions}
   </article>;
 }
