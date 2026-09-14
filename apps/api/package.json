@@ -24,6 +24,7 @@
     "@nestjs/platform-express": "^10.4.1",
     "@nestjs/throttler": "^6.5.0",
     "@traceiq/types": "0.1.0",
+    "ajv": "8.12.0",
     "bullmq": "^5.12.10",
     "cors": "^2.8.5",
     "groq-sdk": "^1.5.0",

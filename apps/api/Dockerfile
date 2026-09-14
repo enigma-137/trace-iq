@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 COPY tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
+COPY contracts ./contracts
 
 RUN npm ci --include=dev --legacy-peer-deps
 

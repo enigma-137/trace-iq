@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, symlink } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
@@ -31,14 +32,16 @@ class MemoryStorage implements ReplayStorage {
 }
 
 function makeService({ enabled = true, sampleRate = 1, matchedFunnelIds = ['fnl_onboarding'],
-  triggerEventNames = ['onboarding_started'], existingChunk }: {
+  triggerEventNames = ['onboarding_started'], existingChunk, recordingFormat = 'rrweb-json-gzip', playback = false }: {
   enabled?: boolean; sampleRate?: number; matchedFunnelIds?: string[]; triggerEventNames?: string[];
   existingChunk?: { content_sha256: string; storage_key: string };
+  recordingFormat?: 'rrweb-json-gzip' | 'mobile-structural-v1'; playback?: boolean;
 } = {}) {
   const now = Date.now();
   const replay = {
     id: 'rpl_test', organization_id: 'org_a', project_id: 'proj_a', session_id: 'sess_a',
     storage_prefix: 'org_a/proj_a/sess_a', privacy_mode: 'balanced',
+    recording_format: recordingFormat, recording_version: recordingFormat === 'rrweb-json-gzip' ? 'rrweb@2' : '1',
     started_at: new Date(now - 1_000).toISOString(), expires_at: new Date(now + 86_400_000).toISOString(),
     chunk_count: 0, event_count: 0, compressed_size_bytes: 0, uncompressed_size_bytes: 0,
     status: 'recording', deleted_at: null
@@ -62,9 +65,18 @@ function makeService({ enabled = true, sampleRate = 1, matchedFunnelIds = ['fnl_
     if (text.includes('SELECT s.id,s.user_id,s.anonymous_id,u.external_id')) {
       return rows([{ id: 'sess_a', user_id: null, anonymous_id: 'anon_a', external_id: null }]);
     }
+    if (text.includes('SELECT * FROM session_replays WHERE id=$1 AND project_id=$2 AND deleted_at')) return playback ? rows([replay]) : empty();
     if (text.includes('SELECT * FROM session_replays WHERE project_id')) return rows([replay]);
+    if (text.includes('INSERT INTO session_replays')) {
+      Object.assign(replay, { id: values[0], recording_format: values[8], recording_version: values[9] });
+      return rows([replay]);
+    }
     if (text.includes('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE')) return rows([replay]);
     if (text.includes('FROM replay_chunks WHERE replay_id=$1 AND sequence=$2')) {
+      return existingChunk ? rows([{ id: 'rpc_existing', replay_id: replay.id, sequence: 0, status: 'ready',
+        event_count: 1, compressed_size_bytes: 10, uncompressed_size_bytes: 20, ...existingChunk }]) : empty();
+    }
+    if (text.includes("FROM replay_chunks WHERE replay_id=$1 AND status='ready'")) {
       return existingChunk ? rows([{ id: 'rpc_existing', replay_id: replay.id, sequence: 0, status: 'ready',
         event_count: 1, compressed_size_bytes: 10, uncompressed_size_bytes: 20, ...existingChunk }]) : empty();
     }
@@ -115,6 +127,14 @@ function canaryEvent(timestamp = Date.now()) {
       filter: `u\\72l(https://example.test/escaped?token=${CANARIES.query})`, rr_dataURL: `data:image/png,${CANARIES.hidden}` } },
     { tagName: 'iframe', attributes: { src: `https://example.test/frame?token=${CANARIES.query}` }, childNodes: [{ textContent: CANARIES.text }] }
   ] } } };
+}
+
+function mobileChunk() {
+  const chunk = JSON.parse(readFileSync(new URL('../../../contracts/mobile-replay/fixtures/valid-react-native.json', import.meta.url), 'utf8'));
+  const first = chunk.events[0].timestamp as number;
+  const now = Date.now() - 1_000;
+  for (const event of chunk.events) event.timestamp = now + event.timestamp - first;
+  return chunk;
 }
 
 describe('Session Replay security', () => {
@@ -567,7 +587,8 @@ rl(https://escaped.example/pixel)}` }, childNodes: []
         const created = {
           id: values[0], organization_id: values[1], project_id: values[2], session_id: values[3],
           user_id: values[4], anonymous_id: values[5], started_at: values[6], storage_prefix: values[7],
-          privacy_mode: values[9], chunk_count: 0, event_count: 0, compressed_size_bytes: 0,
+          recording_format: values[8], recording_version: values[9], privacy_mode: values[10],
+          chunk_count: 0, event_count: 0, compressed_size_bytes: 0,
           uncompressed_size_bytes: 0, status: 'recording', deleted_at: null,
           expires_at: new Date(Date.now() + 86_400_000).toISOString()
         };
@@ -652,5 +673,130 @@ describe('Replay sanitizer privacy modes', () => {
   it('always masks rrweb incremental input events', () => {
     const result = sanitizeReplayEvents([{ type: 3, timestamp: 1, data: { source: 5, text: CANARIES.text } }], 'balanced');
     expect(JSON.stringify(result)).not.toContain(CANARIES.text);
+  });
+});
+
+describe('Mobile replay API format isolation', () => {
+  const identity = { projectId: 'proj_a', sessionId: 'sess_a', anonymousId: 'anon_a' };
+
+  it('binds a mobile grant to its format and stores a schema-validated chunk', async () => {
+    const { service, tokens, storage, db } = makeService({ recordingFormat: 'mobile-structural-v1' });
+    const grant = await service.authorizeUpload('write_key', {
+      ...identity, consentGranted: true, recordingFormat: 'mobile-structural-v1'
+    });
+    expect(tokens.verify(grant.token).recordingFormat).toBe('mobile-structural-v1');
+
+    const chunk = mobileChunk();
+    const result = await service.ingestChunk(grant.token, { ...identity, sequence: 0, events: chunk });
+    expect(result).toMatchObject({ accepted: true, duplicate: false, replayId: grant.replayId });
+    const stored = JSON.parse(gunzipSync([...storage.objects.values()][0]).toString('utf8'));
+    expect(stored).toEqual(chunk);
+    expect(db.queryCalls(/INSERT INTO session_replays/)[0].values.slice(8, 10)).toEqual(['mobile-structural-v1', '1']);
+    expect(db.queryCalls(/INSERT INTO replay_chunks/)[0].values[4]).toBe(chunk.events.length);
+  });
+
+  it('accepts the same mobile contract through bounded gzip-base64 transport', async () => {
+    const { service, storage } = makeService({ recordingFormat: 'mobile-structural-v1' });
+    const grant = await service.authorizeUpload('write_key', {
+      ...identity, consentGranted: true, recordingFormat: 'mobile-structural-v1'
+    });
+    const chunk = mobileChunk();
+    const encodedEvents = gzipSync(Buffer.from(JSON.stringify(chunk))).toString('base64');
+    await service.ingestChunk(grant.token, { ...identity, sequence: 0, encoding: 'gzip-base64', encodedEvents });
+    expect(JSON.parse(gunzipSync([...storage.objects.values()][0]).toString('utf8'))).toEqual(chunk);
+  });
+
+  it('rejects content-bearing fields and mismatched mobile sequences before reserving storage', async () => {
+    const { service, storage, db } = makeService({ recordingFormat: 'mobile-structural-v1' });
+    const grant = await service.authorizeUpload('write_key', {
+      ...identity, consentGranted: true, recordingFormat: 'mobile-structural-v1'
+    });
+    const content = mobileChunk();
+    content.events[0].nodes[1].text = CANARIES.text;
+    await expect(service.ingestChunk(grant.token, { ...identity, sequence: 0, events: content }))
+      .rejects.toThrow(/privacy schema/);
+    const wrongSequence = mobileChunk();
+    wrongSequence.sequence = 1;
+    await expect(service.ingestChunk(grant.token, { ...identity, sequence: 0, events: wrongSequence }))
+      .rejects.toThrow(/sequence/);
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(db.queryCalls(/INSERT INTO replay_chunks/)).toHaveLength(0);
+  });
+
+  it('cannot use a browser grant for mobile data or a mobile grant for rrweb data', async () => {
+    const { service, uploadToken } = makeService();
+    await expect(service.ingestChunk(uploadToken, { ...identity, sequence: 0, events: mobileChunk() }))
+      .rejects.toThrow(/rrweb/);
+    const mobile = makeService({ recordingFormat: 'mobile-structural-v1' });
+    const grant = await mobile.service.authorizeUpload('write_key', {
+      ...identity, consentGranted: true, recordingFormat: 'mobile-structural-v1'
+    });
+    await expect(mobile.service.ingestChunk(grant.token, { ...identity, sequence: 0, events: [canaryEvent()] }))
+      .rejects.toThrow(/privacy schema/);
+  });
+
+  it('cannot append mobile chunks to an existing browser replay', async () => {
+    const { service, tokens, db } = makeService();
+    const token = tokens.sign({ ...identity, organizationId: 'org_a', consentGranted: false,
+      requireConsent: false, privacyMode: 'balanced', maxDurationSeconds: 600, maxChunks: 3000,
+      maxCompressedBytes: 250_000_000, maxUncompressedBytes: 250_000_000,
+      matchedFunnelIds: ['fnl_onboarding'], recordingFormat: 'mobile-structural-v1' }, 300).token;
+    await expect(service.ingestChunk(token, { ...identity, sequence: 0, events: mobileChunk() }))
+      .rejects.toThrow(/format does not match/);
+    expect(db.queryCalls(/INSERT INTO replay_chunks/)).toHaveLength(0);
+  });
+
+  it('cannot append a chunk to a replay from another analytics session', async () => {
+    const { service, uploadToken, replay, db } = makeService();
+    replay.session_id = 'sess_other';
+    await expect(service.ingestChunk(uploadToken, { ...identity, sequence: 0, events: [canaryEvent()] }))
+      .rejects.toThrow(/does not belong.*session/);
+    expect(db.queryCalls(/INSERT INTO replay_chunks/)).toHaveLength(0);
+  });
+
+  it('returns format-aware mobile events without sending them through rrweb playback', async () => {
+    const chunk = mobileChunk();
+    const compressed = gzipSync(Buffer.from(JSON.stringify(chunk)), { level: 6 });
+    const digest = createHash('sha256').update(compressed).digest('hex');
+    const storageKey = `org_a/proj_a/sess_a/000000-${digest.slice(0, 12)}.json.gz`;
+    const { service, storage } = makeService({ recordingFormat: 'mobile-structural-v1', playback: true,
+      existingChunk: { content_sha256: digest, storage_key: storageKey } });
+    storage.objects.set(storageKey, compressed);
+    const result = await service.playback({ id: 'owner' }, 'rpl_test', 'proj_a');
+    expect(result).toMatchObject({ replayId: 'rpl_test', recordingFormat: 'mobile-structural-v1',
+      recordingVersion: '1', runtime: 'react-native', platform: 'android', events: chunk.events, done: true });
+  });
+
+  it('keeps browser playback in the rrweb projection', async () => {
+    const sanitized = sanitizeReplayEvents([canaryEvent()], 'balanced');
+    const compressed = gzipSync(Buffer.from(JSON.stringify(sanitized)), { level: 6 });
+    const digest = createHash('sha256').update(compressed).digest('hex');
+    const storageKey = `org_a/proj_a/sess_a/000000-${digest.slice(0, 12)}.json.gz`;
+    const { service, storage } = makeService({ playback: true,
+      existingChunk: { content_sha256: digest, storage_key: storageKey } });
+    storage.objects.set(storageKey, compressed);
+    const result = await service.playback({ id: 'owner' }, 'rpl_test', 'proj_a');
+    expect(result.recordingFormat).toBe('rrweb-json-gzip');
+    expect(JSON.stringify(result.events)).not.toContain('example.test');
+  });
+
+  it('rejects a stored mobile chunk with content-bearing fields even when its checksum matches', async () => {
+    const chunk = mobileChunk();
+    chunk.events[0].nodes[1].text = CANARIES.text;
+    const compressed = gzipSync(Buffer.from(JSON.stringify(chunk)), { level: 6 });
+    const digest = createHash('sha256').update(compressed).digest('hex');
+    const storageKey = `org_a/proj_a/sess_a/000000-${digest.slice(0, 12)}.json.gz`;
+    const { service, storage } = makeService({ recordingFormat: 'mobile-structural-v1', playback: true,
+      existingChunk: { content_sha256: digest, storage_key: storageKey } });
+    storage.objects.set(storageKey, compressed);
+    await expect(service.playback({ id: 'owner' }, 'rpl_test', 'proj_a')).rejects.toThrow(/privacy schema/);
+  });
+
+  it('preserves browser defaults and rejects an unsupported format before authorization', async () => {
+    const { service, tokens } = makeService();
+    const browser = await service.authorizeUpload('write_key', { ...identity, consentGranted: true });
+    expect(tokens.verify(browser.token).recordingFormat).toBe('rrweb-json-gzip');
+    await expect(service.authorizeUpload('write_key', { ...identity, consentGranted: true,
+      recordingFormat: 'video' as never })).rejects.toThrow(/unsupported/);
   });
 });

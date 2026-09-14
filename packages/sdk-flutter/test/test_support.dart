@@ -2,6 +2,7 @@ import 'dart:collection';
 
 import 'package:traceiq_flutter/src/event.dart';
 import 'package:traceiq_flutter/src/runtime.dart';
+import 'package:traceiq_flutter/src/replay_transport.dart';
 import 'package:traceiq_flutter/src/transport.dart';
 
 final class FakeTransport implements TraceIQTransport {
@@ -38,4 +39,36 @@ final class FakeUuid implements TraceIQUuidGenerator {
   var count = 0;
   @override
   String generate() => '00000000-0000-4000-8000-${(++count).toString().padLeft(12, '0')}';
+}
+
+final class FakeReplayTransport implements TraceIQReplayTransport {
+  Map<String, Object?> settings = <String, Object?>{
+    'enabled': true, 'sampleRate': 1, 'maxDurationSeconds': 300,
+    'flowTriggerEventNames': <String>['checkout_started'],
+  };
+  final List<Map<String, Object?>> grants = <Map<String, Object?>>[];
+  final List<Map<String, Object?>> chunks = <Map<String, Object?>>[];
+  final List<Map<String, Object?>> completions = <Map<String, Object?>>[];
+  int configCalls = 0;
+  int cancellations = 0;
+  bool closed = false;
+
+  @override
+  Future<Map<String, Object?>> config() async { configCalls++; return settings; }
+  @override
+  Future<Map<String, Object?>> authorize(Map<String, Object?> body) async {
+    grants.add(body);
+    return <String, Object?>{
+      'token': 'test-token', 'replayId': 'rpl_test',
+      'expiresAt': DateTime.utc(2030).toIso8601String(),
+    };
+  }
+  @override
+  Future<void> chunk(Map<String, Object?> body, String token) async { chunks.add(body); }
+  @override
+  Future<void> complete(Map<String, Object?> body, String token) async { completions.add(body); }
+  @override
+  void cancelPending() { cancellations++; }
+  @override
+  void close() { closed = true; }
 }

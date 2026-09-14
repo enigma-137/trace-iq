@@ -46,14 +46,16 @@ export function buildDeviceInfo(appVersion?: string): Record<string, unknown> {
 }
 
 /** Subscribe to app background/foreground. Returns an unsubscribe fn (no-op if unavailable). */
-export function onAppBackground(handler: () => void): () => void {
+export function onAppState(handler: (state: 'foreground' | 'background') => void): () => void {
   const appState = rn?.AppState;
   if (!appState?.addEventListener) {
     return () => undefined;
   }
   const subscription = appState.addEventListener('change', (state: string) => {
     if (state === 'background' || state === 'inactive') {
-      handler();
+      handler('background');
+    } else if (state === 'active') {
+      handler('foreground');
     }
   });
   return () => {

@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'config.dart';
 import 'device_info.dart';
 import 'event.dart';
 import 'json_value.dart';
 import 'queue.dart';
+import 'replay.dart';
+import 'replay_transport.dart';
 import 'runtime.dart';
 import 'session.dart';
 import 'storage.dart';
@@ -18,6 +21,8 @@ final class TraceIQClient {
     required this.config,
     required TraceIQStorage storage,
     required TraceIQTransport transport,
+    TraceIQReplayTransport? replayTransport,
+    String? replayPlatform,
     TraceIQClock clock = const SystemTraceIQClock(),
     TraceIQUuidGenerator uuid = const SystemTraceIQUuidGenerator(),
     RetryPolicy? retryPolicy,
@@ -34,7 +39,11 @@ final class TraceIQClient {
           storageKey: 'traceiq.queue.v1.${config.projectId}',
           logger: config.debug ? (message) => debugPrint('[TraceIQ] $message') : null,
         ),
-        _sessions = SessionManager(clock: clock, uuid: uuid, timeout: config.sessionTimeout);
+        _sessions = SessionManager(clock: clock, uuid: uuid, timeout: config.sessionTimeout),
+        _replay = config.replayEnabled ? MobileReplayRecorder(
+          config: config, transport: replayTransport ?? HttpTraceIQReplayTransport(config),
+          clock: clock, platform: replayPlatform,
+        ) : null;
 
   static const _anonymousIdKeyBase = 'traceiq.anonymous_id';
   static const _userIdKeyBase = 'traceiq.user_id';
@@ -51,6 +60,8 @@ final class TraceIQClient {
   final Future<Map<String, Object?>> Function() _metadataProvider;
   final PersistentEventQueue _queue;
   final SessionManager _sessions;
+  final MobileReplayRecorder? _replay;
+  static final ValueNotifier<bool> _disabledReplay = ValueNotifier<bool>(false);
 
   Future<void> _mutationTail = Future<void>.value();
   Future<void>? _flushFuture;
@@ -69,6 +80,8 @@ final class TraceIQClient {
   String? get userId => _userId;
   String get sessionId => _sessions.id;
   int get queuedEventCount => _queue.length;
+  bool get isReplayRecording => _replay?.isRecording ?? false;
+  ValueListenable<bool> get replayRecording => _replay?.recording ?? _disabledReplay;
   String get _anonymousIdKey => '$_anonymousIdKeyBase.${config.projectId}';
   String get _userIdKey => '$_userIdKeyBase.${config.projectId}';
   String get _traitsKey => '$_traitsKeyBase.${config.projectId}';
@@ -114,6 +127,10 @@ final class TraceIQClient {
     await _mutate(() async {
       _ensureUsable();
       if (!_trackingEnabled) return;
+      if (_userId != cleanUserId) {
+        _sessions.reset();
+        _replay?.stop();
+      }
       _userId = cleanUserId;
       await _storage.write(_userIdKey, cleanUserId);
       await _storage.write(_traitsKey, jsonEncode(cleanTraits));
@@ -127,6 +144,7 @@ final class TraceIQClient {
     if (cleanName.isEmpty) throw ArgumentError.value(name, 'name', 'must not be empty');
     _currentScreen = cleanName;
     await _enqueue(r'$page', properties: <String, Object?>{'name': cleanName, ...?properties});
+    _replay?.navigation(cleanName);
   }
 
   Future<void> revenue({
@@ -164,6 +182,7 @@ final class TraceIQClient {
 
   Future<void> reset() => _mutate(() async {
         _ensureUsable();
+        _replay?.stop();
         _userId = null;
         _anonymousId = _uuid.generate();
         _sessions.reset();
@@ -177,6 +196,7 @@ final class TraceIQClient {
   Future<void> setTrackingEnabled(bool enabled) => _mutate(() async {
         _ensureUsable();
         _trackingEnabled = enabled;
+        if (!enabled) _replay?.revokeConsent();
         await _storage.write(_trackingKey, enabled.toString());
         if (!enabled) await _queue.clear();
         _debug('Tracking ${enabled ? 'enabled' : 'disabled; queue cleared'}.');
@@ -184,10 +204,29 @@ final class TraceIQClient {
 
   Future<void> onBackground() async {
     _sessions.background();
-    await flush();
+    _replay?.background();
+    await Future.wait(<Future<void>>[flush(), _replay?.flush() ?? Future<void>.value()]);
   }
 
-  void onResume() => _sessions.resume();
+  void onResume() {
+    if (_sessions.resume()) _replay?.stop();
+    _replay?.resume();
+  }
+
+  Future<void> grantReplayConsent() {
+    _ensureUsable();
+    if (!_trackingEnabled) return Future<void>.value();
+    return _replay?.grantConsent() ?? Future<void>.value();
+  }
+
+  void revokeReplayConsent() => _replay?.revokeConsent();
+  void recordReplaySnapshot(String screen, Size viewport, List<TraceIQReplayNode> nodes) =>
+      _replay?.snapshot(screen, viewport, nodes);
+  void clearReplaySnapshot() => _replay?.clearView();
+  void recordReplayTap(Offset point) => _replay?.tap(point);
+  void recordReplayScroll(Offset point, Offset delta) => _replay?.scroll(point, delta);
+  Future<void> flushReplay() => _replay?.flush() ?? Future<void>.value();
+  Future<void> completeReplay() => _replay?.complete() ?? Future<void>.value();
 
   Future<void> flush() {
     if (!_initialized || _disposed || !_trackingEnabled) return Future<void>.value();
@@ -199,38 +238,50 @@ final class TraceIQClient {
     while (true) {
       final batch = await _mutate(() async => _queue.peek(config.batchSize));
       if (batch.isEmpty) return;
-      final delivered = await _sendWithRetry(batch);
-      if (!delivered) return;
+      final response = await _sendWithRetry(batch);
+      if (response == null) return;
       await _mutate(() => _queue.removeIds(batch.map((event) => event.queueId)));
+      final accepted = response.acceptedEvents;
+      if (response.isSuccess && accepted != null && accepted.length == batch.length && _trackingEnabled) {
+        for (var index = 0; index < batch.length; index++) {
+          final event = batch[index];
+          if (accepted[index] && event.sessionId == _sessions.id &&
+              event.anonymousId == _anonymousId && event.userId == _userId) {
+            await _replay?.acceptedEvent(event);
+          }
+        }
+      }
       _debug('Batch delivered.');
     }
   }
 
-  Future<bool> _sendWithRetry(List<TraceIQEvent> batch) async {
+  Future<TransportResponse?> _sendWithRetry(List<TraceIQEvent> batch) async {
     for (var attempt = 0; attempt <= config.maxRetryCount; attempt++) {
-      if (!_trackingEnabled || _disposed) return false;
+      if (!_trackingEnabled || _disposed) return null;
       try {
         final response = await _transport.send(batch);
-        if (response.isSuccess) return true;
+        if (response.isSuccess) return response;
         if (!RetryPolicy.isRetryableStatus(response.statusCode)) {
           _debug('Permanent HTTP ${response.statusCode}; batch discarded.');
-          return true;
+          return response;
         }
-        if (attempt == config.maxRetryCount) return false;
+        if (attempt == config.maxRetryCount) return null;
         await _clock.delay(_retryPolicy.delayFor(attempt + 1, retryAfter: response.retryAfter));
       } on Object catch (_) {
-        if (attempt == config.maxRetryCount) return false;
+        if (attempt == config.maxRetryCount) return null;
         await _clock.delay(_retryPolicy.delayFor(attempt + 1));
       }
     }
-    return false;
+    return null;
   }
 
   Future<void> dispose() async {
     if (_disposed) return;
     _flushTimer?.cancel();
     await flush();
+    await _replay?.complete();
     _disposed = true;
+    _replay?.dispose();
     _transport.close();
   }
 

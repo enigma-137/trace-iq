@@ -1,0 +1,20 @@
+{
+  "format": "mobile-structural-v1",
+  "version": 1,
+  "runtime": "flutter",
+  "platform": "ios",
+  "sequence": 2,
+  "events": [
+    {
+      "type": "snapshot",
+      "timestamp": 1760000010000,
+      "screen": "Wallet.Home",
+      "viewport": { "width": 393, "height": 852, "orientation": "portrait" },
+      "nodes": [
+        { "id": 0, "kind": "box", "frame": { "x": 0, "y": 0, "width": 393, "height": 852 } },
+        { "id": 1, "parentId": 0, "kind": "input", "frame": { "x": 24, "y": 100, "width": 345, "height": 48 } }
+      ]
+    },
+    { "type": "lifecycle", "timestamp": 1760000010100, "state": "foreground" }
+  ]
+}

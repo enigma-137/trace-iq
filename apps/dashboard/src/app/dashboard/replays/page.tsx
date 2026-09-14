@@ -26,7 +26,7 @@ export default async function ReplaysPage({ searchParams }: {
       <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <p className="max-w-2xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
-            Inspect a session in context. Replay payloads are rrweb events, not video files, and expire on their own retention schedule.
+            Inspect a session in context. Browser replays use rrweb; mobile replays use content-free structural events. Both expire on their retention schedule.
           </p>
           {searchParams.sessionId ? <p className="mt-2 font-mono text-xs text-neutral-500">Session: {searchParams.sessionId}</p> : null}
         </div>
@@ -48,6 +48,9 @@ export default async function ReplaysPage({ searchParams }: {
                   <td className="px-4 py-3">
                     <p className="max-w-52 truncate font-semibold">{replay.identity}</p>
                     <p className="font-mono text-[10px] text-neutral-400">{replay.sessionId}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-wider text-neutral-500">
+                      {replay.recordingFormat === 'mobile-structural-v1' ? 'Mobile structural' : 'Browser rrweb'}
+                    </p>
                     <p className="mt-1 max-w-52 truncate text-[11px] text-neutral-500" title={replay.matchedFlows.map((flow) => flow.name).join(', ')}>
                       {replay.matchedFlows.length > 0 ? `Flows: ${replay.matchedFlows.map((flow) => flow.name).join(', ')}` : 'Flow no longer available'}
                     </p>

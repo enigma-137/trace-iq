@@ -15,6 +15,7 @@ final class TraceIQConfig {
     this.maxQueueSize = 1000,
     this.sessionTimeout = const Duration(minutes: 30),
     this.trackingEnabled = true,
+    this.replayEnabled = false,
   }) {
     if (projectId.trim().isEmpty) {
       throw ArgumentError.value(projectId, 'projectId', 'must not be empty');
@@ -86,7 +87,9 @@ final class TraceIQConfig {
   /// Initial tracking state. A persisted opt-out takes precedence.
   final bool trackingEnabled;
 
+  /// Mobile structural replay is off unless explicitly enabled and consented.
+  final bool replayEnabled;
+
   /// Batch endpoint derived from [apiUrl].
   Uri get batchUri => Uri.parse('${apiUrl.replaceFirst(RegExp(r'/+$'), '')}/v1/events/batch');
 }
-

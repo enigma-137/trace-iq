@@ -1,5 +1,7 @@
 # Session Replay
 
+The replay API also accepts the [mobile structural replay v1 contract](../contracts/mobile-replay/README.md). React Native and Flutter have opt-in structural recorders, and the dashboard has a dedicated placeholder-only mobile player. The rest of this page describes the browser/rrweb recorder and playback path; see the [React Native SDK guide](../packages/react-native/README.md#mobile-session-replay), [Flutter SDK guide](../packages/sdk-flutter/README.md#mobile-session-replay-ios-and-android), and [mobile replay pilot checklist](mobile-replay-pilot.md) for mobile integration.
+
 TraceIQ Session Replay records rrweb event streams; it never creates video files. The feature is disabled by default. On TraceIQ Cloud it is available to Pro organizations and unavailable on Free; self-hosted installations do not require billing. Availability does not turn recording on. The project switch, at least one selected funnel, SDK opt-in, consent policy, deterministic sampling, and server authorization must all pass.
 
 The recording path is:

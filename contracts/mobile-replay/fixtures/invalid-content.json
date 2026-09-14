@@ -1,0 +1,18 @@
+{
+  "format": "mobile-structural-v1",
+  "version": 1,
+  "runtime": "react-native",
+  "platform": "ios",
+  "sequence": 0,
+  "events": [
+    {
+      "type": "snapshot",
+      "timestamp": 1760000000000,
+      "screen": "Checkout.Payment",
+      "viewport": { "width": 390, "height": 844, "orientation": "portrait" },
+      "nodes": [
+        { "id": 0, "kind": "text", "frame": { "x": 0, "y": 0, "width": 100, "height": 20 }, "text": "CANARY_ACCOUNT_NUMBER_123" }
+      ]
+    }
+  ]
+}

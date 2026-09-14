@@ -44,3 +44,5 @@ export interface TimelineEvent {
   occurredAt: string;
   properties?: Record<string, unknown>;
 }
+
+export * from './mobile-replay';

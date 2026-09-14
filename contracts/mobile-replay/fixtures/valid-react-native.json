@@ -1,0 +1,25 @@
+{
+  "format": "mobile-structural-v1",
+  "version": 1,
+  "runtime": "react-native",
+  "platform": "android",
+  "sequence": 0,
+  "events": [
+    {
+      "type": "snapshot",
+      "timestamp": 1760000000000,
+      "screen": "Checkout.Payment",
+      "viewport": { "width": 390, "height": 844, "orientation": "portrait" },
+      "nodes": [
+        { "id": 0, "kind": "box", "frame": { "x": 0, "y": 0, "width": 390, "height": 844 } },
+        { "id": 1, "parentId": 0, "kind": "text", "frame": { "x": 20, "y": 64, "width": 280, "height": 28 } },
+        { "id": 2, "parentId": 0, "kind": "blocked", "frame": { "x": 20, "y": 140, "width": 350, "height": 180 } },
+        { "id": 3, "parentId": 0, "kind": "control", "frame": { "x": 20, "y": 720, "width": 350, "height": 52 } }
+      ]
+    },
+    { "type": "tap", "timestamp": 1760000000100, "x": 180, "y": 745 },
+    { "type": "scroll", "timestamp": 1760000000200, "x": 360, "y": 430, "deltaX": 0, "deltaY": 96 },
+    { "type": "navigation", "timestamp": 1760000000300, "screen": "Checkout.Confirm" },
+    { "type": "lifecycle", "timestamp": 1760000000400, "state": "background" }
+  ]
+}

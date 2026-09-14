@@ -146,7 +146,56 @@ await TraceIQ.setTrackingEnabled(true);
 Opt-out is persisted. Disabling tracking immediately clears queued events and
 ignores new analytics/error/screen events. Configuration and anonymous identity
 remain so the SDK can resume if consent is granted later. Consent UI is the
-application's responsibility.
+application’s responsibility.
+
+## Mobile session replay (iOS and Android)
+
+Replay is off by default and uses the content-free `mobile-structural-v1` format,
+not rrweb, screenshots, or native video. Enable it and grant explicit consent
+from your app's privacy flow. The project also needs Replay enabled and a
+selected funnel. Recording starts only after a funnel first-step event is
+accepted by the API and the server grants an upload token; a queued or rejected
+event cannot start it.
+
+```dart
+await TraceIQ.initialize(
+  projectId: 'proj_...', apiKey: 'trq_...',
+  apiUrl: 'https://api.example.com', replayEnabled: true,
+);
+await TraceIQ.grantReplayConsent(); // only after your own consent decision
+
+// In the Checkout widget tree:
+TraceIQReplayScreen(
+  screen: 'Checkout', // static slug, never user data
+  child: Column(children: [
+    TraceIQReplayRegion(
+      id: 1, kind: TraceIQReplayKind.control, child: CheckoutButton(),
+    ),
+    TraceIQReplayRegion(
+      id: 2, kind: TraceIQReplayKind.blocked, child: PaymentForm(),
+    ),
+  ]),
+);
+
+await TraceIQ.track('checkout_started'); // selected funnel's first step
+```
+
+Only explicitly marked regions become structural nodes. `blocked` and `input`
+regions suppress touches and nested regions. Text, accessibility labels, input
+values, images, child widget types, and arbitrary properties are never read or
+serialized. Use positive IDs unique within a screen; ID 0 is reserved for the
+screen box. Mark payment, credentials, personal data, embedded/native views, and
+unknown third-party widgets as `blocked`. Unmarked views remain blank. You can
+also provide safe geometry manually through `TraceIQ.recordReplaySnapshot`,
+`recordReplayTap`, and `recordReplayScroll`.
+The wrappers sample geometry on activation and rebuild; highly animated or
+custom-rendered surfaces should use explicit safe snapshots where needed.
+
+Call `TraceIQ.revokeReplayConsent()` when consent is withdrawn, or
+`TraceIQ.reset()` on logout. Both immediately stop capture and discard unsent
+replay chunks. The analytics queue remains persistent; replay chunks are
+**memory-only** and background upload is best-effort. Flutter web/desktop are
+excluded from this v1 recorder. The dashboard mobile player is a later step.
 
 ## Configuration
 
@@ -165,6 +214,7 @@ application's responsibility.
 | `maxQueueSize` | `1000` | Persistent event cap; must be at least batch size |
 | `sessionTimeout` | 30 minutes | Background duration that rotates session ID |
 | `trackingEnabled` | `true` | Initial state; persisted opt-out wins |
+| `replayEnabled` | `false` | Opt in to iOS/Android structural replay; explicit consent is still required |
 
 Call `await TraceIQ.shutdown()` when a host can
 explicitly tear down the SDK. It flushes, cancels timers, removes lifecycle/error

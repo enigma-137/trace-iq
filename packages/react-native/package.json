@@ -1,16 +1,18 @@
 {
   "name": "traceiq-react-native",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
-  "description": "TraceIQ SDK for React Native / Expo — screen tracking, device info, offline-friendly batching.",
+  "description": "TraceIQ SDK for React Native and Expo: analytics and opt-in structural session replay.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test tests/replay.test.cjs",
+    "prepublishOnly": "npm run test"
   },
   "files": [
     "dist",

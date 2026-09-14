@@ -11,16 +11,18 @@ import { EntitlementService } from '../billing/entitlement.service';
 import { EventsService } from '../events/events.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
 import {
-  AuthorizeReplayUploadRequest, IngestReplayChunkRequest, ReplaySettings, ReplayUploadClaims
+  AuthorizeReplayUploadRequest, IngestReplayChunkRequest, ReplayRecordingFormat, ReplaySettings, ReplayUploadClaims
 } from './interfaces/replay.interface';
 import { REPLAY_FORMAT_VERSION, REPLAY_LIMITS, ReplayPrivacyMode } from './replay.constants';
+import { validateMobileReplayChunk } from './mobile-replay-validator';
 import { isolateReplayEventsForPlayback, sanitizeReplayEvents } from './replay-sanitizer';
 import { ReplayTokenService } from './replay-token.service';
 import { REPLAY_STORAGE, ReplayStorage } from './storage/replay-storage.interface';
 
 interface ReplayRow extends QueryResultRow {
   id: string; organization_id: string; project_id: string; session_id: string;
-  storage_prefix: string; privacy_mode: ReplayPrivacyMode; started_at: string; ended_at?: string | null;
+  storage_prefix: string; privacy_mode: ReplayPrivacyMode; recording_format: ReplayRecordingFormat;
+  recording_version: string; started_at: string; ended_at?: string | null;
   expires_at: string; chunk_count: number; event_count: number; compressed_size_bytes: number;
   uncompressed_size_bytes: number; status: string; deleted_at?: string | null;
 }
@@ -75,6 +77,7 @@ export class ReplayService {
     const sessionId = this.safeId(input.sessionId, 'sessionId');
     const anonymousId = this.optional(input.anonymousId);
     const userId = this.optional(input.userId);
+    const recordingFormat = this.recordingFormat(input.recordingFormat);
     const auth = await this.events.authenticateWriteKey(this.required(writeKey, 'writeKey'), projectId);
     const settings = await this.loadSettings(projectId);
     if (!settings.enabled) throw new ForbiddenException('Session Replay is disabled for this project.');
@@ -101,7 +104,8 @@ export class ReplayService {
       maxChunks: REPLAY_LIMITS.maxChunksPerReplay,
       maxCompressedBytes: REPLAY_LIMITS.maxReplayBytes,
       maxUncompressedBytes: REPLAY_LIMITS.maxReplayUncompressedBytes,
-      matchedFunnelIds
+      matchedFunnelIds,
+      recordingFormat
     }, REPLAY_LIMITS.uploadTokenSeconds);
     return { ...tokenGrant, replayId };
   }
@@ -109,13 +113,17 @@ export class ReplayService {
   async ingestChunk(uploadToken: string, input: IngestReplayChunkRequest) {
     const claims = this.verifyInputClaims(uploadToken, input);
     const sequence = this.sequence(input.sequence);
+    const recordingFormat = this.recordingFormat(claims.recordingFormat);
     const receivedAt = new Date();
     const settings = await this.loadSettings(claims.projectId);
     await this.assertTokenStillAllowed(claims, settings);
     await this.entitlements.assertReplayAvailable(claims.organizationId);
 
     const decoded = this.decodeEvents(input);
-    const sanitized = sanitizeReplayEvents(decoded, settings.privacyMode);
+    const sanitized = recordingFormat === 'mobile-structural-v1'
+      ? validateMobileReplayChunk(decoded, sequence)
+      : sanitizeReplayEvents(decoded, settings.privacyMode);
+    const recordedEvents = Array.isArray(sanitized) ? sanitized : sanitized.events;
     const uncompressed = Buffer.from(JSON.stringify(sanitized));
     if (uncompressed.byteLength > REPLAY_LIMITS.maxUncompressedChunkBytes) {
       throw new BadRequestException('Replay chunk exceeds the uncompressed size limit.');
@@ -123,7 +131,7 @@ export class ReplayService {
     const compressed = gzipSync(uncompressed, { level: 6 });
     if (compressed.byteLength > REPLAY_LIMITS.maxEncodedBytes) throw new BadRequestException('Replay chunk exceeds the compressed size limit.');
     const digest = createHash('sha256').update(compressed).digest('hex');
-    const bounds = this.eventBounds(sanitized);
+    const bounds = this.eventBounds(recordedEvents);
     const authorizedDurationSeconds = Math.min(settings.maxDurationSeconds, claims.maxDurationSeconds);
     this.validateEventTimes(bounds, receivedAt, authorizedDurationSeconds);
     const claimedStartedAt = input.startedAt !== undefined ? this.date(input.startedAt) : undefined;
@@ -148,11 +156,12 @@ export class ReplayService {
       const currentDurationSeconds = Math.min(currentSettings.maxDurationSeconds, claims.maxDurationSeconds);
       this.validateEventTimes(bounds, receivedAt, currentDurationSeconds);
       const session = await this.ensureSession(client, claims, bounds.first);
-      const candidate = await this.ensureReplay(client, claims, session, currentSettings, claimedStartedAt ?? bounds.first, activeMatchedFunnelIds);
+      const candidate = await this.ensureReplay(client, claims, session, currentSettings, claimedStartedAt ?? bounds.first, activeMatchedFunnelIds, recordingFormat);
       await this.lockReplay(client, candidate.id);
       const replayResult = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [candidate.id]);
       const replay = replayResult.rows[0];
       if (!replay) throw new NotFoundException('Replay no longer exists.');
+      this.assertReplayFormat(replay, recordingFormat);
       this.assertReplayWritable(replay, receivedAt);
       if (claimedStartedAt) {
         this.validateClaimedTimestamp(claimedStartedAt, new Date(replay.started_at), 'startedAt');
@@ -180,11 +189,11 @@ export class ReplayService {
           id,replay_id,sequence,storage_key,event_count,compressed_size_bytes,uncompressed_size_bytes,
           content_sha256,first_event_at,last_event_at,status,reserved_at
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'uploading',now())
-      `, [chunkId, replay.id, sequence, storageKey, sanitized.length, compressed.byteLength,
+      `, [chunkId, replay.id, sequence, storageKey, recordedEvents.length, compressed.byteLength,
         uncompressed.byteLength, digest, bounds.first, bounds.last]);
       return { replay, duplicate: false, chunk: {
         id: chunkId, sequence, storage_key: storageKey, content_sha256: digest, status: 'uploading',
-        event_count: sanitized.length, compressed_size_bytes: compressed.byteLength,
+        event_count: recordedEvents.length, compressed_size_bytes: compressed.byteLength,
         uncompressed_size_bytes: uncompressed.byteLength
       } as ChunkRow };
     });
@@ -205,6 +214,7 @@ export class ReplayService {
         const replayResult = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [prepared.replay.id]);
         const replay = replayResult.rows[0];
         if (!replay) throw new NotFoundException('Replay no longer exists.');
+        this.assertReplayFormat(replay, recordingFormat);
         this.assertReplayWritable(replay, new Date());
         if (bounds.last.getTime() - new Date(replay.started_at).getTime() > currentDurationSeconds * 1_000 + REPLAY_LIMITS.clockSkewMs) {
           throw new BadRequestException('Replay exceeds the project maximum duration.');
@@ -266,6 +276,7 @@ export class ReplayService {
       const result = await client.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 FOR UPDATE', [candidate.rows[0].id]);
       const replay = result.rows[0];
       if (!replay) return;
+      this.assertReplayFormat(replay, this.recordingFormat(claims.recordingFormat));
       this.assertReplayWritable(replay, receivedAt);
       await client.query(`
         INSERT INTO session_replay_funnels(replay_id,project_id,funnel_id)
@@ -293,7 +304,8 @@ export class ReplayService {
         COALESCE(u.external_id,r.anonymous_id,r.session_id) AS "identity",r.started_at AS "startedAt",
         r.ended_at AS "endedAt",r.duration_ms::float8 AS "durationMs",r.event_count AS "eventCount",
         r.chunk_count AS "chunkCount",r.compressed_size_bytes::float8 AS "compressedSizeBytes",
-        r.privacy_mode AS "privacyMode",r.status,r.expires_at AS "expiresAt",
+        r.privacy_mode AS "privacyMode",r.recording_format AS "recordingFormat",
+        r.recording_version AS "recordingVersion",r.status,r.expires_at AS "expiresAt",
         COALESCE(mf.flows,'[]'::json) AS "matchedFlows",
         COALESCE(e.context->'page'->>'url',e.context->'page'->>'path') AS "entryPage",
         e.device_info->>'deviceType' AS "deviceType",e.device_info->>'browser' AS "browser",
@@ -321,6 +333,7 @@ export class ReplayService {
     const result = await this.database.query<ReplayRow>('SELECT * FROM session_replays WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL AND expires_at>now() LIMIT 1', [this.safeId(replayId, 'replayId'), project.id]);
     const replay = result.rows[0];
     if (!replay) throw new NotFoundException('Replay not found, expired, or inaccessible.');
+    const recordingFormat = this.recordingFormat(replay.recording_format);
     if (Number(replay.uncompressed_size_bytes) > REPLAY_LIMITS.maxReplayUncompressedBytes) throw new BadRequestException('Replay exceeds the expanded playback limit.');
     const cursor = this.clamp(cursorValue, -1, -1, REPLAY_LIMITS.maxChunksPerReplay - 1);
     const limit = this.clamp(limitValue, 10, 1, 25);
@@ -338,6 +351,8 @@ export class ReplayService {
       selectedExpanded += Number(chunk.uncompressed_size_bytes);
     }
     const events: unknown[] = [];
+    let runtime: string | undefined;
+    let platform: string | undefined;
     let compressedBytes = 0;
     let expandedBytes = 0;
     for (const chunk of selected) {
@@ -352,12 +367,23 @@ export class ReplayService {
       expandedBytes += json.byteLength;
       if (expandedBytes > pageLimit) throw new BadRequestException('Playback page exceeds its expanded byte limit.');
       const parsed = JSON.parse(json.toString('utf8')) as unknown;
-      if (!Array.isArray(parsed)) throw new Error('Stored replay chunk is malformed.');
-      events.push(...isolateReplayEventsForPlayback(parsed));
+      if (recordingFormat === 'mobile-structural-v1') {
+        const mobile = validateMobileReplayChunk(parsed, chunk.sequence);
+        if (runtime && (runtime !== mobile.runtime || platform !== mobile.platform)) {
+          throw new Error('Stored mobile replay chunks have inconsistent platform metadata.');
+        }
+        runtime = mobile.runtime;
+        platform = mobile.platform;
+        events.push(...mobile.events);
+      } else {
+        if (!Array.isArray(parsed)) throw new Error('Stored replay chunk is malformed.');
+        events.push(...isolateReplayEventsForPlayback(parsed));
+      }
     }
     const lastSequence = selected.at(-1)?.sequence ?? cursor;
     const hasMore = chunks.rows.length > selected.length;
-    return { replayId: replay.id, events, nextCursor: hasMore ? lastSequence : null, done: !hasMore };
+    return { replayId: replay.id, recordingFormat, recordingVersion: replay.recording_version,
+      ...(runtime ? { runtime, platform } : {}), events, nextCursor: hasMore ? lastSequence : null, done: !hasMore };
   }
 
   async getSettings(user: DashboardUser, projectId?: string) {
@@ -631,7 +657,8 @@ export class ReplayService {
     session: SessionIdentityRow,
     settings: ReplaySettings,
     startedAt: Date,
-    matchedFunnelIds: string[]
+    matchedFunnelIds: string[],
+    recordingFormat: ReplayRecordingFormat
   ) {
     const replayId = claims.replayId;
     let replay: ReplayRow | undefined;
@@ -652,13 +679,16 @@ export class ReplayService {
       const id = replayId || `rpl_${randomUUID()}`;
       const prefix = [claims.organizationId, claims.projectId, session.id].map((part) => this.pathSegment(part)).join('/');
       const result = await executor.query<ReplayRow>(`
-        INSERT INTO session_replays(id,organization_id,project_id,session_id,user_id,anonymous_id,started_at,storage_prefix,recording_version,privacy_mode,expires_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()+($11::int*interval '1 day')) RETURNING *
+        INSERT INTO session_replays(id,organization_id,project_id,session_id,user_id,anonymous_id,started_at,storage_prefix,recording_format,recording_version,privacy_mode,expires_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now()+($12::int*interval '1 day')) RETURNING *
       `, [id, claims.organizationId, claims.projectId, session.id, session.user_id, session.anonymous_id, startedAt,
-        prefix, REPLAY_FORMAT_VERSION, settings.privacyMode, settings.retentionDays]);
+        prefix, recordingFormat, recordingFormat === 'mobile-structural-v1' ? '1' : REPLAY_FORMAT_VERSION,
+        settings.privacyMode, settings.retentionDays]);
       replay = result.rows[0];
     }
     if (!replay) throw new Error('Replay could not be created.');
+    if (replay.session_id !== session.id) throw new ForbiddenException('Replay does not belong to the upload grant session.');
+    this.assertReplayFormat(replay, recordingFormat);
     await executor.query(`
       INSERT INTO session_replay_funnels(replay_id,project_id,funnel_id)
       SELECT $1,$2,unnest($3::text[])
@@ -697,6 +727,16 @@ export class ReplayService {
 
   private assertReplayWritable(replay: ReplayRow, now: Date) {
     if (replay.deleted_at || ['deleting', 'deleted', 'expired', 'failed'].includes(replay.status) || new Date(replay.expires_at) <= now) throw new ConflictException('Replay is deleted, deleting, expired, or otherwise not writable.');
+  }
+
+  private assertReplayFormat(replay: ReplayRow, expected: ReplayRecordingFormat) {
+    if (replay.recording_format !== expected) throw new ConflictException('Replay recording format does not match the upload grant.');
+  }
+
+  private recordingFormat(value: unknown): ReplayRecordingFormat {
+    if (value === undefined || value === 'rrweb-json-gzip') return 'rrweb-json-gzip';
+    if (value === 'mobile-structural-v1') return value;
+    throw new BadRequestException('Replay recording format is unsupported.');
   }
 
   private assertReplayCapacity(replay: ReplayRow, compressedBytes: number, uncompressedBytes: number, claims: ReplayUploadClaims) {
@@ -752,7 +792,7 @@ export class ReplayService {
   private date(value: unknown) { const parsed = typeof value === 'string' ? new Date(value) : value instanceof Date ? value : new Date(Number.NaN); if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Replay timestamp is invalid.'); return parsed; }
   private number(value: unknown, min: number, max: number, field: string, integer=false) { const n=Number(value); if (!Number.isFinite(n) || n<min || n>max || (integer&&!Number.isInteger(n))) throw new BadRequestException(`${field} is invalid.`); return n; }
   private clamp(value: string|undefined, fallback:number,min:number,max:number) { const n=Number(value); return Number.isFinite(n) ? Math.min(max,Math.max(min,Math.trunc(n))) : fallback; }
-  private eventBounds(events: Record<string, unknown>[]) { const times=events.map((event) => Number(event.timestamp)).filter(Number.isFinite); return { first:new Date(Math.min(...times)), last:new Date(Math.max(...times)) }; }
+  private eventBounds(events: Array<{ timestamp?: unknown }>) { const times=events.map((event) => Number(event.timestamp)).filter(Number.isFinite); return { first:new Date(Math.min(...times)), last:new Date(Math.max(...times)) }; }
 }
 
 export function sampleSession(sessionId: string, rate: number) {

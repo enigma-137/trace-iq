@@ -2,25 +2,31 @@
 
 import 'rrweb-player/dist/style.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { loadMobilePlayback, type MobilePlayback, type MobilePlaybackPage } from '@/features/replay/mobile-player';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { MobileReplayPlayer } from './MobileReplayPlayer';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export function ReplayPlayer({ replayId, projectId }: { replayId: string; projectId?: string }) {
+  const section = useRef<HTMLElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [status, setStatus] = useState('Loading replay...');
+  const [mobile, setMobile] = useState<MobilePlayback | null>(null);
 
   useEffect(() => {
     let destroyPlayer: (() => void) | undefined;
     let cancelled = false;
     const controller = new AbortController();
+    setStatus('Loading replay...');
+    setMobile(null);
     void (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token || !root.current) return setStatus('Your dashboard session expired.');
+      if (!session?.access_token) return setStatus('Your dashboard session expired.');
 
       type ReplayEvent = { type: number; timestamp: number };
-      type Page = { events: ReplayEvent[]; nextCursor: number | null; done: boolean };
+      type Page = MobilePlaybackPage;
       const loadPage = async (cursor?: number): Promise<Page> => {
         const query = new URLSearchParams({ limit: '10' });
         if (projectId) query.set('projectId', projectId);
@@ -33,10 +39,20 @@ export function ReplayPlayer({ replayId, projectId }: { replayId: string; projec
       };
 
       let page = await loadPage();
-      const initial = [...page.events];
+      if (page.recordingFormat === 'mobile-structural-v1') {
+        const playback = await loadMobilePlayback(page, async (cursor) => loadPage(cursor));
+        if (cancelled) return;
+        setMobile(playback);
+        setStatus('');
+        return;
+      }
+      if (page.recordingFormat && page.recordingFormat !== 'rrweb-json-gzip') {
+        throw new Error('This replay format is not supported.');
+      }
+      const initial = [...page.events] as ReplayEvent[];
       while (initial.length < 2 && page.nextCursor !== null) {
         page = await loadPage(page.nextCursor);
-        initial.push(...page.events);
+        initial.push(...page.events as ReplayEvent[]);
       }
       if (initial.length < 2) return setStatus('This replay does not contain enough events to play.');
       const { default: RrwebPlayer } = await import('rrweb-player');
@@ -53,7 +69,7 @@ export function ReplayPlayer({ replayId, projectId }: { replayId: string; projec
       const incrementalPlayer = player as unknown as { addEvent: (event: ReplayEvent) => void };
       while (!cancelled && page.nextCursor !== null) {
         page = await loadPage(page.nextCursor);
-        for (const event of page.events) incrementalPlayer.addEvent(event);
+        for (const event of page.events as ReplayEvent[]) incrementalPlayer.addEvent(event);
       }
     })().catch((error: unknown) => {
       if (!cancelled && !controller.signal.aborted) setStatus(error instanceof Error ? error.message : 'Replay could not be loaded.');
@@ -62,13 +78,17 @@ export function ReplayPlayer({ replayId, projectId }: { replayId: string; projec
   }, [projectId, replayId, supabase]);
 
   return (
-    <section className="rounded-md border border-neutral-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+    <section ref={section} className="rounded-md border border-neutral-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-neutral-500">Playback runs in rrweb&apos;s sandboxed iframe. Recorded network URLs are removed by the API.</p>
-        <button type="button" className="rounded-md border px-3 py-1.5 text-xs font-semibold" onClick={() => void root.current?.requestFullscreen()}>Fullscreen</button>
+        <p className="text-xs text-neutral-500">{mobile
+          ? 'Mobile playback draws content-free structural placeholders; no app text or image assets are reconstructed.'
+          : 'Browser playback runs in rrweb\'s sandboxed iframe. Recorded network URLs are removed by the API.'}</p>
+        <button type="button" className="rounded-md border px-3 py-1.5 text-xs font-semibold"
+          onClick={() => void section.current?.requestFullscreen()}>Fullscreen</button>
       </div>
       {status ? <p className="grid min-h-96 place-items-center text-sm text-neutral-500">{status}</p> : null}
-      <div ref={root} className="min-h-0 overflow-hidden rounded bg-neutral-950" />
+      {mobile ? <MobileReplayPlayer playback={mobile} /> : null}
+      <div ref={root} className={mobile ? 'hidden' : 'min-h-0 overflow-hidden rounded bg-neutral-950'} />
     </section>
   );
 }

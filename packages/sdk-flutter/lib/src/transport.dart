@@ -7,9 +7,11 @@ import 'config.dart';
 import 'event.dart';
 
 final class TransportResponse {
-  const TransportResponse({required this.statusCode, this.retryAfter});
+  const TransportResponse({required this.statusCode, this.retryAfter, this.acceptedEvents});
   final int statusCode;
   final Duration? retryAfter;
+  /// Null if the server did not provide a valid per-event acknowledgement.
+  final List<bool>? acceptedEvents;
   bool get isSuccess => statusCode >= 200 && statusCode < 300;
 }
 
@@ -41,7 +43,21 @@ final class HttpTraceIQTransport implements TraceIQTransport {
     return TransportResponse(
       statusCode: response.statusCode,
       retryAfter: _parseRetryAfter(response.headers['retry-after']),
+      acceptedEvents: _acceptedEvents(response.body, events.length),
     );
+  }
+
+  static List<bool>? _acceptedEvents(String body, int expectedLength) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<Object?, Object?>) return null;
+      final results = decoded['results'];
+      if (results is! List<Object?> || results.length != expectedLength) return null;
+      if (results.any((item) => item is! Map<Object?, Object?> || item['accepted'] is! bool)) return null;
+      return results.map((item) => (item as Map<Object?, Object?>)['accepted'] == true).toList(growable: false);
+    } on FormatException {
+      return null;
+    }
   }
 
   static Duration? _parseRetryAfter(String? value) {
@@ -57,4 +73,3 @@ final class HttpTraceIQTransport implements TraceIQTransport {
   @override
   void close() => _client.close();
 }
-

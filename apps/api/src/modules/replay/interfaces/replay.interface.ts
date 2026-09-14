@@ -24,12 +24,15 @@ export interface IngestReplayChunkRequest {
   anonymousId?: string;
   userId?: string;
   sequence?: number;
-  events?: unknown[];
+  /** rrweb event array or a mobile-structural-v1 chunk object. */
+  events?: unknown;
   encodedEvents?: string;
   encoding?: 'gzip-base64';
   startedAt?: string;
   endedAt?: string;
 }
+
+export type ReplayRecordingFormat = 'rrweb-json-gzip' | 'mobile-structural-v1';
 
 export interface AuthorizeReplayUploadRequest {
   projectId?: string;
@@ -38,6 +41,7 @@ export interface AuthorizeReplayUploadRequest {
   anonymousId?: string;
   userId?: string;
   consentGranted?: boolean;
+  recordingFormat?: ReplayRecordingFormat;
 }
 
 export interface ReplayUploadClaims {
@@ -57,6 +61,8 @@ export interface ReplayUploadClaims {
   maxCompressedBytes: number;
   maxUncompressedBytes: number;
   matchedFunnelIds: string[];
+  /** Absent only on grants issued before mobile replay; those are browser grants. */
+  recordingFormat?: ReplayRecordingFormat;
   issuedAt: number;
   expiresAt: number;
 }

@@ -46,6 +46,22 @@ void main() {
     expect(response.retryAfter, const Duration(seconds: 9));
   });
 
+  test('exposes only valid per-event acceptance for replay triggers', () async {
+    final transport = HttpTraceIQTransport(
+      TraceIQConfig(projectId: 'p', apiKey: 'k', apiUrl: 'https://api.example.test'),
+      client: MockClient((_) async => http.Response(
+        '{"accepted":true,"results":[{"accepted":false},{"accepted":true}]}', 200)),
+    );
+    final response = await transport.send(<TraceIQEvent>[sampleEvent(), sampleEvent()]);
+    expect(response.acceptedEvents, <bool>[false, true]);
+
+    final malformed = HttpTraceIQTransport(
+      TraceIQConfig(projectId: 'p', apiKey: 'k', apiUrl: 'https://api.example.test'),
+      client: MockClient((_) async => http.Response('{"accepted":true}', 200)),
+    );
+    expect((await malformed.send(<TraceIQEvent>[sampleEvent()])).acceptedEvents, isNull);
+  });
+
   test('request timeout is surfaced for retry handling', () async {
     final config = TraceIQConfig(
       projectId: 'p', apiKey: 'k', apiUrl: 'https://api.example.test',

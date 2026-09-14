@@ -16,6 +16,7 @@ export interface ReplayListItem {
   durationMs: number;
   eventCount: number;
   chunkCount: number;
+  recordingFormat?: 'rrweb-json-gzip' | 'mobile-structural-v1';
   compressedSizeBytes: number;
   privacyMode: 'strict' | 'balanced' | 'custom';
   status: string;

@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://traceiq.dev/contracts/mobile-replay/v1.schema.json",
+  "title": "TraceIQ mobile structural replay chunk v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "runtime", "platform", "sequence", "events"],
+  "properties": {
+    "format": { "const": "mobile-structural-v1" },
+    "version": { "const": 1 },
+    "runtime": { "enum": ["react-native", "flutter"] },
+    "platform": { "enum": ["ios", "android"] },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": { "oneOf": [
+        { "$ref": "#/$defs/snapshot" },
+        { "$ref": "#/$defs/tap" },
+        { "$ref": "#/$defs/scroll" },
+        { "$ref": "#/$defs/navigation" },
+        { "$ref": "#/$defs/lifecycle" }
+      ] }
+    }
+  },
+  "$defs": {
+    "timestamp": { "type": "integer", "minimum": 0, "maximum": 4102444800000 },
+    "screen": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,79}$" },
+    "coordinate": { "type": "number", "minimum": -100000, "maximum": 100000 },
+    "dimension": { "type": "number", "minimum": 0, "maximum": 100000 },
+    "frame": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "$ref": "#/$defs/coordinate" },
+        "y": { "$ref": "#/$defs/coordinate" },
+        "width": { "$ref": "#/$defs/dimension" },
+        "height": { "$ref": "#/$defs/dimension" }
+      }
+    },
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "frame"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "parentId": { "type": "integer", "minimum": 0 },
+        "kind": { "enum": ["box", "text", "image", "icon", "input", "control", "blocked"] },
+        "frame": { "$ref": "#/$defs/frame" }
+      }
+    },
+    "viewport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["width", "height", "orientation"],
+      "properties": {
+        "width": { "$ref": "#/$defs/dimension" },
+        "height": { "$ref": "#/$defs/dimension" },
+        "orientation": { "enum": ["portrait", "landscape"] }
+      }
+    },
+    "snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "timestamp", "screen", "viewport", "nodes"],
+      "properties": {
+        "type": { "const": "snapshot" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "screen": { "$ref": "#/$defs/screen" },
+        "viewport": { "$ref": "#/$defs/viewport" },
+        "nodes": { "type": "array", "maxItems": 2000, "items": { "$ref": "#/$defs/node" } }
+      }
+    },
+    "tap": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "timestamp", "x", "y"],
+      "properties": {
+        "type": { "const": "tap" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "x": { "$ref": "#/$defs/coordinate" },
+        "y": { "$ref": "#/$defs/coordinate" }
+      }
+    },
+    "scroll": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "timestamp", "x", "y", "deltaX", "deltaY"],
+      "properties": {
+        "type": { "const": "scroll" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "x": { "$ref": "#/$defs/coordinate" },
+        "y": { "$ref": "#/$defs/coordinate" },
+        "deltaX": { "$ref": "#/$defs/coordinate" },
+        "deltaY": { "$ref": "#/$defs/coordinate" }
+      }
+    },
+    "navigation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "timestamp", "screen"],
+      "properties": {
+        "type": { "const": "navigation" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "screen": { "$ref": "#/$defs/screen" }
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "timestamp", "state"],
+      "properties": {
+        "type": { "const": "lifecycle" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "state": { "enum": ["foreground", "background"] }
+      }
+    }
+  }
+}

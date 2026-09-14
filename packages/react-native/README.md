@@ -2,7 +2,7 @@
 
 TraceIQ SDK for React Native and Expo. Tracks screens and events with device info,
 persists the anonymous id across launches, batches events, and flushes when the app
-backgrounds (so nothing is lost when users leave).
+backgrounds on a best-effort basis.
 
 ## Install
 
@@ -51,6 +51,65 @@ traceiq.reset();
 | `group({ organizationId, traits? })` | Associate the user with an account. |
 | `reset()` | Clear the user + rotate the anonymous id (on logout). |
 | `flush()` / `shutdown()` | Send now / stop timers and flush. |
+| `grantReplayConsent()` / `revokeReplayConsent()` | Explicitly allow or stop mobile replay. |
+| `isReplayRecording` | Whether a mobile upload grant is active in the foreground. |
+| `recordReplaySnapshot`, `recordReplayTap`, `recordReplayScroll` | Manual structural capture for custom views. |
+| `flushReplay()` / `completeReplay()` | Upload pending chunks / finish the current replay. |
+
+## Mobile session replay
+
+This is an opt-in, content-free structural recorder for iOS and Android. It does not
+use rrweb, screenshots, native screen capture, or an on-device replay database. It
+works with React Native and Expo's JavaScript runtime. The project must have Replay
+enabled and a selected funnel; the SDK waits for its first-step event to be
+**accepted by the API** before requesting an upload grant. An HTTP-successful batch
+with a rejected event does not activate recording. No view geometry is read before
+that grant. Consent must be explicitly granted even if the project does not require
+it. Revocation, logout, and session rotation stop capture and discard unsent chunks.
+
+```tsx
+import { createReplayComponents, traceiq } from 'traceiq-react-native';
+
+traceiq.initialize({
+  projectId: 'proj_...', writeKey: 'trq_...', endpoint: 'https://api.example.com',
+  replay: { enabled: true }
+});
+
+// Call only after your app has obtained its own valid replay consent.
+traceiq.grantReplayConsent();
+
+// Create once at module scope. Region IDs must be unique positive integers per screen.
+const { ReplayScreen, ReplayRegion } = createReplayComponents(traceiq);
+
+function CheckoutScreen() {
+  return (
+    <ReplayScreen screen="Checkout">
+      <ReplayRegion id={1} kind="control"><CheckoutButton /></ReplayRegion>
+      <ReplayRegion id={2} kind="blocked"><PaymentForm /></ReplayRegion>
+    </ReplayScreen>
+  );
+}
+
+// This must match the first step of a selected Replay funnel.
+traceiq.capture({ event: 'checkout_started' });
+```
+
+`ReplayScreen` captures the screen's dimensions and tap locations. Only explicitly
+marked `ReplayRegion`s become nodes; unmarked views are blank. `blocked` and
+`input` regions suppress interactions within their bounds and omit nested regions.
+Use static screen slugs, not names containing personal data. Text, accessibility
+labels, input values, children, styles, image bytes, and arbitrary props are never
+serialized. For scroll gestures intercepted by custom controls, call
+`recordReplayScroll(x, y, deltaX, deltaY)` with coordinates relative to the replay
+screen; events outside opted-in safe regions are dropped. Native controls that
+intercept touch events can use `recordReplayTap(x, y)` explicitly.
+
+The SDK batches in memory and uploads only while the process is alive. A backgrounded
+app may be suspended before its best-effort flush finishes; no replay bytes are
+stored on disk. Analytics events still use their separate at-most-once queue.
+The dashboard plays `mobile-structural-v1` as safe placeholder geometry with
+touch, scroll, navigation, and lifecycle markers. It never reconstructs original
+text or images. The Flutter SDK has a matching opt-in recorder.
 
 ## Behavior
 
