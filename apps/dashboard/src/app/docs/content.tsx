@@ -545,6 +545,14 @@ traceiq.initialize({
 traceiq.identify({ userId: 'user_123', traits: { kyc_tier: 2 } });
 traceiq.screen('Wallet');
 traceiq.capture({ event: 'transfer_started', properties: { amount: 5000, currency: 'NGN' } });`}</Code>
+        <P>
+          For opt-in iOS/Android structural session replay, see the{' '}
+          <Link className="font-semibold text-blue-600 hover:underline dark:text-cyan-400" href="/docs?page=session-replay#replay-react-native">
+            React Native session replay guide
+          </Link>. It requires <Mono>traceiq-react-native@0.2.0</Mono> or later;
+          verify that release is available before installing. No rrweb, screenshots,
+          or input contents are captured by the mobile recorder.
+        </P>
       </Section>
     );
   }

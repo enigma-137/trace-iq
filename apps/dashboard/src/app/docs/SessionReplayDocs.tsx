@@ -16,41 +16,52 @@ export function SessionReplayDocs({
     <div className="space-y-8">
       <ReplaySection id="session-replay" title="Session Replay">
         <ReplayP>
-          Reconstruct how a browser session unfolded without recording a video.
-          TraceIQ captures a sanitized rrweb event stream, stores it with
-          separate retention controls, and plays it back from the Replays
-          workspace.
+          Reconstruct how a browser or mobile app session unfolded without
+          recording a video. The browser SDK captures a sanitized rrweb stream;
+          the React Native SDK captures content-free structural snapshots and
+          interaction markers. Both use Replay&apos;s separate retention controls
+          and the Replays workspace, but have different recorders and players.
         </ReplayP>
-        <Callout tone="info" title="Start with the JavaScript Quickstart">
-          This guide builds on the existing browser integration. Complete the{" "}
+        <Callout tone="info" title="Choose your SDK">
+          For browser replay, complete the{" "}
           <Link
             className="font-semibold underline underline-offset-4"
             href="/docs?page=quickstart"
           >
             JavaScript installation guide
           </Link>{" "}
-          first and make sure you are using the current browser SDK (v
-          {SDK_VERSIONS.javascript}) or later. Then return here to add only the
-          Replay-specific configuration.
+          first and use the current browser SDK (v{SDK_VERSIONS.javascript}) or
+          later. For an iOS/Android app, start with the{" "}
+          <Link className="font-semibold underline underline-offset-4" href="/docs?page=react-native">
+            React Native / Expo SDK
+          </Link>{" "}
+          and follow the mobile section below. Mobile replay requires the
+          recorder-enabled <ReplayMono>traceiq-react-native@0.2.0</ReplayMono>;
+          confirm that version is published before installing it.
         </Callout>
         <Callout tone="warning" title="Privacy starts in your application">
-          Session Replay can contain personal data from the DOM. TraceIQ applies
-          conservative masking and two sanitization passes, but you remain
-          responsible for your notice, lawful basis or consent, selector review,
-          retention choice, and data-subject process. Masking is a risk control,
-          not a guarantee of legal compliance.
+          Browser DOM replay can contain personal data; conservative masking
+          and two sanitization passes reduce that risk. Mobile replay instead
+          sends placeholder geometry, never text or image content. You remain
+          responsible for your notice, lawful basis or consent, reviewed safe
+          regions, retention choice, and data-subject process. Neither masking
+          nor structural capture guarantees legal compliance.
         </Callout>
       </ReplaySection>
 
       <ReplaySection id="replay-overview" title="What Session Replay does">
         <ReplayP>
-          The browser SDK dynamically loads{" "}
+          Browser replay dynamically loads{" "}
           <ReplayMono>@rrweb/record</ReplayMono>, records DOM snapshots and
           incremental changes, sanitizes every event before transport, and
           uploads bounded chunks. The API sanitizes each decoded chunk again,
           compresses it, and stores the payload outside PostgreSQL. PostgreSQL
           contains searchable ownership, timing, size, checksum, status, and
-          retention metadata—not the rrweb DOM payload.
+          retention metadata—not the rrweb DOM payload. React Native replay
+          uses the separate <ReplayMono>mobile-structural-v1</ReplayMono> format
+          and never loads rrweb. Its snapshots contain a static screen ID,
+          viewport, and explicitly marked placeholder rectangles; tap, scroll,
+          navigation, and lifecycle events form the timeline.
         </ReplayP>
         <ReplayBullets
           items={[
@@ -85,12 +96,16 @@ export function SessionReplayDocs({
         <ReplayBullets
           items={[
             [
-              "Browser SDK",
-              `Use traceiq-sdk-js ${SDK_VERSIONS.javascript} or later. Replay is not provided by the Node.js or React Native SDKs.`,
+              "Supported SDKs",
+              `Use traceiq-sdk-js ${SDK_VERSIONS.javascript} or later for browser replay, or traceiq-react-native 0.2.0 or later for iOS/Android structural replay. The Node.js SDK does not record sessions.`,
             ],
             [
               "Browser runtime",
               "Replay requires a browser document plus fetch and AbortController. Native CompressionStream support is optional; the SDK falls back to uncompressed JSON transport and the API still compresses storage.",
+            ],
+            [
+              "Mobile runtime",
+              "React Native / Expo replay runs on iOS and Android. It uses JavaScript-managed opt-in views, not browser DOM capture, screenshots, video, or rrweb.",
             ],
             [
               "Project setting",
@@ -98,7 +113,7 @@ export function SessionReplayDocs({
             ],
             [
               "SDK opt-in",
-              "Your browser initialization must also set replay.enabled to true. A dashboard setting alone does not load rrweb in the page.",
+              "Your browser or React Native initialization must also set replay.enabled to true and explicitly grant consent. A dashboard setting alone does not start a recorder.",
             ],
             [
               "Cloud availability",
@@ -112,7 +127,7 @@ export function SessionReplayDocs({
         />
       </ReplaySection>
 
-      <ReplaySection id="replay-enable" title="Enable Replay">
+      <ReplaySection id="replay-enable" title="Enable browser Replay">
         <ReplayP>
           After completing the JavaScript Quickstart, enable replay for the
           intended project under{" "}
@@ -150,13 +165,98 @@ traceiq.grantReplayConsent();`}</ReplayCode>
         </ReplayP>
       </ReplaySection>
 
+      <ReplaySection id="replay-react-native" title="React Native / Expo session replay">
+        <ReplayP>
+          Use <ReplayMono>traceiq-react-native@0.2.0</ReplayMono> or later on
+          iOS/Android. The npm <ReplayMono>0.1.0</ReplayMono> release has analytics
+          only; check that 0.2.0 is available before installation. Keep your
+          existing analytics initialization and add the replay option. In the{" "}
+          <Link className="font-semibold text-blue-600 hover:underline dark:text-cyan-400" href="/dashboard/settings/replay">
+            project Replay settings
+          </Link>
+          , enable recording and select a funnel whose first step is the
+          accepted event you intend to trigger. Start with Strict privacy and
+          required consent.
+        </ReplayP>
+        <ReplayCode lang="bash">{'npm install traceiq-react-native@^0.2.0'}</ReplayCode>
+        <ReplayCode lang="tsx">{`import { createReplayComponents, traceiq } from 'traceiq-react-native';
+
+traceiq.initialize({
+  projectId: '${projectId}',
+  writeKey: 'YOUR_PROJECT_WRITE_KEY',
+  endpoint: '${apiBaseUrl}',
+  replay: { enabled: true },
+});
+
+// Call only after your app's replay-purpose consent flow succeeds.
+traceiq.grantReplayConsent();
+
+// Create once at module scope; IDs are unique positive integers per screen.
+const { ReplayScreen, ReplayRegion } = createReplayComponents(traceiq);
+
+function CheckoutScreen() {
+  return (
+    <ReplayScreen screen="Checkout">
+      <ReplayRegion id={1} kind="control"><CheckoutButton /></ReplayRegion>
+      <ReplayRegion id={2} kind="blocked"><PaymentForm /></ReplayRegion>
+    </ReplayScreen>
+  );
+}
+
+// Match the first step of a selected funnel. Recording begins only after
+// normal analytics ingestion accepts this event and the API grants upload.
+traceiq.capture({ event: 'checkout_started' });
+
+// Wire these to your app's lifecycle; do not call them at startup.
+function onReplayConsentWithdrawn() { traceiq.revokeReplayConsent(); }
+function onLogout() { traceiq.reset(); }`}</ReplayCode>
+        <ReplayBullets
+          items={[
+            [
+              "Start gates",
+              "Recording stays off until project enablement, a selected funnel's first event accepted by the API, sampling, SDK opt-in, explicit consent, and a short-lived upload grant all pass. A queued or rejected analytics event is not enough. No view layout is measured before the grant.",
+            ],
+            [
+              "Safe regions",
+              "ReplayScreen captures viewport dimensions and touch locations. Only ReplayRegion views become nodes; unmarked views remain blank. Use static screen IDs, positive unique region IDs, and block payment, credential, personal-data, native, and third-party surfaces. Input and blocked regions suppress interactions inside them.",
+            ],
+            [
+              "Custom gestures",
+              "For custom controls that intercept touches or scrolls, call recordReplayTap(x, y) or recordReplayScroll(x, y, deltaX, deltaY) with replay-screen-relative logical coordinates. Events outside safe regions are dropped.",
+            ],
+            [
+              "Lifecycle and delivery",
+              "App backgrounding stops visual capture and requests a best-effort flush. Revocation, logout, or session rotation discards unsent replay content. Chunks stay in memory, never in an on-device replay cache, so a network interruption can leave a gap.",
+            ],
+            [
+              "Privacy and playback",
+              "Text, input values, accessibility labels, image pixels, screenshots, network bodies, and arbitrary props are not part of the mobile format. The dashboard draws generic shapes and tap/scroll/navigation/lifecycle markers; it never reconstructs the original UI assets.",
+            ],
+          ]}
+        />
+        <ReplayP>
+          Normal <ReplayMono>screen()</ReplayMono> and{" "}
+          <ReplayMono>capture()</ReplayMono> events remain separate analytics
+          events. The replay is associated with their accepted session ID. See
+          the{" "}
+          <Link className="font-semibold text-blue-600 hover:underline dark:text-cyan-400" href="/docs?page=react-native">
+            React Native SDK guide
+          </Link>{" "}
+          for ordinary event tracking and the{" "}
+          <Link className="font-semibold text-blue-600 hover:underline dark:text-cyan-400" href="/dashboard/replays">
+            Replays workspace
+          </Link>{" "}
+          to inspect a recording.
+        </ReplayP>
+      </ReplaySection>
+
       <ReplaySection id="replay-settings" title="Dashboard settings">
         <ReplayP>
           Settings are per project. Owners and admins can save them;
           organization entitlements may impose stricter Cloud limits. Recorder
           configuration is fetched when a recording start is attempted, so new
           values govern new starts. Disabling replay also causes the API to
-          reject subsequent chunk uploads from an already-running page.
+          reject subsequent chunk uploads from an active recorder.
           Previously stored chunks are not erased by changing a setting.
         </ReplayP>
         <ReplayTable
@@ -222,7 +322,7 @@ traceiq.grantReplayConsent();`}</ReplayCode>
         </Callout>
       </ReplaySection>
 
-      <ReplaySection id="replay-consent" title="Consent lifecycle">
+      <ReplaySection id="replay-consent" title="Browser consent lifecycle">
         <ReplayP>
           TraceIQ supplies recorder controls, not a consent-management platform.
           Your CMP or consent UI remains the source of truth. Consent is held in
@@ -345,7 +445,7 @@ if (!recording) {
         />
       </ReplaySection>
 
-      <ReplaySection id="replay-chunks" title="Snapshots, chunks, and delivery">
+      <ReplaySection id="replay-chunks" title="Browser snapshots, chunks, and delivery">
         <ReplayP>
           rrweb emits an initial full snapshot and TraceIQ requests another full
           snapshot boundary every 30 seconds. A full snapshot flushes any older
@@ -461,7 +561,7 @@ if (!recording) {
         </ReplayP>
       </ReplaySection>
 
-      <ReplaySection id="replay-privacy" title="Privacy modes and selectors">
+      <ReplaySection id="replay-privacy" title="Browser privacy modes and selectors">
         <ReplayTable
           columns={["Mode", "Visible text", "Inputs and known secrets"]}
           rows={[
@@ -620,8 +720,12 @@ if (!recording) {
         <ReplayBullets
           items={[
             [
-              "Playback",
+              "Browser playback",
               "Select Watch replay. The player waits for at least two rrweb events, starts paused, can skip inactive time, and offers 0.5×, 1×, 2×, 4×, and 8× speeds plus fullscreen.",
+            ],
+            [
+              "Mobile playback",
+              "React Native recordings open in the separate structural player. Seek, pause, step between events, change speed (0.5×–4×), or use fullscreen. Shapes are placeholders, not screenshots or restored text/images.",
             ],
             [
               "Large sessions",
@@ -675,8 +779,13 @@ if (!recording) {
             ],
             [
               "Player needs more events",
-              "Fewer than two ready events.",
+              "Fewer than two browser rrweb events.",
               "This is often an initial snapshot without a later mutation or a failed second upload.",
+            ],
+            [
+              "No mobile replay starts",
+              "A mobile start gate did not pass.",
+              "Verify traceiq-react-native 0.2.0+, iOS/Android, replay.enabled, explicit consent, project enablement, a selected funnel's accepted first-step event, sampling, and the upload grant. A locally queued event does not qualify.",
             ],
             [
               "Layout/assets differ",
@@ -790,7 +899,7 @@ export function TraceIQClient({ replayConsent }: { replayConsent: ReplayConsent 
         </ReplayP>
       </ReplaySection>
 
-      <ReplaySection id="replay-api" title="SDK API reference">
+      <ReplaySection id="replay-api" title="Browser SDK API reference">
         <ReplayTable
           columns={["API", "Type/default", "Meaning"]}
           rows={[
@@ -876,9 +985,10 @@ export function TraceIQClient({ replayConsent }: { replayConsent: ReplayConsent 
           <ReplayMono>page()</ReplayMono>, <ReplayMono>identify()</ReplayMono>,
           exceptions, Web Vitals, or <ReplayMono>$api_request</ReplayMono>{" "}
           events. Those events power searchable analytics, funnels, users,
-          errors, and API performance. Replay is a separate rrweb stream linked
-          by the same project/session identity so you can inspect the
-          surrounding experience.
+          errors, and API performance. Browser replay is a separate rrweb
+          stream; mobile replay is a separate structural stream. Both link to
+          accepted analytics events by project/session identity so you can
+          inspect the surrounding experience.
         </ReplayP>
         <ReplayBullets
           items={[
@@ -888,7 +998,7 @@ export function TraceIQClient({ replayConsent }: { replayConsent: ReplayConsent 
             ],
             [
               "Different payloads",
-              "Normal event properties are structured analytics data. Replay chunks are sanitized DOM event streams stored outside PostgreSQL.",
+              "Normal event properties are structured analytics data. Browser replay chunks contain sanitized DOM events; mobile chunks contain placeholder geometry and interaction markers. Both payload formats are stored outside PostgreSQL.",
             ],
             [
               "Different failure modes",
