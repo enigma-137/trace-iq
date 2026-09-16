@@ -97,19 +97,78 @@ export default async function UserProfilePage({ params, searchParams }: { params
           <p className="text-sm text-neutral-500 dark:text-slate-500">No events recorded for this user yet.</p>
         ) : (
           <ol className="relative border-l border-neutral-200 dark:border-slate-800">
-            {items.map((item) => (
-              <li key={item.id} className="mb-5 ml-4">
-                <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-neutral-900 dark:bg-white" />
-                <p className="font-mono text-sm font-semibold text-neutral-900 dark:text-white">{item.eventName}</p>
-                <p className="text-xs text-neutral-500 dark:text-slate-500">{formatDateTime(item.occurredAt)}</p>
-                {item.sessionId ? <Link className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:underline" href={`/dashboard/replays?sessionId=${encodeURIComponent(item.sessionId)}${searchParams.projectId ? `&projectId=${encodeURIComponent(searchParams.projectId)}` : ''}`}>Watch replay</Link> : null}
-                {item.properties && Object.keys(item.properties).length > 0 ? (
-                  <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                    <code>{JSON.stringify(item.properties, null, 2)}</code>
-                  </pre>
-                ) : null}
-              </li>
-            ))}
+            {items.map((item) => {
+              const isFlagExposure = item.eventName === '$feature_flag_exposure';
+              const flagKey = String(item.properties?.flagKey ?? '');
+              const flagEnabled = item.properties?.enabled === true;
+              const flagEnv = String(item.properties?.environment ?? 'production');
+              const flagId = String(item.properties?.flagId ?? '');
+
+              return (
+                <li key={item.id} className="mb-5 ml-4">
+                  <span
+                    className={`absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full ${
+                      isFlagExposure
+                        ? flagEnabled
+                          ? 'bg-purple-600 ring-2 ring-purple-200 dark:ring-purple-900'
+                          : 'bg-neutral-400'
+                        : 'bg-neutral-900 dark:bg-white'
+                    }`}
+                  />
+                  {isFlagExposure ? (
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                          🚩 Feature Flag Exposure
+                        </span>
+                        {flagId ? (
+                          <Link
+                            href={`/dashboard/flags/${flagId}${searchParams.projectId ? `?projectId=${encodeURIComponent(searchParams.projectId)}` : ''}`}
+                            className="font-mono text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {flagKey || flagId}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-xs font-bold text-neutral-900 dark:text-white">{flagKey}</span>
+                        )}
+                        <span
+                          className={`rounded px-1.5 py-0.2 text-[10px] font-bold ${
+                            flagEnabled
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                              : 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400'
+                          }`}
+                        >
+                          {flagEnabled ? 'ENABLED' : 'DISABLED'}
+                        </span>
+                        <span className="rounded bg-neutral-100 px-1.5 py-0.2 text-[10px] uppercase tracking-wider text-neutral-600 dark:bg-slate-800 dark:text-slate-400">
+                          {flagEnv}
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-500 dark:text-slate-500">{formatDateTime(item.occurredAt)}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-mono text-sm font-semibold text-neutral-900 dark:text-white">{item.eventName}</p>
+                      <p className="text-xs text-neutral-500 dark:text-slate-500">{formatDateTime(item.occurredAt)}</p>
+                    </>
+                  )}
+
+                  {item.sessionId ? (
+                    <Link
+                      className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:underline"
+                      href={`/dashboard/replays?sessionId=${encodeURIComponent(item.sessionId)}${searchParams.projectId ? `&projectId=${encodeURIComponent(searchParams.projectId)}` : ''}`}
+                    >
+                      Watch replay
+                    </Link>
+                  ) : null}
+                  {item.properties && Object.keys(item.properties).length > 0 && !isFlagExposure ? (
+                    <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                      <code>{JSON.stringify(item.properties, null, 2)}</code>
+                    </pre>
+                  ) : null}
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>

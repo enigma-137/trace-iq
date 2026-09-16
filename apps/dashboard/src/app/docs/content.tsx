@@ -756,75 +756,128 @@ $traceiq->shutdown(); // flush before a short-lived process exits`}</Code>
     return (
       <Section id="flags" title="Feature flags & remote config">
         <P>
-          Ship code behind a flag and turn it on for a slice of users without a release. Rollout is
-          deterministic and sticky — a user hashed into the rollout stays in as you raise the percentage, so
-          nobody flickers on and off. Create and roll out flags under{' '}
+          TraceIQ Feature Flags give you deterministic rollouts, targeting segments, remote configuration,
+          real-time debug testing, exposure tracking, and downstream impact analytics connected directly to your
+          events, user timelines, and errors. Manage flags under{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/flags">
             Feature flags
           </a>
           .
         </P>
-        <P>
-          With the browser SDK, load this user&apos;s flags once, then read them synchronously. Evaluation uses the
-          current <Mono>userId</Mono> (after <Mono>identify()</Mono>) or the anonymous id, so results are stable
-          per person.
-        </P>
-        <Code lang="ts">{`// Fetch once (e.g. on app start, and again after identify())
-await traceiq.loadFeatureFlags();
 
-if (traceiq.isFeatureEnabled('new-checkout')) {
-  renderNewCheckout();
+        <P>
+          <strong>Product Philosophy:</strong> Feature flags in TraceIQ are not isolated switches. When an
+          application evaluates a flag and exposes a user to a feature, TraceIQ records that exposure. You can
+          then inspect the user&apos;s chronological timeline, monitor error spikes, and measure whether conversion
+          improved between exposed and control users.
+        </P>
+
+        <P>
+          <strong>Deterministic &amp; Sticky Rollout:</strong> Hashing uses SHA-256 over <Mono>key:distinctId</Mono> mapped into buckets 0–99. Raising a rollout from 25% → 50% guarantees that everyone already receiving the feature stays in, adding only new users.
+        </P>
+
+        <P><strong>1. JavaScript &amp; TypeScript (Browser SDK):</strong></P>
+        <Code lang="ts">{`import { traceiq } from 'traceiq-sdk-js';
+
+// Load flags once at initialization (or after identify)
+await traceiq.loadFeatureFlags({ plan: 'premium', country: 'NG' });
+
+// Check flag with deterministic sticky assignment
+if (traceiq.flags.isEnabled('nuwell-new-add-meal')) {
+  renderNewMealFlow(traceiq.flags.getPayload('nuwell-new-add-meal'));
 }`}</Code>
-        <P>
-          A flag can also carry a JSON <strong>payload</strong> (remote config) — limits, copy, or a config
-          object. The payload is delivered only when the flag is on for that user, so it doubles as a way to
-          tune behavior without shipping code.
-        </P>
-        <Code lang="ts">{`// Payload is undefined when the flag is off for this user
-const cfg = traceiq.getFeatureFlagPayload('checkout-limits');
-// e.g. { "maxAmount": 50000, "currency": "NGN" }
-const max = cfg?.maxAmount ?? 100000;`}</Code>
-        <P>
-          Any client can evaluate flags over HTTP — same write key as ingestion, in the{' '}
-          <Mono>x-traceiq-write-key</Mono> header. This is what the SDK calls under the hood.
-        </P>
+
+        <P><strong>2. React &amp; Next.js:</strong></P>
+        <Code lang="tsx">{`import { useEffect, useState } from 'react';
+import { traceiq } from 'traceiq-sdk-js';
+
+export function AddMealButton() {
+  const [useNewFlow, setUseNewFlow] = useState(false);
+
+  useEffect(() => {
+    void traceiq.loadFeatureFlags().then(() => {
+      setUseNewFlow(traceiq.flags.isEnabled('nuwell-new-add-meal'));
+    });
+  }, []);
+
+  if (useNewFlow) {
+    return <NewAddMealModal config={traceiq.flags.getPayload('nuwell-new-add-meal')} />;
+  }
+  return <LegacyAddMealButton />;
+}`}</Code>
+
+        <P><strong>3. Node.js (Server SDK):</strong></P>
+        <Code lang="ts">{`import { TraceIQ } from '@traceiq/node';
+
+const traceiq = new TraceIQ({
+  projectId: process.env.TRACEIQ_PROJECT_ID!,
+  writeKey: process.env.TRACEIQ_WRITE_KEY!
+});
+
+// Server-side evaluation with safe fallback
+const isEnabled = await traceiq.isFeatureEnabled('nuwell-new-add-meal', userId, {
+  defaultValue: false,
+  properties: { plan: 'premium', country: 'NG' },
+  environment: 'production'
+});`}</Code>
+
+        <P><strong>4. Python &amp; Other Backend Services:</strong></P>
+        <Code lang="python">{`import requests
+
+response = requests.post(
+    "${apiBaseUrl}/v1/flags/evaluate",
+    headers={"x-traceiq-write-key": WRITE_KEY, "Content-Type": "application/json"},
+    json={
+        "projectId": PROJECT_ID,
+        "distinctId": user_id,
+        "environment": "production",
+        "properties": {"plan": "premium", "country": "NG"}
+    }
+)
+data = response.json()
+is_enabled = data.get("flags", {}).get("nuwell-new-add-meal", False)
+payload = data.get("payloads", {}).get("nuwell-new-add-meal")`}</Code>
+
+        <P><strong>5. HTTP REST API:</strong></P>
         <Code lang="bash">{`curl -X POST ${apiBaseUrl}/v1/flags/evaluate \\
-  -H 'content-type: application/json' \\
+  -H 'Content-Type: application/json' \\
   -H 'x-traceiq-write-key: YOUR_PROJECT_WRITE_KEY' \\
-  -d '{ "projectId": "${projectId}", "distinctId": "user_123" }'`}</Code>
-        <P>Response — a map of flag → on/off, plus payloads for the flags that are on:</P>
-        <Code lang="json">{`{
-  "flags": { "new-checkout": true, "legacy-flow": false },
-  "payloads": { "new-checkout": { "maxAmount": 50000 } }
-}`}</Code>
-        <P>
-          <strong>Target a segment before rolling out.</strong> A flag can require that a user&apos;s properties match
-          one or more rules (all must match — AND). The SDK sends the user&apos;s traits automatically, and you can pass
-          any other property (e.g. <Mono>plan</Mono>, <Mono>country</Mono>) at load time. Rules evaluate before the
-          rollout %, so only matching users are ever in the bucket.
-        </P>
-        <Code lang="ts">{`// Must match ALL rules, then the % rollout applies within that set.
-await traceiq.loadFeatureFlags({ plan: 'pro', country: 'US' });
+  -d '{
+    "projectId": "${projectId}",
+    "distinctId": "emmanuel",
+    "environment": "production",
+    "properties": { "plan": "premium", "country": "NG" }
+  }'`}</Code>
 
-// Behind the scenes the dashboard stored:
-// targeting: [{ property: 'plan', operator: 'eq', value: 'pro' },
-//             { property: 'country', operator: 'eq', value: 'US' }]`}</Code>
-        <P>Supported operators on property values:</P>
+        <P>Response:</P>
+        <Code lang="json">{`{
+  "flags": { "nuwell-new-add-meal": true },
+  "payloads": { "nuwell-new-add-meal": { "dailyScanLimit": 5, "showVoiceInput": true } },
+  "details": { "nuwell-new-add-meal": { "enabled": true, "reason": "matched_targeting_group_1", "revision": 3 } },
+  "environment": "production"
+}`}</Code>
+
+        <P><strong>Targeting Operators:</strong></P>
         <Bullets
           items={[
-            ['eq / ne', 'Equal to / not equal to a string, number, or boolean.'],
-            ['gt / gte / lt / lte', 'Numeric comparison — the property must be a number to match.'],
-            ['Overrides', 'A per-user on/off override always wins, before targeting and rollout.']
+            ['equals / does not equal', 'Exact matching for strings, numbers, or booleans.'],
+            ['contains / does not contain', 'Case-insensitive substring match (e.g. email contains "@traceiq.run").'],
+            ['greater than / less than', 'Numeric boundary comparisons (e.g. scanCount >= 5).'],
+            ['exists / does not exist', 'Tests whether a property trait is present on the user identity.'],
+            ['is one of', 'Matches comma-separated values (e.g. plan in "pro, enterprise, beta").'],
+            ['Targeting Groups (OR)', 'Create multiple groups where any matching group qualifies the user. Rules within a group are combined with AND.']
           ]}
         />
+
+        <P><strong>Safe Kill Switch:</strong></P>
         <P>
-          Full evaluation order per user: master switch → per-user override → targeting rules → % rollout. A flag that
-          targets everyone behaves exactly as before.
+          Disabling a flag instantly returns fallback/off values on future evaluations across all SDKs.
+          Targeting rules, rollout percentage, remote configuration JSON, and historical telemetry are strictly
+          preserved.
         </P>
       </Section>
     );
   }
-
   if (id === 'alerts') {
     return (
       <Section id="alerts" title="Alerts">

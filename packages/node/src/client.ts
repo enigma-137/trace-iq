@@ -236,6 +236,162 @@ export class TraceIQ {
     return new Date().toISOString();
   }
 
+  /**
+   * Evaluates all feature flags for a given user identity and property set.
+   */
+  async evaluateFlags(params: {
+    distinctId: string;
+    properties?: Record<string, unknown>;
+    environment?: string;
+  }): Promise<{
+    flags: Record<string, boolean>;
+    payloads: Record<string, unknown>;
+    details: Record<string, { enabled: boolean; reason: string; revision: number }>;
+  }> {
+    const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
+    const url = `${this.options.endpoint}/v1/flags/evaluate`;
+    try {
+      const response = await fetchImpl(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-traceiq-write-key': this.options.writeKey,
+          ...(params.environment ? { 'x-traceiq-environment': params.environment } : {})
+        },
+        body: JSON.stringify({
+          projectId: this.options.projectId,
+          distinctId: params.distinctId,
+          properties: params.properties,
+          environment: params.environment
+        })
+      });
+
+      if (!response.ok) {
+        this.debug(`evaluateFlags failed with ${response.status}`);
+        return { flags: {}, payloads: {}, details: {} };
+      }
+
+      const data = (await response.json()) as {
+        flags?: Record<string, boolean>;
+        payloads?: Record<string, unknown>;
+        details?: Record<string, { enabled: boolean; reason: string; revision: number }>;
+      };
+
+      return {
+        flags: data.flags ?? {},
+        payloads: data.payloads ?? {},
+        details: data.details ?? {}
+      };
+    } catch (error) {
+      this.handleError(error instanceof Error ? error : new Error('TraceIQ flag evaluation error'));
+      return { flags: {}, payloads: {}, details: {} };
+    }
+  }
+
+  /**
+   * Checks if a single feature flag is enabled for a user with safe fallback.
+   */
+  async isFeatureEnabled(
+    key: string,
+    distinctId: string,
+    options?: {
+      defaultValue?: boolean;
+      properties?: Record<string, unknown>;
+      environment?: string;
+      trackExposure?: boolean;
+    }
+  ): Promise<boolean> {
+    const res = await this.evaluateFlags({
+      distinctId,
+      properties: options?.properties,
+      environment: options?.environment
+    });
+    const enabled = res.flags[key] ?? options?.defaultValue ?? false;
+
+    if (options?.trackExposure !== false) {
+      void this.trackFlagExposure({
+        flagKey: key,
+        distinctId,
+        enabled,
+        environment: options?.environment,
+        properties: options?.properties
+      });
+    }
+
+    return enabled;
+  }
+
+  /**
+   * Retrieves the remote-config payload for a feature flag with safe fallback.
+   */
+  async getFeatureFlagPayload<T = unknown>(
+    key: string,
+    distinctId: string,
+    options?: {
+      defaultValue?: T;
+      properties?: Record<string, unknown>;
+      environment?: string;
+      trackExposure?: boolean;
+    }
+  ): Promise<T | undefined> {
+    const res = await this.evaluateFlags({
+      distinctId,
+      properties: options?.properties,
+      environment: options?.environment
+    });
+    const isEnabled = res.flags[key] === true;
+
+    if (options?.trackExposure !== false) {
+      void this.trackFlagExposure({
+        flagKey: key,
+        distinctId,
+        enabled: isEnabled,
+        environment: options?.environment,
+        properties: options?.properties
+      });
+    }
+
+    if (!isEnabled) {
+      return options?.defaultValue;
+    }
+
+    return (res.payloads[key] as T) ?? options?.defaultValue;
+  }
+
+  /**
+   * Explicitly tracks a feature flag exposure from the server.
+   */
+  async trackFlagExposure(params: {
+    flagKey: string;
+    distinctId: string;
+    enabled: boolean;
+    environment?: string;
+    properties?: Record<string, unknown>;
+  }): Promise<void> {
+    const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
+    const url = `${this.options.endpoint}/v1/flags/exposure`;
+    try {
+      await fetchImpl(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-traceiq-write-key': this.options.writeKey,
+          ...(params.environment ? { 'x-traceiq-environment': params.environment } : {})
+        },
+        body: JSON.stringify({
+          projectId: this.options.projectId,
+          flagKey: params.flagKey,
+          distinctId: params.distinctId,
+          enabled: params.enabled,
+          environment: params.environment ?? 'production',
+          properties: params.properties
+        })
+      });
+    } catch (error) {
+      this.debug(`trackFlagExposure error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   private handleError(error: Error): void {
     this.debug(error.message);
     this.options.onError?.(error);
@@ -247,3 +403,4 @@ export class TraceIQ {
     }
   }
 }
+

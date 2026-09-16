@@ -1,76 +1,88 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { Checkbox, Select } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
-import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-interface Flag {
+export interface FlagTarget {
+  property: string;
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'not_contains' | 'exists' | 'not_exists' | 'in';
+  value: string | number | boolean | Array<string | number>;
+}
+
+export interface FlagTargetGroup {
+  id?: string;
+  name?: string;
+  rules: FlagTarget[];
+}
+
+export interface FlagItem {
   id: string;
   key: string;
   name: string;
   description: string | null;
   enabled: boolean;
   rolloutPercentage: number;
+  environment: 'development' | 'staging' | 'production';
+  flagType: 'boolean' | 'remote_config' | 'multivariate';
   overrides: Record<string, boolean>;
   targeting: FlagTarget[];
+  targetingGroups: FlagTargetGroup[];
   payload: unknown;
+  revision: number;
+  archivedAt: string | null;
+  recentExposures24h: number;
+  totalExposures: number;
+  lastEvaluatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-type FlagTarget = {
-  property: string;
-  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
-  value: string | number | boolean;
-};
-
-type FlagConfirmation = 'delete' | 'clear-targeting' | 'clear-payload';
-
-const OPERATORS: Array<{ value: FlagTarget['operator']; label: string }> = [
-  { value: 'eq', label: '=' },
-  { value: 'ne', label: '≠' },
-  { value: 'gt', label: '>' },
-  { value: 'gte', label: '≥' },
-  { value: 'lt', label: '<' },
-  { value: 'lte', label: '≤' }
-];
-
-function parseTargetValue(raw: string): string | number | boolean {
-  const trimmed = raw.trim();
-  if (trimmed === '') return trimmed;
-  if (trimmed === 'true') return true;
-  if (trimmed === 'false') return false;
-  const num = Number(trimmed);
-  if (trimmed !== '' && Number.isFinite(num)) return num;
-  return trimmed;
+export interface FlagSummaryMetrics {
+  total: number;
+  active: number;
+  rollingOut: number;
+  withRecentExposure: number;
+  disabled: number;
 }
 
-function targetingSummary(targeting: FlagTarget[]): string {
-  if (targeting.length === 0) return 'Everyone';
-  return targeting
-    .map((rule) => {
-      const op = OPERATORS.find((o) => o.value === rule.operator)?.label ?? rule.operator;
-      return `${rule.property} ${op} ${rule.value}`;
-    })
-    .join(' AND ');
-}
+const inputClass =
+  'h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs text-neutral-900 transition placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-slate-400';
 
-export function FlagManager({ flags }: { flags: Flag[] }) {
+export function FlagManager({
+  flags = [],
+  metrics,
+  projectId
+}: {
+  flags: FlagItem[];
+  metrics?: FlagSummaryMetrics;
+  projectId?: string;
+}) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
-  const [key, setKey] = useState('');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [rollout, setRollout] = useState('0');
-  const [enabled, setEnabled] = useState(true);
-  const [payload, setPayload] = useState('');
-  const [targeting, setTargeting] = useState<FlagTarget[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const [selectedEnv, setSelectedEnv] = useState<'all' | 'production' | 'staging' | 'development'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'rolling_out' | 'disabled' | 'archived'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Create Modal state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createKey, setCreateKey] = useState('');
+  const [createName, setCreateName] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createEnv, setCreateEnv] = useState<'production' | 'staging' | 'development'>('production');
+  const [createType, setCreateType] = useState<'boolean' | 'remote_config'>('boolean');
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Kill Switch Confirm Modal state
+  const [killSwitchFlag, setKillSwitchFlag] = useState<FlagItem | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
 
   async function getToken(): Promise<string | null> {
     const {
@@ -82,544 +94,581 @@ export function FlagManager({ flags }: { flags: Flag[] }) {
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
     const token = await getToken();
     if (!token) {
-      setError('Your dashboard session expired. Sign in again.');
+      toast.error('Session expired. Please sign in again.');
       return null;
     }
     return fetch(`${apiBaseUrl}${path}`, {
       ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(init.headers ?? {})
+      }
     });
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    if (!key.trim()) return setError('Give the flag a key (e.g. new-checkout).');
-
-    let parsedPayload: unknown;
-    if (payload.trim()) {
-      try {
-        parsedPayload = JSON.parse(payload);
-      } catch {
-        return setError('Payload must be valid JSON (e.g. {"limit": 5}).');
-      }
+  function handleNameChange(val: string) {
+    setCreateName(val);
+    if (!createKey || createKey === slugify(createName)) {
+      setCreateKey(slugify(val));
     }
+  }
 
-    setIsSubmitting(true);
-    const response = await authFetch('/v1/dashboard/flags', {
-      method: 'POST',
-      body: JSON.stringify({
-        key: key.trim(),
-        name: name.trim() || undefined,
-        description: description.trim() || undefined,
-        enabled,
-        rolloutPercentage: Number(rollout) || 0,
-        targeting,
-        payload: parsedPayload
-      })
-    });
-    if (!response) return setIsSubmitting(false);
-    if (!response.ok) {
-      setError(await readError(response));
-      setIsSubmitting(false);
+  function slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    const key = createKey.trim();
+    if (!key) {
+      setCreateError('Flag key is required (e.g. nuwell-new-add-meal).');
       return;
     }
-    setKey('');
-    setName('');
-    setDescription('');
-    setRollout('0');
-    setEnabled(true);
-    setPayload('');
-    setTargeting([]);
-    setIsSubmitting(false);
+
+    setIsCreating(true);
+    const res = await authFetch('/v1/dashboard/flags', {
+      method: 'POST',
+      body: JSON.stringify({
+        key,
+        name: createName.trim() || key,
+        description: createDescription.trim() || undefined,
+        environment: createEnv,
+        flagType: createType,
+        enabled: false,
+        rolloutPercentage: 0,
+        projectId
+      })
+    });
+
+    setIsCreating(false);
+
+    if (!res) return;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setCreateError(err.message || 'Failed to create feature flag.');
+      return;
+    }
+
+    const data = await res.json();
+    toast.success(`Flag "${key}" created.`);
+    setIsCreateOpen(false);
+    setCreateKey('');
+    setCreateName('');
+    setCreateDescription('');
+    router.push(`/dashboard/flags/${data.id}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
     router.refresh();
   }
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
-      <form
-        className="grid h-fit gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950"
-        onSubmit={handleCreate}
-      >
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">New flag</h2>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
-            Ship behind a flag, target a segment by property, roll out to a % of that segment, then flip to 100% — or off in
-            one click.
-          </p>
-        </div>
+  async function handleConfirmKillSwitch() {
+    if (!killSwitchFlag) return;
+    setIsToggling(true);
+    const nextState = !killSwitchFlag.enabled;
 
-        <Field label="Key">
-          <input
-            className={inputClass}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="new-checkout"
-          />
-        </Field>
-        <Field label="Name (optional)">
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="New checkout flow" />
-        </Field>
-        <Field label="Description (optional)">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Redesigned 2-step checkout" />
-        </Field>
-        <Field label="Rollout %">
-          <input className={inputClass} type="number" min={0} max={100} value={rollout} onChange={(e) => setRollout(e.target.value)} />
-        </Field>
-        <Checkbox checked={enabled} onCheckedChange={setEnabled} label="Enabled" />
+    const res = await authFetch(`/v1/dashboard/flags/${killSwitchFlag.id}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled: nextState, projectId })
+    });
+    setIsToggling(false);
+    setKillSwitchFlag(null);
 
-        <div className="grid gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
-            Target (optional)
-          </span>
-          <TargetingEditor value={targeting} onChange={setTargeting} />
-          <p className="text-[11px] font-normal normal-case tracking-normal text-neutral-400 dark:text-slate-500">
-            All rules must match (AND). The SDK passes the user&apos;s traits / properties with each evaluation. Leave empty
-            to target everyone.
-          </p>
-        </div>
-
-        <Field label="Payload — remote config (optional)">
-          <textarea
-            className={`${inputClass} min-h-[72px] py-2 font-mono text-xs`}
-            value={payload}
-            onChange={(e) => setPayload(e.target.value)}
-            placeholder={'{ "maxAmount": 50000, "banner": "Try the new checkout" }'}
-            spellCheck={false}
-          />
-          <span className="text-[11px] font-normal normal-case tracking-normal text-neutral-400 dark:text-slate-500">
-            JSON delivered to the SDK only when this flag is on for a user. Leave blank for a plain on/off flag.
-          </span>
-        </Field>
-
-        {error ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-            {error}
-          </p>
-        ) : null}
-
-        <div>
-          <button
-            type="submit"
-            className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving…' : 'Create flag'}
-          </button>
-        </div>
-      </form>
-
-      <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800 dark:text-slate-500">
-          Flags
-        </p>
-        {flags.length === 0 ? (
-          <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No flags yet. Create one to start rolling out safely.</p>
-        ) : (
-          <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
-            {flags.map((flag) => (
-              <FlagRow key={flag.id} flag={flag} authFetch={authFetch} onChanged={() => router.refresh()} />
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function TargetingEditor({ value, onChange }: { value: FlagTarget[]; onChange: (next: FlagTarget[]) => void }) {
-  function updateRule(index: number, patch: Partial<FlagTarget>) {
-    const next = value.map((rule, i) => (i === index ? { ...rule, ...patch } : rule));
-    onChange(next);
-  }
-
-  function removeRule(index: number) {
-    onChange(value.filter((_, i) => i !== index));
-  }
-
-  function addRule() {
-    onChange([...value, { property: '', operator: 'eq', value: '' }]);
-  }
-
-  return (
-    <div className="grid gap-2">
-      {value.length === 0 ? (
-        <p className="text-sm text-neutral-400 dark:text-slate-600">No rules — this flag targets everyone.</p>
-      ) : (
-        value.map((rule, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <input
-              className={`${inputClass} min-w-0 flex-1 font-mono text-xs`}
-              value={rule.property}
-              onChange={(e) => updateRule(index, { property: e.target.value })}
-              placeholder="plan"
-              aria-label={`Rule ${index + 1} property`}
-            />
-            <Select
-              value={rule.operator}
-              onValueChange={(operator) => updateRule(index, { operator: operator as FlagTarget['operator'] })}
-              items={OPERATORS.map((op) => ({ value: op.value, label: op.label }))}
-            />
-            <input
-              className={`${inputClass} min-w-0 flex-1 font-mono text-xs`}
-              value={String(rule.value)}
-              onChange={(e) => updateRule(index, { value: parseTargetValue(e.target.value) })}
-              placeholder="pro"
-              aria-label={`Rule ${index + 1} value`}
-            />
-            <button
-              type="button"
-              className={deleteBtn}
-              onClick={() => removeRule(index)}
-              aria-label={`Remove rule ${index + 1}`}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
-        ))
-      )}
-      <button
-        type="button"
-        className="h-8 w-fit rounded-md border border-dashed border-neutral-300 px-3 text-xs font-semibold text-neutral-600 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-        onClick={addRule}
-      >
-        + Add rule
-      </button>
-    </div>
-  );
-}
-
-function FlagRow({
-  flag,
-  authFetch,
-  onChanged
-}: {
-  flag: Flag;
-  authFetch: (path: string, init: RequestInit) => Promise<Response | null>;
-  onChanged: () => void;
-}) {
-  const [rollout, setRollout] = useState(String(flag.rolloutPercentage));
-  const [busy, setBusy] = useState(false);
-  const dirty = Number(rollout) !== flag.rolloutPercentage;
-
-  const hasPayload = flag.payload != null;
-  const hasTargeting = flag.targeting.length > 0;
-  const [payloadText, setPayloadText] = useState(hasPayload ? JSON.stringify(flag.payload, null, 2) : '');
-  const [payloadError, setPayloadError] = useState<string | null>(null);
-  const [targeting, setTargeting] = useState<FlagTarget[]>(flag.targeting);
-  const [targetingError, setTargetingError] = useState<string | null>(null);
-  const [targetingDirty, setTargetingDirty] = useState(false);
-  const [confirmation, setConfirmation] = useState<FlagConfirmation | null>(null);
-  const [confirmationError, setConfirmationError] = useState<string | null>(null);
-
-  async function update(patch: Record<string, unknown>) {
-    setBusy(true);
-    const response = await authFetch(`/v1/dashboard/flags/${flag.id}`, { method: 'PUT', body: JSON.stringify(patch) });
-    setBusy(false);
-    if (response?.ok) {
-      setTargetingDirty(false);
-      onChanged();
-    }
-    return response;
-  }
-
-  async function savePayload() {
-    setPayloadError(null);
-    const trimmed = payloadText.trim();
-    if (!trimmed) {
-      await update({ payload: null });
+    if (!res || !res.ok) {
+      toast.error('Failed to change flag state.');
       return;
     }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      setPayloadError('Payload must be valid JSON.');
-      return;
-    }
-    const response = await update({ payload: parsed });
-    if (response && !response.ok) setPayloadError(await readError(response));
+
+    toast.success(`Flag ${killSwitchFlag.key} is now ${nextState ? 'active' : 'disabled'}.`);
+    router.refresh();
   }
 
-  async function saveTargeting() {
-    setTargetingError(null);
-    const complete = targeting.every((rule) => rule.property.trim().length > 0);
-    if (!complete) {
-      setTargetingError('Every rule needs a property.');
-      return;
-    }
-    const response = await update({ targeting });
-    if (response && !response.ok) setTargetingError(await readError(response));
-  }
-
-  async function confirmDestructiveAction() {
-    if (!confirmation || busy) return;
-    setBusy(true);
-    setConfirmationError(null);
-    try {
-      const isDelete = confirmation === 'delete';
-      const patch = confirmation === 'clear-targeting'
-        ? { targeting: [] }
-        : confirmation === 'clear-payload'
-          ? { payload: null }
-          : null;
-      const response = await authFetch(`/v1/dashboard/flags/${flag.id}`, {
-        method: isDelete ? 'DELETE' : 'PUT',
-        ...(patch ? { body: JSON.stringify(patch) } : {})
-      });
-      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
-
-      if (confirmation === 'clear-targeting') {
-        setTargeting([]);
-        setTargetingError(null);
-        setTargetingDirty(false);
-        toast.success(`Targeting for "${flag.name}" was cleared.`, { title: 'Flag targeting cleared' });
-      } else if (confirmation === 'clear-payload') {
-        setPayloadText('');
-        setPayloadError(null);
-        toast.success(`Payload for "${flag.name}" was cleared.`, { title: 'Flag payload cleared' });
-      } else {
-        toast.success(`Flag "${flag.name}" was deleted.`, { title: 'Flag deleted' });
+  // Filter flags
+  const filteredFlags = useMemo(() => {
+    return flags.filter((f) => {
+      // Env filter
+      if (selectedEnv !== 'all' && f.environment !== selectedEnv) {
+        return false;
       }
-      setConfirmation(null);
-      onChanged();
-    } catch (caughtError) {
-      const message = await readApiError(caughtError, 'Could not complete this flag change.');
-      setConfirmationError(message);
-      toast.error(message, { title: confirmation === 'delete' ? 'Flag deletion failed' : 'Flag update failed' });
-    } finally {
-      setBusy(false);
-    }
-  }
+      // Status filter
+      if (statusFilter === 'active' && (!f.enabled || f.archivedAt)) return false;
+      if (statusFilter === 'rolling_out' && (!f.enabled || f.rolloutPercentage <= 0 || f.rolloutPercentage >= 100 || f.archivedAt)) return false;
+      if (statusFilter === 'disabled' && (f.enabled || f.archivedAt)) return false;
+      if (statusFilter === 'archived' && !f.archivedAt) return false;
+      if (statusFilter !== 'archived' && f.archivedAt) return false;
+
+      // Search
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesKey = f.key.toLowerCase().includes(q);
+        const matchesName = f.name.toLowerCase().includes(q);
+        const matchesDesc = (f.description ?? '').toLowerCase().includes(q);
+        if (!matchesKey && !matchesName && !matchesDesc) return false;
+      }
+
+      return true;
+    });
+  }, [flags, selectedEnv, statusFilter, searchQuery]);
+
+  // Derived metrics
+  const activeMetrics = useMemo(() => {
+    if (metrics) return metrics;
+    const nonArchived = flags.filter((f) => !f.archivedAt);
+    return {
+      total: nonArchived.length,
+      active: nonArchived.filter((f) => f.enabled).length,
+      rollingOut: nonArchived.filter((f) => f.enabled && f.rolloutPercentage > 0 && f.rolloutPercentage < 100).length,
+      withRecentExposure: nonArchived.filter((f) => f.recentExposures24h > 0).length,
+      disabled: nonArchived.filter((f) => !f.enabled).length
+    };
+  }, [flags, metrics]);
 
   return (
-    <li className="px-5 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${flag.enabled
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
-                  : 'border border-neutral-200 text-neutral-400 dark:border-slate-800 dark:text-slate-600'
-                }`}
-            >
-              {flag.enabled ? 'On' : 'Off'}
-            </span>
-            <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{flag.name}</p>
-            <code className="truncate rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-600 dark:bg-slate-900 dark:text-slate-400">
-              {flag.key}
-            </code>
-            {hasPayload ? (
-              <span className="shrink-0 rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:border-slate-800 dark:text-slate-400">
-                Config
-              </span>
-            ) : null}
-            {hasTargeting ? (
-              <span className="shrink-0 rounded border border-sky-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 dark:border-sky-900 dark:text-sky-300">
-                Targeted
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            {hasTargeting ? (
-              <span className="text-sky-600 dark:text-sky-300">{targetingSummary(flag.targeting)}</span>
-            ) : flag.enabled ? (
-              'All users'
-            ) : null}{' '}
-            {flag.enabled ? `· rolled out to ${flag.rolloutPercentage}%` : '· off for everyone (master switch)'}
-            {flag.description ? ` · ${flag.description}` : ''}
+    <div className="space-y-6">
+      {/* Top Header Controls & Metrics */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">Feature Flags</h1>
+          <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
+            Control releases, target users, configure features remotely, and monitor what happens after exposure.
           </p>
         </div>
-
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={rollout}
-              onChange={(e) => setRollout(e.target.value)}
-              className="h-8 w-16 rounded-md border border-neutral-300 bg-white px-2 text-sm text-neutral-900 outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-white"
-            />
-            <span className="text-xs text-neutral-400">%</span>
-          </div>
-          <button
-            className={toolbarBtn}
-            disabled={busy || !dirty}
-            onClick={() => update({ rolloutPercentage: Number(rollout) || 0 })}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/docs?page=flags"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            Save
-          </button>
-          <button className={toolbarBtn} disabled={busy} onClick={() => update({ enabled: !flag.enabled })}>
-            {flag.enabled ? 'Disable' : 'Enable'}
-          </button>
+            Documentation
+          </Link>
           <button
-            className={deleteBtn}
-            disabled={busy}
-            onClick={() => {
-              setConfirmationError(null);
-              setConfirmation('delete');
-            }}
-            aria-label="Delete flag"
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
+            Create flag
           </button>
         </div>
       </div>
 
-      <details
-        className="group mt-3"
-        open={targetingDirty}
-        onToggle={(event) => {
-          const open = (event.target as HTMLDetailsElement).open;
-          if (!open) setTargetingError(null);
-        }}
-      >
-        <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition group-open:rotate-90" aria-hidden>
-            <path d="M9 6l6 6-6 6" />
-          </svg>
-          {hasTargeting ? 'Edit targeting (segment)' : 'Add targeting (segment)'}
-        </summary>
-        <div className="mt-2 grid gap-2">
-          <TargetingEditor
-            value={targeting}
-            onChange={(next) => {
-              setTargeting(next);
-              setTargetingDirty(true);
-            }}
-          />
-          {targetingError ? <p className="text-xs text-red-600 dark:text-red-400">{targetingError}</p> : null}
-          <div className="flex items-center gap-2">
-            <button className={toolbarBtn} disabled={busy} onClick={saveTargeting}>
-              Save targeting
-            </button>
-            {hasTargeting ? (
-              <button
-                className={toolbarBtn}
-                disabled={busy}
-                onClick={() => {
-                  setConfirmationError(null);
-                  setConfirmation('clear-targeting');
-                }}
-              >
-                Clear
-              </button>
-            ) : null}
-            <span className="text-[11px] text-neutral-400 dark:text-slate-500">
-              Rules must ALL match. The user&apos;s traits are sent with each evaluation.
-            </span>
-          </div>
-        </div>
-      </details>
+      {/* Summary Metrics Bar */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <MetricCard label="Total flags" value={activeMetrics.total} />
+        <MetricCard label="Active flags" value={activeMetrics.active} accent="emerald" />
+        <MetricCard label="Rolling out" value={activeMetrics.rollingOut} accent="indigo" />
+        <MetricCard label="Recent exposure" value={activeMetrics.withRecentExposure} accent="cyan" />
+        <MetricCard label="Disabled" value={activeMetrics.disabled} accent="slate" />
+      </div>
 
-      <details className="group mt-3">
-        <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition group-open:rotate-90" aria-hidden>
-            <path d="M9 6l6 6-6 6" />
-          </svg>
-          {hasPayload ? 'Edit payload (remote config)' : 'Add payload (remote config)'}
-        </summary>
-        <div className="mt-2 grid gap-2">
-          <textarea
-            className="min-h-[80px] w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-xs text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white"
-            value={payloadText}
-            onChange={(e) => setPayloadText(e.target.value)}
-            placeholder={'{ "maxAmount": 50000 }'}
-            spellCheck={false}
-          />
-          {payloadError ? <p className="text-xs text-red-600 dark:text-red-400">{payloadError}</p> : null}
-          <div className="flex items-center gap-2">
-            <button className={toolbarBtn} disabled={busy} onClick={savePayload}>
-              Save payload
-            </button>
-            {hasPayload ? (
+      {/* Filters & Environment Selector */}
+      <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Environment Tabs */}
+          <div className="inline-flex rounded-md bg-neutral-100 p-0.5 dark:bg-slate-900">
+            {(['all', 'production', 'staging', 'development'] as const).map((env) => (
               <button
-                className={toolbarBtn}
-                disabled={busy}
-                onClick={() => {
-                  setConfirmationError(null);
-                  setConfirmation('clear-payload');
-                }}
+                key={env}
+                onClick={() => setSelectedEnv(env)}
+                className={`rounded px-2.5 py-1 text-xs font-semibold capitalize transition ${
+                  selectedEnv === env
+                    ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-800 dark:text-white'
+                    : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
               >
-                Clear
+                {env === 'all' ? 'All Environments' : env}
               </button>
-            ) : null}
-            <span className="text-[11px] text-neutral-400 dark:text-slate-500">Sent to the SDK only when the flag is on.</span>
+            ))}
+          </div>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className="h-8 rounded-md border border-neutral-300 bg-white px-2 text-xs font-medium text-neutral-800 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <option value="all">All States</option>
+            <option value="active">Active</option>
+            <option value="rolling_out">Rolling Out (1-99%)</option>
+            <option value="disabled">Disabled</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+
+        {/* Search */}
+        <div className="relative sm:w-64">
+          <input
+            type="text"
+            placeholder="Search flags by name or key…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 w-full rounded-md border border-neutral-300 bg-white pl-8 pr-3 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+          />
+          <svg
+            className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400 dark:text-slate-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </div>
+      </div>
+
+      {/* Flags List Table / Cards */}
+      {filteredFlags.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-950">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+              <line x1="4" y1="22" x2="4" y2="15"></line>
+            </svg>
+          </div>
+          <h3 className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">
+            {searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'
+              ? 'No matching feature flags found'
+              : 'You haven’t created any feature flags yet'}
+          </h3>
+          <p className="mx-auto mt-1 max-w-sm text-xs text-neutral-500 dark:text-slate-400">
+            {searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'
+              ? 'Try changing your filters or search term to locate the flag.'
+              : 'Ship code safely behind a flag, test with real users, roll out deterministically, and observe conversion and error signals.'}
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+            >
+              + Create your first flag
+            </button>
           </div>
         </div>
-      </details>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="divide-y divide-neutral-200 dark:divide-slate-800">
+            {filteredFlags.map((flag) => (
+              <FlagListRow
+                key={flag.id}
+                flag={flag}
+                projectId={projectId}
+                onKillSwitch={() => setKillSwitchFlag(flag)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fast Create Flag Modal */}
       <DashboardDialog
-        open={Boolean(confirmation)}
-        title={confirmation === 'delete' ? 'Delete flag?' : confirmation === 'clear-targeting' ? 'Clear flag targeting?' : 'Clear flag payload?'}
-        description={
-          confirmation === 'delete'
-            ? 'This permanently removes the flag. SDK evaluations using its key will fall back to their default value.'
-            : confirmation === 'clear-targeting'
-              ? 'This removes every targeting rule and makes the flag apply according to its rollout percentage alone.'
-              : 'This permanently removes the remote-config payload from this flag.'
-        }
-        onClose={() => {
-          if (!busy) setConfirmation(null);
-        }}
+        open={isCreateOpen}
+        title="Create Feature Flag"
+        description="Ship code behind a flag, target a segment, and roll out safely."
+        onClose={() => setIsCreateOpen(false)}
         footer={
           <>
-            <button type="button" className={toolbarBtn} disabled={busy} onClick={() => setConfirmation(null)}>
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(false)}
+              className="h-9 rounded-md border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            >
               Cancel
             </button>
             <button
               type="button"
-              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
-              disabled={busy}
-              onClick={() => void confirmDestructiveAction()}
+              onClick={(e) => void handleCreate(e as unknown as FormEvent)}
+              disabled={isCreating}
+              className="h-9 rounded-md bg-neutral-900 px-4 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black"
             >
-              {busy ? 'Working…' : confirmation === 'delete' ? 'Delete flag' : 'Clear configuration'}
+              {isCreating ? 'Creating…' : 'Create flag'}
             </button>
           </>
         }
       >
-        <div className="grid gap-3">
-          <p className="text-sm text-neutral-600 dark:text-slate-400">
-            This change affects <span className="font-semibold text-neutral-900 dark:text-white">{flag.name}</span>.
-          </p>
-          {confirmationError ? (
-            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
-              {confirmationError}
+        <form onSubmit={handleCreate} className="space-y-4 pt-2">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              className={inputClass}
+              placeholder="e.g. New Add Meal Flow"
+              value={createName}
+              onChange={(e) => handleNameChange(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+              Key <span className="text-red-500">*</span>
+            </label>
+            <input
+              className={`${inputClass} font-mono text-xs`}
+              placeholder="e.g. nuwell-new-add-meal"
+              value={createKey}
+              onChange={(e) => setCreateKey(e.target.value)}
+              required
+            />
+            <p className="mt-1 text-[11px] text-neutral-400 dark:text-slate-500">
+              Unique identifier used in your application code.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+              Description (optional)
+            </label>
+            <input
+              className={inputClass}
+              placeholder="e.g. Redesigned quick meal logging with voice and scanner"
+              value={createDescription}
+              onChange={(e) => setCreateDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+                Environment
+              </label>
+              <select
+                value={createEnv}
+                onChange={(e) => setCreateEnv(e.target.value as typeof createEnv)}
+                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              >
+                <option value="production">Production</option>
+                <option value="staging">Staging</option>
+                <option value="development">Development</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+                Flag Type
+              </label>
+              <select
+                value={createType}
+                onChange={(e) => setCreateType(e.target.value as typeof createType)}
+                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              >
+                <option value="boolean">Boolean (On / Off)</option>
+                <option value="remote_config">Remote Config (JSON)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+            <strong>Default state:</strong> Created flags start <strong>Disabled (0% rollout)</strong> so nothing ships to users until you configure and activate it.
+          </div>
+
+          {createError ? (
+            <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+              {createError}
             </p>
           ) : null}
-        </div>
+        </form>
       </DashboardDialog>
-    </li>
+
+      {/* Safe Kill Switch Modal */}
+      <DashboardDialog
+        open={Boolean(killSwitchFlag)}
+        title={killSwitchFlag?.enabled ? 'Disable Feature Flag' : 'Enable Feature Flag'}
+        description={
+          killSwitchFlag?.enabled
+            ? `Disabling "${killSwitchFlag.key}" will immediately return fallback/off values to all applications. Rollout configuration, targeting rules, remote config, and history will be safely preserved.`
+            : `Enabling "${killSwitchFlag?.key ?? ''}" will activate evaluation according to its ${killSwitchFlag?.rolloutPercentage ?? 0}% rollout and targeting rules.`
+        }
+        onClose={() => setKillSwitchFlag(null)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setKillSwitchFlag(null)}
+              className="h-9 rounded-md border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirmKillSwitch()}
+              disabled={isToggling}
+              className={`h-9 rounded-md px-4 text-xs font-bold text-white transition disabled:opacity-50 ${
+                killSwitchFlag?.enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
+              }`}
+            >
+              {isToggling ? 'Updating…' : killSwitchFlag?.enabled ? 'Confirm disable' : 'Enable flag'}
+            </button>
+          </>
+        }
+      />
+    </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function MetricCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
+  const accentClasses: Record<string, string> = {
+    emerald: 'text-emerald-600 dark:text-emerald-400',
+    indigo: 'text-indigo-600 dark:text-indigo-400',
+    cyan: 'text-cyan-600 dark:text-cyan-400',
+    slate: 'text-neutral-600 dark:text-slate-400'
+  };
+
   return (
-    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
-      {label}
-      {children}
-    </label>
+    <div className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:text-slate-500">
+        {label}
+      </p>
+      <p className={`mt-1 font-mono text-xl font-bold ${accent ? accentClasses[accent] : 'text-neutral-900 dark:text-white'}`}>
+        {value.toLocaleString()}
+      </p>
+    </div>
   );
 }
 
-async function readError(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { message?: string };
-    return body.message ?? `Request failed with ${response.status}`;
-  } catch {
-    return `Request failed with ${response.status}`;
-  }
+function FlagListRow({
+  flag,
+  projectId,
+  onKillSwitch
+}: {
+  flag: FlagItem;
+  projectId?: string;
+  onKillSwitch: () => void;
+}) {
+  const detailsHref = `/dashboard/flags/${flag.id}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`;
+
+  // Human state description
+  const statusBadge = getStatusBadge(flag);
+  const targetingDesc = formatTargetingSummary(flag);
+
+  return (
+    <div className="flex flex-col gap-3 p-4 transition hover:bg-neutral-50/60 dark:hover:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+      {/* Flag Info */}
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={detailsHref}
+            className="text-sm font-bold text-neutral-900 underline-offset-4 hover:underline dark:text-white"
+          >
+            {flag.name}
+          </Link>
+          <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] text-neutral-700 dark:bg-slate-800 dark:text-slate-300">
+            {flag.key}
+          </code>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadge.className}`}>
+            {statusBadge.label}
+          </span>
+          <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+            {flag.environment}
+          </span>
+          {flag.flagType === 'remote_config' ? (
+            <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+              Remote config
+            </span>
+          ) : null}
+        </div>
+
+        {flag.description ? (
+          <p className="text-xs text-neutral-500 dark:text-slate-400 line-clamp-1">{flag.description}</p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-[11px] text-neutral-400 dark:text-slate-500">
+          <span>Targeting: <strong className="text-neutral-700 dark:text-slate-300 font-medium">{targetingDesc}</strong></span>
+          <span>Exposures (24h): <strong className="text-neutral-700 dark:text-slate-300 font-mono">{flag.recentExposures24h.toLocaleString()}</strong></span>
+          <span>Total: <strong className="text-neutral-700 dark:text-slate-300 font-mono">{flag.totalExposures.toLocaleString()}</strong></span>
+          <span>Rev: <strong className="text-neutral-700 dark:text-slate-300 font-mono">r{flag.revision}</strong></span>
+        </div>
+      </div>
+
+      {/* Quick Rollout indicator & Actions */}
+      <div className="flex items-center gap-3 sm:shrink-0">
+        {/* Rollout Progress Mini Bar */}
+        <div className="w-24 space-y-1">
+          <div className="flex justify-between text-[10px] font-mono text-neutral-500 dark:text-slate-400">
+            <span>Rollout</span>
+            <span>{flag.enabled ? `${flag.rolloutPercentage}%` : 'Off'}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-slate-800">
+            <div
+              className={`h-full rounded-full transition-all ${
+                flag.enabled ? (flag.rolloutPercentage === 100 ? 'bg-emerald-500' : 'bg-indigo-500') : 'bg-neutral-300 dark:bg-slate-700'
+              }`}
+              style={{ width: `${flag.enabled ? flag.rolloutPercentage : 0}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Kill switch Toggle Button */}
+        <button
+          onClick={onKillSwitch}
+          className={`h-8 rounded-md px-2.5 text-xs font-semibold transition ${
+            flag.enabled
+              ? 'border border-neutral-300 bg-white text-neutral-800 hover:bg-red-50 hover:text-red-700 hover:border-red-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-red-950/40 dark:hover:text-red-300'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:text-black dark:hover:bg-emerald-400'
+          }`}
+          title={flag.enabled ? 'Disable flag immediately' : 'Enable flag'}
+        >
+          {flag.enabled ? 'Disable' : 'Enable'}
+        </button>
+
+        {/* View Details CTA */}
+        <Link
+          href={detailsHref}
+          className="inline-flex h-8 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Configure →
+        </Link>
+      </div>
+    </div>
+  );
 }
 
-const inputClass =
-  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';
+function getStatusBadge(flag: FlagItem): { label: string; className: string } {
+  if (flag.archivedAt) {
+    return { label: 'Archived', className: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400' };
+  }
+  if (!flag.enabled) {
+    return { label: 'Disabled', className: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400' };
+  }
+  if (flag.totalExposures === 0 && flag.rolloutPercentage === 0) {
+    return { label: 'Draft / Never evaluated', className: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
+  }
+  if (flag.rolloutPercentage === 0) {
+    return { label: 'Enabled · 0% rollout', className: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
+  }
 
-const toolbarBtn =
-  'inline-flex h-8 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
+  const hasTargeting = (flag.targetingGroups && flag.targetingGroups.length > 0) || (flag.targeting && flag.targeting.length > 0);
+  if (flag.rolloutPercentage === 100) {
+    return hasTargeting
+      ? { label: 'Enabled · Targeted only', className: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300' }
+      : { label: 'Enabled · All users', className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' };
+  }
 
-const deleteBtn =
-  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-400 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-500 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-400';
+  return hasTargeting
+    ? { label: `Enabled · Targeted · ${flag.rolloutPercentage}%`, className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' }
+    : { label: `Enabled · ${flag.rolloutPercentage}% rollout`, className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' };
+}
+
+function formatTargetingSummary(flag: FlagItem): string {
+  const groups = flag.targetingGroups && flag.targetingGroups.length > 0
+    ? flag.targetingGroups
+    : flag.targeting && flag.targeting.length > 0
+      ? [{ name: 'Default', rules: flag.targeting }]
+      : [];
+
+  if (groups.length === 0) return 'All users';
+  if (groups.length === 1) {
+    const rules = groups[0].rules;
+    if (rules.length === 0) return 'All users';
+    return rules.map((r) => `${r.property} ${r.operator} ${r.value}`).join(' AND ');
+  }
+  return `${groups.length} targeting groups (OR)`;
+}

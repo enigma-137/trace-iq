@@ -20,9 +20,20 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private lastRageAt = 0;
   private featureFlags: Record<string, boolean> = {};
   private featureFlagPayloads: Record<string, unknown> = {};
+  private featureFlagDetails: Record<string, { enabled: boolean; reason: string; revision: number }> = {};
   private featureFlagsLoaded = false;
+  private recordedExposures = new Set<string>();
   private replayConsentGranted = false;
   private replayRecorder?: ReplayRecorder;
+
+  public readonly flags = {
+    load: (properties?: Record<string, string | number | boolean>) => this.loadFeatureFlags(properties),
+    isEnabled: (key: string, defaultValue = false) => this.isFeatureEnabled(key, defaultValue),
+    getPayload: <T = unknown>(key: string, defaultValue?: T) => this.getFeatureFlagPayload<T>(key, defaultValue),
+    evaluate: <T = unknown>(key: string, options?: { defaultValue?: boolean; defaultPayload?: T; trackExposure?: boolean }) =>
+      this.evaluateFeatureFlag<T>(key, options),
+    recordExposure: (key: string) => this.recordFlagExposure(key)
+  };
 
   initialize(options: TraceIQInitOptions): void {
     this.options = {
@@ -305,38 +316,108 @@ export class BrowserTraceIQClient implements TraceIQClient {
         body: JSON.stringify({
           projectId: options.projectId,
           distinctId: this.distinctId(),
+          environment: options.environment,
           properties: Object.keys(traits).length > 0 ? traits : undefined
         })
       });
 
       if (!response.ok) {
         this.debug(`TraceIQ flag evaluation rejected with ${response.status}.`);
-        return { flags: this.featureFlags, payloads: this.featureFlagPayloads };
+        return { flags: this.featureFlags, payloads: this.featureFlagPayloads, details: this.featureFlagDetails };
       }
 
       const body = (await response.json()) as Partial<TraceIQFeatureFlags>;
       this.featureFlags = body.flags ?? {};
       this.featureFlagPayloads = body.payloads ?? {};
+      this.featureFlagDetails = body.details ?? {};
       this.featureFlagsLoaded = true;
     } catch (error) {
       this.debug('TraceIQ flag evaluation failed.', error);
     }
 
-    return { flags: this.featureFlags, payloads: this.featureFlagPayloads };
+    return { flags: this.featureFlags, payloads: this.featureFlagPayloads, details: this.featureFlagDetails };
   }
 
-  isFeatureEnabled(key: string): boolean {
+  isFeatureEnabled(key: string, defaultValue = false): boolean {
     if (!this.featureFlagsLoaded) {
       this.debug('Feature flags have not been loaded yet — call loadFeatureFlags() first.');
+      return defaultValue;
     }
-    return this.featureFlags[key] === true;
+    const enabled = this.featureFlags[key] ?? defaultValue;
+    if (this.options?.autoTrackFlagExposures !== false) {
+      this.recordFlagExposure(key);
+    }
+    return enabled;
   }
 
-  getFeatureFlagPayload(key: string): unknown {
+  getFeatureFlagPayload<T = unknown>(key: string, defaultValue?: T): T | undefined {
     if (this.featureFlags[key] !== true) {
-      return undefined;
+      return defaultValue;
     }
-    return this.featureFlagPayloads[key];
+    if (this.options?.autoTrackFlagExposures !== false) {
+      this.recordFlagExposure(key);
+    }
+    return (this.featureFlagPayloads[key] as T) ?? defaultValue;
+  }
+
+  evaluateFeatureFlag<T = unknown>(
+    key: string,
+    options?: { defaultValue?: boolean; defaultPayload?: T; trackExposure?: boolean }
+  ): { enabled: boolean; payload?: T; reason?: string; revision?: number } {
+    const isLoaded = this.featureFlagsLoaded;
+    const isEnabled = isLoaded ? (this.featureFlags[key] ?? options?.defaultValue ?? false) : (options?.defaultValue ?? false);
+    const payload = isEnabled ? ((this.featureFlagPayloads[key] as T) ?? options?.defaultPayload) : options?.defaultPayload;
+    const detail = this.featureFlagDetails[key];
+
+    if (options?.trackExposure !== false && this.options?.autoTrackFlagExposures !== false) {
+      this.recordFlagExposure(key);
+    }
+
+    return {
+      enabled: isEnabled,
+      payload,
+      reason: detail?.reason,
+      revision: detail?.revision
+    };
+  }
+
+  recordFlagExposure(key: string): void {
+    const options = this.options;
+    if (!options) return;
+
+    const isEnabled = this.featureFlags[key] === true;
+    const detail = this.featureFlagDetails[key];
+    const revision = detail?.revision ?? 1;
+    const dedupKey = `${key}:${this.distinctId()}:${revision}:${isEnabled ? '1' : '0'}`;
+    if (this.recordedExposures.has(dedupKey)) {
+      return;
+    }
+    this.recordedExposures.add(dedupKey);
+
+    const endpoint = `${(options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/flags/exposure`;
+
+    void fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-traceiq-write-key': options.writeKey,
+        ...(options.environment ? { 'x-traceiq-environment': options.environment } : {})
+      },
+      body: JSON.stringify({
+        projectId: options.projectId,
+        flagKey: key,
+        distinctId: this.distinctId(),
+        userId: this.identity?.userId,
+        anonymousId: this.anonymousId,
+        sessionId: this.sessionId,
+        enabled: isEnabled,
+        environment: options.environment ?? 'production',
+        revision: detail?.revision ?? 1,
+        evaluationReason: detail?.reason ?? (isEnabled ? 'sdk_enabled' : 'sdk_disabled')
+      })
+    }).catch((err) => {
+      this.debug('TraceIQ flag exposure tracking error', err);
+    });
   }
 
   private distinctId(): string | undefined {
