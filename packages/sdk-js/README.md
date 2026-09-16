@@ -40,6 +40,31 @@ traceiq.initialize({
 traceiq.track('signup_completed', { plan: 'pro' });
 ```
 
+## Feature Flags
+
+TraceIQ Feature Flags support deterministic sticky rollouts, user targeting, remote configuration payloads, and automatic exposure tracking.
+
+```ts
+import { traceiq } from 'traceiq-sdk-js';
+
+// 1. Identify the user first so targeting rules (plan, custom traits) evaluate against them
+traceiq.identify({
+  userId: 'usr_123',
+  traits: { plan: 'pro', role: 'member' }
+});
+
+// 2. Load flags for the identified user
+await traceiq.flags.load();
+
+// 3. Evaluate flag state (automatically records exposure without duplicate rerender spam)
+if (traceiq.flags.isEnabled('nuwell-new-add-meal')) {
+  const config = traceiq.flags.getPayload('nuwell-new-add-meal');
+  renderNewFeature(config);
+} else {
+  renderLegacyFeature();
+}
+```
+
 ## Common methods
 
 ```ts

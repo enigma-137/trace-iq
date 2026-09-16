@@ -1589,10 +1589,16 @@ traceiq.initialize({
   environment: '${environment}'
 });
 
-// Load flags for the current user and traits
-await traceiq.flags.load({ plan: 'pro', country: 'NG' });
+// 1. Identify user (binds distinctId and traits for targeted evaluation)
+traceiq.identify({
+  userId: user.id,
+  traits: { plan: user.plan, country: 'NG' }
+});
 
-// Check flag state (automatically records exposure)
+// 2. Load flags for the identified user
+await traceiq.flags.load();
+
+// 3. Check flag state (automatically records exposure)
 if (traceiq.flags.isEnabled('${flagKey}')) {
   const config = traceiq.flags.getPayload('${flagKey}');
 }`,
@@ -1601,19 +1607,26 @@ if (traceiq.flags.isEnabled('${flagKey}')) {
 import { useEffect, useState } from 'react';
 import { traceiq } from 'traceiq-sdk-js';
 
-export function FeatureToggleComponent() {
+export function FeatureToggleComponent({ user }: { user: { id: string; plan: string } }) {
   const [enabled, setEnabled] = useState(false);
   const [payload, setPayload] = useState<unknown>(null);
 
   useEffect(() => {
-    void traceiq.flags.load({ plan: 'pro' }).then(() => {
+    // 1. Identify user with their traits
+    traceiq.identify({ userId: user.id, traits: { plan: user.plan } });
+
+    // 2. Load flags for the identified user
+    void traceiq.flags.load().then(() => {
       const isEnabled = traceiq.flags.isEnabled('${flagKey}');
       setEnabled(isEnabled);
       if (isEnabled) {
         setPayload(traceiq.flags.getPayload('${flagKey}'));
       }
+    }).catch(() => {
+      // Graceful fallback to false on network error
+      setEnabled(false);
     });
-  }, []);
+  }, [user.id, user.plan]);
 
   if (!enabled) return <DefaultComponent />;
   return <NewComponent config={payload} />;
