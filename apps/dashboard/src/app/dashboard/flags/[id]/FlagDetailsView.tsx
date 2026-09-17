@@ -1,12 +1,14 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from '../../DashboardDialog';
 import { FlagItem, FlagTarget, FlagTargetGroup } from '../FlagManager';
 import { toast } from '@/lib/toast';
+import { UserDetailHoverCard, UserPreviewData, formatRelativeTime, formatShortId } from '../UserDetailHoverCard';
+import { UserPickerModal } from '../UserPickerModal';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -117,7 +119,21 @@ export function FlagDetailsView({
   const [isKillSwitchOpen, setIsKillSwitchOpen] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
 
-  // Targeting state
+  // Specific Users & Overrides state
+  const [overrides, setOverrides] = useState<Record<string, boolean>>(flag.overrides ?? {});
+  const [resolvedUsersMap, setResolvedUsersMap] = useState<Map<string, UserPreviewData>>(new Map());
+  const [isResolvingUsers, setIsResolvingUsers] = useState(false);
+
+  // Modals for adding users
+  const [isAddIncludedModalOpen, setIsAddIncludedModalOpen] = useState(false);
+  const [isAddExcludedModalOpen, setIsAddExcludedModalOpen] = useState(false);
+
+  // Hover Card state
+  const [hoveredUser, setHoveredUser] = useState<UserPreviewData | null>(null);
+  const [hoveredAnchor, setHoveredAnchor] = useState<HTMLElement | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Targeting Rules state
   const initialGroups: FlagTargetGroup[] = useMemo(() => {
     if (flag.targetingGroups && flag.targetingGroups.length > 0) {
       return flag.targetingGroups;
@@ -138,11 +154,16 @@ export function FlagDetailsView({
   const [isSavingPayload, setIsSavingPayload] = useState(false);
 
   // Evaluation Tester state
+  const [testerMode, setTesterMode] = useState<'known' | 'manual'>('known');
+  const [selectedKnownUser, setSelectedKnownUser] = useState<UserPreviewData | null>(null);
+  const [isKnownUserPickerOpen, setIsKnownUserPickerOpen] = useState(false);
   const [testDistinctId, setTestDistinctId] = useState('user_test_123');
   const [testPropertiesJson, setTestPropertiesJson] = useState('{\n  "plan": "premium",\n  "country": "NG",\n  "platform": "web"\n}');
+  const [isEditingSimulationProps, setIsEditingSimulationProps] = useState(false);
   const [testResult, setTestResult] = useState<TestEvaluationResponse | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   // Analytics state
   const [analyticsDays, setAnalyticsDays] = useState('14');
@@ -183,6 +204,85 @@ export function FlagDetailsView({
         ...(init.headers ?? {})
       }
     });
+  }
+
+  // Resolve user display names and metadata for all distinct IDs currently in overrides
+  useEffect(() => {
+    const overrideIds = Object.keys(overrides);
+    if (overrideIds.length === 0) return;
+
+    async function resolveIdentities() {
+      setIsResolvingUsers(true);
+      try {
+        const res = await authFetch('/v1/dashboard/users/resolve', {
+          method: 'POST',
+          body: JSON.stringify({ distinctIds: overrideIds, projectId })
+        });
+        if (res && res.ok) {
+          const json = (await res.json()) as { persons: UserPreviewData[] };
+          const map = new Map<string, UserPreviewData>(resolvedUsersMap);
+          for (const person of json.persons) {
+            map.set(person.distinctId, person);
+            if (person.id) map.set(person.id, person);
+            if (person.externalId) map.set(person.externalId, person);
+          }
+          setResolvedUsersMap(map);
+        }
+      } catch {
+        // fallback
+      } finally {
+        setIsResolvingUsers(false);
+      }
+    }
+
+    void resolveIdentities();
+  }, [overrides]);
+
+  // Included & Excluded lists
+  const includedUsersList = useMemo(() => {
+    return Object.entries(overrides)
+      .filter(([, val]) => val === true)
+      .map(([id]) => {
+        return (
+          resolvedUsersMap.get(id) || {
+            id,
+            distinctId: id,
+            displayName: id.includes('@') ? id.split('@')[0] : `User ${id.slice(-4).toUpperCase()}`,
+            emailMasked: id.includes('@') ? `${id[0]}••••@${id.split('@')[1]}` : null
+          }
+        );
+      });
+  }, [overrides, resolvedUsersMap]);
+
+  const excludedUsersList = useMemo(() => {
+    return Object.entries(overrides)
+      .filter(([, val]) => val === false)
+      .map(([id]) => {
+        return (
+          resolvedUsersMap.get(id) || {
+            id,
+            distinctId: id,
+            displayName: id.includes('@') ? id.split('@')[0] : `User ${id.slice(-4).toUpperCase()}`,
+            emailMasked: id.includes('@') ? `${id[0]}••••@${id.split('@')[1]}` : null
+          }
+        );
+      });
+  }, [overrides, resolvedUsersMap]);
+
+  function handleRowMouseEnter(u: UserPreviewData, el: HTMLElement) {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredUser(u);
+      setHoveredAnchor(el);
+    }, 60);
+  }
+
+  function handleRowMouseLeave() {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredUser(null);
+      setHoveredAnchor(null);
+    }, 150);
   }
 
   // 1. Rollout Save
@@ -232,6 +332,7 @@ export function FlagDetailsView({
     const res = await authFetch(`/v1/dashboard/flags/${flag.id}`, {
       method: 'PUT',
       body: JSON.stringify({
+        overrides,
         targetingGroups: targetGroups,
         projectId
       })
@@ -239,12 +340,61 @@ export function FlagDetailsView({
     setIsSavingTargeting(false);
 
     if (!res || !res.ok) {
-      toast.error('Failed to save targeting rules.');
+      toast.error('Failed to save targeting configuration.');
       return;
     }
 
-    toast.success('Targeting rules saved.');
+    toast.success('Targeting rules and audience saved.');
     router.refresh();
+  }
+
+  // Add users callback from picker modal
+  function handleAddIncludedUsers(selectedUsers: UserPreviewData[]) {
+    const nextOverrides = { ...overrides };
+    const nextMap = new Map(resolvedUsersMap);
+    for (const u of selectedUsers) {
+      const key = u.distinctId || u.id;
+      nextOverrides[key] = true;
+      nextMap.set(key, u);
+    }
+    setOverrides(nextOverrides);
+    setResolvedUsersMap(nextMap);
+    toast.success(`Added ${selectedUsers.length} specific ${selectedUsers.length === 1 ? 'user' : 'users'}. Click Save to apply.`);
+  }
+
+  function handleAddExcludedUsers(selectedUsers: UserPreviewData[]) {
+    const nextOverrides = { ...overrides };
+    const nextMap = new Map(resolvedUsersMap);
+    for (const u of selectedUsers) {
+      const key = u.distinctId || u.id;
+      nextOverrides[key] = false;
+      nextMap.set(key, u);
+    }
+    setOverrides(nextOverrides);
+    setResolvedUsersMap(nextMap);
+    toast.success(`Excluded ${selectedUsers.length} ${selectedUsers.length === 1 ? 'user' : 'users'}. Click Save to apply.`);
+  }
+
+  function handleRemoveUser(distinctId: string) {
+    const nextOverrides = { ...overrides };
+    delete nextOverrides[distinctId];
+    setOverrides(nextOverrides);
+  }
+
+  function handleClearAllIncluded() {
+    const nextOverrides = { ...overrides };
+    for (const [id, val] of Object.entries(nextOverrides)) {
+      if (val === true) delete nextOverrides[id];
+    }
+    setOverrides(nextOverrides);
+  }
+
+  function handleClearAllExcluded() {
+    const nextOverrides = { ...overrides };
+    for (const [id, val] of Object.entries(nextOverrides)) {
+      if (val === false) delete nextOverrides[id];
+    }
+    setOverrides(nextOverrides);
   }
 
   // 4. Remote Config Save
@@ -302,68 +452,92 @@ export function FlagDetailsView({
       try {
         parsedProps = JSON.parse(testPropertiesJson);
       } catch {
-        setTestError('Test properties must be a valid JSON object.');
+        setTestError('Invalid properties JSON format.');
         return;
       }
     }
 
     setIsTesting(true);
-    const res = await authFetch(`/v1/dashboard/flags/${flag.id}/test-evaluation`, {
-      method: 'POST',
-      body: JSON.stringify({
-        distinctId: testDistinctId.trim(),
-        properties: parsedProps,
-        projectId
-      })
-    });
-    setIsTesting(false);
+    try {
+      const res = await authFetch(`/v1/dashboard/flags/${flag.id}/test-evaluation`, {
+        method: 'POST',
+        body: JSON.stringify({
+          distinctId: testDistinctId.trim(),
+          properties: parsedProps,
+          projectId
+        })
+      });
+      setIsTesting(false);
 
-    if (!res) return;
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setTestError(err.message || 'Failed to simulate flag evaluation.');
-      return;
+      if (!res || !res.ok) {
+        setTestError('Evaluation failed. Check distinct ID and try again.');
+        return;
+      }
+
+      const data = (await res.json()) as TestEvaluationResponse;
+      setTestResult(data);
+    } catch (err) {
+      setIsTesting(false);
+      setTestError(err instanceof Error ? err.message : 'Evaluation request failed');
     }
+  }
 
-    const data = (await res.json()) as TestEvaluationResponse;
-    setTestResult(data);
+  // Selection callback for Evaluation Tester Known User
+  function handleSelectTesterUser(usersList: UserPreviewData[]) {
+    if (usersList.length === 0) return;
+    const user = usersList[0];
+    setSelectedKnownUser(user);
+    setTestDistinctId(user.distinctId || user.id);
+
+    // Auto-populate stored properties from user's traits & metadata
+    const userProps: Record<string, unknown> = {
+      ...(user.traits || {}),
+      ...(user.traitsPreview || {})
+    };
+    if (user.lastCountry) userProps.country = user.lastCountry;
+    if (user.lastOs) userProps.platform = user.lastOs.toLowerCase();
+
+    setTestPropertiesJson(JSON.stringify(userProps, null, 2));
+    setIsEditingSimulationProps(false);
   }
 
   // 6. Analytics Fetch
-  async function fetchAnalytics(days = analyticsDays, convEvent = conversionEventInput) {
+  async function fetchAnalytics(daysOverride?: string, eventOverride?: string) {
     setIsLoadingAnalytics(true);
-    const query = new URLSearchParams();
-    if (days) query.set('days', days);
-    if (convEvent.trim()) query.set('conversionEvent', convEvent.trim());
-    if (projectId) query.set('projectId', projectId);
+    const d = daysOverride ?? analyticsDays;
+    const evt = eventOverride ?? conversionEventInput;
+    const params = new URLSearchParams({ days: d });
+    if (evt.trim()) params.set('conversionEvent', evt.trim());
+    if (projectId) params.set('projectId', projectId);
 
-    const res = await authFetch(`/v1/dashboard/flags/${flag.id}/analytics?${query.toString()}`, {
+    const res = await authFetch(`/v1/dashboard/flags/${flag.id}/analytics?${params.toString()}`, {
       method: 'GET'
     });
     setIsLoadingAnalytics(false);
 
     if (res && res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as AnalyticsResponse;
       setAnalyticsData(data);
     }
   }
 
-  // 7. Activity Fetch
+  // 7. Activity History Fetch
   async function fetchActivity() {
     setIsLoadingActivity(true);
-    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-    const res = await authFetch(`/v1/dashboard/flags/${flag.id}/activity${query}`, {
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    const res = await authFetch(`/v1/dashboard/flags/${flag.id}/activity?${params.toString()}`, {
       method: 'GET'
     });
     setIsLoadingActivity(false);
 
     if (res && res.ok) {
-      const data = await res.json();
-      setActivityList(data.activities ?? []);
+      const data = (await res.json()) as { activities: ActivityItem[] };
+      setActivityList(data.activities);
     }
   }
 
-  // 8. Settings Save
+  // 8. General Settings Save
   async function handleSaveSettings(e: FormEvent) {
     e.preventDefault();
     setIsSavingSettings(true);
@@ -379,11 +553,11 @@ export function FlagDetailsView({
     setIsSavingSettings(false);
 
     if (!res || !res.ok) {
-      toast.error('Failed to update settings.');
+      toast.error('Failed to save flag settings.');
       return;
     }
 
-    toast.success('Flag settings updated.');
+    toast.success('Settings updated.');
     router.refresh();
   }
 
@@ -515,7 +689,7 @@ export function FlagDetailsView({
       {/* Tabs Navigation */}
       <div className="flex overflow-x-auto border-b border-neutral-200 dark:border-slate-800">
         <TabButton id="overview" label="Overview" active={activeTab} onClick={handleTabChange} />
-        <TabButton id="targeting" label="Targeting" active={activeTab} onClick={handleTabChange} />
+        <TabButton id="targeting" label="Targeting & Users" active={activeTab} onClick={handleTabChange} />
         <TabButton id="tester" label="Evaluation Tester" active={activeTab} onClick={handleTabChange} />
         <TabButton id="remote_config" label="Remote Config" active={activeTab} onClick={handleTabChange} />
         <TabButton id="analytics" label="Impact & Analytics" active={activeTab} onClick={handleTabChange} />
@@ -598,104 +772,66 @@ export function FlagDetailsView({
                 ) : null}
                 <button
                   type="button"
-                  disabled={isSavingRollout || rolloutVal === flag.rolloutPercentage}
                   onClick={handleSaveRollout}
+                  disabled={isSavingRollout || rolloutVal === flag.rolloutPercentage}
                   className="h-8 rounded-md bg-neutral-900 px-4 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
                 >
-                  {isSavingRollout ? 'Saving…' : 'Save Rollout'}
+                  {isSavingRollout ? 'Saving…' : 'Save Rollout %'}
                 </button>
               </div>
             </div>
 
-            {/* Quick Targeting Summary Card */}
+            {/* Audience Overview Summary Card */}
             <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Targeting Rules</h3>
-                  <p className="text-xs text-neutral-500 dark:text-slate-400">
-                    Gated conditions evaluated before applying percentage rollout.
+                  <h2 className="text-base font-bold text-neutral-900 dark:text-white">Audience Summary</h2>
+                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
+                    Who receives this feature flag in {flag.environment}.
                   </p>
                 </div>
                 <button
                   onClick={() => handleTabChange('targeting')}
-                  className="text-xs font-bold text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
+                  className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  Edit rules →
+                  Configure Targeting →
                 </button>
               </div>
 
-              <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                {formatPlainLanguageTargeting(targetGroups)}
-              </div>
-            </div>
-
-            {/* Remote Config Preview (if configured) */}
-            {flag.payload != null ? (
-              <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Remote Config (JSON Payload)</h3>
-                    <p className="text-xs text-neutral-500 dark:text-slate-400">
-                      Returned to SDK when this flag is active for a user.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleTabChange('remote_config')}
-                    className="text-xs font-bold text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
-                  >
-                    Edit JSON →
-                  </button>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-md border border-neutral-200 bg-neutral-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
+                  <span className="text-[11px] font-semibold text-neutral-500 dark:text-slate-400">Specific Users</span>
+                  <p className="mt-1 text-base font-bold text-neutral-900 dark:text-white">
+                    {includedUsersList.length > 0 ? `${includedUsersList.length} included` : 'None'}
+                  </p>
+                  {excludedUsersList.length > 0 ? (
+                    <span className="text-[10px] text-red-600 dark:text-red-400">{excludedUsersList.length} excluded</span>
+                  ) : null}
                 </div>
 
-                <pre className="mt-3 max-h-48 overflow-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                  <code>{JSON.stringify(flag.payload, null, 2)}</code>
-                </pre>
+                <div className="rounded-md border border-neutral-200 bg-neutral-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
+                  <span className="text-[11px] font-semibold text-neutral-500 dark:text-slate-400">Targeting Rules</span>
+                  <p className="mt-1 text-base font-bold text-neutral-900 dark:text-white">
+                    {targetGroups.filter((g) => g.rules.length > 0).length > 0
+                      ? `${targetGroups.filter((g) => g.rules.length > 0).length} rule groups`
+                      : 'All users eligible'}
+                  </p>
+                </div>
+
+                <div className="rounded-md border border-neutral-200 bg-neutral-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
+                  <span className="text-[11px] font-semibold text-neutral-500 dark:text-slate-400">Rollout Allocation</span>
+                  <p className="mt-1 text-base font-bold text-neutral-900 dark:text-white">
+                    {flag.enabled ? `${rolloutVal}% of audience` : 'Disabled (0%)'}
+                  </p>
+                </div>
               </div>
-            ) : null}
+            </div>
           </div>
 
-          {/* Right Sidebar: Key Metrics & Status */}
+          {/* Right Column: Fast Code Integration snippet */}
           <div className="space-y-6">
-            {/* Status & Exposure Box */}
             <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Telemetry & Telemetry</h3>
-
-              <dl className="mt-4 space-y-3">
-                <div className="flex justify-between text-xs">
-                  <dt className="text-neutral-500 dark:text-slate-400">Environment</dt>
-                  <dd className="font-semibold uppercase text-neutral-900 dark:text-white">{flag.environment}</dd>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <dt className="text-neutral-500 dark:text-slate-400">Recent exposures (24h)</dt>
-                  <dd className="font-mono font-semibold text-neutral-900 dark:text-white">{flag.recentExposures24h.toLocaleString()}</dd>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <dt className="text-neutral-500 dark:text-slate-400">Total exposures</dt>
-                  <dd className="font-mono font-semibold text-neutral-900 dark:text-white">{flag.totalExposures.toLocaleString()}</dd>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <dt className="text-neutral-500 dark:text-slate-400">Last evaluated</dt>
-                  <dd className="text-neutral-900 dark:text-white">{flag.lastEvaluatedAt ? new Date(flag.lastEvaluatedAt).toLocaleString() : 'Never evaluated'}</dd>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <dt className="text-neutral-500 dark:text-slate-400">Config revision</dt>
-                  <dd className="font-mono text-neutral-900 dark:text-white">r{flag.revision}</dd>
-                </div>
-              </dl>
-
-              <div className="mt-5 border-t border-neutral-200 pt-4 dark:border-slate-800">
-                <button
-                  onClick={() => handleTabChange('tester')}
-                  className="w-full rounded-md border border-neutral-300 bg-white py-2 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                >
-                  ⚡ Open Evaluation Tester
-                </button>
-              </div>
-            </div>
-
-            {/* SDK Integration Quick Reference */}
-            <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Code Integration</h3>
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Quick Integration</h3>
               <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
                 Quick copy snippet for JS / TypeScript:
               </p>
@@ -717,7 +853,7 @@ export function FlagDetailsView({
                   onClick={() => handleTabChange('settings')}
                   className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  View React, Python, Flutter, Node SDKs →
+                  View React, Next.js, Node SDKs →
                 </button>
               </div>
             </div>
@@ -730,178 +866,348 @@ export function FlagDetailsView({
         <div className="space-y-6">
           <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div>
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Targeting Rule Builder</h2>
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Targeting & Specific Users</h2>
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
-                Gate this feature to specific user segments based on traits provided by your application (e.g. plan, country, email).
+                Target real TraceIQ users directly or configure rule-based segment filters.
               </p>
             </div>
 
             {/* Plain-Language Summary Banner */}
             <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
               <span className="font-bold text-neutral-500 dark:text-slate-400 uppercase tracking-wider text-[10px] block mb-1">
-                Audience Logic Summary:
+                Audience Precedence & Logic Summary:
               </span>
-              {formatPlainLanguageTargeting(targetGroups)}
+              <div className="space-y-1">
+                <p>
+                  <strong>1. Exclusions:</strong> {excludedUsersList.length > 0 ? `${excludedUsersList.length} excluded users always receive FALSE.` : 'No users excluded.'}
+                </p>
+                <p>
+                  <strong>2. Specific Overrides:</strong> {includedUsersList.length > 0 ? `${includedUsersList.length} specific users always receive TRUE.` : 'No explicit user overrides.'}
+                </p>
+                <p>
+                  <strong>3. Rules & Rollout:</strong> {formatPlainLanguageTargeting(targetGroups)} (at {rolloutVal}% percentage rollout).
+                </p>
+              </div>
             </div>
 
-            {/* Target Groups */}
-            <div className="mt-6 space-y-6">
-              {targetGroups.map((group, groupIdx) => (
-                <div
-                  key={groupIdx}
-                  className="rounded-md border border-neutral-300 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
-                >
-                  <div className="flex items-center justify-between border-b border-neutral-200 pb-2 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded bg-neutral-900 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-white dark:text-black">
-                        Group {groupIdx + 1}
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="Group name (e.g. Premium Web Users)"
-                        value={group.name ?? ''}
-                        onChange={(e) => {
-                          const next = [...targetGroups];
-                          next[groupIdx] = { ...next[groupIdx], name: e.target.value };
-                          setTargetGroups(next);
-                        }}
-                        className="h-7 border-0 bg-transparent text-xs font-semibold text-neutral-900 focus:outline-none dark:text-white"
-                      />
+            {/* Section 1: Specific Included Users */}
+            <div className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3 dark:border-slate-850 dark:border-slate-800/60">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Specific Users (Always Included)</h3>
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      {includedUsersList.length}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                    These users always receive this feature flag, bypassing targeting rules and percentage rollout.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {includedUsersList.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={handleClearAllIncluded}
+                      className="text-xs text-neutral-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                    >
+                      Clear all
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setIsAddIncludedModalOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-xs font-bold text-white transition hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+                  >
+                    + Add users
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected Included Users Rows (Names Only) */}
+              <div className="mt-3">
+                {includedUsersList.length === 0 ? (
+                  <p className="py-3 text-xs text-neutral-400 dark:text-slate-500 italic">
+                    No specific users selected. Click "+ Add users" to target users by display name.
+                  </p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {includedUsersList.map((user) => (
+                      <div
+                        key={user.distinctId}
+                        tabIndex={0}
+                        onFocus={(e) => handleRowMouseEnter(user, e.currentTarget)}
+                        onBlur={handleRowMouseLeave}
+                        onMouseEnter={(e) => handleRowMouseEnter(user, e.currentTarget)}
+                        onMouseLeave={handleRowMouseLeave}
+                        className="group flex items-center justify-between rounded-lg border border-neutral-200/80 bg-neutral-50/50 px-3 py-2 transition hover:border-neutral-300 hover:bg-neutral-100/70 dark:border-slate-800 dark:bg-slate-900/50 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                      >
+                        <span className="truncate text-xs font-semibold text-neutral-900 dark:text-white">
+                          {user.displayName}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUser(user.distinctId)}
+                          className="rounded p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                          title="Remove user from targeting"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 2: Excluded Users */}
+            <div className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3 dark:border-slate-850 dark:border-slate-800/60">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Excluded Users (Always Blocked)</h3>
+                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                      {excludedUsersList.length}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                    These users are never given access, even if they match targeting rules or rollout percentages.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {excludedUsersList.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={handleClearAllExcluded}
+                      className="text-xs text-neutral-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                    >
+                      Clear all
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setIsAddExcludedModalOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-xs font-bold text-neutral-800 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    + Exclude users
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected Excluded Users Rows */}
+              <div className="mt-3">
+                {excludedUsersList.length === 0 ? (
+                  <p className="py-3 text-xs text-neutral-400 dark:text-slate-500 italic">
+                    No users excluded. Click "+ Exclude users" to explicitly block known accounts.
+                  </p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {excludedUsersList.map((user) => (
+                      <div
+                        key={user.distinctId}
+                        tabIndex={0}
+                        onFocus={(e) => handleRowMouseEnter(user, e.currentTarget)}
+                        onBlur={handleRowMouseLeave}
+                        onMouseEnter={(e) => handleRowMouseEnter(user, e.currentTarget)}
+                        onMouseLeave={handleRowMouseLeave}
+                        className="group flex items-center justify-between rounded-lg border border-red-200/60 bg-red-50/30 px-3 py-2 transition hover:border-red-300 dark:border-red-900/30 dark:bg-red-950/20"
+                      >
+                        <span className="truncate text-xs font-semibold text-neutral-900 dark:text-white">
+                          {user.displayName}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUser(user.distinctId)}
+                          className="rounded p-1 text-neutral-400 hover:bg-red-100 hover:text-red-700 dark:text-slate-500 dark:hover:bg-red-950 dark:hover:text-red-300"
+                          title="Remove user from exclusion"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 3: Targeting Rules (Determines everyone else) */}
+            <div className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+              <div className="border-b border-neutral-100 pb-3 dark:border-slate-800/60">
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Targeting Rules (Determines Everyone Else)</h3>
+                <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                  Gate non-overridden users based on traits sent by your application (e.g. plan = premium, country = NG).
+                </p>
+              </div>
+
+              {/* Target Groups */}
+              <div className="mt-4 space-y-6">
+                {targetGroups.map((group, groupIdx) => (
+                  <div
+                    key={groupIdx}
+                    className="rounded-md border border-neutral-300 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+                  >
+                    <div className="flex items-center justify-between border-b border-neutral-200 pb-2 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded bg-neutral-900 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-white dark:text-black">
+                          Group {groupIdx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Group name (e.g. Premium Web Users)"
+                          value={group.name ?? ''}
+                          onChange={(e) => {
+                            const next = [...targetGroups];
+                            next[groupIdx] = { ...next[groupIdx], name: e.target.value };
+                            setTargetGroups(next);
+                          }}
+                          className="h-7 border-0 bg-transparent text-xs font-semibold text-neutral-900 focus:outline-none dark:text-white"
+                        />
+                      </div>
+
+                      {targetGroups.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetGroups(targetGroups.filter((_, i) => i !== groupIdx));
+                          }}
+                          className="text-xs text-red-600 hover:underline dark:text-red-400"
+                        >
+                          Remove group
+                        </button>
+                      ) : null}
                     </div>
 
-                    {targetGroups.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTargetGroups(targetGroups.filter((_, i) => i !== groupIdx));
-                        }}
-                        className="text-xs text-red-600 hover:underline dark:text-red-400"
-                      >
-                        Remove group
-                      </button>
-                    ) : null}
-                  </div>
+                    {/* Rules inside group */}
+                    <div className="mt-3 space-y-2">
+                      {group.rules.length === 0 ? (
+                        <p className="py-2 text-xs text-neutral-400 dark:text-slate-500 italic">
+                          No rules in this group. Matches all users.
+                        </p>
+                      ) : (
+                        group.rules.map((rule, ruleIdx) => (
+                          <div key={ruleIdx} className="flex flex-wrap items-center gap-2 pt-1">
+                            {ruleIdx > 0 ? (
+                              <span className="rounded bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600 dark:bg-slate-800 dark:text-slate-400">
+                                AND
+                              </span>
+                            ) : (
+                              <span className="w-10 text-[11px] font-bold text-neutral-400">WHERE</span>
+                            )}
 
-                  {/* Rules inside group */}
-                  <div className="mt-3 space-y-2">
-                    {group.rules.length === 0 ? (
-                      <p className="py-2 text-xs text-neutral-400 dark:text-slate-500 italic">
-                        No rules in this group. Matches all users.
-                      </p>
-                    ) : (
-                      group.rules.map((rule, ruleIdx) => (
-                        <div key={ruleIdx} className="flex flex-wrap items-center gap-2 pt-1">
-                          {ruleIdx > 0 ? (
-                            <span className="rounded bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600 dark:bg-slate-800 dark:text-slate-400">
-                              AND
-                            </span>
-                          ) : (
-                            <span className="w-10 text-[11px] font-bold text-neutral-400">WHERE</span>
-                          )}
-
-                          <input
-                            type="text"
-                            placeholder="property (e.g. plan)"
-                            value={rule.property}
-                            onChange={(e) => {
-                              const next = [...targetGroups];
-                              const r = [...next[groupIdx].rules];
-                              r[ruleIdx] = { ...r[ruleIdx], property: e.target.value };
-                              next[groupIdx] = { ...next[groupIdx], rules: r };
-                              setTargetGroups(next);
-                            }}
-                            className="h-8 w-44 rounded-md border border-neutral-300 bg-white px-2.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                          />
-
-                          <select
-                            value={rule.operator}
-                            onChange={(e) => {
-                              const next = [...targetGroups];
-                              const r = [...next[groupIdx].rules];
-                              r[ruleIdx] = { ...r[ruleIdx], operator: e.target.value as FlagTarget['operator'] };
-                              next[groupIdx] = { ...next[groupIdx], rules: r };
-                              setTargetGroups(next);
-                            }}
-                            className="h-8 rounded-md border border-neutral-300 bg-white px-2 text-xs font-medium text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                          >
-                            {OPERATORS.map((op) => (
-                              <option key={op.value} value={op.value}>
-                                {op.label}
-                              </option>
-                            ))}
-                          </select>
-
-                          {rule.operator !== 'exists' && rule.operator !== 'not_exists' ? (
                             <input
                               type="text"
-                              placeholder="value (e.g. premium)"
-                              value={String(rule.value ?? '')}
+                              placeholder="property (e.g. plan)"
+                              value={rule.property}
                               onChange={(e) => {
                                 const next = [...targetGroups];
                                 const r = [...next[groupIdx].rules];
-                                r[ruleIdx] = { ...r[ruleIdx], value: e.target.value };
+                                r[ruleIdx] = { ...r[ruleIdx], property: e.target.value };
                                 next[groupIdx] = { ...next[groupIdx], rules: r };
                                 setTargetGroups(next);
                               }}
-                              className="h-8 min-w-[160px] flex-1 rounded-md border border-neutral-300 bg-white px-2.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                              className="h-8 w-44 rounded-md border border-neutral-300 bg-white px-2.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                             />
-                          ) : null}
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = [...targetGroups];
-                              next[groupIdx] = {
-                                ...next[groupIdx],
-                                rules: next[groupIdx].rules.filter((_, i) => i !== ruleIdx)
-                              };
-                              setTargetGroups(next);
-                            }}
-                            className="rounded p-1 text-neutral-400 hover:text-red-600 dark:text-slate-500"
-                            title="Remove condition"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <line x1="18" y1="6" x2="6" y2="18"></line>
-                              <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                          </button>
-                        </div>
-                      ))
-                    )}
+                            <select
+                              value={rule.operator}
+                              onChange={(e) => {
+                                const next = [...targetGroups];
+                                const r = [...next[groupIdx].rules];
+                                r[ruleIdx] = { ...r[ruleIdx], operator: e.target.value as FlagTarget['operator'] };
+                                next[groupIdx] = { ...next[groupIdx], rules: r };
+                                setTargetGroups(next);
+                              }}
+                              className="h-8 rounded-md border border-neutral-300 bg-white px-2 text-xs font-medium text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                            >
+                              {OPERATORS.map((op) => (
+                                <option key={op.value} value={op.value}>
+                                  {op.label}
+                                </option>
+                              ))}
+                            </select>
 
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = [...targetGroups];
-                          next[groupIdx] = {
-                            ...next[groupIdx],
-                            rules: [...next[groupIdx].rules, { property: '', operator: 'eq', value: '' }]
-                          };
-                          setTargetGroups(next);
-                        }}
-                        className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        + Add rule
-                      </button>
+                            {rule.operator !== 'exists' && rule.operator !== 'not_exists' ? (
+                              <input
+                                type="text"
+                                placeholder="value (e.g. premium)"
+                                value={String(rule.value ?? '')}
+                                onChange={(e) => {
+                                  const next = [...targetGroups];
+                                  const r = [...next[groupIdx].rules];
+                                  r[ruleIdx] = { ...r[ruleIdx], value: e.target.value };
+                                  next[groupIdx] = { ...next[groupIdx], rules: r };
+                                  setTargetGroups(next);
+                                }}
+                                className="h-8 min-w-[160px] flex-1 rounded-md border border-neutral-300 bg-white px-2.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                              />
+                            ) : null}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...targetGroups];
+                                next[groupIdx] = {
+                                  ...next[groupIdx],
+                                  rules: next[groupIdx].rules.filter((_, i) => i !== ruleIdx)
+                                };
+                                setTargetGroups(next);
+                              }}
+                              className="rounded p-1 text-neutral-400 hover:text-red-600 dark:text-slate-500"
+                              title="Remove condition"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
+                          </div>
+                        ))
+                      )}
+
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...targetGroups];
+                            next[groupIdx] = {
+                              ...next[groupIdx],
+                              rules: [...next[groupIdx].rules, { property: '', operator: 'eq', value: '' }]
+                            };
+                            setTargetGroups(next);
+                          }}
+                          className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          + Add rule
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetGroups([
-                      ...targetGroups,
-                      { name: `Target Group ${targetGroups.length + 1}`, rules: [{ property: '', operator: 'eq', value: '' }] }
-                    ]);
-                  }}
-                  className="rounded-md border border-dashed border-neutral-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
-                >
-                  + Add targeting group (OR)
-                </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetGroups([
+                        ...targetGroups,
+                        { name: `Target Group ${targetGroups.length + 1}`, rules: [{ property: '', operator: 'eq', value: '' }] }
+                      ]);
+                    }}
+                    className="rounded-md border border-dashed border-neutral-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    + Add targeting group (OR)
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -916,238 +1222,416 @@ export function FlagDetailsView({
               </button>
             </div>
           </div>
+
+          {/* User Picker Modal for Included Users */}
+          <UserPickerModal
+            isOpen={isAddIncludedModalOpen}
+            onClose={() => setIsAddIncludedModalOpen(false)}
+            onSelectUsers={handleAddIncludedUsers}
+            initialSelectedIds={includedUsersList.map((u) => u.distinctId)}
+            title="Add specific users (Always eligible)"
+            description="Search users by name, email, distinct ID, or traits. Selected users receive this feature directly."
+            projectId={projectId}
+          />
+
+          {/* User Picker Modal for Excluded Users */}
+          <UserPickerModal
+            isOpen={isAddExcludedModalOpen}
+            onClose={() => setIsAddExcludedModalOpen(false)}
+            onSelectUsers={handleAddExcludedUsers}
+            initialSelectedIds={excludedUsersList.map((u) => u.distinctId)}
+            title="Add excluded users (Always blocked)"
+            description="Selected users are explicitly blocked from receiving this feature flag."
+            projectId={projectId}
+          />
+
+          {/* Branched Hover Details Panel */}
+          <UserDetailHoverCard
+            user={hoveredUser}
+            anchorEl={hoveredAnchor}
+            isOpen={hoveredUser !== null && hoveredAnchor !== null}
+            onMouseEnter={() => {
+              if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+            }}
+            onMouseLeave={handleRowMouseLeave}
+          />
         </div>
       ) : null}
 
       {/* Tab 3: Evaluation Tester */}
       {activeTab === 'tester' ? (
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_1.8fr]">
-          {/* Simulator Form */}
-          <form
-            onSubmit={handleRunTestEvaluation}
-            className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 space-y-4"
-          >
-            <div>
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Evaluation Tester</h2>
-              <p className="text-xs text-neutral-500 dark:text-slate-400">
-                Simulate evaluation against the production engine with any test user and property set.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
-                User / Distinct ID
-              </label>
-              <input
-                type="text"
-                value={testDistinctId}
-                onChange={(e) => setTestDistinctId(e.target.value)}
-                className="mt-1 h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            <div>
+        <div className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_1.8fr]">
+            {/* Simulator Form */}
+            <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 space-y-4">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
-                  User Properties (JSON)
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTestPropertiesJson('{\n  "plan": "premium",\n  "country": "NG",\n  "email": "dev@traceiq.run"\n}');
-                  }}
-                  className="text-[11px] text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  Insert sample
-                </button>
+                <div>
+                  <h2 className="text-base font-bold text-neutral-900 dark:text-white">Evaluation Tester</h2>
+                  <p className="text-xs text-neutral-500 dark:text-slate-400">
+                    Simulate evaluation against the production engine with any test user and property set.
+                  </p>
+                </div>
+
+                {/* Tester Mode Toggle */}
+                <div className="flex rounded-md border border-neutral-200 p-0.5 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setTesterMode('known')}
+                    className={`rounded px-2 py-1 text-[11px] font-semibold transition ${
+                      testerMode === 'known'
+                        ? 'bg-neutral-900 text-white dark:bg-white dark:text-black'
+                        : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400'
+                    }`}
+                  >
+                    Known User
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTesterMode('manual')}
+                    className={`rounded px-2 py-1 text-[11px] font-semibold transition ${
+                      testerMode === 'manual'
+                        ? 'bg-neutral-900 text-white dark:bg-white dark:text-black'
+                        : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400'
+                    }`}
+                  >
+                    Manual / JSON
+                  </button>
+                </div>
               </div>
-              <textarea
-                rows={6}
-                value={testPropertiesJson}
-                onChange={(e) => setTestPropertiesJson(e.target.value)}
-                className="mt-1 w-full rounded-md border border-neutral-300 bg-white p-2.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              />
-            </div>
 
-            {testError ? (
-              <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-                {testError}
-              </p>
-            ) : null}
+              {/* Mode 1: Known User Selector */}
+              {testerMode === 'known' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+                      Select Known Project User
+                    </label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsKnownUserPickerOpen(true)}
+                        onMouseEnter={(e) => {
+                          if (selectedKnownUser) handleRowMouseEnter(selectedKnownUser, e.currentTarget);
+                        }}
+                        onMouseLeave={handleRowMouseLeave}
+                        className="flex h-9 w-full items-center justify-between rounded-md border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-900 transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-850"
+                      >
+                        <span className="truncate">
+                          {selectedKnownUser ? selectedKnownUser.displayName : 'Search and select user...'}
+                        </span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
 
-            <button
-              type="submit"
-              disabled={isTesting}
-              className="h-9 w-full rounded-md bg-neutral-900 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            >
-              {isTesting ? 'Evaluating…' : '⚡ Test Evaluation'}
-            </button>
-          </form>
-
-          {/* Result Breakdown View */}
-          <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 space-y-4">
-            <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Simulation Result</h3>
-
-            {testResult ? (
-              <div className="space-y-4">
-                {/* Big Result Badge */}
-                <div
-                  className={`flex items-center justify-between rounded-lg p-4 border ${
-                    testResult.enabled
-                      ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
-                      : 'border-red-200 bg-red-50/70 text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-900 font-bold text-base">
-                      {testResult.enabled ? '✓' : '✕'}
-                    </span>
-                    <div>
-                      <p className="text-base font-bold">
-                        {testResult.enabled ? 'FEATURE ENABLED' : 'FEATURE DISABLED'}
-                      </p>
-                      <p className="text-xs opacity-90">{testResult.humanReason}</p>
+                      {selectedKnownUser ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedKnownUser(null);
+                            setTestDistinctId('user_test_123');
+                            setTestPropertiesJson('{\n  "plan": "premium",\n  "country": "NG",\n  "platform": "web"\n}');
+                          }}
+                          className="rounded p-2 text-neutral-400 hover:text-neutral-700 dark:text-slate-500"
+                          title="Clear user"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 
-                  <span className="font-mono text-xs uppercase px-2.5 py-1 rounded bg-white dark:bg-slate-900 font-semibold shadow-sm">
-                    {testResult.reason}
-                  </span>
-                </div>
-
-                {/* Bucketing Details */}
-                <div className="grid grid-cols-2 gap-3 rounded-md bg-neutral-50 p-3.5 text-xs dark:bg-slate-900">
-                  <div>
-                    <span className="text-neutral-500 dark:text-slate-400">Deterministic Bucket:</span>
-                    <p className="mt-0.5 font-mono text-sm font-bold text-neutral-900 dark:text-white">
-                      {testResult.bucket} <span className="font-normal text-xs text-neutral-400">(out of 0–99)</span>
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-neutral-500 dark:text-slate-400">Required Rollout:</span>
-                    <p className="mt-0.5 font-mono text-sm font-bold text-neutral-900 dark:text-white">
-                      {testResult.requiredRollout}% {testResult.bucket < testResult.requiredRollout ? '✓ (Included)' : '✕ (Excluded)'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Target Groups Breakdown */}
-                {testResult.groupDetails.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                      Targeting Evaluation Breakdown
-                    </p>
-                    {testResult.groupDetails.map((grp) => (
-                      <div
-                        key={grp.groupIndex}
-                        className="rounded border border-neutral-200 p-3 text-xs dark:border-slate-800 dark:bg-slate-900/50"
-                      >
-                        <div className="flex items-center justify-between pb-1.5 border-b border-neutral-200 dark:border-slate-800">
-                          <span className="font-bold text-neutral-800 dark:text-slate-200">{grp.groupName}</span>
-                          <span className={`text-[11px] font-bold ${grp.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {grp.passed ? 'PASSED ✓' : 'FAILED ✕'}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 space-y-1">
-                          {grp.rules.map((r, i) => (
-                            <div key={i} className="flex items-center justify-between text-[11px] font-mono">
-                              <span>
-                                {r.property} {r.operator} {String(r.expectedValue)}
-                              </span>
-                              <span className="text-neutral-500 dark:text-slate-400">
-                                actual: <strong>{String(r.actualValue)}</strong> {r.passed ? '✓' : '✕'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                  {/* Evaluation Context & Temporary Overrides */}
+                  {selectedKnownUser ? (
+                    <div className="rounded-md border border-neutral-200 bg-neutral-50/70 p-3 text-xs dark:border-slate-800 dark:bg-slate-900/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-neutral-700 dark:text-slate-300">Loaded User Context</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingSimulationProps(!isEditingSimulationProps)}
+                          className="text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {isEditingSimulationProps ? 'Hide simulation overrides' : 'Edit simulation traits'}
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                ) : null}
 
-                {/* Delivered Payload (if enabled) */}
-                {testResult.payload != null ? (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                      Delivered Payload
+                      {isEditingSimulationProps ? (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                              Simulation Only
+                            </span>
+                            <span className="text-[10px] text-neutral-400 dark:text-slate-500">
+                              Overrides will not mutate real user profile.
+                            </span>
+                          </div>
+                          <textarea
+                            rows={4}
+                            value={testPropertiesJson}
+                            onChange={(e) => setTestPropertiesJson(e.target.value)}
+                            className="w-full rounded-md border border-neutral-300 bg-white p-2 font-mono text-[11px] text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-neutral-600 dark:text-slate-400 space-y-1">
+                          <div>Distinct ID: <code className="font-mono text-neutral-800 dark:text-slate-200">{formatShortId(testDistinctId)}</code></div>
+                          {selectedKnownUser.emailMasked && <div>Email: <code className="font-mono text-neutral-800 dark:text-slate-200">{selectedKnownUser.emailMasked}</code></div>}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {testError ? (
+                    <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+                      {testError}
                     </p>
-                    <pre className="rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
-                      <code>{JSON.stringify(testResult.payload, null, 2)}</code>
-                    </pre>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => void handleRunTestEvaluation()}
+                    disabled={isTesting}
+                    className="h-9 w-full rounded-md bg-neutral-900 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+                  >
+                    {isTesting ? 'Evaluating…' : '⚡ Test Evaluation'}
+                  </button>
+                </div>
+              ) : (
+                /* Mode 2: Manual Simulation Form */
+                <form onSubmit={handleRunTestEvaluation} className="space-y-4">
+                  <div className="flex items-center gap-1.5 rounded bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                    <span>💡 <strong>Manual mode:</strong> Test hypothetical users that do not exist yet.</span>
                   </div>
-                ) : null}
-              </div>
-            ) : (
-              <p className="py-8 text-center text-xs text-neutral-400 dark:text-slate-500">
-                Run an evaluation simulation to see the detailed debug breakdown.
-              </p>
-            )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+                      User / Distinct ID
+                    </label>
+                    <input
+                      type="text"
+                      value={testDistinctId}
+                      onChange={(e) => setTestDistinctId(e.target.value)}
+                      className="mt-1 h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-slate-300">
+                        User Properties (JSON)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTestPropertiesJson('{\n  "plan": "premium",\n  "country": "NG",\n  "email": "dev@traceiq.run"\n}');
+                        }}
+                        className="text-[11px] text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        Insert sample
+                      </button>
+                    </div>
+                    <textarea
+                      rows={5}
+                      value={testPropertiesJson}
+                      onChange={(e) => setTestPropertiesJson(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-neutral-300 bg-white p-2.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  {testError ? (
+                    <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+                      {testError}
+                    </p>
+                  ) : null}
+
+                  <button
+                    type="submit"
+                    disabled={isTesting}
+                    className="h-9 w-full rounded-md bg-neutral-900 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+                  >
+                    {isTesting ? 'Evaluating…' : '⚡ Test Evaluation'}
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Result Breakdown View */}
+            <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 space-y-4">
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Simulation Result</h3>
+
+              {testResult ? (
+                <div className="space-y-4">
+                  {/* Big Human-Readable Result Badge */}
+                  <div
+                    className={`flex items-center justify-between rounded-lg p-4 border ${
+                      testResult.enabled
+                        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
+                        : 'border-red-200 bg-red-50/70 text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <span className="text-[11px] font-bold tracking-wider uppercase opacity-75">Status</span>
+                      <p className="text-xl font-black">{testResult.enabled ? 'FEATURE ENABLED' : 'FEATURE DISABLED'}</p>
+                    </div>
+                    <span className="rounded bg-white/80 px-2.5 py-1 text-xs font-bold shadow-sm dark:bg-black/60">
+                      {testResult.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+
+                  {/* Human-Readable Details Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="text-neutral-500 dark:text-slate-400">Target User</span>
+                      <p className="mt-1 font-semibold text-neutral-900 dark:text-white">
+                        {selectedKnownUser ? selectedKnownUser.displayName : formatShortId(testDistinctId)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="text-neutral-500 dark:text-slate-400">Evaluation Reason</span>
+                      <p className="mt-1 font-semibold text-neutral-900 dark:text-white">
+                        {testResult.reason === 'matched_override_enabled'
+                          ? 'Matched Specific User (Forced ON)'
+                          : testResult.reason === 'matched_override_disabled'
+                            ? 'Matched Excluded User (Forced OFF)'
+                            : testResult.reason.startsWith('matched_targeting_group')
+                              ? `Matched Targeting Group ${testResult.matchedGroupIndex !== null ? testResult.matchedGroupIndex + 1 : ''}`
+                              : testResult.reason === 'disqualified_by_targeting'
+                                ? 'Disqualified by Targeting Rules'
+                                : testResult.reason === 'rollout_bucket_included'
+                                  ? 'Included in Rollout'
+                                  : testResult.reason === 'rollout_bucket_excluded'
+                                    ? 'Excluded by Rollout'
+                                    : testResult.reason}
+                      </p>
+                    </div>
+
+                    <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="text-neutral-500 dark:text-slate-400">Deterministic Bucket</span>
+                      <p className="mt-1 font-mono font-bold text-neutral-900 dark:text-white">
+                        {testResult.bucket} / 100
+                      </p>
+                    </div>
+
+                    <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="text-neutral-500 dark:text-slate-400">Flag Revision</span>
+                      <p className="mt-1 font-mono font-bold text-neutral-900 dark:text-white">
+                        r{testResult.revision}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Technical Details Accordion */}
+                  <div className="border-t border-neutral-100 pt-3 dark:border-slate-800/60">
+                    <button
+                      type="button"
+                      onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                      className="flex w-full items-center justify-between text-xs font-semibold text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
+                    >
+                      <span>{showTechnicalDetails ? '▾ Hide technical details' : '▸ View technical details'}</span>
+                      <span className="font-mono text-[10px] text-neutral-400">{testResult.reason}</span>
+                    </button>
+
+                    {showTechnicalDetails ? (
+                      <div className="mt-3 space-y-3">
+                        <div className="rounded border border-neutral-200 bg-neutral-50 p-3 font-mono text-[11px] text-neutral-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                          <div>Distinct ID: {testDistinctId}</div>
+                          <div>Environment: {testResult.environment}</div>
+                          <div>Required Rollout: {testResult.requiredRollout}%</div>
+                          <div>Human Reason: {testResult.humanReason}</div>
+                        </div>
+
+                        {testResult.groupDetails && testResult.groupDetails.length > 0 ? (
+                          <div className="space-y-2">
+                            <span className="text-[11px] font-bold text-neutral-700 dark:text-slate-300">Rule Evaluation Breakdown:</span>
+                            {testResult.groupDetails.map((grp) => (
+                              <div key={grp.groupIndex} className="rounded border border-neutral-200 p-2 text-xs dark:border-slate-800">
+                                <div className="flex items-center justify-between font-semibold">
+                                  <span>{grp.groupName}</span>
+                                  <span className={grp.passed ? 'text-emerald-600' : 'text-red-600'}>
+                                    {grp.passed ? 'Passed' : 'Failed'}
+                                  </span>
+                                </div>
+                                <div className="mt-1 space-y-1">
+                                  {grp.rules.map((r, rIdx) => (
+                                    <div key={rIdx} className="font-mono text-[10px] text-neutral-500 dark:text-slate-400">
+                                      {r.property} {r.operator} "{String(r.expectedValue)}" → actual: "{String(r.actualValue)}" ({r.passed ? '✓' : '✗'})
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-xs text-neutral-400 dark:text-slate-500">
+                  Select a user or enter properties and click <strong>⚡ Test Evaluation</strong> to run simulation.
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* User Picker for Evaluation Tester */}
+          <UserPickerModal
+            isOpen={isKnownUserPickerOpen}
+            onClose={() => setIsKnownUserPickerOpen(false)}
+            onSelectUsers={handleSelectTesterUser}
+            title="Select user to test"
+            description="Pick any real user to automatically load their stored distinct ID, traits, and metadata."
+            projectId={projectId}
+          />
         </div>
       ) : null}
 
-      {/* Tab 4: Remote Config JSON Editor */}
+      {/* Tab 4: Remote Config */}
       {activeTab === 'remote_config' ? (
-        <div className="space-y-6">
-          <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h2 className="text-base font-bold text-neutral-900 dark:text-white">Remote Config (JSON Payload)</h2>
-                <p className="text-xs text-neutral-500 dark:text-slate-400">
-                  Deliver dynamic configuration, feature settings, limits, or text copy directly to your application when this flag is active.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleFormatPayload}
-                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
-                >
-                  Format JSON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPayloadText('')}
-                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
-                >
-                  Clear
-                </button>
-              </div>
+        <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Dynamic Remote Config Payload</h2>
+              <p className="text-xs text-neutral-500 dark:text-slate-400">
+                JSON configuration delivered dynamically to eligible clients when the flag evaluates to enabled.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={handleFormatPayload}
+              className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+            >
+              Format JSON
+            </button>
+          </div>
 
+          <div>
             <textarea
               rows={12}
               value={payloadText}
               onChange={(e) => setPayloadText(e.target.value)}
-              placeholder={'{\n  "dailyScanLimit": 5,\n  "showVoiceInput": true,\n  "banner": "Welcome to NuWell v2"\n}'}
-              className="w-full rounded-md border border-neutral-300 bg-white p-3 font-mono text-xs text-neutral-900 focus:border-neutral-900 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-400"
-              spellCheck={false}
+              placeholder="e.g. { &quot;theme&quot;: &quot;dark&quot;, &quot;discountPercent&quot;: 20, &quot;badge&quot;: &quot;BETA&quot; }"
+              className="w-full rounded-md border border-neutral-300 bg-white p-3 font-mono text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
             />
+          </div>
 
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-slate-400">
-              <span>Size: <strong>{new Blob([payloadText]).size} bytes</strong> / 25 KB</span>
-              <span>Payload is only delivered to clients when the flag evaluates to <strong>ON</strong>.</span>
-            </div>
+          {payloadError ? (
+            <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+              {payloadError}
+            </p>
+          ) : null}
 
-            {payloadError ? (
-              <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-                {payloadError}
-              </p>
-            ) : null}
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={handleSavePayload}
-                disabled={isSavingPayload}
-                className="h-9 rounded-md bg-neutral-900 px-5 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-              >
-                {isSavingPayload ? 'Saving…' : 'Save Remote Config'}
-              </button>
-            </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleSavePayload}
+              disabled={isSavingPayload}
+              className="h-9 rounded-md bg-neutral-900 px-5 text-xs font-bold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+            >
+              {isSavingPayload ? 'Saving…' : 'Save Remote Config'}
+            </button>
           </div>
         </div>
       ) : null}
@@ -1155,152 +1639,55 @@ export function FlagDetailsView({
       {/* Tab 5: Impact & Analytics */}
       {activeTab === 'analytics' ? (
         <div className="space-y-6">
-          {/* Controls Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-4 dark:border-slate-800">
             <div>
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Observed Feature Impact</h2>
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white">Telemetry & Conversion Impact</h2>
               <p className="text-xs text-neutral-500 dark:text-slate-400">
-                Compare conversions and error rates between exposed users and unexposed control users.
+                Live exposure volume, error rate comparison, and downstream conversion metrics.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Conversion event (e.g. meal_logged)"
-                value={conversionEventInput}
-                onChange={(e) => setConversionEventInput(e.target.value)}
-                className="h-8 w-48 rounded-md border border-neutral-300 bg-white px-2.5 text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              />
               <select
                 value={analyticsDays}
                 onChange={(e) => {
                   setAnalyticsDays(e.target.value);
                   void fetchAnalytics(e.target.value);
                 }}
-                className="h-8 rounded-md border border-neutral-300 bg-white px-2 text-xs font-medium text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                className="h-8 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
               >
                 <option value="7">Last 7 days</option>
                 <option value="14">Last 14 days</option>
                 <option value="30">Last 30 days</option>
               </select>
-              <button
-                onClick={() => fetchAnalytics()}
-                className="h-8 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-black"
-              >
-                Refresh
-              </button>
             </div>
           </div>
 
           {isLoadingAnalytics ? (
-            <div className="py-12 text-center text-xs text-neutral-500">Loading impact telemetry…</div>
+            <div className="py-12 text-center text-xs text-neutral-500">Loading exposure telemetry…</div>
           ) : analyticsData ? (
             <div className="space-y-6">
-              {/* Top Numbers */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Metrics cards */}
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">
-                    Exposed Users (Active)
-                  </span>
-                  <p className="mt-1 font-mono text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                    {analyticsData.exposedUsers.toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">
-                    Control Users (Unexposed)
-                  </span>
-                  <p className="mt-1 font-mono text-2xl font-bold text-neutral-900 dark:text-white">
-                    {analyticsData.controlUsers.toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">
-                    Total Evaluations
-                  </span>
-                  <p className="mt-1 font-mono text-2xl font-bold text-neutral-900 dark:text-white">
+                  <span className="text-[11px] font-semibold text-neutral-500 dark:text-slate-400">Total Evaluations</span>
+                  <p className="mt-1 text-2xl font-black text-neutral-900 dark:text-white">
                     {analyticsData.totalExposures.toLocaleString()}
                   </p>
                 </div>
-              </div>
 
-              {/* Conversion and Errors Comparisons */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Conversion Comparison */}
-                <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Observed Conversion ({analyticsData.conversion.eventName})
-                  </h3>
-                  <p className="text-xs text-neutral-500 dark:text-slate-400">
-                    Percentage of users in each group who performed this event.
+                <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                  <span className="text-[11px] font-semibold text-neutral-500 dark:text-slate-400">Exposed Active Users</span>
+                  <p className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    {analyticsData.exposedUsers.toLocaleString()}
                   </p>
-
-                  <div className="mt-6 space-y-4">
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-indigo-600 dark:text-indigo-400">Exposed Group</span>
-                        <span className="font-mono">{analyticsData.conversion.exposedRate}% ({analyticsData.conversion.exposedCount} users)</span>
-                      </div>
-                      <div className="mt-1 h-3 w-full rounded-full bg-neutral-100 dark:bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-indigo-500"
-                          style={{ width: `${Math.min(analyticsData.conversion.exposedRate, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-neutral-600 dark:text-slate-400">Control Group</span>
-                        <span className="font-mono">{analyticsData.conversion.controlRate}% ({analyticsData.conversion.controlCount} users)</span>
-                      </div>
-                      <div className="mt-1 h-3 w-full rounded-full bg-neutral-100 dark:bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-neutral-400 dark:bg-slate-600"
-                          style={{ width: `${Math.min(analyticsData.conversion.controlRate, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Errors Comparison */}
-                <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Observed Error Rate ($exception)
-                  </h3>
-                  <p className="text-xs text-neutral-500 dark:text-slate-400">
-                    Percentage of users in each group who hit any application error.
+                <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                  <span className="text-[11px] font-semibold text-neutral-500 dark:text-slate-400">Control (Disabled) Users</span>
+                  <p className="mt-1 text-2xl font-black text-neutral-700 dark:text-slate-300">
+                    {analyticsData.controlUsers.toLocaleString()}
                   </p>
-
-                  <div className="mt-6 space-y-4">
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-red-600 dark:text-red-400">Exposed Group</span>
-                        <span className="font-mono">{analyticsData.errors.exposedRate}% ({analyticsData.errors.exposedCount} users)</span>
-                      </div>
-                      <div className="mt-1 h-3 w-full rounded-full bg-neutral-100 dark:bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-red-500"
-                          style={{ width: `${Math.min(analyticsData.errors.exposedRate * 5, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-neutral-600 dark:text-slate-400">Control Group</span>
-                        <span className="font-mono">{analyticsData.errors.controlRate}% ({analyticsData.errors.controlCount} users)</span>
-                      </div>
-                      <div className="mt-1 h-3 w-full rounded-full bg-neutral-100 dark:bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-neutral-400 dark:bg-slate-600"
-                          style={{ width: `${Math.min(analyticsData.errors.controlRate * 5, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

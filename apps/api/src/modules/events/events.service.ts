@@ -7,6 +7,7 @@ import { WebhooksService } from '../webhooks/webhooks.service';
 import { AchievementsService } from '../achievements/achievements.service';
 import { UsageService } from '../billing/usage.service';
 import { EntitlementService } from '../billing/entitlement.service';
+import { sanitizeIngestedTraits } from '../users/users.service';
 
 type JsonObject = Record<string, unknown>;
 
@@ -47,6 +48,7 @@ export interface IngestEventResponse {
   eventId: string;
   usageWarningPercentage?: 70 | 90 | 100;
 }
+
 
 export interface BatchIngestResponse {
   accepted: true;
@@ -178,6 +180,21 @@ export class EventsService {
     // 4) One multi-row insert for the whole batch.
     const { eventIds, usageWarningPercentage } = await this.bulkInsertEvents(auth, prepared);
     await this.backfillSessionIdentities(auth.project_id, sessionIds);
+
+    // Merge traits onto user profiles if identified
+    for (const p of prepared) {
+      if (p.userId && (p.eventName === '$identify' || (p.properties && p.properties.traits))) {
+        const rawTraits = (p.properties?.traits ?? (p.eventName === '$identify' ? p.properties : {})) as Record<string, unknown>;
+        const sanitized = sanitizeIngestedTraits(rawTraits);
+        if (sanitized && Object.keys(sanitized).length > 0) {
+          void this.database.query(
+            `UPDATE users SET traits = COALESCE(traits, '{}'::jsonb) || $3::jsonb, updated_at = now() WHERE project_id = $1 AND id = $2`,
+            [auth.project_id, p.userId, JSON.stringify(sanitized)]
+          );
+        }
+      }
+    }
+
     prepared.forEach((p, i) => {
       const eventId = eventIds[i];
       results[p.index] = { accepted: true, eventId };
@@ -198,7 +215,8 @@ export class EventsService {
     return { accepted: true, results, ...(usageWarningPercentage ? { usageWarningPercentage } : {}) };
   }
 
-  // Upsert distinct identified users in a single statement; returns external_id → user id.
+  // Ensure every unique external_id in this batch has a corresponding row in `users`.
+  // Uses ON CONFLICT to make it idempotent, returning a map of external_id -> user_id.
   private async bulkEnsureUsers(
     projectId: string,
     users: Array<{ externalId: string; anonymousId?: string }>
@@ -341,6 +359,18 @@ export class EventsService {
     }
     if (userId && sessionId) {
       await this.backfillSessionIdentities(auth.project_id, [sessionId]);
+    }
+
+    // Merge traits onto user profile if identified
+    if (userId && (eventName === '$identify' || input.properties?.traits)) {
+      const rawTraits = (input.properties?.traits ?? (eventName === '$identify' ? input.properties : {})) as Record<string, unknown>;
+      const sanitized = sanitizeIngestedTraits(rawTraits);
+      if (sanitized && Object.keys(sanitized).length > 0) {
+        void this.database.query(
+          `UPDATE users SET traits = COALESCE(traits, '{}'::jsonb) || $3::jsonb, updated_at = now() WHERE project_id = $1 AND id = $2`,
+          [auth.project_id, userId, JSON.stringify(sanitized)]
+        );
+      }
     }
 
     const networkInfo = this.buildNetworkInfo(input.networkInfo, meta);

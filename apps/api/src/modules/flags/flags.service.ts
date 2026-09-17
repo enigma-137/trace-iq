@@ -444,6 +444,8 @@ export class FlagsService {
       action = enabled ? 'enabled' : 'disabled';
     } else if (flag.rollout_percentage !== rollout) {
       action = 'rollout_updated';
+    } else if (JSON.stringify(flag.overrides ?? {}) !== JSON.stringify(overrides ?? {})) {
+      action = 'specific_users_updated';
     } else if (JSON.stringify(flag.targeting_groups) !== JSON.stringify(targetingGroups)) {
       action = 'targeting_updated';
     } else if (JSON.stringify(flag.payload) !== JSON.stringify(payload)) {
@@ -461,6 +463,7 @@ export class FlagsService {
         name: flag.name,
         enabled: flag.enabled,
         rolloutPercentage: flag.rollout_percentage,
+        overridesCount: Object.keys(flag.overrides ?? {}).length,
         targetingGroups: flag.targeting_groups,
         payload: flag.payload
       },
@@ -468,6 +471,7 @@ export class FlagsService {
         name,
         enabled,
         rolloutPercentage: rollout,
+        overridesCount: Object.keys(overrides ?? {}).length,
         targetingGroups,
         payload
       }
