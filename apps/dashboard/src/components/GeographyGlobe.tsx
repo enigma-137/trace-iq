@@ -362,11 +362,21 @@ export function GeographyGlobe({
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: !isSmallScreen.current,
-      alpha: true,
-      powerPreference: 'low-power',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !isSmallScreen.current,
+        alpha: true,
+        powerPreference: 'low-power',
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (err) {
+      console.warn('WebGL context creation failed for GeographyGlobe:', err);
+      setError(true);
+      setLoading(false);
+      return;
+    }
+
     renderer.setPixelRatio(
       Math.min(window.devicePixelRatio, isSmallScreen.current ? 1.5 : 2)
     );
@@ -379,7 +389,12 @@ export function GeographyGlobe({
     mount.style.position = 'relative';
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
-    console.log('Globe: renderer appended', renderer.domElement.tagName, renderer.domElement.width, renderer.domElement.height);
+
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      stop();
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
 
     const globeGroup = new THREE.Group();
     globeGroup.rotation.x = 0.35;
@@ -672,7 +687,9 @@ export function GeographyGlobe({
       }
       meshMapRef.current.clear();
 
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.dispose();
+      renderer.forceContextLoss();
       coreGeo.dispose();
       coreMat.dispose();
       debugWireGeo.dispose();
