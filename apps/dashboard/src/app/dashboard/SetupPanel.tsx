@@ -25,11 +25,13 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 export function SetupPanel({
   organizationId,
   projectId,
-  newProject = false
+  newProject = false,
+  children
 }: {
   organizationId?: string | null;
   projectId?: string | null;
   newProject?: boolean;
+  children?: React.ReactNode;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -151,14 +153,21 @@ export function SetupPanel({
         reportProjectFailure(await readApiError(response));
         return;
       }
-      const created = (await response.json()) as SetupResponse;
-      setSetup(created);
-      if (created.writeKey?.value) {
-        setRevealedWriteKey(created.writeKey.value);
+      const nextSetup = (await response.json()) as SetupResponse;
+      setSetup(nextSetup);
+      setProjectNameDraft(nextSetup.project?.name ?? '');
+      setOrgNameDraft(nextSetup.organization?.name ?? '');
+      if (nextSetup.writeKey?.value) {
+        setRevealedWriteKey(nextSetup.writeKey.value);
       }
-      reportProjectSuccess('Project created. Copy your write key now — it is shown only once.');
+      reportProjectSuccess(`Workspace initialized with project "${nextSetup.project?.name}".`);
+      if (nextSetup.project?.id) {
+        router.push(`/dashboard?projectId=${encodeURIComponent(nextSetup.project.id)}`);
+      }
     } catch (error) {
-      reportProjectFailure(await readApiError(error, 'Could not create the project. Please try again.'));
+      reportProjectFailure(
+        await readApiError(error, 'Could not initialize workspace. Please try again.')
+      );
     } finally {
       setIsBootstrapping(false);
     }
@@ -174,31 +183,44 @@ export function SetupPanel({
       return;
     }
     setIsSavingProjectName(true);
-    setStatus(null);
     try {
       const token = await getAccessToken();
       if (!token) {
-        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Project update failed');
+        toast.error('Session expired. Sign in again.', { title: 'Rename failed' });
         return;
       }
-      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects/${encodeURIComponent(setup.project.id)}`, {
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects/${setup.project.id}`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ name: trimmed })
       });
       if (!response.ok) {
-        reportPanelFailure(await readApiError(response), 'Project update failed');
+        toast.error(await readApiError(response), { title: 'Rename failed' });
         return;
       }
       const updated = await response.json();
       setSetup((current) =>
-        current && current.project ? { ...current, project: { ...current.project, name: updated.project.name } } : current
+        current && current.project
+          ? {
+              ...current,
+              project: {
+                ...current.project,
+                name: updated.name ?? trimmed,
+                slug: updated.slug ?? current.project.slug
+              }
+            }
+          : current
       );
-      setProjectNameDraft(updated.project.name);
       setIsEditingProjectName(false);
-      toast.success('Project name updated.', { title: 'Project updated' });
+      toast.success(`Project renamed to "${trimmed}".`, { title: 'Project updated' });
+      router.refresh();
     } catch (error) {
-      reportPanelFailure(await readApiError(error, 'Could not rename project.'), 'Project update failed');
+      toast.error(await readApiError(error, 'Could not rename project.'), {
+        title: 'Rename failed'
+      });
     } finally {
       setIsSavingProjectName(false);
     }
@@ -207,37 +229,51 @@ export function SetupPanel({
   // Handle Organization Rename
   async function handleSaveOrgName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!setup?.organization?.id) return;
     const trimmed = orgNameDraft.trim();
-    if (!trimmed || trimmed === setup?.organization?.name) {
+    if (!trimmed || trimmed === setup.organization.name) {
       setIsEditingOrgName(false);
       return;
     }
     setIsSavingOrgName(true);
-    setStatus(null);
     try {
       const token = await getAccessToken();
       if (!token) {
-        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Organization update failed');
+        toast.error('Session expired. Sign in again.', { title: 'Rename failed' });
         return;
       }
-      const orgQuery = setup?.organization?.id ? `?organizationId=${encodeURIComponent(setup.organization.id)}` : '';
-      const response = await fetch(`${apiBaseUrl}/v1/setup/organization${orgQuery}`, {
+      const response = await fetch(`${apiBaseUrl}/v1/setup/organization`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationName: trimmed })
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: trimmed })
       });
       if (!response.ok) {
-        reportPanelFailure(await readApiError(response), 'Organization update failed');
+        toast.error(await readApiError(response), { title: 'Rename failed' });
         return;
       }
+      const updated = await response.json();
       setSetup((current) =>
-        current ? { ...current, organization: { ...current.organization!, name: trimmed } } : current
+        current && current.organization
+          ? {
+              ...current,
+              organization: {
+                ...current.organization,
+                name: updated.name ?? trimmed,
+                slug: updated.slug ?? current.organization.slug
+              }
+            }
+          : current
       );
-      setOrgNameDraft(trimmed);
       setIsEditingOrgName(false);
-      toast.success('Organization name updated.', { title: 'Organization updated' });
+      toast.success(`Organization renamed to "${trimmed}".`, { title: 'Organization updated' });
+      router.refresh();
     } catch (error) {
-      reportPanelFailure(await readApiError(error, 'Could not update organization.'), 'Organization update failed');
+      toast.error(await readApiError(error, 'Could not rename organization.'), {
+        title: 'Rename failed'
+      });
     } finally {
       setIsSavingOrgName(false);
     }
@@ -247,11 +283,10 @@ export function SetupPanel({
   async function handleRegenerateWriteKey() {
     if (!setup?.project?.id) return;
     setIsRegenerating(true);
-    setStatus(null);
     try {
       const token = await getAccessToken();
       if (!token) {
-        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Key regeneration failed');
+        toast.error('Session expired. Sign in again.', { title: 'Regeneration failed' });
         return;
       }
       const response = await fetch(
@@ -262,108 +297,109 @@ export function SetupPanel({
         }
       );
       if (!response.ok) {
-        reportPanelFailure(await readApiError(response), 'Key regeneration failed');
+        toast.error(await readApiError(response), { title: 'Regeneration failed' });
         return;
       }
-      const nextSetup = (await response.json()) as SetupResponse;
-      setSetup(nextSetup);
-      if (nextSetup.writeKey?.value) {
-        setRevealedWriteKey(nextSetup.writeKey.value);
-      }
+      const data = await response.json();
+      setSetup((current) =>
+        current
+          ? {
+              ...current,
+              writeKey: {
+                prefix: data.prefix ?? 'trq_live_',
+                value: data.value
+              },
+              sdkSnippet: data.sdkSnippet ?? current.sdkSnippet
+            }
+          : current
+      );
+      setRevealedWriteKey(data.value);
       setIsRegenerateDialogOpen(false);
-      toast.success('New write key generated. Copy it now — it is shown only once.', {
+      toast.success('Write key rotated successfully. Copy the new key now.', {
         title: 'Write key regenerated'
       });
     } catch (error) {
-      reportPanelFailure(
-        await readApiError(error, 'Could not regenerate write key. Please try again.'),
-        'Key regeneration failed'
-      );
+      toast.error(await readApiError(error, 'Failed to rotate write key.'), {
+        title: 'Regeneration failed'
+      });
     } finally {
       setIsRegenerating(false);
     }
   }
 
-  // Handle Project Creation
+  // Handle Project Creation inside existing Organization
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!setup?.organization?.id) {
-      reportProjectFailure('Choose an organization before creating a project.');
-      return;
-    }
+    if (!newProjectName.trim()) return;
     setIsCreatingProject(true);
-    setStatus(null);
     try {
       const token = await getAccessToken();
       if (!token) {
-        reportProjectFailure('Your dashboard session expired. Sign in again.');
+        toast.error('Session expired. Sign in again.', { title: 'Create failed' });
         return;
       }
-      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: setup.organization.id,
-          projectName: newProjectName.trim() || 'Web App'
-        })
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/v1/dashboard/projects${organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : ''}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: newProjectName.trim() })
+        }
+      );
       if (!response.ok) {
-        reportProjectFailure(await readApiError(response));
+        toast.error(await readApiError(response), { title: 'Create failed' });
         return;
       }
       const created = (await response.json()) as SetupResponse;
       setCreatedProject(created);
-      setNewProjectOpen(false);
-      setNewProjectName('Web App');
-      reportProjectSuccess(
-        `Project "${created.project?.name ?? 'Web App'}" created. Copy the write key now — it is shown once.`
-      );
+      toast.success(`Project "${created.project?.name}" created successfully.`, {
+        title: 'Project created'
+      });
     } catch (error) {
-      reportProjectFailure(await readApiError(error, 'Could not create project. Please try again.'));
+      toast.error(await readApiError(error, 'Could not create project.'), {
+        title: 'Create failed'
+      });
     } finally {
       setIsCreatingProject(false);
     }
   }
 
-  // Handle Project Deletion
+  // Handle Safe Project Deletion
   async function handleDeleteProject() {
-    if (!setup?.project?.id) return;
+    if (!setup?.project?.id || !isDeleteConfirmed) return;
     setIsDeletingProject(true);
     try {
       const token = await getAccessToken();
       if (!token) {
-        reportPanelFailure('Your dashboard session expired. Sign in again.', 'Project deletion failed');
+        toast.error('Session expired. Sign in again.', { title: 'Deletion failed' });
         return;
       }
-      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects/${encodeURIComponent(setup.project.id)}`, {
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects/${setup.project.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) {
-        reportPanelFailure(await readApiError(response), 'Project deletion failed');
+        toast.error(await readApiError(response), { title: 'Deletion failed' });
         return;
       }
       const result = await response.json();
       setIsDeleteDialogOpen(false);
-      setDeleteConfirmName('');
-      setDeleteConfirmPhrase('');
-      toast.success(`Project "${setup.project.name}" has been permanently deleted.`, {
+      toast.success(`Project "${setup.project.name}" permanently deleted.`, {
         title: 'Project deleted'
       });
-
-      // Navigate to remaining project or refresh setup
       if (result.remainingProjects && result.remainingProjects.length > 0) {
-        const nextProject = result.remainingProjects[0];
-        router.push(`/dashboard?projectId=${encodeURIComponent(nextProject.id)}`);
+        const nextProjectId = result.remainingProjects[0].id;
+        router.push(`/dashboard?projectId=${encodeURIComponent(nextProjectId)}`);
       } else {
         router.push('/dashboard/settings');
-        void loadSetup();
       }
     } catch (error) {
-      reportPanelFailure(
-        await readApiError(error, 'Could not delete project. Please try again.'),
-        'Project deletion failed'
-      );
+      toast.error(await readApiError(error, 'Failed to delete project.'), {
+        title: 'Deletion failed'
+      });
     } finally {
       setIsDeletingProject(false);
     }
@@ -371,11 +407,7 @@ export function SetupPanel({
 
   function reportProjectFailure(message: string) {
     setStatus({ tone: 'error', message });
-    if (/plan limit for projects|project limit|settings\s*→\s*billing/i.test(message)) {
-      toast.warning(message, { title: 'Project limit reached' });
-      return;
-    }
-    toast.error(message, { title: 'Project creation failed' });
+    toast.error(message, { title: 'Action failed' });
   }
 
   function reportPanelFailure(message: string, title: string) {
@@ -394,40 +426,6 @@ export function SetupPanel({
 
   return (
     <section className="grid gap-6" aria-labelledby="overview-title">
-      {/* Header & Controls */}
-      <div className="flex flex-col gap-4 pt-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="overview-title" className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-            {hasProject ? 'Project Overview' : 'Create your tracking workspace'}
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-            {hasProject
-              ? 'Workspace credentials, project identifiers, and lifecycle management.'
-              : 'Create an organization, a project, and the initial write key for event ingestion.'}
-          </p>
-        </div>
-
-        {hasProject ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
-            {isOwnerOrAdmin ? (
-              <button
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
-                type="button"
-                onClick={() => {
-                  setNewProjectOpen(true);
-                  setCreatedProject(null);
-                  setStatus(null);
-                }}
-              >
-                <HugeiconsIcon icon={PlusSignIcon} size={15} />
-                New project
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
       {status ? (
         <p
           className={`rounded-md border px-3.5 py-2.5 text-sm ${
@@ -480,169 +478,76 @@ export function SetupPanel({
             This organization has no projects yet. Ask an owner or admin to set up the first project.
           </div>
         ) : (
-          <form
-            className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-            onSubmit={handleBootstrapSubmit}
-          >
-            <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
-              Organization name
-              <input
-                className={inputClass}
-                value={bootstrapOrgName}
-                onChange={(e) => setBootstrapOrgName(e.target.value)}
-                required
-              />
-            </label>
-            <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
-              Project name
-              <input
-                className={inputClass}
-                value={bootstrapProjectName}
-                onChange={(e) => setBootstrapProjectName(e.target.value)}
-                required
-              />
-            </label>
-            <div className="flex items-end">
-              <button
-                className="h-10 w-full rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200 sm:w-auto"
-                type="submit"
-                disabled={isBootstrapping}
-              >
-                {isBootstrapping ? 'Creating…' : 'Create workspace'}
-              </button>
+          <div className="grid gap-4">
+            <div className="pt-2">
+              <h2 id="overview-title" className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+                Create your tracking workspace
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+                Create an organization, a project, and the initial write key for event ingestion.
+              </p>
             </div>
-          </form>
+            <form
+              className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+              onSubmit={handleBootstrapSubmit}
+            >
+              <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+                Organization name
+                <input
+                  className={inputClass}
+                  value={bootstrapOrgName}
+                  onChange={(e) => setBootstrapOrgName(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
+                Project name
+                <input
+                  className={inputClass}
+                  value={bootstrapProjectName}
+                  onChange={(e) => setBootstrapProjectName(e.target.value)}
+                  required
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  className="h-10 w-full rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200 sm:w-auto"
+                  type="submit"
+                  disabled={isBootstrapping}
+                >
+                  {isBootstrapping ? 'Creating…' : 'Create workspace'}
+                </button>
+              </div>
+            </form>
+          </div>
         )
       ) : (
         <>
-          {/* Compact Settings Overview Table / List */}
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="border-b border-neutral-200 px-5 py-3.5 dark:border-slate-800">
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Workspace Configuration</h3>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                General project identifiers and credentials for browser/server telemetry.
+          {/* SECTION 1: ORGANIZATION SETTINGS (At the very top) */}
+          <div className="grid gap-3 pt-2" aria-labelledby="org-overview-title">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Organization</p>
+              <h2 id="org-overview-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+                Organization Settings
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+                Overall account and team workspace managing all projects, members, and billing.
               </p>
             </div>
 
-            <div className="divide-y divide-neutral-200 text-sm dark:divide-slate-800">
-              {/* Row 1: Project Name */}
+            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Project Name</span>
-                    <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
-                      {setup?.project?.slug ?? '—'}
-                    </span>
-                  </div>
-                  {isEditingProjectName ? (
-                    <form className="mt-2 flex max-w-md items-center gap-2" onSubmit={handleSaveProjectName}>
-                      <input
-                        className="h-8 flex-1 rounded-md border border-neutral-300 bg-white px-2.5 text-xs text-neutral-900 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        value={projectNameDraft}
-                        onChange={(e) => setProjectNameDraft(e.target.value)}
-                        placeholder="Project name"
-                        maxLength={80}
-                        required
-                        autoFocus
-                      />
-                      <button
-                        type="submit"
-                        disabled={isSavingProjectName || !projectNameDraft.trim()}
-                        className="h-8 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                      >
-                        {isSavingProjectName ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProjectNameDraft(setup?.project?.name ?? '');
-                          setIsEditingProjectName(false);
-                        }}
-                        className="h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                      >
-                        Cancel
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="mt-1 text-sm font-semibold text-neutral-900 dark:text-white">
-                      {setup?.project?.name ?? '—'}
-                    </p>
-                  )}
-                </div>
-                {!isEditingProjectName && isOwnerOrAdmin ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProjectNameDraft(setup?.project?.name ?? '');
-                      setIsEditingProjectName(true);
-                    }}
-                    className="h-8 shrink-0 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    Rename
-                  </button>
-                ) : null}
-              </div>
-
-              {/* Row 2: Project ID */}
-              <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                <div className="min-w-0">
-                  <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Project ID</span>
-                  <p className="mt-1 font-mono text-xs font-semibold text-neutral-900 dark:text-slate-200">
-                    {setup?.project?.id ?? '—'}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
-                    Immutable identifier for API requests and SDK initialization.
-                  </p>
-                </div>
-                {setup?.project?.id ? (
-                  <CopyButton value={setup.project.id} label="Copy ID" compact />
-                ) : null}
-              </div>
-
-              {/* Row 3: Write Key */}
-              <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Write Key</span>
-                    <span className="rounded bg-neutral-100 px-1.5 py-0.2 text-[10px] font-medium text-neutral-500 dark:bg-slate-800 dark:text-slate-400">
-                      Client Token
-                    </span>
-                  </div>
-                  <p className="mt-1 font-mono text-xs text-neutral-600 dark:text-slate-400">
-                    {setup?.writeKey?.value
-                      ? setup.writeKey.value
-                      : setup?.writeKey?.prefix
-                      ? `${setup.writeKey.prefix}••••••••••••••••`
-                      : 'trq_live_••••••••••••••••••••'}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
-                    Secret token used to authenticate event telemetry. Masked for security.
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {setup?.writeKey?.value ? (
-                    <CopyButton value={setup.writeKey.value} label="Copy key" compact />
-                  ) : null}
-                  {isOwnerOrAdmin ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsRegenerateDialogOpen(true)}
-                      className="h-8 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Regenerate
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Row 4: Organization */}
-              <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Organization</span>
+                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Organization Name</span>
                     {organizationRole ? (
                       <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium capitalize text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                         {organizationRole}
+                      </span>
+                    ) : null}
+                    {setup?.organization?.slug ? (
+                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
+                        {setup.organization.slug}
                       </span>
                     ) : null}
                   </div>
@@ -697,7 +602,155 @@ export function SetupPanel({
             </div>
           </div>
 
-          {/* SDK Integration Snippet Card */}
+          {/* SECTION 2: PROJECT CONFIGURATION & DETAILS */}
+          <div className="grid gap-3 border-t border-neutral-200 pt-6 dark:border-slate-800" aria-labelledby="project-overview-title">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Project</p>
+                <h2 id="project-overview-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+                  Project Configuration
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+                  Workspace credentials, project identifiers, and client telemetry configuration.
+                </p>
+              </div>
+
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
+                {isOwnerOrAdmin ? (
+                  <button
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    type="button"
+                    onClick={() => {
+                      setNewProjectOpen(true);
+                      setCreatedProject(null);
+                      setStatus(null);
+                    }}
+                  >
+                    <HugeiconsIcon icon={PlusSignIcon} size={15} />
+                    New project
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Project Details Card */}
+            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <div className="divide-y divide-neutral-200 text-sm dark:divide-slate-800">
+                {/* Row 1: Project Name */}
+                <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Project Name</span>
+                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
+                        {setup?.project?.slug ?? '—'}
+                      </span>
+                    </div>
+                    {isEditingProjectName ? (
+                      <form className="mt-2 flex max-w-md items-center gap-2" onSubmit={handleSaveProjectName}>
+                        <input
+                          className="h-8 flex-1 rounded-md border border-neutral-300 bg-white px-2.5 text-xs text-neutral-900 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          value={projectNameDraft}
+                          onChange={(e) => setProjectNameDraft(e.target.value)}
+                          placeholder="Project name"
+                          maxLength={80}
+                          required
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSavingProjectName || !projectNameDraft.trim()}
+                          className="h-8 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                        >
+                          {isSavingProjectName ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProjectNameDraft(setup?.project?.name ?? '');
+                            setIsEditingProjectName(false);
+                          }}
+                          className="h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <p className="mt-1 text-sm font-semibold text-neutral-900 dark:text-white">
+                        {setup?.project?.name ?? '—'}
+                      </p>
+                    )}
+                  </div>
+                  {!isEditingProjectName && isOwnerOrAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProjectNameDraft(setup?.project?.name ?? '');
+                        setIsEditingProjectName(true);
+                      }}
+                      className="h-8 shrink-0 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      Rename
+                    </button>
+                  ) : null}
+                </div>
+
+                {/* Row 2: Project ID */}
+                <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
+                  <div className="min-w-0">
+                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Project ID</span>
+                    <p className="mt-1 font-mono text-xs font-semibold text-neutral-900 dark:text-slate-200">
+                      {setup?.project?.id ?? '—'}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
+                      Immutable identifier for API requests and SDK initialization.
+                    </p>
+                  </div>
+                  {setup?.project?.id ? (
+                    <CopyButton value={setup.project.id} label="Copy ID" compact />
+                  ) : null}
+                </div>
+
+                {/* Row 3: Write Key */}
+                <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Write Key</span>
+                      <span className="rounded bg-neutral-100 px-1.5 py-0.2 text-[10px] font-medium text-neutral-500 dark:bg-slate-800 dark:text-slate-400">
+                        Client Token
+                      </span>
+                    </div>
+                    <p className="mt-1 font-mono text-xs text-neutral-600 dark:text-slate-400">
+                      {setup?.writeKey?.value
+                        ? setup.writeKey.value
+                        : setup?.writeKey?.prefix
+                        ? `${setup.writeKey.prefix}••••••••••••••••`
+                        : 'trq_live_••••••••••••••••••••'}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
+                      Secret token used to authenticate event telemetry. Masked for security.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {setup?.writeKey?.value ? (
+                      <CopyButton value={setup.writeKey.value} label="Copy key" compact />
+                    ) : null}
+                    {isOwnerOrAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsRegenerateDialogOpen(true)}
+                        className="h-8 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Regenerate
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: INTEGRATION SNIPPET */}
           {setup?.sdkSnippet ? (
             <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3.5 dark:border-slate-800">
@@ -787,7 +840,10 @@ export function SetupPanel({
             </div>
           ) : null}
 
-          {/* Danger Zone Card */}
+          {/* SECTION 4 & 5: CHILDREN (Security 2FA & AI Access / Personal Access Tokens) */}
+          {children}
+
+          {/* SECTION 6: DANGER ZONE (Delete this project - Rendered at the VERY END) */}
           <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50/20 shadow-sm dark:border-red-950/60 dark:bg-red-950/10">
             <div className="border-b border-red-200/80 px-5 py-3.5 dark:border-red-950/60">
               <div className="flex items-center gap-2">
