@@ -920,13 +920,20 @@ input {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 9px;
-  border: 1px solid var(--traceiq-line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--traceiq-fg);
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
   cursor: pointer;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.traceiq-site .menu-button:hover {
+  opacity: 0.85;
+}
+
+.traceiq-site .menu-button:active {
+  transform: scale(0.92);
 }
 
 /* ---------------------------------------------------------------- Hero ---------------------------------------------------------------- */
@@ -2215,7 +2222,6 @@ input {
 @media (max-width: 800px) {
   .traceiq-site .desktop-nav { display: none; }
   .traceiq-site .menu-button { display: inline-flex; }
-  .traceiq-site .site-header { position: relative; }
   .traceiq-site .footer-links { grid-template-columns: repeat(2, 1fr); }
   .traceiq-site .product-shot-primary { margin-top: 28px; }
   .traceiq-site .product-shot-bar span:last-child { display: none; }
@@ -2224,29 +2230,6 @@ input {
   .traceiq-site .landing-overview-availability { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .traceiq-site .landing-overview-availability > :nth-child(3) { border-top: 1px solid rgba(51, 65, 85, 0.72); }
   .traceiq-site .landing-overview-availability > :nth-child(odd) { padding-left: 0; border-left: 0; }
-
-  /* Dropdown panel revealed by the hamburger toggle (nav is display:none above,
-     and only this .is-open state ever brings it back on small screens). */
-  .traceiq-site .desktop-nav.is-open {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    padding: 10px;
-    border-bottom: 1px solid var(--traceiq-line);
-    background: rgba(5, 5, 5, 0.97);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 24px 40px rgba(0, 0, 0, 0.45);
-  }
-
-  .traceiq-site .desktop-nav.is-open a {
-    padding: 12px;
-    border-radius: 8px;
-  }
 }
 
 @media (max-width: 560px) {

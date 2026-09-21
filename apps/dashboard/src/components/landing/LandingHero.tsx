@@ -158,7 +158,7 @@ export function LandingHero({
           className="absolute pointer-events-auto flex flex-col items-start text-left max-w-[calc(100vw-48px)] sm:max-w-[560px]"
           style={{
             left: 'clamp(24px, 5vw, 80px)',
-            bottom: 'clamp(48px, 8vh, 96px)',
+            bottom: 'clamp(104px, 16vh, 128px)',
           }}
         >
           {/* Confident, compact headline */}

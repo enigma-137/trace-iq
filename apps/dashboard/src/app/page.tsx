@@ -141,19 +141,53 @@ export default function Page() {
           <a className="brand" href="#top" aria-label="TraceIQ home">
             <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-7 w-auto block" />
           </a>
-          <nav className={`desktop-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
+          <nav className="desktop-nav" aria-label="Primary navigation">
             {navItems.map((item) => (
               <a href={item.href} key={item.href}>{item.label}</a>
             ))}
           </nav>
           <div className="header-actions">
             <a className="text-link hidden sm:inline-flex" href="/auth/login">Sign in</a>
-            <a className="button button-small" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
+            <a className="button button-small hidden sm:inline-flex" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'}>
-              {menuOpen ? <HugeiconsIcon icon={Cancel01Icon} size={20} /> : <HugeiconsIcon icon={Menu01Icon} size={20} />}
+              {menuOpen ? <HugeiconsIcon icon={Cancel01Icon} size={22} /> : <HugeiconsIcon icon={Menu01Icon} size={22} />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Dropdown Navigation Menu */}
+        {menuOpen && (
+          <div className="mobile-nav-panel sm:hidden w-full bg-[#0a0a0a]/98 backdrop-blur-2xl border-b border-white/10 px-6 py-6 flex flex-col gap-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex flex-col gap-1">
+              {navItems.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="px-3 py-2.5 text-base font-medium text-zinc-200 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+            <div className="pt-4 border-t border-white/10 flex flex-col gap-2.5">
+              <a
+                href="/auth/login"
+                onClick={() => setMenuOpen(false)}
+                className="w-full py-2.5 px-3 text-center text-sm font-medium text-zinc-300 hover:text-white rounded-lg border border-white/10 hover:bg-white/[0.04] transition-colors"
+              >
+                Sign in
+              </a>
+              <a
+                href="/auth/login"
+                onClick={() => setMenuOpen(false)}
+                className="w-full py-2.5 px-3 text-center text-sm font-semibold text-zinc-950 bg-white hover:bg-zinc-100 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+              >
+                Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} />
+              </a>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Hero — Cinematic video background with fallback and atmospheric readability overlay */}
