@@ -1203,10 +1203,10 @@ input {
 .traceiq-site .product-shot {
   overflow: hidden;
   margin: 0;
-  border: 1px solid var(--traceiq-line);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: #070809;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.36);
+  background: #000000;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.6);
 }
 
 .traceiq-site .product-shot-primary {
@@ -1219,7 +1219,7 @@ input {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--traceiq-line);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--traceiq-soft);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 0.68rem;
@@ -1245,22 +1245,20 @@ input {
   display: block;
   width: 100%;
   height: auto;
-  background: #08090b;
+  background: #000000;
 }
 
 .traceiq-site .product-shot-caption {
   margin: 0;
   padding: 13px 16px;
-  border-top: 1px solid var(--traceiq-line);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--traceiq-soft);
   font-size: 0.76rem;
 }
 
 .traceiq-site .landing-overview-demo {
-  padding: clamp(14px, 2.5vw, 28px);
-  background:
-    radial-gradient(circle at 88% 4%, rgba(19, 19, 20, 0.08), transparent 24%),
-    #08090b;
+  padding: clamp(16px, 2.5vw, 32px);
+  background: #000000;
   color: #f8fafc;
 }
 
@@ -1270,7 +1268,7 @@ input {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
-  color: #64748b;
+  color: #71717a;
   font-family: var(--font-ibm-plex-mono), monospace;
   font-size: 11px;
 }
@@ -1300,19 +1298,17 @@ input {
 .traceiq-site .landing-overview-story,
 .traceiq-site .landing-overview-availability,
 .traceiq-site .landing-overview-card {
-  border: 1px solid rgba(51, 65, 85, 0.9);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.74);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: #09090b;
+  box-shadow: none;
 }
 
 .traceiq-site .landing-overview-story {
   position: relative;
   overflow: hidden;
   padding: 18px;
-  background:
-    radial-gradient(circle at 88% 20%, rgba(59, 130, 246, 0.2), transparent 42%),
-    rgba(15, 23, 42, 0.74);
+  background: #09090b;
 }
 
 .traceiq-site .landing-overview-story > p:first-child {
@@ -1328,10 +1324,10 @@ input {
 }
 
 .traceiq-site .landing-overview-facts button {
-  border: 1px solid #334155;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   padding: 5px 10px;
-  background: #111827;
+  background: #111113;
   color: #e2e8f0;
   cursor: pointer;
   font-family: var(--font-ibm-plex-mono), monospace;
@@ -1341,27 +1337,27 @@ input {
 }
 
 .traceiq-site .landing-overview-facts button span {
-  color: #94a3b8;
+  color: #a1a1aa;
 }
 
 .traceiq-site .landing-overview-facts button:hover,
 .traceiq-site .landing-overview-facts button:focus-visible,
 .traceiq-site .landing-overview-facts button.is-active {
-  border-color: #3b82f6;
-  background: #2563eb;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
   outline: none;
   transform: translateY(-1px);
 }
 
 .traceiq-site .landing-overview-facts button:is(:hover, :focus-visible, .is-active) span {
-  color: #dbeafe;
+  color: #ffffff;
 }
 
 .traceiq-site .landing-overview-fact-detail {
   min-height: 18px;
   margin-top: 10px;
-  color: #94a3b8;
+  color: #a1a1aa;
   font-size: 11px;
 }
 
@@ -1379,7 +1375,7 @@ input {
   gap: 10px;
   margin: 0;
   padding: 3px 16px;
-  border-left: 1px solid rgba(51, 65, 85, 0.72);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
   transition: background 150ms ease;
 }
 
@@ -1389,7 +1385,7 @@ input {
 }
 
 .traceiq-site .landing-overview-availability > :hover {
-  background: rgba(30, 41, 59, 0.65);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .traceiq-site .landing-overview-availability p {
@@ -1400,7 +1396,7 @@ input {
 }
 
 .traceiq-site .landing-overview-availability small {
-  color: #64748b;
+  color: #71717a;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -1447,8 +1443,8 @@ input {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 11px;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.72);
-  color: #94a3b8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
   font-size: 10px;
 }
 
@@ -1468,11 +1464,11 @@ input {
 }
 
 .traceiq-site .landing-overview-card-header button {
-  border: 1px solid #475569;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   padding: 5px 9px;
-  background: #0f172a;
-  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d4d4d8;
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
@@ -1482,8 +1478,8 @@ input {
 .traceiq-site .landing-overview-card-header button:hover,
 .traceiq-site .landing-overview-card-header button:focus-visible,
 .traceiq-site .landing-overview-card-header button[aria-pressed='true'] {
-  border-color: #60a5fa;
-  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
   outline: none;
 }
 
@@ -1494,7 +1490,7 @@ input {
 }
 
 .traceiq-site .landing-overview-activity li + li {
-  border-top: 1px solid rgba(51, 65, 85, 0.58);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .traceiq-site .landing-overview-activity li button {
@@ -1516,7 +1512,7 @@ input {
 .traceiq-site .landing-overview-activity li button:hover,
 .traceiq-site .landing-overview-activity li button:focus-visible,
 .traceiq-site .landing-overview-activity li button.is-selected {
-  background: rgba(30, 41, 59, 0.92);
+  background: rgba(255, 255, 255, 0.06);
   outline: none;
 }
 
@@ -1533,14 +1529,14 @@ input {
 .traceiq-site .landing-overview-activity li small {
   overflow: hidden;
   margin-top: 2px;
-  color: #64748b;
+  color: #71717a;
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .traceiq-site .landing-overview-activity time {
-  color: #94a3b8;
+  color: #a1a1aa;
   font-family: var(--font-ibm-plex-mono), monospace;
   font-size: 9px;
 }
@@ -1574,7 +1570,7 @@ input {
 
 .traceiq-site .product-detail-label {
   margin-bottom: 14px;
-  color: #60a5fa;
+  color: var(--traceiq-soft);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 0.68rem;
   font-weight: 600;
@@ -1591,6 +1587,7 @@ input {
 .traceiq-site .product-detail p {
   max-width: 620px;
   margin: 0;
+  color: var(--traceiq-muted);
   font-size: 0.9rem;
 }
 
@@ -1609,37 +1606,26 @@ input {
 
 .traceiq-site .product-shot-secondary {
   border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #000000;
+  overflow: hidden;
 }
 
 .traceiq-site .product-flow-preview {
-  background: #020617;
+  background: #000000;
 }
 
 .traceiq-site .landing-api-flow-viewport {
   width: 100%;
-  overflow: hidden;
-  background: #020617;
-  transition: height 180ms ease;
-}
-
-.traceiq-site .landing-api-flow-canvas {
-  width: 1120px;
-  transform-origin: left top;
-  will-change: transform;
+  background: #000000;
 }
 
 .traceiq-site .landing-api-flow-graph {
-  width: 1120px;
+  width: 100%;
   border: 0;
   border-radius: 0;
   box-shadow: none;
-}
-
-.traceiq-site .landing-api-flow-graph .svg-node-flow-columns {
-  grid-auto-flow: column;
-  grid-auto-columns: 230px;
-  justify-content: space-between;
-  gap: 40px;
+  background: #000000;
 }
 
 .traceiq-site .signal-card {

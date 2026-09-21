@@ -37,7 +37,7 @@ export function PaceStatTile({
 
   return (
     <div
-      className={`group relative flex flex-col justify-between overflow-hidden rounded-md border border-neutral-200 bg-white p-4.5 shadow-xs transition hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-700 sm:p-5 ${className}`}
+      className={`group relative flex flex-col justify-between overflow-hidden rounded-md border border-neutral-200 bg-white p-4.5 shadow-xs transition hover:border-neutral-300 dark:border-white/[0.08] dark:bg-[#09090b] dark:shadow-none dark:hover:border-white/20 sm:p-5 ${className}`}
     >
       {/* Top Header: Subtle Title with optional mini icon */}
       <div className="flex items-center justify-between gap-2">

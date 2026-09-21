@@ -7,14 +7,16 @@ import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import CodeIcon from '@hugeicons/core-free-icons/CodeIcon';
 import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
-import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import RocketIcon from '@hugeicons/core-free-icons/Rocket01Icon';
 import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
 import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import TerminalIcon from '@hugeicons/core-free-icons/TerminalIcon';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { LandingHero } from '@/components/landing/LandingHero';
+import { LandingArchitectureCards } from '@/components/landing/LandingArchitectureCards';
 import { LandingApiFlow } from '@/components/LandingApiFlow';
 import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
+import { LandingScrollCapabilities } from '@/components/landing/LandingScrollCapabilities';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 import { TrustedTeamsSection } from '@/components/TrustedTeams';
 
@@ -130,7 +132,7 @@ export default function Page() {
   };
 
   return (
-    <main className="traceiq-site min-h-screen overflow-hidden bg-background text-foreground">
+    <main className="traceiq-site min-h-screen bg-background text-foreground">
       <div className="site-noise" aria-hidden="true" />
 
       {/* Floating Header */}
@@ -160,13 +162,11 @@ export default function Page() {
       {/* Trusted by teams */}
       <TrustedTeamsSection />
 
-      {/* Metrics */}
-      <section className="metrics mx-auto grid max-w-[1060px] grid-cols-1 border-y border-border px-5 py-6 sm:grid-cols-3 sm:px-0 sm:py-7" aria-label="TraceIQ deployment properties">
-        {metrics.map(([value, label]) => <div className="metric" key={label}><strong>{value}</strong><span>{label}</span></div>)}
-      </section>
+      {/* Full-width white background section with architecture images & captions */}
+      <LandingArchitectureCards />
 
       {/* Product preview */}
-      <section className="traceiq-frame mx-auto max-w-[1200px] px-5 py-24 sm:px-8 lg:py-36" id="product">
+      <section className="traceiq-frame mx-auto w-full max-w-[1880px] px-6 sm:px-10 lg:px-14 xl:px-20 2xl:px-24 py-24 sm:py-28 lg:py-36" id="product">
         <div className="section-kicker">01 / Inside TraceIQ</div>
         <div className="intro-grid">
           <h2>Traffic, behavior, and health.<br /><em>One inspectable view.</em></h2>
@@ -179,8 +179,23 @@ export default function Page() {
           <LandingOverviewDemo />
           <p className="product-shot-caption">See product behavior, system health, and incoming activity in one place.</p>
         </div>
+      </section>
 
-        <div className="product-detail">
+      {/* Full-bleed Editorial Photographic Break */}
+      <section className="relative w-full h-[70vh] sm:h-[85vh] lg:h-[95vh] min-h-[500px] overflow-hidden bg-black select-none" aria-hidden="true">
+        <img
+          src="/landing/editorial-office.png"
+          alt="Engineering architecture and workspace"
+          className="w-full h-full object-cover object-center"
+          loading="lazy"
+        />
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#050505] via-[#050505]/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent pointer-events-none" />
+      </section>
+
+      {/* API performance */}
+      <section className="traceiq-frame mx-auto w-full max-w-[1880px] px-6 sm:px-10 lg:px-14 xl:px-20 2xl:px-24 py-24 sm:py-28 lg:py-36" id="performance">
+        <div className="product-detail mt-0">
           <div className="product-detail-copy">
             <span className="product-detail-label">API performance</span>
             <h3>Follow every request through the stack.</h3>
@@ -294,7 +309,7 @@ export default function Page() {
             <div className="flex items-center justify-between px-5 py-4 border-t border-border">
               <span className="text-xs text-zinc-500 font-mono">SDK simulation ready.</span>
               <button onClick={simulateSDKEvent} className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-50 px-4 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-200 active:scale-95">
-                <HugeiconsIcon icon={FlashIcon} size={14} /> Fire event
+                Fire event  <HugeiconsIcon icon={RocketIcon} size={14} />
               </button>
             </div>
           </div>
@@ -333,24 +348,8 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-32" id="solutions">
-        <div className="section-kicker">05 / Core capabilities</div>
-        <div className="feature-heading">
-          <h2>Every signal,<br /><em>in focus.</em></h2>
-          <p>The core workflows already available today—from acquisition and journeys to application health and controlled collaboration.</p>
-        </div>
-        <div className="feature-grid">
-          {[
-            ['01', 'Web analytics', 'Realtime visitors, pages, referrers, browsers, operating systems, UTM campaigns, goals, Web Vitals, and reusable filters.'],
-            ['02', 'Funnels and journeys', 'Measure conversion and retention, then inspect real session-to-session page transitions instead of illustrative paths.'],
-            ['03', 'Users and cohorts', 'Connect anonymous activity to identified users, inspect chronological timelines, and reuse behavioral cohorts.'],
-            ['04', 'Errors and API health', 'Group exceptions, inspect affected users, and rank endpoints by traffic, error rate, average latency, and p95 latency.'],
-            ['05', 'Flags and alerts', 'Run deterministic rollouts, target segments, attach remote configuration, and notify teams through email or webhooks.'],
-            ['06', 'Share and export', 'Create permission-scoped public dashboards, forward signed events, or export your raw data as CSV and JSON.']
-          ].map(([number, title, body]) => <article className="feature-card" key={title}><span className="card-number">{number}</span><h3>{title}</h3><p>{body}</p></article>)}
-        </div>
-      </section>
+      {/* Core Capabilities - Fullscreen Scroll Experience */}
+      <LandingScrollCapabilities />
 
       {/* Workflow */}
       <section className="traceiq-frame section mx-auto grid max-w-[1060px] gap-12 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:gap-20 lg:py-36" id="resources">

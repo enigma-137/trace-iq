@@ -188,10 +188,10 @@ export function SvgNodeFlowGraph({
   const maxVolume = Math.max(...paths.map((path) => path.volume ?? 0), 1);
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-2xl ${className}`}>
+    <div className={`relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm dark:border-white/[0.08] dark:bg-[#000000] dark:text-zinc-100 ${className}`}>
       {/* Header */}
       {(title || subtitle) && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-4 dark:border-slate-800/80">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-4 dark:border-white/[0.08]">
           <div>
             {title && (
               <div className="flex items-center gap-2.5">
@@ -200,20 +200,20 @@ export function SvgNodeFlowGraph({
               </div>
             )}
             {subtitle && (
-              <p className="mt-1 text-xs font-mono text-neutral-500 dark:text-slate-400">
+              <p className="mt-1 text-xs font-mono text-neutral-500 dark:text-zinc-400">
                 {subtitle}
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-mono text-neutral-600 dark:text-slate-400">
-            <span className="rounded bg-neutral-100 px-2.5 py-1 border border-neutral-200 text-neutral-700 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300">
+          <div className="flex items-center gap-4 text-xs font-mono text-neutral-600 dark:text-zinc-400">
+            <span className="rounded bg-neutral-100 px-2.5 py-1 border border-neutral-200 text-neutral-700 dark:bg-zinc-900 dark:border-white/[0.08] dark:text-zinc-300">
               <strong className="text-neutral-900 dark:text-white">{columns.length}</strong> layers
             </span>
-            <span className="rounded bg-neutral-100 px-2.5 py-1 border border-neutral-200 text-neutral-700 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300">
+            <span className="rounded bg-neutral-100 px-2.5 py-1 border border-neutral-200 text-neutral-700 dark:bg-zinc-900 dark:border-white/[0.08] dark:text-zinc-300">
               <strong className="text-neutral-900 dark:text-white">{totalNodes}</strong> nodes
             </span>
-            <span className="rounded bg-neutral-100 px-2.5 py-1 border border-neutral-200 text-neutral-700 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300">
+            <span className="rounded bg-neutral-100 px-2.5 py-1 border border-neutral-200 text-neutral-700 dark:bg-zinc-900 dark:border-white/[0.08] dark:text-zinc-300">
               <strong className="text-cyan-600 dark:text-cyan-400">{totalConnections}</strong> dynamic flows
             </span>
           </div>
@@ -243,8 +243,8 @@ export function SvgNodeFlowGraph({
               <stop offset="100%" stopColor="#10b981" stopOpacity="1" />
             </linearGradient>
             <linearGradient id={`flow-grad-neutral-${filterId}`} x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="#64748b" stopOpacity="0.8" />
+              <stop offset="0%" stopColor="#a1a1aa" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#71717a" stopOpacity="0.8" />
             </linearGradient>
 
             {/* Glow Filters */}
@@ -323,17 +323,17 @@ export function SvgNodeFlowGraph({
           })}
         </svg>
 
-        {/* Card Columns Layout */}
-        <div className="svg-node-flow-columns relative z-20 grid h-full gap-8 md:grid-flow-col md:auto-cols-[clamp(190px,19vw,320px)] md:justify-between md:gap-10">
+        {/* Card Columns Layout - Stretched Responsive Grid */}
+        <div className="svg-node-flow-columns relative z-20 grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 xl:gap-10">
           {columns.map((col) => (
-            <div key={col.id} className="flex flex-col gap-3">
+            <div key={col.id} className="flex flex-col gap-3 min-w-0">
               {/* Column Header */}
-              <div className="mb-1 border-b border-neutral-200 pb-2 dark:border-slate-800/80">
-                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-slate-400">
+              <div className="mb-1 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
+                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-zinc-400">
                   {col.title}
                 </span>
                 {col.subtitle && (
-                  <p className="text-[11px] font-mono text-neutral-400 dark:text-slate-500">{col.subtitle}</p>
+                  <p className="text-[11px] font-mono text-neutral-400 dark:text-zinc-500 truncate">{col.subtitle}</p>
                 )}
               </div>
 
@@ -357,22 +357,22 @@ export function SvgNodeFlowGraph({
                       onMouseLeave={() => setHoveredNodeId(null)}
                       className={`group relative flex flex-col justify-between rounded-lg border p-3.5 transition-all duration-200 cursor-pointer ${
                         isHovered
-                          ? 'border-cyan-500 bg-white shadow-lg shadow-cyan-500/10 scale-[1.02] z-30 dark:border-cyan-400/80 dark:bg-slate-900 dark:shadow-cyan-950/40'
+                          ? 'border-emerald-500 bg-white shadow-lg shadow-emerald-500/10 scale-[1.02] z-30 dark:border-white/30 dark:bg-zinc-900 dark:shadow-2xl'
                           : isDimmed || isFiltered
-                          ? 'border-neutral-200/40 bg-neutral-50/40 opacity-30 dark:border-slate-800/40 dark:bg-slate-950/60'
-                          : 'border-neutral-200/90 bg-neutral-50/70 hover:border-neutral-300 hover:bg-neutral-100/90 dark:border-slate-800/80 dark:bg-slate-900/80 dark:hover:border-slate-700 dark:hover:bg-slate-900'
+                          ? 'border-neutral-200/40 bg-neutral-50/40 opacity-25 dark:border-white/[0.04] dark:bg-zinc-950/40'
+                          : 'border-neutral-200/90 bg-neutral-50/70 hover:border-neutral-300 hover:bg-neutral-100/90 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:hover:border-white/[0.16] dark:hover:bg-zinc-800/80'
                       }`}
                     >
                       {/* Top bar: Status dot & Count badge */}
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className={`h-2 w-2 rounded-full ${theme.dot} ${isHovered ? 'animate-ping' : ''}`} />
-                          <span className="truncate font-mono text-xs font-semibold text-neutral-800 group-hover:text-neutral-900 dark:text-slate-200 dark:group-hover:text-white">
+                          <span className="truncate font-mono text-xs font-semibold text-neutral-800 group-hover:text-neutral-900 dark:text-zinc-200 dark:group-hover:text-white">
                             {node.title}
                           </span>
                         </div>
                         {node.countBadge !== undefined && (
-                          <span className="shrink-0 rounded bg-neutral-200/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-neutral-700 border border-neutral-300/60 dark:bg-slate-800/90 dark:text-slate-300 dark:border-slate-700/50">
+                          <span className="shrink-0 rounded bg-neutral-200/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-neutral-700 border border-neutral-300/60 dark:bg-zinc-800/90 dark:text-zinc-300 dark:border-white/[0.08]">
                             {node.countBadge}
                           </span>
                         )}
@@ -380,24 +380,24 @@ export function SvgNodeFlowGraph({
 
                       {/* Description / Meta */}
                       {node.description && (
-                        <p className="text-[11px] text-neutral-500 dark:text-slate-400 line-clamp-2 mb-1 font-sans">
+                        <p className="text-[11px] text-neutral-500 dark:text-zinc-400 line-clamp-2 mb-1 font-sans">
                           {node.description}
                         </p>
                       )}
 
                       {/* Footer tags / status pill */}
                       {(node.tags || node.meta) && (
-                        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-neutral-400 dark:text-slate-500">
+                        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-neutral-400 dark:text-zinc-500">
                           {node.tags && (
                             <div className="flex flex-wrap gap-1">
                               {node.tags.map((tag, i) => (
-                                <span key={i} className="rounded bg-white px-1.5 py-0.5 text-neutral-600 border border-neutral-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800/60">
+                                <span key={i} className="rounded bg-white px-1.5 py-0.5 text-neutral-600 border border-neutral-200 dark:bg-zinc-950 dark:text-zinc-400 dark:border-white/[0.08]">
                                   {tag}
                                 </span>
                               ))}
                             </div>
                           )}
-                          {node.meta && <span className="ml-auto text-neutral-500 dark:text-slate-400">{node.meta}</span>}
+                          {node.meta && <span className="ml-auto text-neutral-500 dark:text-zinc-400">{node.meta}</span>}
                         </div>
                       )}
                     </div>
@@ -411,9 +411,9 @@ export function SvgNodeFlowGraph({
 
       {/* Legend & Filter Footer */}
       {legends && legends.length > 0 && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-4 text-xs font-mono text-neutral-600 dark:border-slate-800/80 dark:text-slate-400">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-4 text-xs font-mono text-neutral-600 dark:border-white/[0.08] dark:text-zinc-400">
           <div className="flex flex-wrap items-center gap-4">
-            <span className="font-semibold uppercase tracking-wider text-[11px] text-neutral-500 dark:text-slate-500">Legend:</span>
+            <span className="font-semibold uppercase tracking-wider text-[11px] text-neutral-500 dark:text-zinc-500">Legend:</span>
             {legends.map((item) => {
               const theme = STATUS_COLORS[item.status] || STATUS_COLORS.neutral;
               const isActive = activeFilterStatus === item.status;
@@ -424,8 +424,8 @@ export function SvgNodeFlowGraph({
                   onClick={() => setActiveFilterStatus(isActive ? null : item.status)}
                   className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 transition border ${
                     isActive
-                      ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-slate-800 dark:text-white dark:border-cyan-500/50'
-                      : 'hover:bg-neutral-100 border-transparent text-neutral-600 dark:hover:bg-slate-900 dark:text-slate-400'
+                      ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-zinc-800 dark:text-white dark:border-white/20'
+                      : 'hover:bg-neutral-100 border-transparent text-neutral-600 dark:hover:bg-zinc-900 dark:text-zinc-400'
                   }`}
                   title={item.description}
                 >
@@ -436,7 +436,7 @@ export function SvgNodeFlowGraph({
             })}
           </div>
 
-          <div className="text-[11px] text-neutral-400 dark:text-slate-500 italic">
+          <div className="text-[11px] text-neutral-400 dark:text-zinc-500 italic">
             * Hover over nodes to inspect dynamic data flow
           </div>
         </div>

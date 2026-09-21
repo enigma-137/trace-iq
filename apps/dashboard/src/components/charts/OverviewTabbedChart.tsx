@@ -63,30 +63,30 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
 
   return (
     <div
-      className={`flex flex-col justify-between overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}
+      className={`flex flex-col justify-between overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-xs dark:border-white/[0.08] dark:bg-[#09090b] dark:shadow-none ${className}`}
     >
       <div>
         {/* Header with Title and Tabs */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-neutral-100 dark:border-white/[0.08]">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200">
               <HugeiconsIcon icon={ChartBarLineIcon} size={16} />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Observability & Ingestion Trends</h3>
-              <p className="text-xs text-neutral-500 dark:text-slate-400">14-day stream volume and activity breakdown</p>
+              <p className="text-xs text-neutral-500 dark:text-zinc-400">14-day stream volume and activity breakdown</p>
             </div>
           </div>
 
           {/* Tab Pill Switcher */}
-          <div className="inline-flex rounded-md border border-neutral-200 bg-neutral-100/70 p-0.5 text-xs dark:border-slate-800 dark:bg-slate-950/60">
+          <div className="inline-flex rounded-md border border-neutral-200 bg-neutral-100/70 p-0.5 text-xs dark:border-white/[0.08] dark:bg-black/60">
             <button
               type="button"
               onClick={() => setActiveTab('all')}
               className={`rounded px-2.5 py-1 font-medium transition ${
                 activeTab === 'all'
-                  ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-white text-neutral-900 shadow-xs dark:bg-white/[0.1] dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               All Series
@@ -96,8 +96,8 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
               onClick={() => setActiveTab('events')}
               className={`rounded px-2.5 py-1 font-medium transition ${
                 activeTab === 'events'
-                  ? 'bg-white text-blue-600 shadow-xs dark:bg-slate-800 dark:text-blue-400'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-white text-blue-600 shadow-xs dark:bg-white/[0.1] dark:text-blue-400'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               Events
@@ -107,8 +107,8 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
               onClick={() => setActiveTab('api')}
               className={`rounded px-2.5 py-1 font-medium transition ${
                 activeTab === 'api'
-                  ? 'bg-white text-emerald-600 shadow-xs dark:bg-slate-800 dark:text-emerald-400'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-white text-emerald-600 shadow-xs dark:bg-white/[0.1] dark:text-emerald-400'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               API Load
@@ -118,8 +118,8 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
               onClick={() => setActiveTab('errors')}
               className={`rounded px-2.5 py-1 font-medium transition ${
                 activeTab === 'errors'
-                  ? 'bg-white text-rose-600 shadow-xs dark:bg-slate-800 dark:text-rose-400'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-white text-rose-600 shadow-xs dark:bg-white/[0.1] dark:text-rose-400'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               Errors

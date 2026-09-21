@@ -29,7 +29,7 @@ export function TopEventsList({ events }: TopEventsListProps) {
             </span>
             <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400">{event.total.toLocaleString()}</span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-white/[0.08]">
             <div
               className="h-full rounded-full bg-blue-500"
               style={{ width: `${(event.total / maxTotal) * 100}%` }}
