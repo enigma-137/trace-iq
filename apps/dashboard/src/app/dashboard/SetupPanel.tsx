@@ -205,13 +205,13 @@ export function SetupPanel({
       setSetup((current) =>
         current && current.project
           ? {
-              ...current,
-              project: {
-                ...current.project,
-                name: updated.name ?? trimmed,
-                slug: updated.slug ?? current.project.slug
-              }
+            ...current,
+            project: {
+              ...current.project,
+              name: updated.name ?? trimmed,
+              slug: updated.slug ?? current.project.slug
             }
+          }
           : current
       );
       setIsEditingProjectName(false);
@@ -258,13 +258,13 @@ export function SetupPanel({
       setSetup((current) =>
         current && current.organization
           ? {
-              ...current,
-              organization: {
-                ...current.organization,
-                name: updated.name ?? trimmed,
-                slug: updated.slug ?? current.organization.slug
-              }
+            ...current,
+            organization: {
+              ...current.organization,
+              name: updated.name ?? trimmed,
+              slug: updated.slug ?? current.organization.slug
             }
+          }
           : current
       );
       setIsEditingOrgName(false);
@@ -304,13 +304,13 @@ export function SetupPanel({
       setSetup((current) =>
         current
           ? {
-              ...current,
-              writeKey: {
-                prefix: data.prefix ?? 'trq_live_',
-                value: data.value
-              },
-              sdkSnippet: data.sdkSnippet ?? current.sdkSnippet
-            }
+            ...current,
+            writeKey: {
+              prefix: data.prefix ?? 'trq_live_',
+              value: data.value
+            },
+            sdkSnippet: data.sdkSnippet ?? current.sdkSnippet
+          }
           : current
       );
       setRevealedWriteKey(data.value);
@@ -428,11 +428,10 @@ export function SetupPanel({
     <section className="grid gap-6" aria-labelledby="overview-title">
       {status ? (
         <p
-          className={`rounded-md border px-3.5 py-2.5 text-sm ${
-            status.tone === 'success'
-              ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-              : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-          }`}
+          className={`rounded-md border px-3.5 py-2.5 text-sm ${status.tone === 'success'
+            ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+            : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+            }`}
         >
           {status.message}
         </p>
@@ -526,10 +525,10 @@ export function SetupPanel({
           {/* SECTION 1: ORGANIZATION SETTINGS (At the very top) */}
           <div className="grid gap-3 pt-2" aria-labelledby="org-overview-title">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Organization</p>
-              <h2 id="org-overview-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+              <p className="text-[11px] mt-4 font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Organization</p>
+              {/* <h2 id="org-overview-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
                 Organization Settings
-              </h2>
+              </h2> */}
               <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
                 Overall account and team workspace managing all projects, members, and billing.
               </p>
@@ -724,8 +723,8 @@ export function SetupPanel({
                       {setup?.writeKey?.value
                         ? setup.writeKey.value
                         : setup?.writeKey?.prefix
-                        ? `${setup.writeKey.prefix}••••••••••••••••`
-                        : 'trq_live_••••••••••••••••••••'}
+                          ? `${setup.writeKey.prefix}••••••••••••••••`
+                          : 'trq_live_••••••••••••••••••••'}
                     </p>
                     <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
                       Secret token used to authenticate event telemetry. Masked for security.
@@ -1026,9 +1025,8 @@ function CopyButton({ value, label, compact = false }: { value: string; label: s
 
   return (
     <button
-      className={`rounded-md border border-neutral-200 bg-white font-semibold text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white ${
-        compact ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-xs'
-      }`}
+      className={`rounded-md border border-neutral-200 bg-white font-semibold text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white ${compact ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-xs'
+        }`}
       type="button"
       onClick={handleCopy}
     >
