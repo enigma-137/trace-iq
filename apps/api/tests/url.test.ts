@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { assertSafeFetchUrl } from '../src/common/url';
+import { assertDnsSafeUrl, assertSafeFetchUrl } from '../src/common/url';
 
 describe('assertSafeFetchUrl (SSRF protection)', () => {
   it('accepts public https URLs', () => {
@@ -60,5 +60,13 @@ describe('assertSafeFetchUrl (SSRF protection)', () => {
 
   it('allows public IPv6 addresses', () => {
     expect(assertSafeFetchUrl('http://[2606:4700:4700::1111]/')).toBe('http://[2606:4700:4700::1111]/');
+  });
+});
+
+describe('assertDnsSafeUrl (DNS SSRF resolution)', () => {
+  it('accepts domains that resolve to public IPs', async () => {
+    const url = 'https://example.com/webhook';
+    const result = await assertDnsSafeUrl(url);
+    expect(result).toBe(url);
   });
 });

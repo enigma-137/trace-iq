@@ -14,6 +14,6 @@ import { OrganizationsSwitcherController } from './organizations.switcher.contro
   imports: [AuthModule, EmailsModule],
   controllers: [OrganizationsController, MembersController, InvitesController, AuditController, OrganizationsSwitcherController],
   providers: [OrganizationsService, InvitesService, AuditService],
-  exports: [OrganizationsService]
+  exports: [OrganizationsService, AuditService]
 })
 export class OrganizationsModule {}

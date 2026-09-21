@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { EntitlementService } from '../billing/entitlement.service';
+import { AuditService } from '../organizations/audit.service';
 
 export type ResolvedProject = {
   id: string;
@@ -12,11 +13,16 @@ export type ResolvedProject = {
   role: string;
 };
 
+export interface RenameProjectRequest {
+  name: string;
+}
+
 @Injectable()
 export class ProjectsService {
   constructor(
     private readonly database: DatabaseService,
-    private readonly entitlements: EntitlementService = new EntitlementService(database)
+    private readonly entitlements: EntitlementService = new EntitlementService(database),
+    @Optional() private readonly audit?: AuditService
   ) {}
 
   async listAccessibleProjects(user: DashboardUser) {
@@ -105,6 +111,139 @@ export class ProjectsService {
     await this.entitlements.assertProjectWritable(project.id);
     await this.entitlements.assertMemberWritable(project.organizationId, user.id);
     return project;
+  }
+
+  /**
+   * Renames an existing project. Requires owner or admin permissions on the organization.
+   * Project ID and slug remain immutable to preserve integration stability.
+   */
+  async renameProject(user: DashboardUser, projectId: string, newNameInput: string) {
+    const project = await this.requireWritableProject(user, projectId);
+
+    if (!['owner', 'admin'].includes(project.role)) {
+      throw new ForbiddenException('Only owners and admins can rename projects.');
+    }
+
+    const trimmed = typeof newNameInput === 'string' ? newNameInput.trim() : '';
+    if (!trimmed) {
+      throw new BadRequestException('Project name cannot be empty.');
+    }
+    if (trimmed.length > 80) {
+      throw new BadRequestException('Project name must be 80 characters or fewer.');
+    }
+
+    const oldName = project.name;
+    await this.database.query(
+      `
+        UPDATE projects
+        SET name = $2, updated_at = now()
+        WHERE id = $1
+      `,
+      [project.id, trimmed]
+    );
+
+    await this.audit?.record({
+      organizationId: project.organizationId,
+      actorUserId: user.id,
+      action: 'project.renamed',
+      metadata: {
+        projectId: project.id,
+        oldName,
+        newName: trimmed
+      }
+    });
+
+    return {
+      project: {
+        id: project.id,
+        name: trimmed,
+        slug: project.slug,
+        organizationId: project.organizationId
+      }
+    };
+  }
+
+  /**
+   * Permanently deletes a project and all associated project-scoped data.
+   * Requires owner or admin permissions on the parent organization.
+   */
+  async deleteProject(user: DashboardUser, projectId: string) {
+    const project = await this.requireWritableProject(user, projectId);
+
+    if (!['owner', 'admin'].includes(project.role)) {
+      throw new ForbiddenException('Only owners and admins can delete projects.');
+    }
+
+    await this.database.transaction(async (client) => {
+      // 1. Clean up replay chunks and replays (which have ON DELETE RESTRICT on projects/sessions)
+      await client.query(
+        `
+          DELETE FROM replay_chunks
+          WHERE replay_id IN (
+            SELECT id FROM session_replays WHERE project_id = $1
+          )
+        `,
+        [project.id]
+      );
+
+      await client.query(
+        `DELETE FROM session_replay_funnels WHERE project_id = $1`,
+        [project.id]
+      );
+
+      await client.query(
+        `DELETE FROM replay_setting_funnels WHERE project_id = $1`,
+        [project.id]
+      );
+
+      await client.query(
+        `DELETE FROM session_replays WHERE project_id = $1`,
+        [project.id]
+      );
+
+      await client.query(
+        `DELETE FROM replay_settings WHERE project_id = $1`,
+        [project.id]
+      );
+
+      // 2. Delete the project row (all other tables cascade automatically: events, users, sessions,
+      // feature_flags, webhooks, dashboards, alerts, cohorts, funnels, project_write_keys, etc.)
+      const result = await client.query(
+        `DELETE FROM projects WHERE id = $1 AND organization_id = $2`,
+        [project.id, project.organizationId]
+      );
+
+      if (result.rowCount === 0) {
+        throw new NotFoundException('Project not found or already deleted.');
+      }
+    });
+
+    await this.audit?.record({
+      organizationId: project.organizationId,
+      actorUserId: user.id,
+      action: 'project.deleted',
+      metadata: {
+        projectId: project.id,
+        projectName: project.name
+      }
+    });
+
+    // Fetch remaining accessible projects in the same organization
+    const remainingResult = await this.database.query<{ id: string; name: string; slug: string }>(
+      `
+        SELECT id, name, slug
+        FROM projects
+        WHERE organization_id = $1
+        ORDER BY created_at ASC
+      `,
+      [project.organizationId]
+    );
+
+    return {
+      deleted: true,
+      projectId: project.id,
+      remainingProjects: remainingResult.rows
+    };
   }
 
   private optionalString(value: unknown): string | undefined {

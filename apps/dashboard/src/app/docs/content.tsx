@@ -1097,42 +1097,92 @@ app.use(traceiq.middleware({
     return (
       <Section id="webhooks" title="Webhooks">
         <P>
-          Forward events to another system the moment they land — a data-warehouse loader, an ops tool, a Slack
-          relay. Add a webhook under{' '}
+          TraceIQ Webhooks forward events in real time to external HTTP endpoints as JSON payloads.
+          Manage endpoints, monitor deliveries, inspect failure logs, and test endpoints from the{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/webhooks">
             Webhooks
-          </a>
-          : a URL, an optional signing secret, and either all events or a chosen list. Delivery is best-effort and
-          never blocks or slows down ingestion.
+          </a>{' '}
+          page.
         </P>
-        <P>Each delivery is a JSON <Mono>POST</Mono> with this body:</P>
-        <Code lang="json">{`{
-  "webhookId": "whk_…",
-  "event": "purchase",
-  "eventId": "evt_…",
-  "userId": "user_123",
-  "anonymousId": null,
-  "sessionId": "sess_1",
-  "properties": { "amount": 50000, "currency": "NGN" },
-  "occurredAt": "2026-07-18T10:00:00.000Z",
-  "deliveredAt": "2026-07-18T10:00:00.400Z"
-}`}</Code>
-        <P>
-          If you set a secret, every request carries an <Mono>x-traceiq-signature</Mono> header so you can confirm
-          it came from TraceIQ and wasn&apos;t tampered with — an HMAC-SHA256 of the raw request body:
-        </P>
-        <Code lang="ts">{`// Node.js — verify the signature
-import { createHmac, timingSafeEqual } from 'node:crypto';
 
-function verify(rawBody, header, secret) {
-  const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex');
-  const a = Buffer.from(header ?? '');
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}`}</Code>
+        <P><strong>Request Headers</strong></P>
+        <P>Every webhook POST request includes standard metadata headers and an HMAC-SHA256 signature:</P>
+        <Bullets
+          items={[
+            ['X-TraceIQ-Event', 'The name of the event being delivered (e.g. order_completed, $identify).'],
+            ['X-TraceIQ-Delivery-ID', 'Unique UUID for this specific delivery attempt.'],
+            ['X-TraceIQ-Timestamp', 'Unix timestamp in seconds when the webhook was signed.'],
+            ['X-TraceIQ-Signature', 'HMAC-SHA256 signature in format "sha256=<hex_digest>" computed over `${timestamp}.${rawBody}`.'],
+            ['User-Agent', 'TraceIQ-Webhooks/2.0']
+          ]}
+        />
+
+        <P><strong>Verifying Signatures</strong></P>
         <P>
-          Use <Mono>Test</Mono> on any webhook to send a sample <Mono>traceiq.webhook.test</Mono> payload and see
-          the response code. Recent deliveries (and failures) are logged on the Webhooks page.
+          To prevent replay attacks and verify authenticity, always verify the signature against the raw request body and timestamp before processing.
+        </P>
+
+        <P><strong>Node.js (Express / Fastify):</strong></P>
+        <Code lang="ts">{`import crypto from 'crypto';
+
+export function verifyWebhook(rawBody: string, signatureHeader: string, timestampHeader: string, secret: string) {
+  const [scheme, signature] = signatureHeader.split('=');
+  if (scheme !== 'sha256' || !signature) return false;
+
+  // Prevent replay attacks (tolerance: 5 minutes)
+  const timestamp = parseInt(timestampHeader, 10);
+  if (isNaN(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) {
+    return false;
+  }
+
+  const payloadToSign = \`\${timestampHeader}.\${rawBody}\`;
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payloadToSign)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex')
+  );
+}`}</Code>
+
+        <P><strong>Python (FastAPI / Flask):</strong></P>
+        <Code lang="python">{`import hmac
+import hashlib
+import time
+
+def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str, secret: str) -> bool:
+    try:
+        scheme, signature = signature_header.split('=', 1)
+        if scheme != 'sha256':
+            return False
+        
+        # Check timestamp freshness (5 minutes tolerance)
+        ts = int(timestamp_header)
+        if abs(time.time() - ts) > 300:
+            return False
+            
+        payload = f"{timestamp_header}.".encode('utf-8') + raw_body
+        expected = hmac.new(secret.encode('utf-8'), payload, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(signature, expected)
+    except Exception:
+        return False`}</Code>
+
+        <P><strong>Retry Policy</strong></P>
+        <P>
+          Deliveries timeout after 10 seconds. On transient failures (HTTP 408, 425, 429, 500, 502, 503, 504, or connection timeouts), TraceIQ automatically retries up to 5 times with exponential backoff:
+        </P>
+        <Bullets
+          items={[
+            ['Attempt 1 → 2', '~60 seconds'],
+            ['Attempt 2 → 3', '~5 minutes'],
+            ['Attempt 3 → 4', '~30 minutes'],
+            ['Attempt 4 → 5', '~2 hours']
+          ]}
+        />
+        <P>
+          Client errors (400, 401, 403, 404, 422) are treated as permanent failures and will not be retried automatically. You can always manually retry any delivery from the webhook detail drawer.
         </P>
       </Section>
     );
@@ -1186,9 +1236,7 @@ function verify(rawBody, header, secret) {
       <Section id="features" title="Feature guide">
         <Bullets
           items={[
-            ['Events', 'Live stream of raw events; expand a row for the full payload (properties, device, network, context).'],
-            ['Insights', 'Trend any event over time (hourly/daily/weekly), broken down by a property or dimension (os, country, …). Supports measures — count, unique users, sum/avg of a numeric property like amount.'],
-            ['Dashboards', 'Saved Insights views you pin and open side-by-side — mine/shared, with free-form date ranges that drive the comparison window.'],
+            ['Insights', 'Event counts, unique users, sums, averages, and conversion funnels over customizable date ranges.'],
             ['Funnels', 'Ordered-event conversion with per-step drop-off; click a step to see who reached it or dropped off.'],
             ['Retention', 'Weekly cohort × week-offset grid — of the people who did something in a week, how many came back in later weeks. The core "is it sticky?" view.'],
             ['Cohorts', 'Saved groups of users defined by the events they did (or didn’t) do, reusable as filters across the product.'],

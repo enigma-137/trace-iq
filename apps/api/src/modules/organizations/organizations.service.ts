@@ -31,6 +31,12 @@ export interface AddMemberRequestBody {
   role?: MemberRole;
 }
 
+export interface AddMemberRequest {
+  userId: string;
+  email?: string;
+  role?: MemberRole;
+}
+
 export interface UpdateMemberRoleRequestBody {
   role?: MemberRole;
 }
@@ -287,9 +293,9 @@ export class OrganizationsService {
     });
   }
 
-  async regenerateWriteKey(user: DashboardUser) {
+  async regenerateWriteKey(user: DashboardUser, projectId?: string) {
     const transaction = await this.database.transaction(async (client) => {
-      const existing = await this.getExistingSetup(client, user);
+      const existing = await this.getExistingSetup(client, user, undefined, projectId);
 
       if (!existing.organization || !existing.project) {
         throw new BadRequestException('Create an organization and project before regenerating a write key.');
@@ -338,15 +344,15 @@ export class OrganizationsService {
     return transaction;
   }
 
-  async renameOrganization(user: DashboardUser, input: BootstrapSetupRequest) {
+  async renameOrganization(user: DashboardUser, input: BootstrapSetupRequest, organizationId?: string) {
     const organizationName = this.cleanName(input.organizationName, '');
 
     if (!organizationName) {
       throw new BadRequestException('Organization name is required.');
     }
 
-    return this.database.transaction(async (client) => {
-      const existing = await this.getExistingSetup(client, user);
+    const transaction = await this.database.transaction(async (client) => {
+      const existing = await this.getExistingSetup(client, user, organizationId);
 
       if (!existing.organization) {
         throw new BadRequestException('Create an organization before renaming it.');
@@ -357,6 +363,8 @@ export class OrganizationsService {
       }
 
       await this.entitlements.assertMemberWritable(existing.organization.id, user.id, client);
+
+      const oldName = existing.organization.name;
       await client.query(
         `
           UPDATE organizations
@@ -370,16 +378,28 @@ export class OrganizationsService {
         organization: {
           ...existing.organization,
           name: organizationName
-        }
+        },
+        oldName
       };
     });
+
+    await this.audit?.record({
+      organizationId: transaction.organization.id,
+      actorUserId: user.id,
+      action: 'organization.renamed',
+      metadata: { oldName: transaction.oldName, newName: organizationName }
+    });
+
+    return {
+      organization: transaction.organization
+    };
   }
 
   async listMembers(user: DashboardUser) {
     const existing = await this.getExistingSetup(this.database, user);
 
     if (!existing.organization) {
-      throw new BadRequestException('Create an organization before managing members.');
+      throw new BadRequestException('Create an organization before viewing members.');
     }
 
     const result = await this.database.query<MemberRow>(
@@ -387,28 +407,23 @@ export class OrganizationsService {
         SELECT user_id, role, email, created_at
         FROM organization_members
         WHERE organization_id = $1
-        ORDER BY
-          CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
-          created_at ASC;
+        ORDER BY created_at ASC;
       `,
       [existing.organization.id]
     );
 
     return {
       organizationId: existing.organization.id,
-      members: result.rows.map((row) => ({
-        userId: row.user_id,
-        role: row.role,
-        email: row.email ?? null,
-        createdAt: row.created_at
-      }))
+      organizationName: existing.organization.name,
+      role: existing.organization.role,
+      members: result.rows.map((row) => this.toMember(row))
     };
   }
 
-  async addMember(user: DashboardUser, input: { userId: string; email: string; role?: MemberRole }) {
-    const role = this.normalizeRole(input.role ?? 'member');
+  async addMember(user: DashboardUser, input: AddMemberRequest, role?: MemberRole) {
+    const assignedRole = this.normalizeRole(role ?? input.role, 'member');
 
-    if (role === 'owner') {
+    if (assignedRole === 'owner') {
       throw new BadRequestException("Ownership is granted by changing an existing member's role, not by adding a member.");
     }
 
@@ -446,7 +461,7 @@ export class OrganizationsService {
           VALUES ($1, $2, $3, $4)
           RETURNING user_id, role, email, created_at;
         `,
-        [existing.organization.id, input.userId, role, input.email]
+        [existing.organization.id, input.userId, assignedRole, input.email]
       );
 
       const member = this.toMember(result.rows[0]);
@@ -626,8 +641,12 @@ export class OrganizationsService {
     return transaction;
   }
 
-  private normalizeRole(value: MemberRole | undefined): MemberRole {
-    if (!value || !['owner', 'admin', 'member'].includes(value)) {
+  private normalizeRole(value: MemberRole | undefined, fallback?: MemberRole): MemberRole {
+    if (!value) {
+      if (fallback) return fallback;
+      throw new BadRequestException('Role must be one of owner, admin, or member.');
+    }
+    if (!['owner', 'admin', 'member'].includes(value)) {
       throw new BadRequestException('Role must be one of owner, admin, or member.');
     }
 
@@ -751,8 +770,14 @@ export class OrganizationsService {
       .catch(() => undefined);
   }
 
-  private async getExistingSetup(client: QueryExecutor, user: DashboardUser, organizationId?: string) {
+  private async getExistingSetup(
+    client: QueryExecutor,
+    user: DashboardUser,
+    organizationId?: string,
+    projectId?: string
+  ) {
     const orgId = this.optionalString(organizationId);
+    const projId = this.optionalString(projectId);
     const result = await client.query<
       QueryResultRow & {
         organization_id: string;
@@ -778,10 +803,11 @@ export class OrganizationsService {
         LEFT JOIN projects p ON p.organization_id = o.id
         WHERE om.user_id = $1
           AND ($2::text IS NULL OR o.id = $2)
+          AND ($3::text IS NULL OR p.id = $3)
         ORDER BY o.created_at ASC, p.created_at ASC
         LIMIT 1;
       `,
-      [user.id, orgId ?? null]
+      [user.id, orgId ?? null, projId ?? null]
     );
 
     const row = result.rows[0];

@@ -1,6 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
+import { lookup } from 'node:dns/promises';
 
-const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', 'metadata.google.internal']);
+const BLOCKED_HOSTS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '0.0.0.0',
+  'metadata.google.internal',
+  'instance-data',
+  '169.254.169.254'
+]);
 
 const PRIVATE_BLOCKS: Array<{ network: string; prefix: number }> = [
   { network: '10.0.0.0', prefix: 8 },
@@ -42,7 +51,7 @@ function ipv4ToInt(ip: string): number {
   return ((parts[0] ?? 0) << 24) | ((parts[1] ?? 0) << 16) | ((parts[2] ?? 0) << 8) | (parts[3] ?? 0);
 }
 
-function isBlockedIpv4(ip: string): boolean {
+export function isBlockedIpv4(ip: string): boolean {
   const mapped = MAPPED_V6.exec(ip);
   const candidate = mapped ? mapped[1] : ip;
   const int = ipv4ToInt(candidate);
@@ -53,7 +62,7 @@ function isBlockedIpv4(ip: string): boolean {
   });
 }
 
-function isBlockedHostname(host: string): boolean {
+export function isBlockedHostname(host: string): boolean {
   const normalized = host.toLowerCase().replace(/\.$/, '');
 
   if (BLOCKED_HOSTS.has(normalized)) {
@@ -73,14 +82,25 @@ function isBlockedHostname(host: string): boolean {
   return false;
 }
 
+export function isBlockedIpAddress(ip: string): boolean {
+  const stripped = ip.replace(/^\[|\]$/g, '').toLowerCase();
+  if (stripped === '::1' || LINK_LOCAL_V6.test(stripped) || UNIQUE_LOCAL_V6.test(stripped)) {
+    return true;
+  }
+  if (stripped.includes(':')) {
+    const mapped = mappedV6ToIpv4(stripped);
+    if (mapped && isBlockedIpv4(mapped)) {
+      return true;
+    }
+    return false;
+  }
+  return isBlockedIpv4(stripped);
+}
+
 /**
- * Validates that a URL is safe for the server to fetch (SSRF protection).
+ * Validates that a URL is syntactically safe for the server to fetch (SSRF protection).
  * Rejects non-http(s) schemes, hostnames/IPs that resolve to private or
  * loopback space, and cloud metadata endpoints.
- *
- * NOTE: this blocks obvious private addresses at validation time. For strict
- * protection against DNS rebinding, the target IP must also be re-checked at
- * delivery time against the resolved address.
  */
 export function assertSafeFetchUrl(input: unknown, field = 'URL'): string {
   const raw = typeof input === 'string' ? input.trim() : '';
@@ -102,29 +122,43 @@ export function assertSafeFetchUrl(input: unknown, field = 'URL'): string {
     throw new BadRequestException(`${field} targets a private or reserved host and cannot be used.`);
   }
 
-  // URL.hostname keeps IPv6 literals bracketed (e.g. "[::1]"); drop the brackets
-  // before any address matching.
   const strippedHost = host.replace(/^\[|\]$/g, '');
-
   const isIp = /^[0-9a-f:.]+$/i.test(strippedHost);
-  if (isIp) {
-    if (strippedHost.includes(':')) {
-      const mappedIpv4 = mappedV6ToIpv4(strippedHost);
-      if (mappedIpv4) {
-        if (isBlockedIpv4(mappedIpv4)) {
-          throw new BadRequestException(`${field} targets a private or reserved address and cannot be used.`);
-        }
-      } else {
-        const stripped = strippedHost.toLowerCase();
-        if (stripped === '::1' || LINK_LOCAL_V6.test(stripped) || UNIQUE_LOCAL_V6.test(stripped)) {
-          throw new BadRequestException(`${field} targets a non-public address and cannot be used.`);
-        }
-        // Global unicast IPv6 addresses pass through.
-      }
-    } else if (isBlockedIpv4(strippedHost)) {
-      throw new BadRequestException(`${field} targets a private or reserved address and cannot be used.`);
-    }
+  if (isIp && isBlockedIpAddress(strippedHost)) {
+    throw new BadRequestException(`${field} targets a private or reserved address and cannot be used.`);
   }
 
   return raw;
+}
+
+/**
+ * Resolves the hostname via DNS at runtime and verifies that none of the
+ * resolved IPs belong to private or loopback ranges (DNS rebinding protection).
+ */
+export async function assertDnsSafeUrl(rawUrl: string, field = 'URL'): Promise<string> {
+  const validatedUrl = assertSafeFetchUrl(rawUrl, field);
+  const parsed = new URL(validatedUrl);
+  const host = parsed.hostname.replace(/^\[|\]$/g, '');
+
+  const isIp = /^[0-9a-f:.]+$/i.test(host);
+  if (isIp) {
+    if (isBlockedIpAddress(host)) {
+      throw new BadRequestException(`${field} targets a private or reserved address.`);
+    }
+    return validatedUrl;
+  }
+
+  try {
+    const addresses = await lookup(host, { all: true });
+    for (const { address } of addresses) {
+      if (isBlockedIpAddress(address)) {
+        throw new BadRequestException(`${field} resolved to a private or reserved address and cannot be delivered to.`);
+      }
+    }
+  } catch (err) {
+    if (err instanceof BadRequestException) throw err;
+    throw new BadRequestException(`${field} host could not be resolved.`);
+  }
+
+  return validatedUrl;
 }

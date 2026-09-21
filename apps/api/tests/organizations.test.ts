@@ -159,7 +159,7 @@ describe('OrganizationsService.createProjectForUser', () => {
     await service.createProjectForUser(user, { organizationId: 'org_2', projectName: 'Mobile' });
 
     const setup = db.queryCalls(/FROM organization_members om/);
-    expect(setup[0].values).toEqual(['user_1', 'org_2']);
+    expect(setup[0].values).toEqual(['user_1', 'org_2', null]);
   });
 });
 

@@ -36,19 +36,24 @@ export class OrganizationsController {
   @Patch('organization')
   async renameOrganization(
     @Body() body: BootstrapSetupRequest,
+    @Query('organizationId') organizationId?: string,
     @Headers('authorization') authorization?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireSupabaseSession(user);
-    return this.organizationsService.renameOrganization(user, body);
+    return this.organizationsService.renameOrganization(user, body, organizationId);
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('write-key/regenerate')
-  async regenerateWriteKey(@Headers('authorization') authorization?: string) {
+  async regenerateWriteKey(
+    @Query('projectId') projectId?: string,
+    @Body('projectId') bodyProjectId?: string,
+    @Headers('authorization') authorization?: string
+  ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireSupabaseSession(user);
     this.authService.requireStepUpIfEnrolled(user);
-    return this.organizationsService.regenerateWriteKey(user);
+    return this.organizationsService.regenerateWriteKey(user, projectId || bodyProjectId);
   }
 }

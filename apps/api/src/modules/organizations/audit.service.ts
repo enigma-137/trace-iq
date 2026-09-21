@@ -11,7 +11,11 @@ export type AuditAction =
   | 'invite.resend'
   | 'invite.cancelled'
   | 'invite.accepted'
-  | 'write_key.rotated';
+  | 'write_key.rotated'
+  | 'project.created'
+  | 'project.renamed'
+  | 'project.deleted'
+  | 'organization.renamed';
 
 export interface AuditEvent {
   organizationId: string;
