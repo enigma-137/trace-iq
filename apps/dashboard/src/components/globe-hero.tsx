@@ -56,16 +56,30 @@ function GlobeHeroFallback() {
   );
 }
 
+function createSafeRenderer(isSmallScreen: boolean): THREE.WebGLRenderer | null {
+  const attempts = [
+    { antialias: !isSmallScreen, alpha: true, powerPreference: 'default' as const },
+    { antialias: false, alpha: true, powerPreference: 'default' as const },
+    { antialias: false, alpha: true, precision: 'mediump' as const },
+    { antialias: false, alpha: true },
+    {},
+  ];
+
+  for (const opts of attempts) {
+    try {
+      return new THREE.WebGLRenderer(opts);
+    } catch {
+      // try next fallback option
+    }
+  }
+  return null;
+}
+
 export default function GlobeHero() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [webglSupported, setWebglSupported] = useState(true);
 
   useEffect(() => {
-    if (!isWebGLAvailable()) {
-      setWebglSupported(false);
-      return;
-    }
-
     const mount = mountRef.current;
     if (!mount) return;
 
@@ -77,25 +91,17 @@ export default function GlobeHero() {
     const isSmallScreen = window.matchMedia('(max-width: 640px)').matches;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    const renderer = createSafeRenderer(isSmallScreen);
+    if (!renderer) {
+      setWebglSupported(false);
+      return;
+    }
+
     const scene = new THREE.Scene();
     scene.background = null;
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 0, 6.0);
     camera.lookAt(0, 0, 0);
-
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: !isSmallScreen,
-        alpha: true,
-        powerPreference: 'low-power',
-        failIfMajorPerformanceCaveat: false,
-      });
-    } catch (err) {
-      console.warn('WebGL context creation failed for GlobeHero, falling back to 2D view:', err);
-      setWebglSupported(false);
-      return;
-    }
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isSmallScreen ? 1.5 : 2));
     renderer.setClearColor(0x000000, 0);

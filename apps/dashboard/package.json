@@ -29,16 +29,17 @@
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.29.0",
     "next": "^14.2.5",
-    "rrweb-player": "^2.1.1",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "remark-gfm": "^4.0.1",
+    "rrweb-player": "^2.1.1",
     "shiki": "^4.4.2",
     "tailwind-merge": "^2.4.0",
     "three": "^0.185.1",
     "topojson-client": "^3.1.0",
-    "traceiq-sdk-js": "^0.1.4"
+    "traceiq-sdk-js": "^0.1.4",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@types/earcut": "^3.0.0",

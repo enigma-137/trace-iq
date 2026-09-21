@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import * as topojson from 'topojson-client';
 import earcut from 'earcut';
+import worldTopology from 'world-atlas/countries-110m.json';
 import { numericToAlpha2, alpha2ToName } from '@/lib/country-codes';
 
 interface CountryItem {
@@ -35,9 +36,6 @@ const DRAG_SENSITIVITY = 0.005;
 const INERTIA_DECAY = 0.94;
 const COUNTRY_ELEVATION = 0.012;
 const HOVER_ELEVATION = 0.025;
-
-const WORLD_TOPOJSON =
-  'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
 type LatLon = [number, number];
 type PolygonCoords = LatLon[][];
@@ -218,6 +216,25 @@ function computeCentroid(
   return [sumLon / count, sumLat / count];
 }
 
+function createSafeRenderer(isSmallScreen: boolean): THREE.WebGLRenderer | null {
+  const attempts = [
+    { antialias: !isSmallScreen, alpha: true, powerPreference: 'default' as const },
+    { antialias: false, alpha: true, powerPreference: 'default' as const },
+    { antialias: false, alpha: true, precision: 'mediump' as const },
+    { antialias: false, alpha: true },
+    {},
+  ];
+
+  for (const opts of attempts) {
+    try {
+      return new THREE.WebGLRenderer(opts);
+    } catch {
+      // try next fallback option
+    }
+  }
+  return null;
+}
+
 export function GeographyGlobe({
   data,
   metric = 'visitors',
@@ -362,16 +379,9 @@ export function GeographyGlobe({
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: !isSmallScreen.current,
-        alpha: true,
-        powerPreference: 'low-power',
-        failIfMajorPerformanceCaveat: false,
-      });
-    } catch (err) {
-      console.warn('WebGL context creation failed for GeographyGlobe:', err);
+    const renderer = createSafeRenderer(isSmallScreen.current);
+    if (!renderer) {
+      console.warn('WebGL context creation failed for GeographyGlobe');
       setError(true);
       setLoading(false);
       return;
@@ -620,30 +630,21 @@ export function GeographyGlobe({
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    let cancelled = false;
-    async function loadTopo() {
+    function loadTopo() {
       try {
-        setDebug('fetching topojson');
-        const response = await fetch(WORLD_TOPOJSON);
-        if (!response.ok) throw new Error('Failed to load world topology');
-        const topology = await response.json();
-        if (cancelled) return;
-        topoRef.current = topology;
+        topoRef.current = worldTopology;
         setLoading(false);
-        setDebug('building countries');
         const featureCollection = topojson.feature(
-          topology,
-          topology.objects.countries
+          worldTopology as any,
+          worldTopology.objects.countries as any
         ) as unknown as GeoJSON.FeatureCollection;
         updateCountryMeshes(featureCollection);
         setDebug('countries rendered');
       } catch (err) {
         console.error('Globe load error:', err);
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-          setDebug('error: ' + (err instanceof Error ? err.message : String(err)));
-        }
+        setError(true);
+        setLoading(false);
+        setDebug('error: ' + (err instanceof Error ? err.message : String(err)));
       }
     }
 
@@ -653,7 +654,6 @@ export function GeographyGlobe({
     console.log('Globe: animation started');
 
     return () => {
-      cancelled = true;
       stop();
       window.cancelAnimationFrame(frameIdRef.current);
       mount.removeEventListener('pointerdown', onPointerDown);

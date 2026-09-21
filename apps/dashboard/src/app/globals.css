@@ -16,10 +16,23 @@
   box-sizing: border-box;
 }
 
-html {
+html, body {
   scroll-behavior: smooth;
-  /* Stops the layout shifting sideways when a page grows past one viewport. */
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Thin dark scrollbar for the marketing console pane and other inner panels.
@@ -794,11 +807,21 @@ input {
 
 /* ---------------------------------------------------------------- Header */
 .traceiq-site .site-header {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  transition: background-color 260ms ease, border-color 260ms ease, backdrop-filter 260ms ease, box-shadow 260ms ease;
+}
+
+.traceiq-site .site-header.is-scrolled {
   border-bottom: 1px solid var(--traceiq-line);
-  background: rgba(5, 5, 5, 0.62);
-  backdrop-filter: blur(14px);
+  background: rgba(5, 5, 5, 0.90);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .traceiq-site .brand {

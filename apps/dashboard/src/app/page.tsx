@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
 import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
@@ -12,15 +12,16 @@ import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
 import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import TerminalIcon from '@hugeicons/core-free-icons/TerminalIcon';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
-import GlobeHero from '@/components/globe-hero';
+import { LandingHero } from '@/components/landing/LandingHero';
 import { LandingApiFlow } from '@/components/LandingApiFlow';
 import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 import { TrustedTeamsSection } from '@/components/TrustedTeams';
 
 const navItems = [
-  { label: 'Resources', href: '/docs' },
-  { label: 'Status', href: '/status' },
+  { label: 'Product', href: '#product' },
+  { label: 'Solutions', href: '#solutions' },
+  { label: 'Docs', href: '/docs' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Blog', href: '/blog' }
 ];
@@ -69,6 +70,16 @@ export default function Page() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [activeLanguage, setActiveLanguage] = useState<keyof typeof codeExamples>('JavaScript');
   const [copied, setCopied] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 24);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Interactive sandbox state
   const [activeTab, setActiveTab] = useState<'event' | 'user' | 'flags' | 'errors'>('event');
@@ -122,11 +133,11 @@ export default function Page() {
     <main className="traceiq-site min-h-screen overflow-hidden bg-background text-foreground">
       <div className="site-noise" aria-hidden="true" />
 
-      {/* Header */}
-      <header className="site-header">
-        <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-5 sm:px-8">
+      {/* Floating Header */}
+      <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
+        <div className="flex h-20 w-full items-center justify-between px-6 sm:px-10 lg:px-12 xl:px-16">
           <a className="brand" href="#top" aria-label="TraceIQ home">
-            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-7 w-auto" />
+            <img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-7 w-auto block" />
           </a>
           <nav className={`desktop-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
             {navItems.map((item) => (
@@ -134,6 +145,7 @@ export default function Page() {
             ))}
           </nav>
           <div className="header-actions">
+            <a className="text-link hidden sm:inline-flex" href="/auth/login">Sign in</a>
             <a className="button button-small" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'}>
               {menuOpen ? <HugeiconsIcon icon={Cancel01Icon} size={20} /> : <HugeiconsIcon icon={Menu01Icon} size={20} />}
@@ -142,22 +154,8 @@ export default function Page() {
         </div>
       </header>
 
-      {/* Hero — new design copy + existing globe */}
-      <section className="hero mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:gap-8 lg:py-24" id="top">
-        <div className="hero-copy">
-          <div className="eyebrow"><span className="status-dot" /> Observe everything. Understand instantly.</div>
-          <h1>Clarity for<br /><em>complex systems.</em></h1>
-          <p>TraceIQ turns page views, custom events, API response data, and errors into a clear map of how your software really works.</p>
-          <div className="hero-actions">
-            <a className="button" href="/auth/login">Start tracing <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} /></a>
-            <a className="quiet-link" href="#sandbox"><HugeiconsIcon icon={PlayIcon} size={14} fill="currentColor" /> See how it works</a>
-          </div>
-          <div className="hero-note"><span>Open source · self-hosted · inspectable</span><span className="note-line" /></div>
-        </div>
-        <div className="hero-globe">
-          <GlobeHero />
-        </div>
-      </section>
+      {/* Hero — Cinematic video background with fallback and atmospheric readability overlay */}
+      <LandingHero />
 
       {/* Trusted by teams */}
       <TrustedTeamsSection />
