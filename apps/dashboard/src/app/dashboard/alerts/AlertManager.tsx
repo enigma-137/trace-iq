@@ -1,16 +1,25 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { Select, Combobox, Checkbox } from '@traceiq/ui';
-import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/SegmentFilters';
 import { DashboardDialog } from '../DashboardDialog';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import Link from 'next/link';
+import type { FilterCondition } from '@/components/SegmentFilters';
+import { CreateAlertModal, AlertFormData } from './CreateAlertModal';
+import { NotificationGroupModal } from './NotificationGroupModal';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+interface AlertDelivery {
+  channel: string;
+  recipient: string | null;
+  status: string;
+  error: string | null;
+  sentAt: string;
+}
 
 interface Alert {
   id: string;
@@ -40,55 +49,84 @@ interface AlertEvent {
   triggeredAt: string;
 }
 
-interface AlertDelivery {
-  channel: string;
-  recipient: string | null;
-  status: string;
-  error: string | null;
-  sentAt: string;
-}
-
 interface NotificationGroup {
   id: string;
   name: string;
   memberEmails: string[];
 }
 
-const MEASURES = [
-  { value: 'count', label: 'Event count' },
-  { value: 'unique', label: 'Unique users' },
-  { value: 'sum', label: 'Sum of property' },
-  { value: 'avg', label: 'Average of property' }
+const TEMPLATE_ALERTS: Array<{
+  name: string;
+  description: string;
+  data: Partial<AlertFormData>;
+}> = [
+  {
+    name: 'Signup Drop Alert',
+    description: 'Alerts if successful user signups drop by more than 30% compared to yesterday.',
+    data: {
+      name: 'Signups Dropping (>30%)',
+      eventName: 'signup_completed',
+      measure: 'count',
+      windowHours: 24,
+      condition: 'drops_by',
+      threshold: 30
+    }
+  },
+  {
+    name: 'API Error Spike Alert',
+    description: 'Alerts when API request error count spikes by more than 50% over a 1-hour window.',
+    data: {
+      name: 'API Error Rate Spike',
+      eventName: '$api_request',
+      measure: 'count',
+      windowHours: 1,
+      condition: 'spikes_by',
+      threshold: 50
+    }
+  },
+  {
+    name: 'Zero Activity Threshold',
+    description: 'Detects complete system outage when essential telemetry drops below 1.',
+    data: {
+      name: 'Zero Ingestion Warning',
+      eventName: '$api_request',
+      measure: 'count',
+      windowHours: 1,
+      condition: 'below',
+      threshold: 1
+    }
+  }
 ];
 
-const WINDOWS = [
-  { value: 1, label: '1 hour' },
-  { value: 6, label: '6 hours' },
-  { value: 24, label: '24 hours' },
-  { value: 168, label: '7 days' }
-];
-
-const CONDITIONS = [
-  { value: 'above', label: 'is above', percent: false },
-  { value: 'below', label: 'is below', percent: false },
-  { value: 'drops_by', label: 'drops by', percent: true },
-  { value: 'spikes_by', label: 'spikes by', percent: true }
-];
-
-function windowLabel(hours: number): string {
-  return WINDOWS.find((w) => w.value === hours)?.label ?? `${hours}h`;
-}
-
-function summarize(alert: Alert): string {
+function humanReadableCondition(alert: Alert): string {
   const metric =
     alert.measure === 'count'
-      ? `count of ${alert.eventName}`
+      ? `count of "${alert.eventName}"`
       : alert.measure === 'unique'
-        ? `unique users of ${alert.eventName}`
-        : `${alert.measure} of ${alert.property} for ${alert.eventName}`;
-  const cond = CONDITIONS.find((c) => c.value === alert.condition);
-  const target = cond?.percent ? `${alert.threshold}%` : `${alert.threshold}`;
-  return `${metric} ${cond?.label ?? alert.condition} ${target} · rolling ${windowLabel(alert.windowHours)}`;
+        ? `unique users for "${alert.eventName}"`
+        : `average ${alert.property ? `"${alert.property}"` : 'property'} for "${alert.eventName}"`;
+
+  const windowStr = alert.windowHours === 168 ? '7 days' : `${alert.windowHours} hours`;
+
+  switch (alert.condition) {
+    case 'drops_by':
+      return `Triggers when ${metric} drops by ${alert.threshold}% over a rolling ${windowStr} window.`;
+    case 'spikes_by':
+      return `Triggers when ${metric} spikes by ${alert.threshold}% over a rolling ${windowStr} window.`;
+    case 'above':
+      return `Triggers when ${metric} rises above ${alert.threshold.toLocaleString()} in a rolling ${windowStr} window.`;
+    case 'below':
+      return `Triggers when ${metric} falls below ${alert.threshold.toLocaleString()} in a rolling ${windowStr} window.`;
+    default:
+      return `${metric} ${alert.condition} ${alert.threshold} over ${windowStr}`;
+  }
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 export function AlertManager({
@@ -107,26 +145,23 @@ export function AlertManager({
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
 
-  const [name, setName] = useState('');
-  const [eventName, setEventName] = useState(eventNames[0] ?? '');
-  const [measure, setMeasure] = useState('count');
-  const [property, setProperty] = useState('');
-  const [windowHours, setWindowHours] = useState(24);
-  const [condition, setCondition] = useState('drops_by');
-  const [threshold, setThreshold] = useState('30');
-  const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [recipientsInput, setRecipientsInput] = useState('');
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, string>>({});
-  const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Create / Edit Alert Modal state
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [alertModalData, setAlertModalData] = useState<Partial<AlertFormData> | undefined>(undefined);
+  const [isAlertSubmitting, setIsAlertSubmitting] = useState(false);
+  const [alertError, setAlertError] = useState<string | null>(null);
 
-  const needsProperty = measure === 'sum' || measure === 'avg';
-  const isPercent = CONDITIONS.find((c) => c.value === condition)?.percent ?? false;
+  // Notification Group Modal state
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [groupToEdit, setGroupToEdit] = useState<NotificationGroup | null>(null);
+  const [isGroupSubmitting, setIsGroupSubmitting] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+
+  // Alert deletion state
+  const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
+  const [groupToDelete, setGroupToDelete] = useState<NotificationGroup | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { message: string; triggered: boolean }>>({});
 
   async function getToken(): Promise<string | null> {
     const {
@@ -138,702 +173,829 @@ export function AlertManager({
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
     const token = await getToken();
     if (!token) {
-      setError('Your dashboard session expired. Sign in again.');
+      toast.error('Session expired. Please sign in again.');
       return null;
     }
     return fetch(`${apiBaseUrl}${path}`, {
       ...init,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(init.headers ?? {})
+      }
     });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    if (!name.trim()) return setError('Give the alert a name.');
-    if (!eventName.trim()) return setError('Pick an event to watch.');
-    if (needsProperty && !property.trim()) return setError('Enter a numeric property to sum/average.');
-    if (!Number.isFinite(Number(threshold))) return setError('Threshold must be a number.');
+  function handleOpenCreateAlert(initial?: Partial<AlertFormData>) {
+    setAlertModalData(initial);
+    setAlertError(null);
+    setIsAlertModalOpen(true);
+  }
 
-    const emailRecipients = recipientsInput
-      .split(/[,\s]+/u)
-      .map((email) => email.trim())
-      .filter(Boolean);
-    const webhook = webhookUrl.trim();
-    if (!webhook && emailRecipients.length === 0 && selectedGroupIds.length === 0) {
-      return setError('Add a notification channel — a webhook URL and/or email recipients.');
-    }
-
-    setIsSubmitting(true);
-    const response = await authFetch('/v1/dashboard/alerts', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: name.trim(),
-        eventName: eventName.trim(),
-        measure,
-        property: needsProperty ? property.trim() : undefined,
-        filters: cleanFilters(filters),
-        windowHours,
-        condition,
-        threshold: Number(threshold),
-        webhookUrl: webhook || undefined,
-        emailRecipients,
-        notificationGroupIds: selectedGroupIds
-      })
+  function handleOpenDuplicateAlert(alert: Alert) {
+    handleOpenCreateAlert({
+      name: `${alert.name} (Copy)`,
+      eventName: alert.eventName,
+      measure: alert.measure,
+      property: alert.property ?? undefined,
+      windowHours: alert.windowHours,
+      condition: alert.condition,
+      threshold: alert.threshold,
+      filters: alert.filters,
+      webhookUrl: alert.webhookUrl ?? undefined,
+      emailRecipients: alert.emailRecipients,
+      notificationGroupIds: alert.notificationGroupIds
     });
-    if (!response) return setIsSubmitting(false);
-    if (!response.ok) {
-      setError(await readError(response));
-      setIsSubmitting(false);
-      return;
-    }
-    setName('');
-    setThreshold('30');
-    setFilters([]);
-    setWebhookUrl('');
-    setRecipientsInput('');
-    setSelectedGroupIds([]);
-    setIsSubmitting(false);
-    router.refresh();
   }
 
-  async function toggle(alert: Alert) {
-    setBusyId(alert.id);
-    const response = await authFetch(`/v1/dashboard/alerts/${alert.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ enabled: !alert.enabled })
-    });
-    setBusyId(null);
-    if (response?.ok) router.refresh();
-  }
+  async function handleSaveAlert(payload: AlertFormData) {
+    setIsAlertSubmitting(true);
+    setAlertError(null);
 
-  async function test(alert: Alert) {
-    setBusyId(alert.id);
-    const response = await authFetch(`/v1/dashboard/alerts/${alert.id}/test`, { method: 'POST' });
-    setBusyId(null);
-    if (response?.ok) {
-      const result = (await response.json()) as { message: string; triggered: boolean };
-      setTestResults((current) => ({ ...current, [alert.id]: `${result.triggered ? '🔴 Would fire — ' : '🟢 OK — '}${result.message}` }));
-    }
-  }
-
-  async function remove() {
-    if (!alertToDelete || busyId) return;
-    setBusyId(alertToDelete.id);
-    setDeleteError(null);
     try {
-      const response = await authFetch(`/v1/dashboard/alerts/${alertToDelete.id}`, { method: 'DELETE' });
-      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
-      toast.success(`Alert "${alertToDelete.name}" was deleted.`, { title: 'Alert deleted' });
-      setAlertToDelete(null);
+      const response = await authFetch('/v1/dashboard/alerts', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response) {
+        setIsAlertSubmitting(false);
+        return;
+      }
+
+      if (!response.ok) {
+        const message = await readApiError(response, 'Could not save alert.');
+        setAlertError(message);
+        setIsAlertSubmitting(false);
+        return;
+      }
+
+      toast.success(`Alert "${payload.name}" was created successfully.`);
+      setIsAlertModalOpen(false);
+      setIsAlertSubmitting(false);
       router.refresh();
-    } catch (caughtError) {
-      const message = await readApiError(caughtError, 'Could not delete the alert.');
-      setError(message);
-      setDeleteError(message);
-      toast.error(message, { title: 'Alert deletion failed' });
+    } catch (err) {
+      setAlertError(err instanceof Error ? err.message : 'Could not save alert.');
+      setIsAlertSubmitting(false);
+    }
+  }
+
+  async function handleToggle(alert: Alert) {
+    setBusyId(alert.id);
+    try {
+      const response = await authFetch(`/v1/dashboard/alerts/${alert.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ enabled: !alert.enabled })
+      });
+      if (response?.ok) {
+        toast.success(`Alert "${alert.name}" is now ${!alert.enabled ? 'enabled' : 'paused'}.`);
+        router.refresh();
+      }
     } finally {
       setBusyId(null);
     }
   }
 
-  function toggleGroup(id: string) {
-    setSelectedGroupIds((current) => (current.includes(id) ? current.filter((g) => g !== id) : [...current, id]));
+  async function handleTest(alert: Alert) {
+    setBusyId(alert.id);
+    try {
+      const response = await authFetch(`/v1/dashboard/alerts/${alert.id}/test`, { method: 'POST' });
+      if (response?.ok) {
+        const result = (await response.json()) as { message: string; triggered: boolean };
+        setTestResults((prev) => ({ ...prev, [alert.id]: result }));
+        if (result.triggered) {
+          toast.warning(`Test firing triggered: ${result.message}`);
+        } else {
+          toast.success(`Test check passed: ${result.message}`);
+        }
+      }
+    } finally {
+      setBusyId(null);
+    }
   }
 
+  async function handleDeleteAlert() {
+    if (!alertToDelete || busyId) return;
+    setBusyId(alertToDelete.id);
+    try {
+      const response = await authFetch(`/v1/dashboard/alerts/${alertToDelete.id}`, { method: 'DELETE' });
+      if (!response?.ok) throw new Error('Could not delete alert.');
+      toast.success(`Alert "${alertToDelete.name}" was removed.`);
+      setAlertToDelete(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Deletion failed.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Notification Group Handlers
+  function handleOpenCreateGroup() {
+    setGroupToEdit(null);
+    setGroupError(null);
+    setIsGroupModalOpen(true);
+  }
+
+  function handleOpenEditGroup(group: NotificationGroup) {
+    setGroupToEdit(group);
+    setGroupError(null);
+    setIsGroupModalOpen(true);
+  }
+
+  async function handleSaveGroup(name: string, memberEmails: string[], id?: string) {
+    setIsGroupSubmitting(true);
+    setGroupError(null);
+
+    try {
+      const endpoint = id ? `/v1/dashboard/notification-groups/${id}` : '/v1/dashboard/notification-groups';
+      const method = id ? 'PUT' : 'POST';
+
+      const response = await authFetch(endpoint, {
+        method,
+        body: JSON.stringify({ name, memberEmails })
+      });
+
+      if (!response) {
+        setIsGroupSubmitting(false);
+        return;
+      }
+
+      if (!response.ok) {
+        const message = await readApiError(response, 'Could not save notification group.');
+        setGroupError(message);
+        setIsGroupSubmitting(false);
+        return;
+      }
+
+      toast.success(`Notification group "${name}" saved.`);
+      setIsGroupModalOpen(false);
+      setIsGroupSubmitting(false);
+      router.refresh();
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : 'Could not save notification group.');
+      setIsGroupSubmitting(false);
+    }
+  }
+
+  async function handleDeleteGroup() {
+    if (!groupToDelete || busyId) return;
+    setBusyId(groupToDelete.id);
+    try {
+      const response = await authFetch(`/v1/dashboard/notification-groups/${groupToDelete.id}`, {
+        method: 'DELETE'
+      });
+      if (!response?.ok) throw new Error('Could not delete group.');
+      toast.success(`Group "${groupToDelete.name}" was removed.`);
+      setGroupToDelete(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Deletion failed.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Metrics summary
+  const activeAlertsCount = alerts.filter((a) => a.enabled).length;
+  const triggeredCount = alerts.filter((a) => a.lastStatus === 'triggered').length;
+  const totalDestinationsCount =
+    alerts.reduce((sum, a) => {
+      let count = 0;
+      if (a.webhookUrl) count++;
+      if (a.emailRecipients.length > 0) count += a.emailRecipients.length;
+      if (a.notificationGroupIds.length > 0) count += a.notificationGroupIds.length;
+      return sum + count;
+    }, 0) + notificationGroups.length;
+
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6">
+      {/* Plan Entitlement Warning */}
       {!alertsAvailable ? (
-        <div className="rounded-md border border-neutral-300 p-4 text-sm text-neutral-700 dark:border-slate-700 dark:text-slate-300">
-          Alerts are available on Pro. Existing alert definitions are preserved, but evaluation and delivery are paused.{' '}
-          <Link className="font-semibold text-blue-600 hover:underline" href="/dashboard/settings/billing">View upgrade options</Link>.
+        <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <strong className="font-semibold">Automated Alerts require Pro:</strong> Alert rules remain saved, but background evaluation and incident notifications are paused.
+            </div>
+            <Link
+              href="/dashboard/settings/billing"
+              className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition"
+            >
+              Upgrade to Pro →
+            </Link>
+          </div>
         </div>
       ) : null}
-      {alertsAvailable ? <form
-        className="grid gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950"
-        onSubmit={handleSubmit}
-      >
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">New alert</h2>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
-            Watch a metric on a rolling window. We check it in the background and record a firing (then POST your webhook
-            and/or email the recipients) when it crosses the line.
-          </p>
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Alert name">
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="Signups dropping" />
-          </Field>
-          <Field label="Event">
-            <Combobox
-              items={eventNames.map((name) => ({ value: name, label: name }))}
-              value={eventName}
-              onChange={setEventName}
-              placeholder="signup_completed"
-              aria-label="Event"
-            />
-          </Field>
-          <Field label="Measure">
-            <Select
-              value={measure}
-              onValueChange={setMeasure}
-              items={MEASURES.map((m) => ({ value: m.value, label: m.label }))}
-            />
-          </Field>
-          {needsProperty ? (
-            <Field label="Property">
-              <input className={inputClass} value={property} onChange={(e) => setProperty(e.target.value)} placeholder="amount" />
-            </Field>
-          ) : null}
-          <Field label="Window">
-            <Select
-              value={String(windowHours)}
-              onValueChange={(value) => setWindowHours(Number(value))}
-              items={WINDOWS.map((w) => ({ value: String(w.value), label: w.label }))}
-            />
-          </Field>
-          <Field label="Condition">
-            <Select
-              value={condition}
-              onValueChange={setCondition}
-              items={CONDITIONS.map((c) => ({ value: c.value, label: c.label }))}
-            />
-          </Field>
-          <Field label={isPercent ? 'Change (%)' : 'Threshold (value)'}>
-            <input
-              className={inputClass}
-              type="number"
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              placeholder={isPercent ? '30' : '100'}
-            />
-          </Field>
-        </div>
-
-        <div className="grid gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
-            Segment (optional)
-          </span>
-          <SegmentFilters value={filters} onChange={setFilters} />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Webhook URL (optional)">
-            <input
-              className={inputClass}
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://hooks.slack.com/…"
-            />
-          </Field>
-          <Field label="Email recipients (comma-separated)">
-            <input
-              className={inputClass}
-              value={recipientsInput}
-              onChange={(e) => setRecipientsInput(e.target.value)}
-              placeholder="dev@acme.com, oncall@acme.com"
-              type="email"
-              multiple
-            />
-          </Field>
-        </div>
-
-        {notificationGroups.length > 0 ? (
-          <div className="grid gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
-              Also notify groups (optional)
+      {/* Summary Metric Cards: Solid Blue Cards with White Text */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Solid Blue Card 1: Active Monitors */}
+        <div className="relative overflow-hidden rounded-xl border border-blue-500 bg-blue-600 p-5 text-white shadow-sm dark:border-blue-600 dark:bg-blue-600">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-100">
+              Active Monitors
             </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {notificationGroups.map((group) => (
-                <label
-                  key={group.id}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 select-none hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-                >
-                  <Checkbox
-                    checked={selectedGroupIds.includes(group.id)}
-                    onCheckedChange={() => toggleGroup(group.id)}
-                    aria-label={group.name}
-                  />
-                  {group.name}
-                </label>
-              ))}
-            </div>
+            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {alerts.length} Total
+            </span>
           </div>
-        ) : null}
-
-        {error ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-            {error}
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">
+              {activeAlertsCount}
+            </span>
+            <span className="text-xs text-blue-100 font-medium">
+              monitors enabled
+            </span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-blue-50/90">
+            {activeAlertsCount > 0
+              ? 'Continuously evaluating rolling telemetry in the background.'
+              : 'No active monitors enabled. Create or enable an alert below.'}
           </p>
-        ) : null}
-
-        <div>
-          <button
-            type="submit"
-            className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving…' : 'Create alert'}
-          </button>
         </div>
-      </form> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div className="grid gap-6">
-          <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-            <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800 dark:text-slate-500">
-              Alerts
+        {/* Solid Blue Card 2: Recent Firings */}
+        <div className="relative overflow-hidden rounded-xl border border-blue-500 bg-blue-600 p-5 text-white shadow-sm dark:border-blue-600 dark:bg-blue-600">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-100">
+              Recent Firings
+            </span>
+            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {triggeredCount > 0 ? 'Attention' : 'Healthy'}
+            </span>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">
+              {recentEvents.length}
+            </span>
+            <span className="text-xs text-blue-100 font-medium">
+              incident events
+            </span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-blue-50/90">
+            {recentEvents.length > 0
+              ? `${recentEvents.length} threshold alerts recorded across recent evaluation windows.`
+              : 'All monitored metrics are currently within normal baseline thresholds.'}
+          </p>
+        </div>
+
+        {/* Neutral Card 3: Notification Destinations */}
+        <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 lg:col-span-1">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+                Notification Channels
+              </span>
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600 dark:bg-slate-900 dark:text-slate-300">
+                {notificationGroups.length} Groups
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight text-neutral-900 tabular-nums dark:text-white">
+                {totalDestinationsCount}
+              </span>
+              <span className="text-xs text-neutral-500 dark:text-slate-400 font-medium">
+                destinations configured
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
+              Webhooks, team notification groups, and direct email recipients ready to dispatch alerts.
             </p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-slate-800/80">
+            <button
+              type="button"
+              onClick={() => handleOpenCreateAlert()}
+              disabled={!alertsAvailable}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>Create New Alert</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Alerts Section & Recent Firings Layout */}
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        {/* Left Column: Primary Alerts List */}
+        <div className="space-y-6">
+          <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 shadow-xs">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-neutral-200/80 dark:border-slate-800/80">
+              <div>
+                <h3 className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
+                  Monitored Alerts
+                </h3>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
+                  Automated metric monitors running in the background.
+                </p>
+              </div>
+
+              {alerts.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateAlert()}
+                  disabled={!alertsAvailable}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-500 self-start sm:self-auto"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Create alert</span>
+                </button>
+              ) : null}
+            </div>
+
+            {/* Alerts List or Rich Empty State */}
             {alerts.length === 0 ? (
-              <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No alerts yet. Create one above.</p>
+              <div className="py-8 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 mb-4 shadow-inner">
+                  <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                </div>
+                <h4 className="text-base font-bold text-neutral-900 dark:text-white">
+                  No automated alerts created yet
+                </h4>
+                <p className="mx-auto mt-1.5 max-w-lg text-sm text-neutral-500 dark:text-slate-400">
+                  Alerts proactively monitor your telemetry so you know immediately if key metrics drop, error rates spike, or usage hits abnormal levels without watching dashboards.
+                </p>
+
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreateAlert()}
+                    disabled={!alertsAvailable}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-500"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span>Create your first alert</span>
+                  </button>
+                </div>
+
+                {/* Recommended Alert Templates */}
+                <div className="mt-10 pt-8 border-t border-neutral-100 dark:border-slate-800/80">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500 mb-4">
+                    Or start with a common template:
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-3 max-w-3xl mx-auto text-left">
+                    {TEMPLATE_ALERTS.map((tmpl) => (
+                      <button
+                        key={tmpl.name}
+                        type="button"
+                        onClick={() => handleOpenCreateAlert(tmpl.data)}
+                        className="group rounded-xl border border-neutral-200 p-4 transition-all hover:border-blue-500 hover:bg-blue-50/30 hover:shadow-xs dark:border-slate-800 dark:hover:border-blue-500/50 dark:hover:bg-blue-950/20"
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-sm font-semibold text-neutral-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400 transition">
+                            {tmpl.name}
+                          </span>
+                          <span className="text-neutral-400 group-hover:text-blue-600 dark:text-slate-500 dark:group-hover:text-blue-400">
+                            →
+                          </span>
+                        </div>
+                        <p className="mt-1.5 text-xs text-neutral-500 dark:text-slate-400 leading-relaxed">
+                          {tmpl.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : (
-              <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
-                {alerts.map((alert) => (
-                  <li key={alert.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={!alertsAvailable ? 'pro_required' : alert.enabled ? alert.lastStatus : 'disabled'} />
-                        <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{alert.name}</p>
+              <div className="divide-y divide-neutral-200/70 dark:divide-slate-800/70">
+                {alerts.map((alert) => {
+                  const testResult = testResults[alert.id];
+                  return (
+                    <div
+                      key={alert.id}
+                      className="py-5 first:pt-4 last:pb-0 flex flex-col gap-4"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1.5 min-w-0">
+                          {/* Alert Title & Status Badge */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                !alertsAvailable
+                                  ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                                  : alert.enabled
+                                    ? alert.lastStatus === 'triggered'
+                                      ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                    : 'bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400'
+                              }`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  !alertsAvailable
+                                    ? 'bg-amber-500'
+                                    : alert.enabled
+                                      ? alert.lastStatus === 'triggered'
+                                        ? 'bg-red-500 animate-pulse'
+                                        : 'bg-emerald-500'
+                                      : 'bg-neutral-400'
+                                }`}
+                              />
+                              {!alertsAvailable
+                                ? 'Pro required'
+                                : alert.enabled
+                                  ? alert.lastStatus === 'triggered'
+                                    ? 'Firing'
+                                    : 'Active'
+                                  : 'Paused'}
+                            </span>
+
+                            <h4 className="text-base font-bold text-neutral-900 dark:text-white">
+                              {alert.name}
+                            </h4>
+
+                            <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                              {alert.eventName} · {alert.measure}
+                            </span>
+                          </div>
+
+                          {/* Human Readable Condition */}
+                          <p className="text-sm font-medium text-neutral-700 dark:text-slate-200">
+                            {humanReadableCondition(alert)}
+                          </p>
+
+                          {/* Last Evaluated Info */}
+                          <p className="text-xs text-neutral-400 dark:text-slate-500">
+                            {!alertsAvailable
+                              ? 'Evaluations paused while on Free tier'
+                              : alert.lastValue !== null
+                                ? `Last measured value: ${Math.round(alert.lastValue).toLocaleString()} • Checked ${formatDate(alert.lastEvaluatedAt)}`
+                                : 'Awaiting initial background evaluation cycle…'}
+                          </p>
+                        </div>
+
+                        {/* Actions Toolbar */}
+                        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleTest(alert)}
+                            disabled={!alertsAvailable || busyId === alert.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+                            title="Run dry-run evaluation check"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                            <span>{busyId === alert.id ? 'Testing…' : 'Test'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(alert)}
+                            disabled={!alertsAvailable || busyId === alert.id}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                              alert.enabled
+                                ? 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
+                                : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200'
+                            }`}
+                          >
+                            {alert.enabled ? 'Pause' : 'Enable'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDuplicateAlert(alert)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+                            title="Duplicate alert configuration"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            <span>Duplicate</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setAlertToDelete(alert)}
+                            className="inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
+                            aria-label={`Delete ${alert.name}`}
+                            title="Delete alert"
+                          >
+                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                      <p className="mt-1 truncate font-mono text-xs text-neutral-500 dark:text-slate-400">{summarize(alert)}</p>
-                      {alert.webhookUrl || alert.emailRecipients.length > 0 || alert.notificationGroupIds.length > 0 ? (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {alert.webhookUrl ? <ChannelChip tone="webhook">Webhook</ChannelChip> : null}
-                          {alert.emailRecipients.length > 0 ? <ChannelChip tone="email">Email × {alert.emailRecipients.length}</ChannelChip> : null}
-                          {alert.notificationGroupIds.map((id) => (
-                            <ChannelChip key={id} tone="group">
-                              Group · {notificationGroups.find((g) => g.id === id)?.name ?? id}
-                            </ChannelChip>
+
+                      {/* Notification Destination Chips */}
+                      {(alert.webhookUrl || alert.emailRecipients.length > 0 || alert.notificationGroupIds.length > 0) ? (
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500 mr-1">
+                            Dispatches to:
+                          </span>
+                          {alert.webhookUrl ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                              <svg className="h-3 w-3 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
+                              <span>Webhook</span>
+                            </span>
+                          ) : null}
+                          {alert.emailRecipients.map((email) => (
+                            <span key={email} className="inline-flex items-center gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-2 py-0.5 text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+                              <span>{email}</span>
+                            </span>
                           ))}
+                          {alert.notificationGroupIds.map((groupId) => {
+                            const groupName = notificationGroups.find((g) => g.id === groupId)?.name ?? 'Group';
+                            return (
+                              <span key={groupId} className="inline-flex items-center gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-2 py-0.5 text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+                                <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+                                <span>Group · {groupName}</span>
+                              </span>
+                            );
+                          })}
                         </div>
                       ) : null}
-                      {alert.deliveries.length > 0 ? (
-                        <ul className="mt-2 grid gap-1">
-                          {alert.deliveries.slice(0, 4).map((delivery, index) => (
-                            <li key={`${delivery.channel}-${delivery.sentAt}-${index}`} className="flex items-center gap-2 text-xs">
-                              <DeliveryDot status={delivery.status} />
-                              <span className="text-neutral-500 dark:text-slate-400">
-                                {delivery.channel === 'email' ? 'Email to ' : 'Webhook '}
-                                <span className="font-mono text-neutral-600 dark:text-slate-300">
-                                  {delivery.recipient ?? (delivery.channel === 'webhook' ? 'endpoint' : '—')}
-                                </span>{' '}
-                                — {delivery.status === 'sent' ? 'delivered' : 'failed'}
-                                {delivery.error ? ` (${delivery.error})` : ''}
-                              </span>
-                              <span className="ml-auto text-neutral-400 dark:text-slate-500">{formatDate(delivery.sentAt)}</span>
-                            </li>
-                          ))}
-                          {alert.deliveries.length > 4 ? (
-                            <li className="text-xs text-neutral-400 dark:text-slate-500">+{alert.deliveries.length - 4} more</li>
-                          ) : null}
-                        </ul>
-                      ) : null}
-                      <p className="mt-1 text-xs text-neutral-400 dark:text-slate-500">
-                        {!alertsAvailable ? 'Inactive because Alerts require Pro' : alert.lastValue !== null
-                          ? `Last value ${Math.round(alert.lastValue).toLocaleString()} · checked ${formatDate(alert.lastEvaluatedAt)}`
-                          : 'Not evaluated yet · runs automatically within a few minutes'}
-                      </p>
-                      {testResults[alert.id] ? (
-                        <p className="mt-2 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                          {testResults[alert.id]}
-                        </p>
+
+                      {/* Inline Test Result Banner */}
+                      {testResult ? (
+                        <div
+                          className={`rounded-lg p-3 text-xs font-medium border ${
+                            testResult.triggered
+                              ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
+                              : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+                          }`}
+                        >
+                          <strong className="font-semibold">
+                            {testResult.triggered ? '⚠️ Threshold Triggered: ' : '✅ Threshold Passed: '}
+                          </strong>
+                          {testResult.message}
+                        </div>
                       ) : null}
                     </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <button className={toolbarBtn} onClick={() => test(alert)} disabled={!alertsAvailable || busyId === alert.id}>
-                        {busyId === alert.id ? '…' : 'Test'}
-                      </button>
-                      <button className={toolbarBtn} onClick={() => toggle(alert)} disabled={!alertsAvailable || busyId === alert.id}>
-                        {alert.enabled ? 'Disable' : 'Enable'}
-                      </button>
-                      <button
-                        className={deleteBtn}
-                        onClick={() => {
-                          setDeleteError(null);
-                          setAlertToDelete(alert);
-                        }}
-                        disabled={busyId === alert.id}
-                        aria-label="Delete alert"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
-                        </svg>
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                  );
+                })}
+              </div>
             )}
           </section>
 
-          <NotificationGroupsPanel groups={notificationGroups} authFetch={authFetch} refresh={() => router.refresh()} readOnly={!alertsAvailable} />
+          {/* Notification Groups Management Section */}
+          <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 shadow-xs">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-neutral-200/80 dark:border-slate-800/80">
+              <div>
+                <h3 className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
+                  Notification Groups
+                </h3>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
+                  Reusable team and on-call recipient bundles for one-click alert routing.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenCreateGroup}
+                disabled={!alertsAvailable}
+                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 self-start sm:self-auto transition"
+              >
+                <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>Create notification group</span>
+              </button>
+            </div>
+
+            {notificationGroups.length === 0 ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-neutral-500 dark:text-slate-400">
+                  No notification groups created yet. Group multiple team emails (e.g. SRE, Support, Backend On-Call) to quickly attach them to any alert.
+                </p>
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleOpenCreateGroup}
+                    disabled={!alertsAvailable}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black transition"
+                  >
+                    + Add first group
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-neutral-200/70 dark:divide-slate-800/70">
+                {notificationGroups.map((group) => {
+                  const usageCount = alerts.filter((a) => a.notificationGroupIds.includes(group.id)).length;
+                  return (
+                    <div
+                      key={group.id}
+                      className="py-4 first:pt-4 last:pb-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
+                            {group.name}
+                          </h4>
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                            Used by {usageCount} {usageCount === 1 ? 'alert' : 'alerts'}
+                          </span>
+                        </div>
+                        <p className="truncate text-xs text-neutral-500 dark:text-slate-400">
+                          {group.memberEmails.join(', ')}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditGroup(group)}
+                          disabled={!alertsAvailable}
+                          className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGroupToDelete(group)}
+                          disabled={!alertsAvailable}
+                          className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
+                          aria-label={`Delete group ${group.name}`}
+                          title="Delete group"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
 
-        <section className="h-fit rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800 dark:text-slate-500">
-            Recent firings
-          </p>
-          {recentEvents.length === 0 ? (
-            <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">Nothing has fired yet.</p>
-          ) : (
-            <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
-              {recentEvents.map((event) => (
-                <li key={event.id} className="px-5 py-3">
-                  <p className="text-sm font-medium text-neutral-900 dark:text-white">{event.alertName}</p>
-                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{event.message}</p>
-                  <p className="mt-0.5 text-xs text-neutral-400 dark:text-slate-500">{formatDate(event.triggeredAt)}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {/* Right Column: Recent Firings Feed */}
+        <div>
+          <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 shadow-xs sticky top-24">
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-200/80 dark:border-slate-800/80">
+              <div>
+                <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white">
+                  Recent Firings
+                </h3>
+                <p className="text-xs text-neutral-500 dark:text-slate-400">
+                  Incident events detected by active monitors.
+                </p>
+              </div>
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-slate-900 dark:text-slate-400">
+                {recentEvents.length} logged
+              </span>
+            </div>
+
+            {recentEvents.length === 0 ? (
+              <div className="py-10 text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 mb-3">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                </div>
+                <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                  No firings recorded
+                </h4>
+                <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+                  All metrics are operating within specified threshold parameters.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-neutral-200/70 dark:divide-slate-800/70 max-h-[650px] overflow-y-auto">
+                {recentEvents.map((event) => (
+                  <div key={event.id} className="py-3.5 first:pt-3 last:pb-0 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                        {event.alertName}
+                      </p>
+                      <span className="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        Triggered
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600 dark:text-slate-300 leading-relaxed">
+                      {event.message}
+                    </p>
+                    <p className="text-[11px] text-neutral-400 dark:text-slate-500">
+                      {formatDate(event.triggeredAt)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
+
+      {/* Create / Edit Alert Modal */}
+      <CreateAlertModal
+        open={isAlertModalOpen}
+        onClose={() => {
+          setIsAlertModalOpen(false);
+          setAlertError(null);
+        }}
+        onSave={handleSaveAlert}
+        eventNames={eventNames}
+        notificationGroups={notificationGroups}
+        initialData={alertModalData}
+        isSubmitting={isAlertSubmitting}
+        error={alertError}
+      />
+
+      {/* Notification Group Modal */}
+      <NotificationGroupModal
+        open={isGroupModalOpen}
+        onClose={() => {
+          setIsGroupModalOpen(false);
+          setGroupError(null);
+        }}
+        onSave={handleSaveGroup}
+        groupToEdit={groupToEdit}
+        isSubmitting={isGroupSubmitting}
+        error={groupError}
+      />
+
+      {/* Delete Alert Confirmation Dialog */}
       <DashboardDialog
         open={Boolean(alertToDelete)}
-        title="Delete alert?"
-        description="This permanently removes the alert and stops its future evaluations and notifications."
+        title="Delete automated alert?"
+        description="This will permanently delete the alert rule and stop all future evaluations and notification dispatches."
         onClose={() => {
           if (!busyId) setAlertToDelete(null);
         }}
         footer={
-          <>
-            <button type="button" className={toolbarBtn} disabled={Boolean(busyId)} onClick={() => setAlertToDelete(null)}>
+          <div className="flex w-full items-center justify-end gap-2">
+            <button
+              type="button"
+              className="h-9 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              disabled={Boolean(busyId)}
+              onClick={() => setAlertToDelete(null)}
+            >
               Cancel
             </button>
             <button
               type="button"
-              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              className="h-9 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               disabled={Boolean(busyId)}
-              onClick={() => void remove()}
+              onClick={() => void handleDeleteAlert()}
             >
               {busyId ? 'Deleting…' : 'Delete alert'}
             </button>
-          </>
+          </div>
         }
       >
-        <div className="grid gap-3">
-          <p className="text-sm text-neutral-600 dark:text-slate-400">
-            <span className="font-semibold text-neutral-900 dark:text-white">{alertToDelete?.name}</span>
-            {' '}will be permanently removed.
-          </p>
-          {deleteError ? (
-            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
-              {deleteError}
-            </p>
-          ) : null}
-        </div>
+        <p className="text-sm text-neutral-600 dark:text-slate-400">
+          Are you sure you want to delete <strong className="font-semibold text-neutral-900 dark:text-white">{alertToDelete?.name}</strong>? This action cannot be undone.
+        </p>
+      </DashboardDialog>
+
+      {/* Delete Group Confirmation Dialog */}
+      <DashboardDialog
+        open={Boolean(groupToDelete)}
+        title="Delete notification group?"
+        description="Alerts referencing this group will no longer notify its member emails. The alert rules themselves will remain intact."
+        onClose={() => {
+          if (!busyId) setGroupToDelete(null);
+        }}
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <button
+              type="button"
+              className="h-9 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              disabled={Boolean(busyId)}
+              onClick={() => setGroupToDelete(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-9 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              disabled={Boolean(busyId)}
+              onClick={() => void handleDeleteGroup()}
+            >
+              {busyId ? 'Deleting…' : 'Delete group'}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-neutral-600 dark:text-slate-400">
+          Are you sure you want to delete <strong className="font-semibold text-neutral-900 dark:text-white">{groupToDelete?.name}</strong>?
+        </p>
       </DashboardDialog>
     </div>
   );
 }
-
-function ChannelChip({ tone, children }: { tone: 'webhook' | 'email' | 'group'; children: React.ReactNode }) {
-  const styles: Record<string, string> = {
-    webhook: 'border-neutral-300 text-neutral-500 dark:border-slate-700 dark:text-slate-400',
-    email: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
-    group: 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300'
-  };
-  return (
-    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${styles[tone]}`}>
-      {children}
-    </span>
-  );
-}
-
-function DeliveryDot({ status }: { status: string }) {
-  const ok = status === 'sent';
-  return (
-    <span
-      aria-hidden
-      className={`size-1.5 shrink-0 rounded-full ${ok ? 'bg-emerald-500' : 'bg-red-500'}`}
-    />
-  );
-}
-
-function NotificationGroupsPanel({
-  groups,
-  authFetch,
-  refresh,
-  readOnly
-}: {
-  groups: NotificationGroup[];
-  authFetch: (path: string, init: RequestInit) => Promise<Response | null>;
-  refresh: () => void;
-  readOnly: boolean;
-}) {
-  const [name, setName] = useState('');
-  const [emails, setEmails] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editEmails, setEditEmails] = useState('');
-  const [groupToDelete, setGroupToDelete] = useState<NotificationGroup | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  function startEdit(group: NotificationGroup) {
-    setEditingId(group.id);
-    setEditName(group.name);
-    setEditEmails(group.memberEmails.join(', '));
-    setError(null);
-  }
-
-  async function saveEdit(group: NotificationGroup) {
-    setError(null);
-    const memberEmails = editEmails.split(/[,\s]+/u).map((e) => e.trim()).filter(Boolean);
-    if (!editName.trim()) return setError('Name the group.');
-    if (memberEmails.length === 0) return setError('Add at least one email address.');
-
-    setBusy(group.id);
-    const response = await authFetch(`/v1/dashboard/notification-groups/${group.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name: editName.trim(), memberEmails })
-    });
-    setBusy(null);
-    if (!response?.ok) {
-      setError((await readError(response as Response)) || 'Could not save group.');
-      return;
-    }
-    setEditingId(null);
-    refresh();
-  }
-
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    const memberEmails = emails.split(/[,\s]+/u).map((e) => e.trim()).filter(Boolean);
-    if (!name.trim()) return setError('Name the group.');
-    if (memberEmails.length === 0) return setError('Add at least one email address.');
-
-    setIsSaving(true);
-    const response = await authFetch('/v1/dashboard/notification-groups', {
-      method: 'POST',
-      body: JSON.stringify({ name: name.trim(), memberEmails })
-    });
-    setIsSaving(false);
-    if (!response?.ok) {
-      setError((await readError(response as Response)) || 'Could not create group.');
-      return;
-    }
-    setName('');
-    setEmails('');
-    refresh();
-  }
-
-  async function removeGroup() {
-    if (!groupToDelete || busy) return;
-    setBusy(groupToDelete.id);
-    setDeleteError(null);
-    try {
-      const response = await authFetch(`/v1/dashboard/notification-groups/${groupToDelete.id}`, { method: 'DELETE' });
-      if (!response?.ok) throw new Error(response ? await readError(response) : 'Your dashboard session expired. Sign in again.');
-      toast.success(`Notification group "${groupToDelete.name}" was deleted.`, { title: 'Notification group deleted' });
-      setGroupToDelete(null);
-      refresh();
-    } catch (caughtError) {
-      const message = await readApiError(caughtError, 'Could not delete the notification group.');
-      setError(message);
-      setDeleteError(message);
-      toast.error(message, { title: 'Notification group deletion failed' });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800 dark:text-slate-500">
-        Notification groups
-      </p>
-      <div className="grid gap-4 p-5">
-        <p className="text-sm text-neutral-500 dark:text-slate-400">
-          A saved list of emails you can attach to any alert (creating one here makes it appear in the New alert form).
-        </p>
-
-        {!readOnly ? <form className="grid gap-2" onSubmit={handleCreate}>
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Group name, e.g. On-call"
-            aria-label="Group name"
-          />
-          <input
-            className={inputClass}
-            value={emails}
-            onChange={(e) => setEmails(e.target.value)}
-            placeholder="oncall@acme.com, sre@acme.com"
-            type="email"
-            aria-label="Group emails"
-          />
-          {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="h-9 rounded-md border border-neutral-300 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            {isSaving ? 'Saving…' : 'Create group'}
-          </button>
-        </form> : <p className="text-sm text-neutral-500 dark:text-slate-400">Notification groups are read-only while Alerts are unavailable.</p>}
-
-        {groups.length === 0 ? (
-          <p className="text-sm text-neutral-500 dark:text-slate-500">No groups yet.</p>
-        ) : (
-          <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
-            {groups.map((group) =>
-              editingId === group.id ? (
-                <li key={group.id} className="grid gap-2 py-2">
-                  <input
-                    className={inputClass}
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Group name"
-                    aria-label="Edit group name"
-                  />
-                  <input
-                    className={inputClass}
-                    value={editEmails}
-                    onChange={(e) => setEditEmails(e.target.value)}
-                    placeholder="oncall@acme.com, sre@acme.com"
-                    type="email"
-                    aria-label="Edit group emails"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="h-8 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-black"
-                      onClick={() => void saveEdit(group)}
-                      disabled={busy === group.id}
-                    >
-                      {busy === group.id ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      className={toolbarBtn}
-                      onClick={() => setEditingId(null)}
-                      disabled={busy === group.id}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </li>
-              ) : (
-                <li key={group.id} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-neutral-900 dark:text-white">{group.name}</p>
-                    <p className="truncate text-xs text-neutral-400 dark:text-slate-500">
-                      {group.memberEmails.length} {group.memberEmails.length === 1 ? 'member' : 'members'} · {group.memberEmails.join(', ')}
-                    </p>
-                  </div>
-                  {!readOnly ? <div className="flex shrink-0 items-center gap-2">
-                    <button className={toolbarBtn} onClick={() => startEdit(group)} disabled={busy === group.id}>
-                      Edit
-                    </button>
-                    <button
-                      className={deleteBtn}
-                      onClick={() => {
-                        setDeleteError(null);
-                        setGroupToDelete(group);
-                      }}
-                      disabled={busy === group.id}
-                      aria-label={`Delete group ${group.name}`}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
-                      </svg>
-                    </button>
-                  </div> : null}
-                </li>
-              )
-            )}
-          </ul>
-        )}
-      </div>
-      <DashboardDialog
-        open={Boolean(groupToDelete)}
-        title="Delete notification group?"
-        description="Alerts using this group will no longer notify its members. The alerts themselves are not deleted."
-        onClose={() => {
-          if (!busy) setGroupToDelete(null);
-        }}
-        footer={
-          <>
-            <button type="button" className={toolbarBtn} disabled={Boolean(busy)} onClick={() => setGroupToDelete(null)}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
-              disabled={Boolean(busy)}
-              onClick={() => void removeGroup()}
-            >
-              {busy ? 'Deleting…' : 'Delete group'}
-            </button>
-          </>
-        }
-      >
-        <div className="grid gap-3">
-          <p className="text-sm text-neutral-600 dark:text-slate-400">
-            <span className="font-semibold text-neutral-900 dark:text-white">{groupToDelete?.name}</span>
-            {' '}will be permanently removed.
-          </p>
-          {deleteError ? (
-            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
-              {deleteError}
-            </p>
-          ) : null}
-        </div>
-      </DashboardDialog>
-    </section>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    triggered: 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950',
-    ok: 'border border-neutral-300 text-neutral-500 dark:border-slate-700 dark:text-slate-400',
-    pending: 'border border-neutral-200 text-neutral-400 dark:border-slate-800 dark:text-slate-500',
-    disabled: 'border border-neutral-200 text-neutral-300 dark:border-slate-800 dark:text-slate-600',
-    pro_required: 'border border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300'
-  };
-  const label = status === 'triggered' ? 'Firing' : status === 'ok' ? 'OK' : status === 'disabled' ? 'Off' : status === 'pro_required' ? 'Pro required' : 'Pending';
-  return (
-    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${map[status] ?? map.pending}`}>
-      {label}
-    </span>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
-      {label}
-      {children}
-    </label>
-  );
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
-
-async function readError(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { message?: string };
-    return body.message ?? `Request failed with ${response.status}`;
-  } catch {
-    return `Request failed with ${response.status}`;
-  }
-}
-
-const inputClass =
-  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';
-
-const toolbarBtn =
-  'inline-flex h-8 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
-
-const deleteBtn =
-  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-400 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-500 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-400';

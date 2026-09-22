@@ -2221,6 +2221,8 @@ input {
 
 @media (max-width: 800px) {
   .traceiq-site .desktop-nav { display: none; }
+  .traceiq-site .header-actions .button,
+  .traceiq-site .header-actions .text-link { display: none !important; }
   .traceiq-site .menu-button { display: inline-flex; }
   .traceiq-site .footer-links { grid-template-columns: repeat(2, 1fr); }
   .traceiq-site .product-shot-primary { margin-top: 28px; }

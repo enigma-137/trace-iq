@@ -147,8 +147,8 @@ export default function Page() {
             ))}
           </nav>
           <div className="header-actions">
-            <a className="text-link hidden sm:inline-flex" href="/auth/login">Sign in</a>
-            <a className="button button-small hidden sm:inline-flex" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
+            <a className="text-link hidden md:inline-flex" href="/auth/login">Sign in</a>
+            <a className="button button-small hidden md:inline-flex" href="/auth/login">Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'}>
               {menuOpen ? <HugeiconsIcon icon={Cancel01Icon} size={22} /> : <HugeiconsIcon icon={Menu01Icon} size={22} />}
             </button>
@@ -157,7 +157,7 @@ export default function Page() {
 
         {/* Mobile Dropdown Navigation Menu */}
         {menuOpen && (
-          <div className="mobile-nav-panel sm:hidden w-full bg-[#0a0a0a]/98 backdrop-blur-2xl border-b border-white/10 px-6 py-6 flex flex-col gap-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="mobile-nav-panel md:hidden w-full bg-[#0a0a0a]/98 backdrop-blur-2xl border-b border-white/10 px-6 py-6 flex flex-col gap-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="flex flex-col gap-1">
               {navItems.map((item) => (
                 <a
@@ -181,9 +181,11 @@ export default function Page() {
               <a
                 href="/auth/login"
                 onClick={() => setMenuOpen(false)}
-                className="w-full py-2.5 px-3 text-center text-sm font-semibold text-zinc-950 bg-white hover:bg-zinc-100 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                className="w-full py-3 px-4 text-center text-sm font-bold bg-white hover:bg-zinc-100 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-md"
+                style={{ color: '#09090b', backgroundColor: '#ffffff' }}
               >
-                Get started <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} />
+                <span className="font-bold" style={{ color: '#09090b' }}>Get started</span>
+                <HugeiconsIcon icon={ArrowUpRight01Icon} size={15} style={{ color: '#09090b' }} />
               </a>
             </div>
           </div>

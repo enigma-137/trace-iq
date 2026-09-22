@@ -148,18 +148,17 @@ export function LandingScrollCapabilities() {
                 key={slide.number}
                 type="button"
                 onClick={() => handleStepClick(i)}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  i === activeIndex
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${i === activeIndex
                     ? 'w-10 sm:w-16 bg-[#111111]'
                     : 'w-4 sm:w-6 bg-[#d4d2c8] hover:bg-[#b0ae9f]'
-                }`}
+                  }`}
                 aria-label={`Go to slide ${i + 1}: ${slide.tag}`}
               />
             ))}
           </div>
 
           <div className="text-[11px] sm:text-xs font-mono text-[#777777] uppercase tracking-widest">
-            Scroll to explore ({activeIndex + 1} of 6)
+            {/* Scroll to explore ({activeIndex + 1} of 6) */}
           </div>
         </div>
       </div>

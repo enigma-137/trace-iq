@@ -77,27 +77,27 @@ export function LandingOverviewDemo() {
   );
 
   return (
-    <div className="landing-overview-demo dark">
+    <div className="landing-overview-demo dark p-4 sm:p-6 md:p-8">
       {/* Starting directly with Total Event cards (KPI section) */}
-      <section className="landing-overview-kpis" aria-label="Sample product metrics">
+      <section className="landing-overview-kpis grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" aria-label="Sample product metrics">
         <PaceStatTile title="Total Events" value={3990} badge="+20%" badgeTone="green" badgeIcon="up" description="390 last 24h" />
         <PaceStatTile title="P95 Latency" value="8354.5ms" badge="-32ms" badgeTone="green" badgeIcon="down" description="Avg 8979.3ms" />
         <PaceStatTile title="Failure Rate (5xx)" value="8.43%" badge="+1 type" badgeTone="red" badgeIcon="up" description="5 exception occurrences" />
         <PaceStatTile title="Identified Profiles" value={9} suffix="people" badge="+287" badgeTone="blue" badgeIcon="up" description="287 active sessions" />
       </section>
 
-      <section className="landing-overview-main">
-        <div className="landing-overview-left flex flex-col gap-3">
+      <section className="landing-overview-main mt-4">
+        <div className="landing-overview-left flex flex-col gap-4">
           <OverviewTabbedChart data={TREND_POINTS} className="landing-overview-trend" />
 
           {/* Two Pie/Donut Charts: Devices & Referrers */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <section className="landing-overview-card">
-              <div className="landing-overview-card-header">
-                <strong>Devices (30 days)</strong>
-                <span>6.3k events</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <section className="landing-overview-card rounded-xl border border-white/[0.08] bg-[#09090b] p-5 sm:p-6 shadow-xs">
+              <div className="landing-overview-card-header pb-3 border-b border-white/[0.08]">
+                <strong className="text-white text-xs font-semibold">Devices (30 days)</strong>
+                <span className="text-zinc-400 font-mono text-[11px]">6.3k events</span>
               </div>
-              <div className="pt-2">
+              <div className="pt-3">
                 <DonutChart
                   items={DEVICES}
                   size={120}
@@ -109,12 +109,12 @@ export function LandingOverviewDemo() {
               </div>
             </section>
 
-            <section className="landing-overview-card">
-              <div className="landing-overview-card-header">
-                <strong>Referrers (30 days)</strong>
-                <span>6.3k events</span>
+            <section className="landing-overview-card rounded-xl border border-white/[0.08] bg-[#09090b] p-5 sm:p-6 shadow-xs">
+              <div className="landing-overview-card-header pb-3 border-b border-white/[0.08]">
+                <strong className="text-white text-xs font-semibold">Referrers (30 days)</strong>
+                <span className="text-zinc-400 font-mono text-[11px]">6.3k events</span>
               </div>
-              <div className="pt-2">
+              <div className="pt-3">
                 <DonutChart
                   items={REFERRERS}
                   size={120}
@@ -128,9 +128,9 @@ export function LandingOverviewDemo() {
           </div>
         </div>
 
-        <div className="landing-overview-side">
-          <section className="landing-overview-card landing-overview-activity">
-            <div className="landing-overview-card-header">
+        <div className="landing-overview-side flex flex-col gap-4">
+          <section className="landing-overview-card landing-overview-activity rounded-xl border border-white/[0.08] bg-[#09090b] p-5 sm:p-6 shadow-xs">
+            <div className="landing-overview-card-header pb-3 border-b border-white/[0.08]">
               <p><span className="landing-overview-live-dot" /><small>Now</small> 5 events · 1 unique</p>
               <button type="button" onClick={() => setPaused((current) => !current)} aria-pressed={paused}>
                 {paused ? 'Resume' : 'Pause'}
@@ -154,9 +154,14 @@ export function LandingOverviewDemo() {
             </ul>
           </section>
 
-          <section className="landing-overview-card landing-overview-events">
-            <div className="landing-overview-card-header"><strong>Event volume breakdown</strong><span>Hover a row</span></div>
-            <TopEventsList events={TOP_EVENTS} />
+          <section className="landing-overview-card landing-overview-events rounded-xl border border-white/[0.08] bg-[#09090b] p-5 sm:p-6 shadow-xs">
+            <div className="landing-overview-card-header pb-3 border-b border-white/[0.08]">
+              <strong className="text-white text-xs font-semibold">Event volume breakdown</strong>
+              <span className="text-zinc-400 text-[11px]">Hover a row</span>
+            </div>
+            <div className="pt-2">
+              <TopEventsList events={TOP_EVENTS} />
+            </div>
           </section>
         </div>
       </section>

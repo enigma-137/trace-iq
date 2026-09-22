@@ -222,8 +222,8 @@ export function SvgNodeFlowGraph({
 
       {/* Main Flow Container */}
       <div ref={containerRef} className="relative min-h-[460px] w-full py-4">
-        {/* SVG Bezier Flow Layer */}
-        <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible z-10">
+        {/* SVG Bezier Flow Layer - Only shown on large horizontal desktop view to prevent crossing lines on mobile */}
+        <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible z-10 hidden lg:block">
           <defs>
             {/* Linear Gradients for Flow Lines */}
             <linearGradient id={`flow-grad-critical-${filterId}`} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -325,8 +325,18 @@ export function SvgNodeFlowGraph({
 
         {/* Card Columns Layout - Stretched Responsive Grid */}
         <div className="svg-node-flow-columns relative z-20 grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 xl:gap-10">
-          {columns.map((col) => (
+          {columns.map((col, colIdx) => (
             <div key={col.id} className="flex flex-col gap-3 min-w-0">
+              {/* Mobile Stage Connector Divider */}
+              {colIdx > 0 && (
+                <div className="flex lg:hidden items-center justify-center my-1">
+                  <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-3 py-0.5 text-[11px] font-mono text-neutral-500 dark:border-white/10 dark:bg-zinc-900/90 dark:text-zinc-400 shadow-xs">
+                    <span className="text-emerald-500">↓</span>
+                    <span>Pipeline Step {colIdx + 1}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Column Header */}
               <div className="mb-1 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-zinc-400">
