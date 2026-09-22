@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useAskTraceIQ, EvidenceItem } from './AskTraceIQContext';
+import { FormattedAiMessage } from './FormattedAiMessage';
 import AiBrain02Icon from '@hugeicons/core-free-icons/AiBrain02Icon';
 import { HugeiconsIcon } from '@hugeicons/react';
 
@@ -231,7 +232,7 @@ export function AskTraceIQDrawer() {
                 ) : (
                   <div className="space-y-4">
                     <div className="space-y-3 rounded-2xl rounded-tl-sm border border-neutral-200 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-800 dark:border-neutral-800/90 dark:bg-neutral-900/70 dark:text-neutral-200">
-                      <div className="whitespace-pre-wrap">{m.content}</div>
+                      <FormattedAiMessage content={m.content} />
 
                       {/* Evidence Section */}
                       {m.evidence && m.evidence.length > 0 ? (
