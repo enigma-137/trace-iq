@@ -113,7 +113,7 @@ export class UsageService {
     // 3. Set quota_reserved = true on investigation record
     await executor.query(`
       UPDATE ai_investigations
-      SET quota_reserved = true, usage_period = $2, updated_at = now()
+      SET quota_reserved = true, usage_period = $2
       WHERE id = $1
     `, [investigationId, usagePeriod]);
 
@@ -129,7 +129,7 @@ export class UsageService {
   /**
    * Converts an active reservation into consumed monthly usage exactly once.
    */
-  async chargeAskInvestigation(
+  async consumeAskInvestigation(
     executor: QueryExecutor,
     organizationId: string,
     investigationId: string,
@@ -163,7 +163,7 @@ export class UsageService {
     // Mark investigation charged and clear reservation flag
     await executor.query(`
       UPDATE ai_investigations
-      SET usage_charged = true, quota_reserved = false, updated_at = now()
+      SET usage_charged = true, quota_reserved = false
       WHERE id = $1
     `, [investigationId]);
 
@@ -180,9 +180,8 @@ export class UsageService {
   ) {
     await executor.query(`
       UPDATE ai_investigations
-      SET quota_reserved = false, updated_at = now()
+      SET quota_reserved = false
       WHERE id = $1 AND usage_charged = false
     `, [investigationId]);
   }
 }
-
