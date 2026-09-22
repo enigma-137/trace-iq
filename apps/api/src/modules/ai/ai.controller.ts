@@ -1,4 +1,5 @@
 import { Controller, Headers, Param, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '../auth/auth.service';
 import { AiService } from './ai.service';
 
@@ -10,6 +11,7 @@ export class AiController {
   ) {}
 
   @Post('funnels/:id/summary')
+  @Throttle({ default: { limit: 15, ttl: 60_000 } })
   async summarizeFunnel(
     @Param('id') id: string,
     @Headers('authorization') authorization?: string,

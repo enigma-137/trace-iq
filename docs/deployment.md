@@ -156,7 +156,7 @@ DASHBOARD_URL=https://analytics.example.com
 NEXT_PUBLIC_API_URL=https://api.example.com
 ```
 
-`VPS_DATABASE_URL` uses `postgres`, the Compose service hostname. Do not use `localhost` from inside the API container. Set `GROQ_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM` only when those optional features are required.
+`VPS_DATABASE_URL` uses `postgres`, the Compose service hostname. Do not use `localhost` from inside the API container. Set `CENCORI_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM` only when those optional features are required.
 
 The dashboard host needs:
 

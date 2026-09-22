@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
-import { AiService, AI_MODEL } from '../ai/ai.service';
+import { AiService } from '../ai/ai.service';
 import { DigestService, DigestPayload, buildDigestEmail } from './digest.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ export class InsightsService {
   /**
    * Computes the structured facts behind the "today's story" and produces a
    * plain-English narrative. The template narrative is always available (fast,
-   * deterministic); when GROQ_API_KEY is configured the AI upgrades it to a
+   * deterministic); when CENCORI_API_KEY is configured the AI upgrades it to a
    * fuller story, and any failure falls back to the template.
    */
   async getTodayStory(user: DashboardUser, projectId?: string): Promise<TodayStoryResponse> {
@@ -114,14 +114,13 @@ export class InsightsService {
       };
     }
 
-    const prompt = this.buildStoryPrompt(project, facts);
-    const aiNarrative = await this.ai.completeSafely(prompt);
+    const aiNarrative = await this.ai.generateStoryNarrative(project, facts, user.id);
     const narrative = aiNarrative ?? template;
 
     return {
       project: { id: project.id, name: project.name, organizationName: project.organizationName },
       narrative,
-      model: narrative === template ? 'template' : AI_MODEL,
+      model: narrative === template ? 'template' : 'cencori',
       generatedAt: new Date().toISOString(),
       facts
     };
@@ -302,20 +301,6 @@ export class InsightsService {
     return parts.join(' ');
   }
 
-  private buildStoryPrompt(project: { name: string }, facts: TodayStoryFacts): string {
-    const country = facts.topCountry && facts.topCountry.name !== 'unknown' ? `${facts.topCountry.name} (${facts.topCountry.pct}% of activity)` : 'no single dominant country';
-    return [
-      `Write "Today's story" for the TraceIQ project "${project.name}" in 2-3 short, friendly sentences.`,
-      `Use only these numbers:`,
-      `- events in the last 24h: ${facts.eventsToday}, previous 24h: ${facts.eventsYesterday}, delta: ${facts.deltaPct === null ? 'new' : `${facts.deltaPct}%`}`,
-      `- unique users today: ${facts.uniquesToday}`,
-      `- top event: ${facts.topEvent ? `${facts.topEvent.name} (${facts.topEvent.count})` : 'none yet'}`,
-      `- geography: ${country}`,
-      `- active right now: ${facts.activeNow}`,
-      '',
-      "Plain language, no bullet points, no emojis, no 'In summary'. Never invent numbers."
-    ].join('\n');
-  }
 
   private emptyFacts(): TodayStoryFacts {
     return {

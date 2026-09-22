@@ -68,14 +68,14 @@ describe('today story', () => {
     });
 
     const projects = { resolveActiveProject: vi.fn().mockResolvedValue(PROJECT) } as unknown as ProjectsService;
-    const ai = { completeSafely: vi.fn().mockResolvedValue(null) } as unknown as AiService;
+    const ai = { generateStoryNarrative: vi.fn().mockResolvedValue(null) } as unknown as AiService;
     const digest = new DigestService(db as unknown as DatabaseService, {} as EmailService);
     const service = new InsightsService(db as unknown as DatabaseService, projects, ai, digest);
     const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
 
     const result = await service.getTodayStory(user);
 
-    expect(ai.completeSafely).toHaveBeenCalledTimes(1);
+    expect(ai.generateStoryNarrative).toHaveBeenCalledTimes(1);
     expect(result.model).toBe('template');
     expect(result.narrative).toContain('Events are up 20% today');
     expect(result.narrative).toContain('signup');
@@ -96,7 +96,7 @@ describe('today story', () => {
     });
 
     const projects = { resolveActiveProject: vi.fn().mockResolvedValue(PROJECT) } as unknown as ProjectsService;
-    const ai = { completeSafely: vi.fn().mockResolvedValue('The story') } as unknown as AiService;
+    const ai = { generateStoryNarrative: vi.fn().mockResolvedValue('The story') } as unknown as AiService;
     const digest = new DigestService(db as unknown as DatabaseService, {} as EmailService);
     const service = new InsightsService(db as unknown as DatabaseService, projects, ai, digest);
     const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
@@ -104,7 +104,7 @@ describe('today story', () => {
     const result = await service.getTodayStory(user);
 
     expect(result.narrative).toBe('The story');
-    expect(result.model).toBe('openai/gpt-oss-120b');
+    expect(result.model).toBe('cencori');
   });
 
   it('returns a no-data story without calling the AI', async () => {
@@ -116,21 +116,21 @@ describe('today story', () => {
     });
 
     const projects = { resolveActiveProject: vi.fn().mockResolvedValue(PROJECT) } as unknown as ProjectsService;
-    const ai = { completeSafely: vi.fn() } as unknown as AiService;
+    const ai = { generateStoryNarrative: vi.fn() } as unknown as AiService;
     const digest = new DigestService(db as unknown as DatabaseService, {} as EmailService);
     const service = new InsightsService(db as unknown as DatabaseService, projects, ai, digest);
     const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
 
     const result = await service.getTodayStory(user);
 
-    expect(ai.completeSafely).not.toHaveBeenCalled();
+    expect(ai.generateStoryNarrative).not.toHaveBeenCalled();
     expect(result.narrative).toContain('No events today');
   });
 
   it('uses the active project from the project store', async () => {
     const db = mockDatabase();
     const projects = { resolveActiveProject: vi.fn().mockResolvedValue(PROJECT) } as unknown as ProjectsService;
-    const ai = { completeSafely: vi.fn() } as unknown as AiService;
+    const ai = { generateStoryNarrative: vi.fn() } as unknown as AiService;
     const digest = new DigestService(db as unknown as DatabaseService, {} as EmailService);
     const service = new InsightsService(db as unknown as DatabaseService, projects, ai, digest);
     const user: DashboardUser = { id: 'user1', email: 'test@example.com' };

@@ -28,7 +28,11 @@ services:
         sync: false
       - key: NEXT_PUBLIC_API_URL
         sync: false
-      - key: GROQ_API_KEY
+      - key: CENCORI_API_KEY
+        sync: false
+      - key: TRACEIQ_AI_FAST_MODEL
+        sync: false
+      - key: TRACEIQ_AI_REASONING_MODEL
         sync: false
 
   - type: keyvalue

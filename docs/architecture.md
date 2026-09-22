@@ -14,7 +14,7 @@ flowchart LR
   Dashboard -. Supabase mode .-> Auth[Supabase Auth]
   API -. Supabase mode .-> Auth
   API -. optional .-> Email[Resend]
-  API -. optional .-> AI[Groq]
+  API -. optional .-> AI[Cencori]
 ```
 
 - `apps/api` is the NestJS ingestion and dashboard API. Domain modules own authentication, organizations, projects, events, analytics, funnels, cohorts, flags, alerts, webhooks, exports, and related behavior.
@@ -53,7 +53,7 @@ An event can carry a stable `userId`, an `anonymousId`, and a `sessionId`. When 
 
 ## Data and optional providers
 
-PostgreSQL 18 stores both operational and analytical data. This keeps a self-hosted installation understandable and avoids requiring a separate analytics database. Redis 7 is included in the deployment stack. Groq-backed AI features and Resend-backed email delivery are optional and should degrade gracefully when their keys are absent.
+PostgreSQL 18 stores both operational and analytical data. This keeps a self-hosted installation understandable and avoids requiring a separate analytics database. Redis 7 is included in the deployment stack. Cencori-backed AI features and Resend-backed email delivery are optional and degrade gracefully when their keys are absent.
 
 Authentication has two modes. `local` supplies a deterministic single owner for a private loopback installation; `supabase` provides accounts, teams, invitations, sessions, and 2FA. Both modes use the same server-side organization, role, and project authorization checks.
 

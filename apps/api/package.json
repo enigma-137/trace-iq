@@ -26,8 +26,8 @@
     "@traceiq/types": "0.1.0",
     "ajv": "8.12.0",
     "bullmq": "^5.12.10",
+    "cencori": "^1.6.1",
     "cors": "^2.8.5",
-    "groq-sdk": "^1.5.0",
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
