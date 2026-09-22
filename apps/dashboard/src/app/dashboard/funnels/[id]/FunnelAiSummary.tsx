@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
+import AiBrain02Icon from '@hugeicons/core-free-icons/AiBrain02Icon';
+import { HugeiconsIcon } from '@hugeicons/react';
 
 export function FunnelAiSummary({ funnelId, days }: { funnelId: string; days: string }) {
   const { openAsk } = useAskTraceIQ();
@@ -34,10 +36,9 @@ export function FunnelAiSummary({ funnelId, days }: { funnelId: string; days: st
           onClick={handleInvestigate}
           className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
           Investigate with TraceIQ
+          <HugeiconsIcon icon={AiBrain02Icon} size={17} />
+
         </button>
       </div>
     </section>

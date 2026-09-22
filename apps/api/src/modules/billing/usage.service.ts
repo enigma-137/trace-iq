@@ -129,7 +129,7 @@ export class UsageService {
   /**
    * Converts an active reservation into consumed monthly usage exactly once.
    */
-  async consumeAskInvestigation(
+  async chargeAskInvestigation(
     executor: QueryExecutor,
     organizationId: string,
     investigationId: string,
