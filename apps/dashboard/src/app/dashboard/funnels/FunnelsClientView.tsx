@@ -428,7 +428,7 @@ export function FunnelsClientView({ funnels, resultsMap, eventNames }: FunnelsCl
               /* Rich Onboarding Empty State */
               <div className="space-y-6">
                 <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 p-8 text-center dark:border-slate-800 dark:bg-slate-900/30">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
@@ -468,7 +468,7 @@ export function FunnelsClientView({ funnels, resultsMap, eventNames }: FunnelsCl
                         <div>
                           <div className="flex items-center justify-between gap-2">
                             <h5 className="text-sm font-bold text-neutral-900 dark:text-white">{tpl.name}</h5>
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                               {tpl.steps.length} steps
                             </span>
                           </div>
@@ -552,13 +552,12 @@ export function FunnelsClientView({ funnels, resultsMap, eventNames }: FunnelsCl
                             return (
                               <span key={idx} className="inline-flex items-center gap-1">
                                 <span
-                                  className={`rounded px-1.5 py-0.5 border text-[11px] font-medium transition ${
-                                    isLast
-                                      ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-300'
+                                  className={`rounded px-1.5 py-0.5 border text-[11px] font-medium transition ${isLast
+                                      ? 'border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-300'
                                       : isFirst
-                                      ? 'bg-neutral-100 border-neutral-200 text-neutral-800 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200'
-                                      : 'bg-neutral-50 border-neutral-200/80 text-neutral-600 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400'
-                                  }`}
+                                        ? 'bg-neutral-100 border-neutral-200 text-neutral-800 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200'
+                                        : 'bg-neutral-50 border-neutral-200/80 text-neutral-600 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400'
+                                    }`}
                                 >
                                   {step.name}
                                 </span>
@@ -585,11 +584,10 @@ export function FunnelsClientView({ funnels, resultsMap, eventNames }: FunnelsCl
                                 >
                                   <div
                                     style={{ width: `${stepPct}%` }}
-                                    className={`h-full transition-all ${
-                                      idx === steps.length - 1
+                                    className={`h-full transition-all ${idx === steps.length - 1
                                         ? 'bg-blue-600 dark:bg-blue-500'
                                         : 'bg-blue-400/70 dark:bg-blue-500/50'
-                                    }`}
+                                      }`}
                                   />
                                 </div>
                               );

@@ -224,7 +224,7 @@ export class ConversationService {
          surface, context_type, context_id, question, status,
          usage_period, idempotency_key, quota_reserved
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'running', $10, $11, false)
-       ON CONFLICT (id) DO UPDATE SET updated_at = now()
+       ON CONFLICT (id) DO UPDATE SET status = ai_investigations.status
        RETURNING id, organization_id AS "organizationId", project_id AS "projectId",
                  conversation_id AS "conversationId", actor_user_id AS "actorUserId",
                  surface, context_type AS "contextType", context_id AS "contextId",
@@ -312,7 +312,6 @@ export class ConversationService {
 
     if (fields.length === 0) return;
 
-    fields.push(`updated_at = now()`);
     values.push(id);
     await this.database.query(
       `UPDATE ai_investigations SET ${fields.join(', ')} WHERE id = $${idx}`,

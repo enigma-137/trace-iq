@@ -72,13 +72,13 @@ export function AskTraceIQDrawer() {
         {/* Header */}
         <header className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50/90 px-5 py-3.5 backdrop-blur dark:border-neutral-800/80 dark:bg-neutral-900/60">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-500/30 dark:bg-blue-600/20 dark:text-blue-400">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-600 dark:border-blue-500/30 dark:bg-blue-600/20 dark:text-blue-400">
               <HugeiconsIcon icon={AiBrain02Icon} size={17} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-white">Ask TraceIQ</h2>
-                <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/80 dark:text-blue-300">
+                <span className="rounded border border-blue-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/80 dark:text-blue-300">
                   v1
                 </span>
               </div>
@@ -160,11 +160,10 @@ export function AskTraceIQDrawer() {
                       void selectConversation(c.id);
                       setShowHistory(false);
                     }}
-                    className={`w-full truncate rounded px-2 py-1.5 text-left text-xs transition ${
-                      c.id === activeConversationId
-                        ? 'border border-blue-200 bg-blue-50 text-blue-700 font-medium dark:border-blue-500/30 dark:bg-blue-600/20 dark:text-blue-300'
+                    className={`w-full truncate rounded px-2 py-1.5 text-left text-xs transition ${c.id === activeConversationId
+                        ? 'border border-blue-200 text-blue-700 font-medium dark:border-blue-500/30 dark:bg-blue-600/20 dark:text-blue-300'
                         : 'text-neutral-600 hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
-                    }`}
+                      }`}
                   >
                     {c.title}
                   </button>
@@ -191,7 +190,7 @@ export function AskTraceIQDrawer() {
           {/* Empty State */}
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-500/20 dark:bg-blue-600/10 dark:text-blue-400">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 text-blue-600 dark:border-blue-500/20 dark:bg-blue-600/10 dark:text-blue-400">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
@@ -259,7 +258,7 @@ export function AskTraceIQDrawer() {
                               key={fIdx}
                               type="button"
                               onClick={() => void submitQuestion(followup)}
-                              className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-blue-500/50 dark:hover:bg-blue-950/30 dark:hover:text-blue-200"
+                              className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-700 transition hover:border-blue-300 hover:hover:text-blue-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-blue-500/50 dark:hover:bg-blue-950/30 dark:hover:text-blue-200"
                             >
                               {followup}
                             </button>

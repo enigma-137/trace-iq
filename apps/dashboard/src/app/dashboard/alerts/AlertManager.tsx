@@ -60,43 +60,43 @@ const TEMPLATE_ALERTS: Array<{
   description: string;
   data: Partial<AlertFormData>;
 }> = [
-  {
-    name: 'Signup Drop Alert',
-    description: 'Alerts if successful user signups drop by more than 30% compared to yesterday.',
-    data: {
-      name: 'Signups Dropping (>30%)',
-      eventName: 'signup_completed',
-      measure: 'count',
-      windowHours: 24,
-      condition: 'drops_by',
-      threshold: 30
+    {
+      name: 'Signup Drop Alert',
+      description: 'Alerts if successful user signups drop by more than 30% compared to yesterday.',
+      data: {
+        name: 'Signups Dropping (>30%)',
+        eventName: 'signup_completed',
+        measure: 'count',
+        windowHours: 24,
+        condition: 'drops_by',
+        threshold: 30
+      }
+    },
+    {
+      name: 'API Error Spike Alert',
+      description: 'Alerts when API request error count spikes by more than 50% over a 1-hour window.',
+      data: {
+        name: 'API Error Rate Spike',
+        eventName: '$api_request',
+        measure: 'count',
+        windowHours: 1,
+        condition: 'spikes_by',
+        threshold: 50
+      }
+    },
+    {
+      name: 'Zero Activity Threshold',
+      description: 'Detects complete system outage when essential telemetry drops below 1.',
+      data: {
+        name: 'Zero Ingestion Warning',
+        eventName: '$api_request',
+        measure: 'count',
+        windowHours: 1,
+        condition: 'below',
+        threshold: 1
+      }
     }
-  },
-  {
-    name: 'API Error Spike Alert',
-    description: 'Alerts when API request error count spikes by more than 50% over a 1-hour window.',
-    data: {
-      name: 'API Error Rate Spike',
-      eventName: '$api_request',
-      measure: 'count',
-      windowHours: 1,
-      condition: 'spikes_by',
-      threshold: 50
-    }
-  },
-  {
-    name: 'Zero Activity Threshold',
-    description: 'Detects complete system outage when essential telemetry drops below 1.',
-    data: {
-      name: 'Zero Ingestion Warning',
-      eventName: '$api_request',
-      measure: 'count',
-      windowHours: 1,
-      condition: 'below',
-      threshold: 1
-    }
-  }
-];
+  ];
 
 function humanReadableCondition(alert: Alert): string {
   const metric =
@@ -514,7 +514,7 @@ export function AlertManager({
             {/* Alerts List or Rich Empty State */}
             {alerts.length === 0 ? (
               <div className="py-8 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 mb-4 shadow-inner">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 mb-4 shadow-inner">
                   <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -585,26 +585,24 @@ export function AlertManager({
                           {/* Alert Title & Status Badge */}
                           <div className="flex flex-wrap items-center gap-2">
                             <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                !alertsAvailable
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${!alertsAvailable
                                   ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
                                   : alert.enabled
                                     ? alert.lastStatus === 'triggered'
                                       ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
                                       : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                                     : 'bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400'
-                              }`}
+                                }`}
                             >
                               <span
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  !alertsAvailable
+                                className={`h-1.5 w-1.5 rounded-full ${!alertsAvailable
                                     ? 'bg-amber-500'
                                     : alert.enabled
                                       ? alert.lastStatus === 'triggered'
                                         ? 'bg-red-500 animate-pulse'
                                         : 'bg-emerald-500'
                                       : 'bg-neutral-400'
-                                }`}
+                                  }`}
                               />
                               {!alertsAvailable
                                 ? 'Pro required'
@@ -658,11 +656,10 @@ export function AlertManager({
                             type="button"
                             onClick={() => handleToggle(alert)}
                             disabled={!alertsAvailable || busyId === alert.id}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                              alert.enabled
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${alert.enabled
                                 ? 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
                                 : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200'
-                            }`}
+                              }`}
                           >
                             {alert.enabled ? 'Pause' : 'Enable'}
                           </button>
@@ -728,11 +725,10 @@ export function AlertManager({
                       {/* Inline Test Result Banner */}
                       {testResult ? (
                         <div
-                          className={`rounded-lg p-3 text-xs font-medium border ${
-                            testResult.triggered
+                          className={`rounded-lg p-3 text-xs font-medium border ${testResult.triggered
                               ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
                               : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
-                          }`}
+                            }`}
                         >
                           <strong className="font-semibold">
                             {testResult.triggered ? '⚠️ Threshold Triggered: ' : '✅ Threshold Passed: '}
@@ -803,7 +799,7 @@ export function AlertManager({
                           <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
                             {group.name}
                           </h4>
-                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                             Used by {usageCount} {usageCount === 1 ? 'alert' : 'alerts'}
                           </span>
                         </div>
