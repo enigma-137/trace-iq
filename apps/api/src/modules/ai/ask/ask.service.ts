@@ -136,6 +136,30 @@ export class AskService {
       idempotencyKey
     });
 
+    // If another concurrent request with the same idempotency key already created/claimed this investigation
+    if (investigation.quotaReserved || investigation.usageCharged || investigation.status === 'completed' || (idempotencyKey && investigation.actorUserId !== user.id)) {
+      let attempts = 0;
+      while (attempts < 60) {
+        const current = await this.conversations.getInvestigation(investigation.id, organizationId, projectId);
+        if (current && current.status !== 'running') {
+          const messages = await this.conversations.getConversationMessages(current.conversationId || '', organizationId, projectId);
+          const lastAssistantMsg = [...messages].reverse().find((m) => m.role === 'assistant');
+          return {
+            conversationId: current.conversationId || '',
+            investigationId: current.id,
+            answer: lastAssistantMsg?.content || 'Completed investigation.',
+            evidence: current.evidence,
+            findings: current.findings,
+            suggestedFollowups: current.suggestedFollowups,
+            usageCharged: current.usageCharged,
+            model: 'cached'
+          };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        attempts++;
+      }
+    }
+
     // 5. Atomic Quota Reservation (Before Expensive AI Generation)
     if (this.database && this.usage) {
       await this.database.transaction(async (client) => {

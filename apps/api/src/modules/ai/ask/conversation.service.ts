@@ -218,44 +218,53 @@ export class ConversationService {
     const id = params.investigationId || `inv_${randomUUID()}`;
     const usagePeriod = params.usagePeriod || new Date().toISOString().slice(0, 7);
 
-    const result = await this.database.query<any>(
-      `INSERT INTO ai_investigations (
-         id, organization_id, project_id, conversation_id, actor_user_id,
-         surface, context_type, context_id, question, status,
-         usage_period, idempotency_key, quota_reserved
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'running', $10, $11, false)
-       ON CONFLICT (id) DO UPDATE SET status = ai_investigations.status
-       RETURNING id, organization_id AS "organizationId", project_id AS "projectId",
-                 conversation_id AS "conversationId", actor_user_id AS "actorUserId",
-                 surface, context_type AS "contextType", context_id AS "contextId",
-                 question, status, usage_charged AS "usageCharged",
-                 quota_reserved AS "quotaReserved", usage_period AS "usagePeriod",
-                 idempotency_key AS "idempotencyKey", tool_calls_count AS "toolCallsCount",
-                 evidence, findings, suggested_followups AS "suggestedFollowups",
-                 started_at AS "startedAt", completed_at AS "completedAt",
-                 created_at AS "createdAt"`,
-      [
-        id,
-        params.organizationId,
-        params.projectId,
-        params.conversationId || null,
-        params.actorUserId,
-        params.surface || 'global',
-        params.contextType || null,
-        params.contextId || null,
-        params.question,
-        usagePeriod,
-        params.idempotencyKey || null
-      ]
-    );
+    try {
+      const result = await this.database.query<any>(
+        `INSERT INTO ai_investigations (
+           id, organization_id, project_id, conversation_id, actor_user_id,
+           surface, context_type, context_id, question, status,
+           usage_period, idempotency_key, quota_reserved
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'running', $10, $11, false)
+         RETURNING id, organization_id AS "organizationId", project_id AS "projectId",
+                   conversation_id AS "conversationId", actor_user_id AS "actorUserId",
+                   surface, context_type AS "contextType", context_id AS "contextId",
+                   question, status, usage_charged AS "usageCharged",
+                   quota_reserved AS "quotaReserved", usage_period AS "usagePeriod",
+                   idempotency_key AS "idempotencyKey", tool_calls_count AS "toolCallsCount",
+                   evidence, findings, suggested_followups AS "suggestedFollowups",
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   created_at AS "createdAt"`,
+        [
+          id,
+          params.organizationId,
+          params.projectId,
+          params.conversationId || null,
+          params.actorUserId,
+          params.surface || 'global',
+          params.contextType || null,
+          params.contextId || null,
+          params.question,
+          usagePeriod,
+          params.idempotencyKey || null
+        ]
+      );
 
-    const row = result.rows[0];
-    return {
-      ...row,
-      evidence: Array.isArray(row.evidence) ? row.evidence : [],
-      findings: Array.isArray(row.findings) ? row.findings : [],
-      suggestedFollowups: Array.isArray(row.suggestedFollowups) ? row.suggestedFollowups : []
-    };
+      const row = result.rows[0];
+      return {
+        ...row,
+        evidence: Array.isArray(row.evidence) ? row.evidence : [],
+        findings: Array.isArray(row.findings) ? row.findings : [],
+        suggestedFollowups: Array.isArray(row.suggestedFollowups) ? row.suggestedFollowups : []
+      };
+    } catch (err: any) {
+      if (params.idempotencyKey && (err?.code === '23505' || err?.message?.includes('ai_investigations_org_idempotency_idx'))) {
+        const existing = await this.getInvestigationByIdempotencyKey(params.organizationId, params.projectId, params.idempotencyKey);
+        if (existing) {
+          return existing;
+        }
+      }
+      throw err;
+    }
   }
 
   async updateInvestigation(

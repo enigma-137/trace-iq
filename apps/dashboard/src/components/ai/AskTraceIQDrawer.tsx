@@ -161,8 +161,8 @@ export function AskTraceIQDrawer() {
                       setShowHistory(false);
                     }}
                     className={`w-full truncate rounded px-2 py-1.5 text-left text-xs transition ${c.id === activeConversationId
-                        ? 'border border-blue-200 text-blue-700 font-medium dark:border-blue-500/30 dark:bg-blue-600/20 dark:text-blue-300'
-                        : 'text-neutral-600 hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
+                      ? 'border border-blue-200 text-blue-700 font-medium dark:border-blue-500/30 dark:bg-blue-600/20 dark:text-blue-300'
+                      : 'text-neutral-600 hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
                       }`}
                   >
                     {c.title}
@@ -175,10 +175,10 @@ export function AskTraceIQDrawer() {
 
         {/* Active Context Bar */}
         {activeContext?.surface ? (
-          <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50/70 px-5 py-2 text-xs text-blue-700 dark:border-neutral-800/60 dark:bg-blue-950/20 dark:text-blue-300">
+          <div className="flex items-center justify-between border-b border-blue-100 px-5 py-2 text-xs text-blue-700 dark:border-neutral-800/60  dark:text-blue-300">
             <div className="flex items-center gap-2 truncate">
               <span className="font-semibold text-blue-800 dark:text-blue-400">Attached Context:</span>
-              <span className="truncate rounded border border-blue-200 bg-blue-100/70 px-2 py-0.5 text-[11px] text-blue-800 dark:border-blue-700/40 dark:bg-blue-900/40 dark:text-blue-200">
+              <span className="truncate rounded border border-blue-200 px-2 py-0.5 text-[11px] text-blue-800 dark:border-blue-700/40 dark:bg-blue-900/40 dark:text-blue-200">
                 {activeContext.contextTitle || activeContext.surface}
               </span>
             </div>
