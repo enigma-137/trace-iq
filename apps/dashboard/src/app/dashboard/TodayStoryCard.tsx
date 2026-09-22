@@ -1,10 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
+import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -27,15 +29,17 @@ interface TodayStoryResponse {
 }
 
 /**
- * Today's Story — the plain-English headline for the overview. Fetches on mount,
- * regenerates when the button is clicked, and falls back to a template narrative
- * server-side.
+ * Today's Story — Highlighted insight banner matching the modern TraceIQ workspace.
+ * Features dynamic headline, key factual chips, and a "View more" action that
+ * opens the AskTraceIQ AI chat panel.
  */
 export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { openAsk } = useAskTraceIQ();
   const [story, setStory] = useState<TodayStoryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   async function load() {
     setIsLoading(true);
@@ -61,7 +65,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        setError(body?.message ?? 'Could not load today\'s story.');
+        setError(body?.message ?? "Could not load today's story.");
         return;
       }
 
@@ -78,115 +82,126 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  return (
-    <section className="relative mb-5 overflow-hidden rounded-md border border-neutral-200 bg-transparent p-4 transition-all hover:border-neutral-300 dark:border-slate-800/90 dark:hover:border-slate-700/80 sm:p-5">
-      <div className="relative">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-1.5">
-              {/* <Sparkles className="size-3.5 text-blue-600 dark:text-blue-400" /> */}
-              <p className="text-[11px] font-normal uppercase tracking-[0.1em] text-neutral-500 dark:text-slate-400">
-                Today&apos;s Story
-              </p>
-            </div>
-            <p className="mt-0.5 text-sm font-normal text-neutral-700 dark:text-slate-300">
-              {story?.project ? `${story.project.organizationName} / ${story.project.name}` : 'Workspace activity summary'}
-            </p>
-          </div>
+  if (isDismissed) return null;
 
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={isLoading}
-            className="inline-flex h-8 items-center justify-center gap-1.5 self-start rounded-md border border-neutral-300 bg-transparent px-3 text-xs font-medium text-neutral-700 transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 sm:self-auto"
-          >
-            <HugeiconsIcon icon={RefreshIcon} size={14} className={isLoading ? 'animate-spin' : ''} />
-            <span>{isLoading ? 'Writing…' : 'Refresh'}</span>
-          </button>
+  const projectName = story?.project?.name ?? 'your project';
+  const delta = story?.facts.deltaPct;
+  const isUp = delta !== null && delta !== undefined && delta > 0;
+  const isDown = delta !== null && delta !== undefined && delta < 0;
+
+  const headline = story
+    ? isUp
+      ? `Activity is up ${delta}% on ${projectName}`
+      : isDown
+      ? `Activity decreased by ${Math.abs(delta)}% on ${projectName}`
+      : `Daily activity overview on ${projectName}`
+    : `Analyzing activity on ${projectName}…`;
+
+  function handleOpenAi() {
+    openAsk({
+      surface: 'overview',
+      contextTitle: "Today's Story",
+      initialQuestion: `Explain today's activity story and trends for ${projectName}. What were the key events and user patterns?`
+    });
+  }
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-neutral-200/85 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] transition hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-none dark:hover:border-slate-700 sm:p-6">
+      {/* Top right actions: Dismiss & Refresh */}
+      <div className="absolute right-4 top-4 flex items-center gap-1.5 z-10">
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={isLoading}
+          title="Regenerate story"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-50 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+        >
+          <HugeiconsIcon icon={RefreshIcon} size={13} className={isLoading ? 'animate-spin' : ''} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsDismissed(true)}
+          title="Dismiss banner"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300 text-sm font-semibold"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-5 md:flex-row md:items-center">
+        {/* Left: Sleek Brand Visual Anchor */}
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-blue-600 shadow-sm relative overflow-hidden sm:h-24 sm:w-24">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.22),transparent)]" />
+          <div className="relative flex flex-col items-center justify-center text-white">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white/20 backdrop-blur-xs border border-white/30 flex items-center justify-center shadow-xs p-2">
+              <Image
+                src="/brand/logo-white-no-bg.png"
+                alt="TraceIQ"
+                width={28}
+                height={28}
+                className="h-full w-full object-contain"
+                priority
+              />
+            </div>
+          </div>
         </div>
 
-        {error ? (
-          <p className="mt-4 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2.5 text-xs text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-            {error}
+        {/* Middle: Content */}
+        <div className="min-w-0 flex-1 pr-6 md:pr-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            TODAY&apos;S STORY
           </p>
-        ) : null}
 
-        {!story && !error ? (
-          <div className="mt-4 space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="mt-4 h-3 w-40" />
-          </div>
-        ) : null}
+          <h3 className="mt-1 text-base font-bold text-neutral-900 dark:text-white sm:text-lg">
+            {headline}
+          </h3>
 
-        {story ? (
-          <div className="mt-3.5">
-            <p className="max-w-3xl text-sm font-normal leading-6 text-neutral-700 dark:text-slate-300">
-              {story.narrative}
-            </p>
-            <div className="mt-3.5 flex flex-wrap gap-2">
-              <FactChip label="Today" value={story.facts.eventsToday.toLocaleString()} tone="blue" />
-              <FactChip label="Delta" value={deltaLabel(story.facts.deltaPct)} tone={deltaTone(story.facts.deltaPct)} />
-              <FactChip label="Users today" value={story.facts.uniquesToday.toLocaleString()} tone="blue" />
-              {story.facts.topEvent ? (
-                <FactChip
-                  label="Top event"
-                  value={story.facts.topEvent.name}
-                  title={`${story.facts.topEvent.count.toLocaleString()} events`}
-                  tone="neutral"
-                />
-              ) : null}
-              {story.facts.topCountry && story.facts.topCountry.name !== 'unknown' ? (
-                <FactChip
-                  label="Top region"
-                  value={story.facts.topCountry.name}
-                  title={`${story.facts.topCountry.pct}% of activity`}
-                  tone="neutral"
-                />
-              ) : null}
-              {story.facts.activeNow > 0 ? <FactChip label="Active now" value={String(story.facts.activeNow)} tone="green" /> : null}
+          {error ? (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+          ) : isLoading && !story ? (
+            <div className="mt-2 space-y-2">
+              <Skeleton className="h-3.5 w-full max-w-xl" />
+              <Skeleton className="h-3.5 w-4/5 max-w-lg" />
             </div>
-          </div>
-        ) : null}
+          ) : (
+            <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-neutral-600 dark:text-slate-300 sm:text-sm">
+              {story?.narrative}
+            </p>
+          )}
+
+          {story ? (
+            <div className="mt-3.5 flex flex-wrap items-center gap-2">
+              {delta !== null && delta !== undefined ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  Today {delta > 0 ? `+${delta}%` : `${delta}%`}
+                </span>
+              ) : null}
+
+              <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1 text-xs font-normal text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                Users today <span className="font-medium text-neutral-800 dark:text-slate-200">{story.facts.uniquesToday.toLocaleString()}</span>
+              </span>
+
+              {story.facts.topEvent ? (
+                <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1 text-xs font-normal text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                  Top event: <span className="font-mono text-neutral-700 dark:text-slate-300">{story.facts.topEvent.name}</span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Right: "View more" CTA Button */}
+        <div className="flex shrink-0 items-center md:self-center">
+          <button
+            type="button"
+            onClick={handleOpenAi}
+            className="inline-flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 sm:px-5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
+            <span>View more</span>
+            <span aria-hidden>&rarr;</span>
+          </button>
+        </div>
       </div>
     </section>
   );
-}
-
-function FactChip({
-  label,
-  value,
-  tone = 'blue',
-  title
-}: {
-  label: string;
-  value: string;
-  tone?: 'blue' | 'green' | 'red' | 'neutral';
-  title?: string;
-}) {
-  const tones = {
-    blue: 'border-blue-300 text-blue-700 dark:border-blue-900 dark:text-blue-300',
-    green: 'border-emerald-300 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300',
-    red: 'border-rose-300 text-rose-700 dark:border-rose-900 dark:text-rose-300',
-    neutral: 'border-neutral-300 text-neutral-600 dark:border-slate-700 dark:text-slate-300'
-  };
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-normal ${tones[tone]}`} title={title}>
-      <span className="opacity-75">{label}</span>
-      <span className="font-mono">{value}</span>
-    </span>
-  );
-}
-
-function deltaLabel(delta: number | null): string {
-  if (delta === null) return 'new';
-  if (delta === 0) return 'flat';
-  return `${delta > 0 ? '+' : ''}${delta}%`;
-}
-
-function deltaTone(delta: number | null): 'blue' | 'green' | 'red' | 'neutral' {
-  if (delta === null) return 'blue';
-  if (delta > 0) return 'green';
-  if (delta < 0) return 'red';
-  return 'neutral';
 }

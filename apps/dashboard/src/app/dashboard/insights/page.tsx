@@ -1,8 +1,8 @@
+import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { comparisonText, compactNumber, deltaInfo, formatCount } from '@/lib/metrics';
 import { TrendChart } from '@/components/charts/TrendChart';
-import { SegmentBar } from '@/components/SegmentBar';
 import type { FilterCondition } from '@/components/SegmentFilters';
 import { TrendControls } from './TrendControls';
 import { SaveViewButton } from '../SaveViewButton';
@@ -49,7 +49,6 @@ function normalizeMeasure(value: string | undefined): Measure {
   return value === 'unique' || value === 'sum' || value === 'avg' ? value : 'count';
 }
 
-// Sum/avg of money reads better compact (₦1.2M); counts read better in full (12,340).
 function formatterFor(measure: Measure): (value: number) => string {
   return measure === 'sum' || measure === 'avg' ? compactNumber : formatCount;
 }
@@ -57,31 +56,29 @@ function formatterFor(measure: Measure): (value: number) => string {
 function metricLabel(trends: TrendsResponse): string {
   switch (trends.measure) {
     case 'unique':
-      return 'Unique users';
+      return 'Unique Users';
     case 'sum':
-      return `Total ${trends.property}`;
+      return `Total ${trends.property ?? 'Property'}`;
     case 'avg':
-      return `Average ${trends.property}`;
+      return `Average ${trends.property ?? 'Property'}`;
     default:
-      return 'Total events';
+      return 'Total Events';
   }
 }
 
-// A sentence a non-technical reader can parse at a glance.
 function plainSummary(trends: TrendsResponse, formattedCurrent: string): string {
   const window = `the last ${trends.summary.days} days`;
   switch (trends.measure) {
     case 'unique':
-      return `${formattedCurrent} unique people triggered ${trends.event} in ${window}.`;
+      return `${formattedCurrent} unique users triggered ${trends.event} in ${window}.`;
     case 'sum':
-      return `${trends.event} added up to ${formattedCurrent} in ${trends.property} over ${window}.`;
+      return `${trends.event} added up to ${formattedCurrent} in ${trends.property ?? 'property'} over ${window}.`;
     case 'avg':
-      return `${trends.event} averaged ${formattedCurrent} ${trends.property} over ${window}.`;
+      return `${trends.event} averaged ${formattedCurrent} ${trends.property ?? 'property'} over ${window}.`;
     default:
-      return `${trends.event} happened ${formattedCurrent} times in ${window}.`;
+      return `${trends.event} occurred ${formattedCurrent} times in ${window}.`;
   }
 }
-
 
 export default async function InsightsPage({
   searchParams
@@ -115,12 +112,8 @@ export default async function InsightsPage({
   if (selectedEvent && !missingProperty) {
     const query = new URLSearchParams({ event: selectedEvent, interval, measure });
     if (from || to) {
-      if (from) {
-        query.set('from', from);
-      }
-      if (to) {
-        query.set('to', to);
-      }
+      if (from) query.set('from', from);
+      if (to) query.set('to', to);
     } else {
       query.set('days', days);
     }
@@ -140,73 +133,129 @@ export default async function InsightsPage({
 
   return (
     <DashboardShell active="insights" title="Insights" userEmail={user.email}>
-      <section className="mb-6 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Event trends</h2>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
-              Trend an event over time — count it, count unique users, or sum/average a numeric property like{' '}
-              <span className="font-mono text-neutral-700 dark:text-slate-300">amount</span>. Optionally break it down by a property.
-            </p>
+      <div className="space-y-6">
+        {/* Top Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-800 shadow-xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500 dark:text-slate-400 sm:text-sm">
+                Trend an event over time — count volume, unique users, or calculate property sums and averages.
+              </p>
+            </div>
           </div>
-          <SaveViewButton
-            definition={{
-              source: 'trend',
-              event: selectedEvent,
-              interval,
-              from,
-              to,
-              days,
-              measure,
-              property,
-              breakdown,
-              filters: filtersParam
-            }}
-            projectId={project?.id}
-          />
-        </div>
-        <div className="mt-4">
-          <TrendControls
-            eventNames={eventNames}
-            selected={{ event: selectedEvent, interval, days, from, to, breakdown, measure, property }}
-          />
-        </div>
-        <div className="mt-4">
-          <SegmentBar basePath="/dashboard/insights" cohorts={cohortsData?.cohorts ?? []} initialFilters={filters} />
-        </div>
-      </section>
 
-      {eventNamesError ? <ErrorBanner message={eventNamesError} /> : null}
-      {trendsError ? <ErrorBanner message={trendsError} /> : null}
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <SaveViewButton
+              definition={{
+                source: 'trend',
+                event: selectedEvent,
+                interval,
+                from,
+                to,
+                days,
+                measure,
+                property,
+                breakdown,
+                filters: filtersParam
+              }}
+              projectId={project?.id}
+            />
+          </div>
+        </div>
 
-      <section className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        {/* Query Controls: inputs with collapsible middle panel */}
+        <TrendControls
+          eventNames={eventNames}
+          cohorts={cohortsData?.cohorts ?? []}
+          initialFilters={filters}
+          selected={{ event: selectedEvent, interval, days, from, to, breakdown, measure, property }}
+        />
+
+        {/* Error Alerts */}
+        {eventNamesError ? <ErrorBanner message={eventNamesError} /> : null}
+        {trendsError ? <ErrorBanner message={trendsError} /> : null}
+
+        {/* Main Chart / Centered Empty State Area */}
         {!selectedEvent ? (
-          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/40">
-            No events captured yet. Install the SDK and send an event, then come back to chart it.
-          </div>
+          /* Centered Empty State */
+          <section className="flex flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:p-14">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-50 text-neutral-700 shadow-xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-neutral-900 dark:text-white sm:text-lg">
+              No events captured yet
+            </h3>
+            <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-neutral-500 dark:text-slate-400 sm:text-sm sm:leading-6">
+              TraceIQ hasn't recorded events for this project yet. Integrate the SDK or send a test event to begin charting user behavior and metrics.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/dashboard/setup"
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                View SDK Setup Guide
+              </Link>
+              <Link
+                href="/dashboard/web"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-700 shadow-xs transition hover:bg-neutral-50 hover:text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Web Analytics
+              </Link>
+            </div>
+          </section>
         ) : missingProperty ? (
-          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-500 dark:border-slate-700 dark:bg-slate-900/40">
-            Enter a numeric property (e.g. <span className="font-mono text-neutral-700 dark:text-slate-300">amount</span>) to
-            {measure === 'sum' ? ' sum' : ' average'} over time.
-          </div>
+          /* Centered Property Prompt */
+          <section className="flex flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:p-12">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+              Property required for {measure === 'sum' ? 'Sum' : 'Average'}
+            </h3>
+            <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-neutral-500 dark:text-slate-400 sm:text-sm">
+              Enter a numeric property name (e.g.{' '}
+              <span className="font-mono font-semibold text-neutral-800 dark:text-slate-200">amount</span> or{' '}
+              <span className="font-mono font-semibold text-neutral-800 dark:text-slate-200">duration_ms</span>) in the query bar above to chart it.
+            </p>
+          </section>
         ) : trends ? (
+          /* Trends Data Visualization */
           (() => {
             const fmt = formatterFor(trends.measure);
             const current = fmt(trends.summary.current);
             const previous = fmt(trends.summary.previous);
             const delta = deltaInfo(trends.summary.current, trends.summary.previous);
+
             return (
-              <>
-                <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+              <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:p-6">
+                {/* Metric Summary Header */}
+                <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-neutral-100 pb-5 dark:border-slate-800/80">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
                       {metricLabel(trends)}
                     </p>
                     <div className="mt-1 flex items-baseline gap-3">
-                      <span className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">{current}</span>
+                      <span className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white sm:text-4xl">
+                        {current}
+                      </span>
                       <span
-                        className={`inline-flex items-center gap-1 text-sm font-medium ${
-                          delta.muted ? 'text-neutral-400 dark:text-slate-500' : 'text-neutral-800 dark:text-slate-200'
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${
+                          delta.muted
+                            ? 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400'
+                            : 'bg-neutral-100 text-neutral-900 dark:bg-slate-800 dark:text-slate-100'
                         }`}
                         title={`vs ${previous} in the previous ${trends.summary.days} days`}
                       >
@@ -214,17 +263,22 @@ export default async function InsightsPage({
                         {delta.label}
                       </span>
                     </div>
-                    <p className="mt-1.5 max-w-xl text-sm text-neutral-500 dark:text-slate-400">
+                    <p className="mt-2 max-w-xl text-xs text-neutral-500 dark:text-slate-400 sm:text-sm">
                       {plainSummary(trends, current)}{' '}
                       <span className="text-neutral-400 dark:text-slate-500">
                         {comparisonText(trends.summary.days, trends.summary.previous, previous, delta)}
                       </span>
                     </p>
                   </div>
-                  <span className="shrink-0 font-mono text-xs text-neutral-400 dark:text-slate-500">
-                    {trends.breakdown ? `broken down by ${trends.breakdown}` : `${trends.interval} · last ${days}d`}
-                  </span>
+
+                  <div className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-mono text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                    <span>
+                      {trends.breakdown ? `by ${trends.breakdown}` : `${trends.interval} interval · ${days}d`}
+                    </span>
+                  </div>
                 </div>
+
+                {/* Trend Chart */}
                 <TrendChart
                   buckets={trends.buckets}
                   series={trends.series}
@@ -232,21 +286,33 @@ export default async function InsightsPage({
                   format={trends.measure === 'sum' || trends.measure === 'avg' ? 'compact' : 'number'}
                   legendTotals={trends.measure === 'count' || trends.measure === 'sum'}
                 />
-              </>
+              </section>
             );
           })()
         ) : (
-          <p className="text-sm text-neutral-500 dark:text-slate-500">Loading…</p>
+          /* Loading State */
+          <div className="flex items-center justify-center rounded-xl border border-neutral-200 bg-white p-12 text-center text-xs text-neutral-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-500">
+            <svg className="mr-2 h-4 w-4 animate-spin text-neutral-500" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading insights data…
+          </div>
         )}
-      </section>
+      </div>
     </DashboardShell>
   );
 }
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-      {message}
-    </section>
+    <div className="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 text-red-600 dark:text-red-400">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span>{message}</span>
+    </div>
   );
 }

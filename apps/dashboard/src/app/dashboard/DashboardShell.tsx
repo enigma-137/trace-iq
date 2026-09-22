@@ -1,20 +1,35 @@
 import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
-import { MobileNav } from './MobileNav';
+import { DashboardHeader } from './DashboardHeader';
 import { DashboardPlanProvider } from './DashboardPlan';
 import { AskTraceIQProvider } from '@/components/ai/AskTraceIQContext';
 import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
 
-interface DashboardShellProps {
+export interface DashboardShellProps {
   active: string;
-  title: string;
-  userEmail?: string | null;
+  title?: string;
+  organizationName?: string | null;
+  projectName?: string | null;
   projectId?: string | null;
   organizationId?: string | null;
+  alertsSummary?: { total: number; firing: number; healthy: number } | null;
+  userEmail?: string | null;
+  headerActions?: ReactNode;
   children: ReactNode;
 }
 
-export function DashboardShell({ active, title, userEmail, projectId, organizationId, children }: DashboardShellProps) {
+export function DashboardShell({
+  active,
+  title,
+  organizationName,
+  projectName,
+  projectId,
+  organizationId,
+  alertsSummary,
+  userEmail,
+  headerActions,
+  children
+}: DashboardShellProps) {
   const localMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
 
   return (
@@ -25,21 +40,17 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
             <Sidebar active={active} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
 
             <section className="min-w-0 flex-1">
-              <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-8">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <img className="h-7 w-auto dark:hidden lg:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
-                    <div className="min-w-0">
-                      <h1 id="dashboard-title" className="mt-0.5 truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                        {title}
-                      </h1>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <MobileNav active={active} projectId={projectId} userEmail={userEmail} organizationId={organizationId} />
-                  </div>
-                </div>
-              </header>
+              <DashboardHeader
+                active={active}
+                title={title}
+                organizationName={organizationName}
+                projectName={projectName}
+                projectId={projectId}
+                organizationId={organizationId}
+                alertsSummary={alertsSummary}
+                userEmail={userEmail}
+                headerActions={headerActions}
+              />
 
               <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">
                 {localMode ? (

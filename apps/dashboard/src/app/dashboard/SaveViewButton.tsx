@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from './DashboardDialog';
 import type { DashboardDefinition } from './dashboards/types';
+import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -56,6 +57,7 @@ export function SaveViewButton({
       setBusy(false);
       setOpen(false);
       setName('');
+      toast.success(`Dashboard "${trimmed}" saved!`, { title: 'Dashboard saved' });
       router.refresh();
     } catch {
       setError('Could not save the dashboard.');
@@ -74,8 +76,11 @@ export function SaveViewButton({
           setError(null);
           setOpen(true);
         }}
-        className="inline-flex h-9 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3.5 text-xs font-semibold text-neutral-700 shadow-xs transition hover:bg-neutral-50 hover:text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
       >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+        </svg>
         Save view
       </button>
 
@@ -91,7 +96,12 @@ export function SaveViewButton({
             <button type="button" className={secondaryBtn} disabled={busy} onClick={() => setOpen(false)}>
               Cancel
             </button>
-            <button type="button" className={primaryBtn} disabled={busy} onClick={() => void handleSave()}>
+            <button
+              type="button"
+              className={primaryBtn}
+              disabled={busy || !name.trim()}
+              onClick={() => void handleSave()}
+            >
               {busy ? 'Saving…' : 'Save dashboard'}
             </button>
           </>
@@ -108,7 +118,7 @@ export function SaveViewButton({
           />
         </label>
         {error ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <p className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
             {error}
           </p>
         ) : null}
@@ -127,8 +137,8 @@ async function readError(response: Response): Promise<string> {
 }
 
 const inputClass =
-  'min-h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-white dark:focus:ring-white/10';
+  'min-h-9 w-full rounded-lg border border-neutral-300 bg-white px-3 text-xs text-neutral-900 outline-none transition focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-white dark:focus:ring-white/10';
 const secondaryBtn =
-  'h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
+  'h-9 rounded-lg border border-neutral-300 bg-white px-4 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
 const primaryBtn =
-  'h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200';
+  'inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 disabled:opacity-60';

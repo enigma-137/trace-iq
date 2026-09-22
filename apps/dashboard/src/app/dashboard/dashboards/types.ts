@@ -27,6 +27,80 @@ export interface DashboardView {
   updatedAt: string;
 }
 
+export interface DashboardTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  badge: string;
+  iconName: 'product' | 'acquisition' | 'retention' | 'errors';
+  definition: TrendDefinition;
+}
+
+export const RECOMMENDED_TEMPLATES: DashboardTemplate[] = [
+  {
+    id: 'product-overview',
+    name: 'Product Overview',
+    description: 'Track daily active users, overall event volume, and core user interactions across your product.',
+    category: 'Core Analytics',
+    badge: '30d · Unique users',
+    iconName: 'product',
+    definition: {
+      source: 'trend',
+      event: '$pageview',
+      interval: 'day',
+      days: '30',
+      measure: 'unique'
+    }
+  },
+  {
+    id: 'acquisition',
+    name: 'Acquisition',
+    description: 'Monitor incoming traffic channels, referral sources, top landing paths, and first-touch discovery.',
+    category: 'Traffic',
+    badge: '30d · By referrer',
+    iconName: 'acquisition',
+    definition: {
+      source: 'trend',
+      event: '$pageview',
+      interval: 'day',
+      days: '30',
+      measure: 'count',
+      breakdown: '$initial_referrer'
+    }
+  },
+  {
+    id: 'retention',
+    name: 'Retention',
+    description: 'Measure user return cadence, weekly cohort stickiness, and recurring feature engagement over time.',
+    category: 'Engagement',
+    badge: '30d · Identified users',
+    iconName: 'retention',
+    definition: {
+      source: 'trend',
+      event: '$identify',
+      interval: 'day',
+      days: '30',
+      measure: 'unique'
+    }
+  },
+  {
+    id: 'errors-performance',
+    name: 'Errors & Performance',
+    description: 'Detect exception spikes, unhandled client errors, and latency telemetry to protect application reliability.',
+    category: 'Reliability',
+    badge: '7d · Exception count',
+    iconName: 'errors',
+    definition: {
+      source: 'trend',
+      event: '$exception',
+      interval: 'day',
+      days: '7',
+      measure: 'count'
+    }
+  }
+];
+
 // Turn a trends definition back into the insights URL that renders the same view.
 export function dashboardToUrl(def: DashboardDefinition): string {
   if (def.source !== 'trend') return '/dashboard/insights';
