@@ -7,6 +7,7 @@ import { PublicPage } from '@/components/PublicSiteChrome';
 export const metadata: Metadata = { title: 'Blog', description: 'Notes on self-hosted analytics, product telemetry, privacy and building TraceIQ.' };
 
 const posts = [
+  { slug: 'meet-ask-traceiq', title: 'Meet Ask TraceIQ: Investigate your product by asking questions', description: 'Ask about funnels, errors, users, APIs, feature flags, replays, and more — and get evidence-grounded answers across your entire product telemetry.', date: 'September 22, 2026', readTime: '6 min read', tag: 'Product Announcement' },
   { slug: 'why-we-migrated-traceiq-to-self-hosting', title: 'Why we moved TraceIQ toward truly self-hosted analytics', description: 'What changed when we removed mandatory hosted authentication, made local mode one-command, and treated operational ownership as a product feature.', date: 'August 27, 2026', readTime: '7 min read', tag: 'Engineering' },
   { slug: 'traceiq-vs-umami-google-analytics-mixpanel-posthog', title: 'TraceIQ vs Umami, Google Analytics, Mixpanel and PostHog', description: 'A practical, honest guide to choosing the analytics product that matches your team, infrastructure and questions.', date: 'August 27, 2026', readTime: '10 min read', tag: 'Comparison' }
 ];

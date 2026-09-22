@@ -1,0 +1,178 @@
+import { BlogPostLayout } from '@/components/BlogPostLayout'
+
+export const metadata = {
+  title: 'Meet Ask TraceIQ: Investigate Your Product by Asking Questions',
+  description: 'Ask about funnels, errors, users, APIs, feature flags, replays, and more — and get answers grounded in your own product data.'
+}
+
+<BlogPostLayout
+  title="Meet Ask TraceIQ: Investigate Your Product by Asking Questions"
+  description="Most analytics tools give you dashboards. The hard part is connecting what happened across errors, funnels, flags, APIs, and replays. That is what we built Ask TraceIQ for."
+  date="September 22, 2026"
+  readTime="6 min read"
+>
+
+**Ask about funnels, errors, users, APIs, feature flags, replays, and more — and get answers grounded in your own product data.**
+
+Most analytics tools give you dashboards.
+
+Dashboards are useful, but they still require you to know where to look.
+
+If conversion suddenly drops, you might open your funnel. Then check errors. Then look at API performance. Then inspect session replays. Then wonder whether a recent feature rollout affected the same users.
+
+The data may all be there. The hard part is connecting it.
+
+That is what we built **Ask TraceIQ** for.
+
+---
+
+## Ask the question first
+
+Ask TraceIQ lets you investigate your product using natural language.
+
+You can ask things like:
+
+> Why did checkout conversion drop today?
+
+> What errors are affecting the most users?
+
+> Are users exposed to this feature flag behaving differently?
+
+> Which API endpoints are currently failing?
+
+> Show me what happened before users abandoned this funnel.
+
+> Are our webhooks healthy?
+
+TraceIQ can investigate across the product instead of forcing you to manually move between different dashboards.
+
+It can inspect funnels, event trends, errors, API performance, feature flags, user timelines, session replays, retention, cohorts, alerts, and webhook health.
+
+The result is one coherent investigation with the relevant evidence attached.
+
+---
+
+## Not just another chatbot
+
+We didn't want Ask TraceIQ to be a generic chat box sitting beside your analytics.
+
+The AI does not receive unrestricted database access, and it does not generate arbitrary SQL.
+
+Instead, it works through a curated set of **read-only TraceIQ tools**.
+
+When you ask a question, Ask TraceIQ decides what information it needs, uses the appropriate tools, gathers the results, and produces an answer based strictly on that evidence.
+
+For example, investigating a checkout problem might involve:
+
+- **Funnel** → Identify the exact step where conversion changed
+- **API monitoring** → Find elevated 4xx/5xx errors on `/checkout`
+- **Feature flags** → Inspect recent rollout state and variations
+- **Users & Cohorts** → Identify affected sessions and device segments
+- **Session replay** → Surface specific recordings worth watching
+
+You ask one question. TraceIQ handles the cross-surface investigation.
+
+---
+
+## Every answer should show its work
+
+AI answers become dangerous when confident language hides weak evidence.
+
+We designed Ask TraceIQ around a strict, three-tier evidence classification:
+
+- **Observed** — Directly supported by verified TraceIQ telemetry.
+- **Correlated** — Two events occurred together, but the data does not establish causation.
+- **Hypothesis** — A possible explanation that requires further investigation.
+
+Ask TraceIQ attaches concrete evidence cards to its findings and links that evidence directly back into the relevant areas of TraceIQ.
+
+So instead of a vague hallucination:
+
+> *"Your new feature caused checkout conversion to fall."*
+
+You receive grounded, verifiable claims:
+
+> **Observed:** Users exposed to `checkout-v2` had a lower observed checkout conversion during this period.  
+> **Correlated:** API latency and 500 errors on `/api/pay` were elevated among affected sessions.  
+> **Hypothesis:** Payment gateway timeouts may be impacting the final step of the new checkout rollout.
+
+With direct links to inspect the flag, funnel, error issue, user timeline, or session replays yourself.
+
+The goal isn't to replace engineering judgment. It's to make getting to the verified evidence significantly faster.
+
+---
+
+## Ask from anywhere in TraceIQ
+
+Ask TraceIQ is available globally with <kbd className="rounded border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">Cmd + K</kbd>, but it also understands your active context.
+
+- Open it while looking at a **Funnel**, and that funnel automatically becomes part of the investigation context.
+- Open it while viewing an **Error Issue**, **Feature Flag**, **API Endpoint**, or **Session Replay**, and TraceIQ starts there instead of making you explain everything from scratch.
+
+That makes follow-up questions instantaneous:
+
+> What changed here?
+
+> Who is affected?
+
+> Is this happening on mobile too?
+
+> What should I inspect next?
+
+---
+
+## Built with strict privacy boundaries
+
+Product telemetry can contain sensitive information, so we designed the AI layer with defensive boundaries from the beginning:
+
+- **Strict tenant isolation:** Operates solely within your authenticated organization and project.
+- **Read-only tools:** Cannot mutate data, toggle flags, or alter settings.
+- **Sanitized payload pipeline:** Automatically strips credentials, authorization tokens, cookies, IP addresses, and sensitive parameters before sending context to the model provider.
+- **Untrusted data guards:** Treats all event properties, error messages, and raw telemetry as untrusted data to prevent prompt injection.
+- **Resource bounds:** Enforces deterministic limits on tool calls, token budgets, and investigation duration.
+
+A question asked in one project cannot inspect, leak, or bleed into another.
+
+---
+
+## One investigation, not one model call
+
+A useful product investigation often requires several steps.
+
+Ask TraceIQ may need to inspect a funnel, compare an event trend, check error occurrences, and retrieve relevant sessions before synthesizing an answer.
+
+We treat all of that as **one investigation**.
+
+Internal tool calls, reasoning rounds, and intermediate steps do not individually consume your allowance.
+
+- **Free workspaces** include **3 Ask TraceIQ investigations each month**.
+- **Pro workspaces** include **100 Ask TraceIQ investigations each month**.
+
+Furthermore, we only count successfully completed investigations. Provider failures, timeouts, insufficient data, and rejected requests do not consume your allowance.
+
+---
+
+## This is only the beginning
+
+Today, Ask TraceIQ lives inside the dashboard drawer and global command palette.
+
+But we built the underlying architecture so the intelligence layer isn't coupled to a single interface.
+
+The same investigation engine will soon power the places where engineering and product teams already communicate:
+
+- **Slack**
+- **Telegram**
+- **WhatsApp**
+- **AI-Enriched Alerts** that don't just alert *“error rate exceeded 5%”*, but automatically investigate what changed and attach evidence before notifying your team.
+
+Imagine TraceIQ telling your on-call channel:
+
+> *Checkout failures increased sharply in the last 30 minutes. Most affected sessions are on mobile, and 82% of those users were exposed to `checkout-v2`. 14 affected session replays and error traces are ready for review.*
+
+That is where product intelligence is heading.
+
+For now, you can open TraceIQ, press <kbd className="rounded border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">Cmd + K</kbd>, and ask your first question.
+
+**Your product already has the answers buried in its telemetry. Ask TraceIQ helps you find them.**
+
+</BlogPostLayout>
