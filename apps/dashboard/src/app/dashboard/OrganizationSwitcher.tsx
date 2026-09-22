@@ -297,7 +297,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                                     setCreating(false);
                                     router.push(`/dashboard/settings?organizationId=${encodeURIComponent(org.id)}&newProject=1`);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-900"
+                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-blue-600 transition hover:dark:text-blue-400 dark:hover:bg-slate-900"
                                 >
                                   <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.9} aria-hidden="true" />
                                   Add project

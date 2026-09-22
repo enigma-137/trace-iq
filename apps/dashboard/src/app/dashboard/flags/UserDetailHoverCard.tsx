@@ -140,7 +140,7 @@ export function UserDetailHoverCard({
             {user.isMissing ? 'User record missing/deleted' : `Last seen ${formatRelativeTime(user.lastSeenAt)}`}
           </span>
         </div>
-        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
           Target User
         </span>
       </div>

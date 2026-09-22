@@ -270,8 +270,8 @@ export function TeamPanel() {
       {status ? (
         <p
           className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
-              ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-              : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+            ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+            : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
             }`}
         >
           {status.message}
@@ -558,7 +558,7 @@ function RoleBadge({ role }: { role: Role }) {
     role === 'owner'
       ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900'
       : role === 'admin'
-        ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900'
+        ? 'text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900'
         : 'bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-800';
 
   return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${className}`}>{role}</span>;

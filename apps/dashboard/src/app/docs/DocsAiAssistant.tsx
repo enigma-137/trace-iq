@@ -175,7 +175,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                           Base setup only
                         </span>
                       ) : (
-                        <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                        <span className="rounded-md px-2 py-1 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                           {specificSelectedCount} {specificSelectedCount === 1 ? 'feature' : 'features'} selected
                         </span>
                       )}
@@ -210,11 +210,10 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                           onClick={() => toggleFeature(feat.id)}
                           aria-checked={isSelected}
                           role="checkbox"
-                          className={`group flex items-start justify-between gap-3 rounded-lg border p-3.5 text-left transition ${
-                            isSelected
+                          className={`group flex items-start justify-between gap-3 rounded-lg border p-3.5 text-left transition ${isSelected
                               ? 'border-blue-500 bg-blue-50/50 shadow-sm dark:border-blue-500 dark:bg-blue-500/10'
                               : 'border-neutral-200 hover:border-neutral-300 dark:border-slate-800 dark:hover:border-slate-700'
-                          }`}
+                            }`}
                         >
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-neutral-900 dark:text-white">
@@ -225,11 +224,10 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                             </span>
                           </span>
                           <div
-                            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition ${
-                              isSelected
+                            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border transition ${isSelected
                                 ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
                                 : 'border-neutral-300 bg-white group-hover:border-neutral-400 dark:border-slate-700 dark:bg-slate-900'
-                            }`}
+                              }`}
                           >
                             {isSelected && <HugeiconsIcon icon={Tick02Icon} size={14} />}
                           </div>

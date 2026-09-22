@@ -160,11 +160,10 @@ export function DocsSearchModal({ isOpen, onClose, sections, basePath }: DocsSea
                     key={item.id}
                     onClick={() => handleSelect(item.id)}
                     onMouseEnter={() => setSelectedIndex(index)}
-                    className={`flex cursor-pointer items-start justify-between rounded-lg px-3.5 py-2.5 transition-colors ${
-                      isSelected
-                        ? 'bg-blue-50 dark:bg-cyan-950/40 border border-blue-200 dark:border-cyan-500/30'
+                    className={`flex cursor-pointer items-start justify-between rounded-lg px-3.5 py-2.5 transition-colors ${isSelected
+                        ? 'dark:bg-cyan-950/40 border border-blue-200 dark:border-cyan-500/30'
                         : 'border border-transparent hover:bg-neutral-50 dark:hover:bg-slate-900/60'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`mt-0.5 rounded-md p-1.5 ${isSelected ? 'bg-blue-600 text-white dark:bg-cyan-500 dark:text-slate-950' : 'bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400'}`}>

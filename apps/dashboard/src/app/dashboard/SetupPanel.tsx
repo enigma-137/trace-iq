@@ -540,7 +540,7 @@ export function SetupPanel({
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Organization Name</span>
                     {organizationRole ? (
-                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium capitalize text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                      <span className="rounded px-1.5 py-0.5 text-[10px] font-medium capitalize text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                         {organizationRole}
                       </span>
                     ) : null}

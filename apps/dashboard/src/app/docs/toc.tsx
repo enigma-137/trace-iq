@@ -73,8 +73,8 @@ export function TocNav({
                       <Link
                         onClick={onItemClick}
                         className={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-all ${isActive
-                            ? 'bg-blue-50 font-semibold text-blue-700 dark:bg-cyan-500/10 dark:text-cyan-300 border-l-2 border-blue-600 dark:border-cyan-400'
-                            : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-200'
+                          ? 'font-semibold text-blue-700 dark:bg-cyan-500/10 dark:text-cyan-300 border-l-2 border-blue-600 dark:border-cyan-400'
+                          : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-200'
                           }`}
                         href={`${basePath}?page=${s.id}`}
                       >
