@@ -4,12 +4,38 @@ import { FunnelsClientView } from './FunnelsClientView';
 
 export const dynamic = 'force-dynamic';
 
-interface FunnelStepItem {
+export interface FunnelStepItem {
+  order?: number;
   eventName: string;
+  label?: string | null;
+}
+
+export interface FunnelItem {
+  id: string;
+  name: string;
+  stepCount: number;
+  createdAt: string;
+  steps?: FunnelStepItem[];
+}
+
+export interface FunnelResultStep {
+  order: number;
+  eventName: string;
+  label: string | null;
+  count: number;
+  conversionFromStart: number;
+  conversionFromPrevious: number;
+  droppedFromPrevious: number;
+}
+
+export interface FunnelResultsData {
+  funnel: { id: string; name: string };
+  days: number;
+  steps: FunnelResultStep[];
 }
 
 interface FunnelsResponse {
-  funnels: Array<{ id: string; name: string; stepCount: number; createdAt: string; steps?: FunnelStepItem[] }>;
+  funnels: FunnelItem[];
 }
 
 interface EventNamesResponse {
@@ -26,15 +52,30 @@ export default async function FunnelsPage() {
   const funnels = funnelsData?.funnels ?? [];
   const eventNames = eventNamesData?.eventNames ?? [];
 
+  // Fetch 30-day performance results for all funnels in parallel for instant analytics preview
+  const resultsMap: Record<string, FunnelResultsData | null> = {};
+  if (funnels.length > 0) {
+    const resultsPromises = funnels.map((f) =>
+      dashboardGet<FunnelResultsData>(`/v1/dashboard/funnels/${f.id}/results?days=30`, token)
+    );
+    const resultsSettled = await Promise.allSettled(resultsPromises);
+    resultsSettled.forEach((res, index) => {
+      const funnelId = funnels[index]?.id;
+      if (funnelId && res.status === 'fulfilled' && res.value.data) {
+        resultsMap[funnelId] = res.value.data;
+      }
+    });
+  }
+
   return (
     <DashboardShell active="funnels" title="Funnels" userEmail={user.email}>
       {error ? (
-        <section className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <section className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </section>
       ) : null}
 
-      <FunnelsClientView funnels={funnels} eventNames={eventNames} />
+      <FunnelsClientView funnels={funnels} resultsMap={resultsMap} eventNames={eventNames} />
     </DashboardShell>
   );
 }

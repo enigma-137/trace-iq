@@ -28,6 +28,7 @@ export type FunnelSummary = {
   name: string;
   stepCount: number;
   createdAt: string;
+  steps?: Array<{ order: number; eventName: string; label: string | null }>;
 };
 
 export interface FunnelDetail extends FunnelSummary {
@@ -183,7 +184,14 @@ export class FunnelsService {
           f.id,
           f.name,
           count(fs.id)::int AS "stepCount",
-          f.created_at AS "createdAt"
+          f.created_at AS "createdAt",
+          COALESCE(
+            json_agg(
+              json_build_object('order', fs.step_order, 'eventName', fs.event_name, 'label', fs.label)
+              ORDER BY fs.step_order
+            ) FILTER (WHERE fs.id IS NOT NULL),
+            '[]'
+          ) AS steps
         FROM funnels f
         LEFT JOIN funnel_steps fs ON fs.funnel_id = f.id
         WHERE f.project_id = $1

@@ -25,6 +25,7 @@ import { NowActivityPanel } from './NowActivityPanel';
 import { ProjectIdBadge } from './ProjectIdBadge';
 import { alpha2ToName } from '@/lib/country-codes';
 import { OverviewGeographyGlobe } from './OverviewGeographyGlobe';
+import Rocket01Icon from '@hugeicons/core-free-icons/Rocket01Icon';
 
 export const dynamic = 'force-dynamic';
 
@@ -241,7 +242,7 @@ export default async function DashboardPage({
       {/* Top 4 KPI Metric Cards (Pace UI Style) */}
       <section className="mb-5 grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <PaceStatTile
-          icon={<HugeiconsIcon icon={FlashIcon} size={16} />}
+          icon={<HugeiconsIcon icon={Rocket01Icon} size={16} />}
           title="Total Events"
           value={overview?.totals.events ?? 0}
           badge={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
