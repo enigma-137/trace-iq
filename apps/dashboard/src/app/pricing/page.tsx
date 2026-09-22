@@ -1,17 +1,20 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { PublicPage } from '@/components/PublicSiteChrome';
+import { PricingClientView } from './PricingClientView';
 
-export const metadata: Metadata = { title: 'Pricing', description: 'Preview the pricing model TraceIQ is considering for managed analytics. Self-hosting remains free.' };
-
-const tiers = [
-  { name: 'Community', price: '$0', unit: 'forever', description: 'Run TraceIQ on infrastructure you control.', features: ['Open-source self-hosting', 'Web and product analytics', 'Funnels, retention and goals', 'Local auth or optional Supabase', 'Community support'], cta: 'Self-host TraceIQ', href: '/docs' },
-  { name: 'Cloud Starter', price: '$19', unit: 'per month', description: 'A possible managed plan for small products and teams.', features: ['Up to 100,000 events monthly', 'Managed upgrades and backups', 'Three team members', '30-day data retention', 'Email alerts'], cta: 'Join the waitlist', href: '/waitlist', featured: true },
-  { name: 'Growth', price: '$79', unit: 'per month', description: 'A possible plan for growing products with more traffic.', features: ['Up to 1 million events monthly', 'Unlimited team members', 'One-year data retention', 'Public dashboard links', 'Priority support'], cta: 'Talk to us', href: 'mailto:traceiq.run@gmail.comn' }
-];
+export const metadata: Metadata = {
+  title: 'Pricing · TraceIQ',
+  description: 'Simple, transparent pricing for developer-first behavior intelligence. Self-host for free or choose managed TraceIQ Cloud Pro for $19/mo.',
+  openGraph: {
+    title: 'Pricing · TraceIQ',
+    description: 'Simple, transparent pricing for developer-first behavior intelligence. Self-host for free or choose managed TraceIQ Cloud Pro for $19/mo.'
+  }
+};
 
 export default function PricingPage() {
-  return <PublicPage><main><section className="mx-auto max-w-4xl px-5 pb-12 pt-20 text-center sm:px-8 sm:pt-28"><h1 className="mt-6 text-5xl font-semibold tracking-tight sm:text-6xl">Self-host free.<br /><span className="text-zinc-500">Pay for convenience later.</span></h1><p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-zinc-400">These tiers show the model we are considering—not a current offer or promise. Community self-hosting remains the foundation; future paid plans would cover managed infrastructure, retention and support.</p></section><section className="mx-auto grid max-w-6xl gap-4 px-5 pb-24 sm:px-8 lg:grid-cols-3">{tiers.map((tier) => <article key={tier.name} className={`rounded-xl border p-6 ${tier.featured ? 'border-blue-500 bg-blue-500/[0.07]' : 'border-white/10 bg-white/[0.025]'}`}><h2 className="text-xl font-semibold">{tier.name}</h2><p className="mt-3 min-h-12 text-sm leading-6 text-zinc-400">{tier.description}</p><div className="mt-7"><span className="text-4xl font-semibold">{tier.price}</span><span className="ml-2 text-sm text-zinc-500">{tier.unit}</span></div><ul className="mt-7 grid gap-3 text-sm text-zinc-300">{tier.features.map((feature) => <li key={feature} className="flex gap-2"><HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-emerald-400" />{feature}</li>)}</ul><Link href={tier.href} className={`mt-8 inline-flex w-full justify-center rounded-md px-4 py-2.5 text-sm font-semibold ${tier.featured ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-white text-black hover:bg-zinc-200'}`}>{tier.cta}</Link></article>)}</section><section className="border-y border-white/10 bg-white/[0.02]"><div className="mx-auto max-w-3xl px-5 py-14 text-center sm:px-8"><h2 className="text-2xl font-semibold">What would you actually pay for?</h2><p className="mt-3 leading-7 text-zinc-400">We are validating event limits, retention and support before accepting payment. Tell us what feels fair—and what should always remain free.</p><a href="mailto:traceiq.run@gmail.comn?subject=TraceIQ%20pricing%20feedback" className="mt-6 inline-flex text-sm font-semibold text-blue-400 hover:text-blue-300">Send pricing feedback →</a></div></section></main></PublicPage>;
+  return (
+    <PublicPage>
+      <PricingClientView />
+    </PublicPage>
+  );
 }
