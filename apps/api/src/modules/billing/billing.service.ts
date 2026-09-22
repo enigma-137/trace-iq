@@ -665,7 +665,7 @@ export function buildProWelcomeEmail(input: {
             <p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">TraceIQ Pro</p>
             <h1 style="margin:0 0 16px;font-size:28px;line-height:1.2">Welcome to Pro.</h1>
             <p style="margin:0 0 16px;color:#4b5563;font-size:16px;line-height:1.65">Your Pro subscription for <strong>${organization}</strong> is active at <strong>${interval}</strong>.</p>
-            <p style="margin:0 0 24px;color:#4b5563;font-size:16px;line-height:1.65">You now have higher limits for events, projects, team members, retention, and Ask TraceIQ funnel explanations.</p>
+            <p style="margin:0 0 24px;color:#4b5563;font-size:16px;line-height:1.65">You now have higher limits for events, projects, team members, retention, and Ask TraceIQ investigations.</p>
             <a href="${dashboardUrl}" style="display:inline-block;border-radius:8px;background:#2563eb;color:#ffffff;padding:12px 18px;text-decoration:none;font-size:14px;font-weight:700">Open TraceIQ</a>
             <p style="margin:28px 0 0;color:#6b7280;font-size:13px;line-height:1.6">Thanks for supporting TraceIQ. We are glad to have you with us.</p>
           </td></tr>

@@ -7,6 +7,7 @@ import { CohortsService } from './cohorts.service';
 @Module({
   imports: [AuthModule, ProjectsModule],
   controllers: [CohortsController],
-  providers: [CohortsService]
+  providers: [CohortsService],
+  exports: [CohortsService]
 })
 export class CohortsModule {}

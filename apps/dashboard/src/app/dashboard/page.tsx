@@ -4,7 +4,6 @@ import { cookies } from 'next/headers';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
-import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
 import UserMultiple02Icon from '@hugeicons/core-free-icons/UserMultiple02Icon';
 import { DashboardShell } from './DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';

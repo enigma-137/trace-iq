@@ -6,7 +6,7 @@ describe('canonical plan catalogue', () => {
   it('captures the approved Free and Pro plans', () => {
     expect(CLOUD_PLAN_CATALOG.free).toMatchObject({
       price: { monthlyUsd: 0, yearlyUsd: 0 },
-      limits: { eventsPerMonth: 50_000, projects: 1, members: 1, retentionDays: 30, aiInsightsPerMonth: 5 },
+      limits: { eventsPerMonth: 50_000, projects: 1, members: 1, retentionDays: 30, aiInsightsPerMonth: 3 },
       features: { publicDashboards: true },
       requiresPaymentMethod: false
     });

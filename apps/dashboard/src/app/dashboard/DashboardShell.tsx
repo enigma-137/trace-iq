@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { DashboardPlanProvider } from './DashboardPlan';
+import { AskTraceIQProvider } from '@/components/ai/AskTraceIQContext';
+import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
 
 interface DashboardShellProps {
   active: string;
@@ -17,42 +19,41 @@ export function DashboardShell({ active, title, userEmail, projectId, organizati
 
   return (
     <DashboardPlanProvider projectId={projectId}>
-      <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
-        <div className="flex min-h-screen w-full">
-        <Sidebar active={active} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
+      <AskTraceIQProvider projectId={projectId}>
+        <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
+          <div className="flex min-h-screen w-full">
+            <Sidebar active={active} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
 
-        <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-8">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <img className="h-7 w-auto dark:hidden lg:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
-                {/* <img className="hidden h-7 w-auto dark:block lg:hidden" src="/brand/logo-white-no-bg.png" alt="TraceIQ" /> */}
-                <div className="min-w-0">
-                  {/* <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-slate-500">
-                    Dashboard
-                  </p> */}
-                  <h1 id="dashboard-title" className="mt-0.5 truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                    {title}
-                  </h1>
+            <section className="min-w-0 flex-1">
+              <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <img className="h-7 w-auto dark:hidden lg:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
+                    <div className="min-w-0">
+                      <h1 id="dashboard-title" className="mt-0.5 truncate text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+                        {title}
+                      </h1>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <MobileNav active={active} projectId={projectId} userEmail={userEmail} organizationId={organizationId} />
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <MobileNav active={active} projectId={projectId} userEmail={userEmail} organizationId={organizationId} />
-              </div>
-            </div>
-          </header>
+              </header>
 
-          <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">
-            {localMode ? (
-              <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                Local single-user mode · Authentication is disabled. Keep this instance bound to your own machine.
+              <div className="px-5 py-6 md:px-8 xl:px-10 2xl:px-12">
+                {localMode ? (
+                  <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                    Local single-user mode · Authentication is disabled. Keep this instance bound to your own machine.
+                  </div>
+                ) : null}
+                {children}
               </div>
-            ) : null}
-            {children}
+            </section>
           </div>
-        </section>
-        </div>
-      </main>
+          <AskTraceIQDrawer />
+        </main>
+      </AskTraceIQProvider>
     </DashboardPlanProvider>
   );
 }

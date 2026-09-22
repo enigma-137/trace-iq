@@ -1,85 +1,45 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { readApiError } from '@/lib/api-error';
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-
-interface AiSummaryResponse {
-  summary: string;
-  model: string;
-  generatedAt: string;
-}
+import React from 'react';
+import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
 
 export function FunnelAiSummary({ funnelId, days }: { funnelId: string; days: string }) {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { openAsk } = useAskTraceIQ();
 
-  async function handleExplain() {
-    setIsLoading(true);
-    setError(null);
-
-    const {
-      data: { session }
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      setError('Your dashboard session expired. Sign in again.');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/v1/dashboard/ai/funnels/${funnelId}/summary?days=${encodeURIComponent(days)}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-
-      if (!response.ok) {
-        setError(await readApiError(response));
-        return;
-      }
-
-      const body = (await response.json()) as AiSummaryResponse;
-      setSummary(body.summary);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed.');
-    } finally {
-      setIsLoading(false);
-    }
+  function handleInvestigate() {
+    openAsk({
+      surface: 'funnel',
+      entityId: funnelId,
+      contextTitle: `Funnel (Last ${days} days)`,
+      initialQuestion: 'Why did users drop off in this funnel?'
+    });
   }
 
   return (
-    <section className="mt-6 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center justify-between gap-3">
+    <section className="mt-6 rounded-xl border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">✨ Ask TraceIQ</h3>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">Get a plain-English explanation of this funnel's drop-off.</p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Ask TraceIQ</h3>
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+              Intelligence
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
+            Investigate conversion drop-offs, correlated errors, feature flags, and affected user sessions.
+          </p>
         </div>
         <button
           type="button"
-          onClick={handleExplain}
-          disabled={isLoading}
-          className="inline-flex h-9 shrink-0 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          onClick={handleInvestigate}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
         >
-          {isLoading ? 'Thinking…' : summary ? 'Regenerate' : 'Explain this'}
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Investigate with TraceIQ
         </button>
       </div>
-
-      {error ? (
-        <p className="mt-4 rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2.5 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-          {error}
-        </p>
-      ) : null}
-
-      {summary ? (
-        <p className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-          {summary}
-        </p>
-      ) : null}
     </section>
   );
 }

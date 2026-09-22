@@ -8,6 +8,7 @@ import { FlagsService } from './flags.service';
 @Module({
   imports: [AuthModule, ProjectsModule],
   controllers: [FlagsController, FlagsPublicController],
-  providers: [FlagsService]
+  providers: [FlagsService],
+  exports: [FlagsService]
 })
 export class FlagsModule {}

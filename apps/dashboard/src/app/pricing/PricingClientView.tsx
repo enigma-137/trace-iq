@@ -144,9 +144,8 @@ export function PricingClientView() {
             className="relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border border-white/20 bg-zinc-800 p-0.5 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <span
-              className={`inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
-                isYearly ? 'translate-x-6 bg-blue-500' : 'translate-x-0'
-              }`}
+              className={`inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${isYearly ? 'translate-x-6 bg-blue-500' : 'translate-x-0'
+                }`}
             />
           </button>
 

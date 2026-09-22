@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
+import AiBrain02Icon from '@hugeicons/core-free-icons/AiBrain02Icon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import SidebarLeftIcon from '@hugeicons/core-free-icons/SidebarLeftIcon';
 import SidebarRightIcon from '@hugeicons/core-free-icons/SidebarRightIcon';
@@ -13,6 +14,7 @@ import { OrganizationSwitcher } from './OrganizationSwitcher';
 import { navItems, bottomNavItems, navLinkClass, withProjectId } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
 import { DashboardPlanBadge } from './DashboardPlan';
+import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
 
 
 interface SidebarProps {
@@ -23,6 +25,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ active, userEmail, projectId, organizationId }: SidebarProps) {
+  const { openAsk } = useAskTraceIQ();
   const [collapsed, setCollapsed] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -86,8 +89,36 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
         </button>
       </div>
 
+      {/* Ask TraceIQ Launcher */}
+      {expanded ? (
+        <button
+          type="button"
+          onClick={() => openAsk()}
+          className="mt-5 flex w-full items-center justify-between rounded-lg border border-blue-500/30 bg-blue-600/10 px-3 py-2 text-xs font-semibold text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60 hover:bg-blue-600/20 transition"
+        >
+          <div className="flex items-center gap-2">
+            <HugeiconsIcon icon={AiBrain02Icon} size={17} />
+            <span>Ask TraceIQ</span>
+          </div>
+          <kbd className="rounded bg-blue-200/50 px-1.5 py-0.5 text-[10px] font-mono text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+            ⌘K
+          </kbd>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => openAsk()}
+          className="mt-5 flex size-9 items-center justify-center self-center rounded-lg border border-blue-500/30 bg-blue-600/10 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 hover:bg-blue-600/20 transition"
+          title="Ask TraceIQ (⌘K)"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </button>
+      )}
+
       {/* Main Navigation */}
-      <nav className="mt-6 grid gap-0.5" aria-label="Dashboard navigation">
+      <nav className="mt-4 grid gap-0.5" aria-label="Dashboard navigation">
         {navItems.map((item) => {
           const isActive = item.key === active;
           return (

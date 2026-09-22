@@ -207,10 +207,10 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <UsageMeter label="Events this month" value={entitlements.usage.events} limit={entitlements.limits.events} />
           <UsageMeter
-            label="AI funnel explanations this month"
+            label="Ask TraceIQ investigations"
             value={entitlements.usage.aiInsights}
             limit={entitlements.limits.aiInsights}
-            help="One unit is used when an eligible Ask TraceIQ funnel explanation reaches AI generation. Insufficient-data responses do not use your allowance."
+            help="One investigation is used when Ask TraceIQ successfully analyzes a question. Internal tool calls do not consume additional investigations. Insufficient-data and failed responses do not use your allowance."
           />
           <UsageMeter label="Projects" value={entitlements.usage.projects} limit={entitlements.limits.projects} overLimit={entitlements.overLimit.projects} />
           <UsageMeter label="Team members" value={entitlements.usage.members} limit={entitlements.limits.members} overLimit={entitlements.overLimit.members} />
@@ -223,13 +223,13 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       <div className="grid gap-4 lg:grid-cols-2">
         <PlanCard
           name="Free" price="$0" description="For evaluating TraceIQ and smaller projects."
-          features={['50K events/month', '1 project', '1 member', '30-day retention', '5 AI funnel explanations/month', 'Public dashboards']}
+          features={['50K events/month', '1 project', '1 member', '30-day retention', '3 Ask TraceIQ investigations/month', 'Public dashboards']}
           current={!pro}
         />
         <PlanCard
           name="Pro" price={proPrice} secondaryPrice={!hasNonterminalSubscription ? '$190/year' : undefined}
           description={hasNonterminalSubscription && !billingPeriod ? 'Billing interval is syncing from Bachs.' : 'For growing products and teams.'}
-          features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 AI funnel explanations/month', 'Public dashboards']}
+          features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 Ask TraceIQ investigations/month', 'Public dashboards']}
           current={pro}
           actions={pro ? (
             <div className={`grid gap-2 ${billingPeriod === 'monthly' ? 'sm:grid-cols-2' : ''}`}>

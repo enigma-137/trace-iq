@@ -38,7 +38,7 @@ describe('EntitlementService', () => {
 
     expect(snapshot).toMatchObject({
       plan: 'free',
-      limits: { events: 50_000, projects: 1, members: 1, retentionDays: 30, aiInsights: 5 },
+      limits: { events: 50_000, projects: 1, members: 1, retentionDays: 30, aiInsights: 3 },
       features: { publicDashboards: true, sessionReplay: false, alerts: false }
     });
   });

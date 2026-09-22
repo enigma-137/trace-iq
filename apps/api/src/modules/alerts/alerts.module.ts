@@ -10,6 +10,7 @@ import { NotificationGroupsService } from './notification-groups.service';
 @Module({
   imports: [AuthModule, ProjectsModule, EmailsModule],
   controllers: [AlertsController, NotificationGroupsController],
-  providers: [AlertsService, NotificationGroupsService]
+  providers: [AlertsService, NotificationGroupsService],
+  exports: [AlertsService]
 })
 export class AlertsModule {}

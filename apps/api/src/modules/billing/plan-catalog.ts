@@ -36,7 +36,7 @@ export const CLOUD_PLAN_CATALOG: Readonly<Record<CloudPlanKey, Readonly<CloudPla
       projects: 1,
       members: 1,
       retentionDays: 30,
-      aiInsightsPerMonth: 5
+      aiInsightsPerMonth: 3
     },
     features: { publicDashboards: true },
     requiresPaymentMethod: false

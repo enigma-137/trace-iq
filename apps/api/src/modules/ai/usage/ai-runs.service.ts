@@ -20,6 +20,7 @@ export interface RecordAiRunParams {
   latencyMs: number;
   providerRequestId?: string;
   errorMessage?: string | null;
+  investigationId?: string | null;
 }
 
 export interface AiRunRecord {
@@ -37,6 +38,7 @@ export interface AiRunRecord {
   latencyMs: number;
   providerRequestId: string | null;
   errorMessage: string | null;
+  investigationId: string | null;
   createdAt: string;
 }
 
@@ -78,9 +80,10 @@ export class AiRunsService {
             output_tokens,
             latency_ms,
             provider_request_id,
-            error_message
+            error_message,
+            investigation_id
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         `,
         [
           id,
@@ -96,7 +99,8 @@ export class AiRunsService {
           params.outputTokens ?? null,
           Math.max(0, Math.round(params.latencyMs)),
           params.providerRequestId ?? null,
-          boundedError
+          boundedError,
+          params.investigationId ?? null
         ]
       );
     } catch (err) {
@@ -124,6 +128,7 @@ export class AiRunsService {
           latency_ms AS "latencyMs",
           provider_request_id AS "providerRequestId",
           error_message AS "errorMessage",
+          investigation_id AS "investigationId",
           created_at AS "createdAt"
         FROM ai_runs
         WHERE project_id = $1
