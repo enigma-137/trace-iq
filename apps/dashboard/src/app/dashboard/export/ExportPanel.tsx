@@ -63,7 +63,7 @@ export function ExportPanel({ eventNames, userEmail, projectId, projectName }: E
                 Raw Telemetry Engine
               </span>
               {projectName ? (
-                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                <span className="rounded-full  px-2.5 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                   Project: {projectName}
                 </span>
               ) : null}
@@ -215,12 +215,12 @@ export function ExportPanel({ eventNames, userEmail, projectId, projectName }: E
         <div className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-slate-800/80">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md  text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 JSON
               </span>
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Full-Fidelity Schema</h3>
             </div>
-            <span className="rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            <span className="rounded  px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               .json
             </span>
           </div>
@@ -256,7 +256,7 @@ export function ExportPanel({ eventNames, userEmail, projectId, projectName }: E
         <div className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
           <div className="flex items-center justify-between pb-3">
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Programmatic API Export</h3>
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">cURL API Export</h3>
               <p className="text-xs text-neutral-500 dark:text-slate-400">
                 Automate raw data ingestion into your warehouse with scheduled cron jobs.
               </p>
@@ -372,11 +372,10 @@ function PresetCard({
             <p className="text-[11px] text-neutral-400 dark:text-slate-500">{subtitle}</p>
           </div>
           <span
-            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-              badgeTone === 'blue'
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                : 'bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-slate-300'
-            }`}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${badgeTone === 'blue'
+              ? ' text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+              : 'bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-slate-300'
+              }`}
           >
             {badge}
           </span>
