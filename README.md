@@ -20,7 +20,8 @@ TraceIQ is an open-source, developer-first product analytics platform for web, m
 SDKs and applications
         |
         v
-NestJS API (apps/api) ---- Redis
+NestJS API (apps/api) ----
+ Redis
         |
         v
 PostgreSQL 18
