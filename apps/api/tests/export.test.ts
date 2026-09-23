@@ -40,7 +40,7 @@ describe('ExportService', () => {
     });
 
     const projectsMock = {
-      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Production', organization_id: 'org_1' })
+      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Production', organizationId: 'org_1' })
     };
 
     const service = new ExportService(db as never, projectsMock as never);
@@ -59,7 +59,7 @@ describe('ExportService', () => {
   it('rejects email export for free tier cloud organizations', async () => {
     const db = mockDatabase(() => rows([]));
     const projectsMock = {
-      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Production', organization_id: 'org_1' })
+      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Production', organizationId: 'org_1' })
     };
     const entitlementsMock = {
       getSnapshot: vi.fn().mockResolvedValue({
@@ -98,7 +98,7 @@ describe('ExportService', () => {
 
     const db = mockDatabase(() => rows(mockRows));
     const projectsMock = {
-      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Store App', organization_id: 'org_1' })
+      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Store App', organizationId: 'org_1' })
     };
     const entitlementsMock = {
       getSnapshot: vi.fn().mockResolvedValue({
@@ -142,7 +142,7 @@ describe('ExportService', () => {
     const mockRows = [{ id: 'evt_2', eventName: 'login' }];
     const db = mockDatabase(() => rows(mockRows));
     const projectsMock = {
-      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Web', organization_id: 'org_1' })
+      requireActiveProject: vi.fn().mockResolvedValue({ id: 'proj_1', name: 'Web', organizationId: 'org_1' })
     };
     const entitlementsMock = {
       getSnapshot: vi.fn().mockResolvedValue({ deploymentMode: 'self_hosted', plan: 'self_hosted' })

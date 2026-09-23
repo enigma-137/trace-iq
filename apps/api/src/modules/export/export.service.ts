@@ -108,7 +108,7 @@ export class ExportService {
     const project = await this.projects.requireActiveProject(user, dto.projectId);
 
     // Entitlement verification: email export is available on Pro or self-hosted
-    const snapshot = await this.entitlements.getSnapshot(project.organization_id);
+    const snapshot = await this.entitlements.getSnapshot(project.organizationId);
     if (snapshot.deploymentMode === 'cloud' && snapshot.plan === 'free') {
       throw new ForbiddenException({
         code: 'ENTITLEMENT_REQUIRED',
