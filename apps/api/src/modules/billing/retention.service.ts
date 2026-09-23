@@ -62,11 +62,28 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
           projectDeleted += count;
           if (count < 1000) break;
         }
+
+        // Clean up expired observability logs
+        for (let batch = 0; batch < 20; batch += 1) {
+          const result = await client.query(`
+            DELETE FROM observability_logs
+            WHERE id IN (
+              SELECT id FROM observability_logs
+              WHERE project_id = $1 AND timestamp < now() - ($2::int * interval '1 day')
+              ORDER BY timestamp
+              LIMIT 1000
+            )
+          `, [project.id, retentionDays]);
+          const count = result.rowCount ?? 0;
+          projectDeleted += count;
+          if (count < 1000) break;
+        }
+
         return projectDeleted;
       });
     }
 
-    if (deletedEvents > 0) this.logger.log(`Retention sweep deleted ${deletedEvents} expired events.`);
+    if (deletedEvents > 0) this.logger.log(`Retention sweep deleted ${deletedEvents} expired records (events & logs).`);
     return { projectsScanned: projects.rows.length, deletedEvents };
   }
 

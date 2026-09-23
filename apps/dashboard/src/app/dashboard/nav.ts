@@ -4,6 +4,7 @@ export const navItems = [
   { label: 'Insights', href: '/dashboard/insights', key: 'insights' },
   { label: 'Dashboards', href: '/dashboard/dashboards', key: 'dashboards' },
   { label: 'Events', href: '/dashboard/events', key: 'events' },
+  { label: 'Observability', href: '/dashboard/logs', key: 'logs' },
   { label: 'Funnels', href: '/dashboard/funnels', key: 'funnels' },
   { label: 'Retention', href: '/dashboard/retention', key: 'retention' },
   { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' },
