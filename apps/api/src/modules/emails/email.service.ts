@@ -19,6 +19,11 @@ export class EmailService {
     to: string[];
     subject: string;
     html: string;
+    attachments?: Array<{
+      filename: string;
+      content: string | Buffer;
+      contentType?: string;
+    }>;
     idempotencyKey?: string;
   }): Promise<{ ok: boolean; failure?: string }> {
     if (!this.configured) {
@@ -37,15 +42,28 @@ export class EmailService {
         'content-type': 'application/json'
       };
       if (args.idempotencyKey) headers['Idempotency-Key'] = args.idempotencyKey;
+
+      const payload: Record<string, unknown> = {
+        from: this.from,
+        to,
+        subject: args.subject,
+        html: args.html
+      };
+
+      if (args.attachments && args.attachments.length > 0) {
+        payload.attachments = args.attachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.isBuffer(att.content)
+            ? att.content.toString('base64')
+            : Buffer.from(att.content).toString('base64'),
+          contentType: att.contentType
+        }));
+      }
+
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          from: this.from,
-          to,
-          subject: args.subject,
-          html: args.html
-        }),
+        body: JSON.stringify(payload),
         signal: controller.signal
       });
 

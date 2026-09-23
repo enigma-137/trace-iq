@@ -1,6 +1,6 @@
-import { Controller, Get, Headers, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
-import { ExportService } from './export.service';
+import { ExportService, EmailExportDto } from './export.service';
 
 @Controller('v1/dashboard/export')
 export class ExportController {
@@ -22,4 +22,15 @@ export class ExportController {
     this.authService.requireScope(user, 'exports:read');
     return this.exportService.exportEvents(user, { projectId, from, to, event, limit });
   }
+
+  @Post('email')
+  async emailExport(
+    @Headers('authorization') authorization?: string,
+    @Body() body?: EmailExportDto
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'exports:read');
+    return this.exportService.emailExport(user, body ?? {});
+  }
 }
+

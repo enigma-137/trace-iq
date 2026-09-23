@@ -12,7 +12,12 @@ interface PlanContextValue {
   billingPeriod: 'monthly' | 'yearly' | null;
 }
 
-const PlanContext = createContext<PlanContextValue>({ plan: null, billingPeriod: null });
+export const PlanContext = createContext<PlanContextValue>({ plan: null, billingPeriod: null });
+
+export function useDashboardPlan() {
+  return useContext(PlanContext);
+}
+
 
 export function DashboardPlanProvider({ projectId, children }: { projectId?: string | null; children: ReactNode }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
