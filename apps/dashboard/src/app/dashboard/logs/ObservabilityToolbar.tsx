@@ -41,17 +41,17 @@ const TIME_RANGES: { id: ObservabilityFilterState['timeRange']; label: string }[
 
 const LEVELS: { id: LogLevel | ''; label: string; color: string }[] = [
   { id: '', label: 'All levels', color: 'bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-slate-300' },
-  { id: 'error', label: 'Error', color: 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' },
-  { id: 'warn', label: 'Warn', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' },
-  { id: 'info', label: 'Info', color: 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60' },
-  { id: 'debug', label: 'Debug', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 border border-slate-200 dark:border-slate-700' }
+  { id: 'error', label: 'Error', color: ' text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' },
+  { id: 'warn', label: 'Warn', color: ' text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' },
+  { id: 'info', label: 'Info', color: ' text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60' },
+  { id: 'debug', label: 'Debug', color: ' text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700' }
 ];
 
 const STATUSES: { id: LogStatus | ''; label: string; color: string }[] = [
   { id: '', label: 'All status', color: 'bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-slate-300' },
-  { id: 'success', label: 'Success (2xx)', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60' },
-  { id: 'warning', label: 'Warning (4xx)', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' },
-  { id: 'error', label: 'Error (5xx)', color: 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' }
+  { id: 'success', label: 'Success (2xx)', color: ' text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60' },
+  { id: 'warning', label: 'Warning (4xx)', color: ' text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' },
+  { id: 'error', label: 'Error (5xx)', color: ' text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' }
 ];
 
 export function ObservabilityToolbar({
@@ -102,7 +102,7 @@ export function ObservabilityToolbar({
                 const count = s.id === 'all' ? undefined : sourceCounts[s.id];
                 return (
                   <option key={s.id} value={s.id}>
-                    {s.icon} {s.label} {count !== undefined ? `(${count})` : ''}
+                    {s.label} {count !== undefined ? `(${count})` : ''}
                   </option>
                 );
               })}
@@ -155,11 +155,10 @@ export function ObservabilityToolbar({
                   key={t.id}
                   type="button"
                   onClick={() => onFilterChange({ ...filters, timeRange: t.id })}
-                  className={`rounded px-2.5 py-1 text-xs font-medium transition ${
-                    active
-                      ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-800 dark:text-white'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                  }`}
+                  className={`rounded px-2.5 py-1 text-xs font-medium transition ${active
+                    ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-800 dark:text-white'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
                 >
                   {t.label}
                 </button>
@@ -171,19 +170,17 @@ export function ObservabilityToolbar({
           <button
             type="button"
             onClick={onToggleLive}
-            className={`flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition ${
-              isLive
-                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-950/50 dark:text-emerald-300'
-                : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-            }`}
+            className={`flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition ${isLive
+              ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-950/50 dark:text-emerald-300'
+              : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+              }`}
             title={isLive ? 'Live stream active (polling every 3s)' : 'Enable live streaming'}
           >
             <span
-              className={`h-2 w-2 rounded-full ${
-                isLive
-                  ? 'animate-pulse bg-emerald-500'
-                  : 'bg-neutral-400 dark:bg-slate-500'
-              }`}
+              className={`h-2 w-2 rounded-full ${isLive
+                ? 'animate-pulse bg-emerald-500'
+                : 'bg-neutral-400 dark:bg-slate-500'
+                }`}
             />
             <span>Live</span>
           </button>
@@ -231,11 +228,10 @@ export function ObservabilityToolbar({
                         level: lvl.id as LogLevel | ''
                       })
                     }
-                    className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
-                      isSelected
-                        ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-900 ' + lvl.color
-                        : 'opacity-70 hover:opacity-100 ' + lvl.color
-                    }`}
+                    className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${isSelected
+                      ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-900 ' + lvl.color
+                      : 'opacity-70 hover:opacity-100 ' + lvl.color
+                      }`}
                   >
                     {lvl.label}
                   </button>
@@ -262,11 +258,10 @@ export function ObservabilityToolbar({
                         status: st.id as LogStatus | ''
                       })
                     }
-                    className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
-                      isSelected
-                        ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-900 ' + st.color
-                        : 'opacity-70 hover:opacity-100 ' + st.color
-                    }`}
+                    className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${isSelected
+                      ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-900 ' + st.color
+                      : 'opacity-70 hover:opacity-100 ' + st.color
+                      }`}
                   >
                     {st.label}
                   </button>
