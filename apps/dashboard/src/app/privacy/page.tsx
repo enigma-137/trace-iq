@@ -190,16 +190,16 @@ export default function PrivacyPage() {
             </section>
 
             <section id="ai-mcp">
-              <h2>5. AI Copilots &amp; Model Context Protocol (MCP)</h2>
+              <h2>5. AI Copilots, Cencori &amp; Model Context Protocol (MCP)</h2>
               <p>
-                TraceIQ provides an optional Model Context Protocol (MCP) server that allows authorized AI developer tools (such as Claude Code, Cursor, or custom agents) to inspect telemetry, investigate error spikes, and summarize funnels.
+                TraceIQ incorporates AI-driven insights and natural language query assistance powered by services like Cencori, and provides an optional Model Context Protocol (MCP) server allowing developer tools (such as Claude Code, Cursor, or custom agents) to inspect telemetry, investigate error spikes, and summarize funnels.
               </p>
               <ul>
                 <li>
                   <strong>Permission Scoping:</strong> Every AI interaction requires a cryptographically generated Personal Access Token (PAT) with explicit read or write scopes.
                 </li>
                 <li>
-                  <strong>No Training on Customer Data:</strong> Neither TraceIQ nor its AI tool interfaces use your raw telemetry, logs, or user records to train general machine learning or foundation models without explicit consent.
+                  <strong>No Training on Customer Data:</strong> Neither TraceIQ nor our AI partners (including Cencori) use your raw customer telemetry, logs, or user records to train public machine learning or foundation models without explicit consent.
                 </li>
               </ul>
             </section>
@@ -284,9 +284,19 @@ export default function PrivacyPage() {
                     <td>United States / EU</td>
                   </tr>
                   <tr>
-                    <td>Stripe, Inc.</td>
+                    <td>Bachs</td>
                     <td>Payment Processing &amp; Billing Management</td>
-                    <td>United States</td>
+                    <td>Nigeria / Global</td>
+                  </tr>
+                  <tr>
+                    <td>Cencori</td>
+                    <td>AI Services &amp; Natural Language Analytics Processing</td>
+                    <td>Nigeria / Global</td>
+                  </tr>
+                  <tr>
+                    <td>Resend, Inc.</td>
+                    <td>Transactional Emails &amp; Notification Delivery</td>
+                    <td>United States / Global</td>
                   </tr>
                   <tr>
                     <td>Vercel Inc.</td>

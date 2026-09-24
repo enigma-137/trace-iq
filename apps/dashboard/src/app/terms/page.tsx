@@ -189,7 +189,7 @@ export default function TermsPage() {
               </p>
               <ul>
                 <li>
-                  <strong>Billing Cycles:</strong> Subscriptions are billed in advance on a monthly or annual recurring basis via our payment processor (Stripe).
+                  <strong>Billing Cycles:</strong> Subscriptions are billed in advance on a monthly or annual recurring basis via our payment processor (Bachs).
                 </li>
                 <li>
                   <strong>Event Quotas &amp; Overages:</strong> Paid plans include defined monthly event ingestion and session replay quotas. Ingestion exceeding plan allowances may be throttled or subject to overage charges as specified in your plan details.
@@ -214,14 +214,14 @@ export default function TermsPage() {
             </section>
 
             <section id="ai-mcp-terms">
-              <h2>8. AI Copilot &amp; MCP Server Usage</h2>
+              <h2>8. AI Copilot (Cencori) &amp; MCP Server Usage</h2>
               <p>
-                When using TraceIQ&apos;s Model Context Protocol (MCP) integrations or AI assistant connections:
+                When using TraceIQ&apos;s AI analytics features (powered in partnership with Cencori) or Model Context Protocol (MCP) integrations:
               </p>
               <ul>
                 <li>AI assistant tokens are strictly bound to your user permissions and organization scopes.</li>
                 <li>You are responsible for reviewing and authorizing any automated mutation operations initiated by external AI agents.</li>
-                <li>TraceIQ will not utilize your telemetry or operational logs to train public AI foundation models.</li>
+                <li>Neither TraceIQ nor its AI infrastructure partners (including Cencori) will utilize your customer telemetry or operational logs to train public AI foundation models.</li>
               </ul>
             </section>
 
