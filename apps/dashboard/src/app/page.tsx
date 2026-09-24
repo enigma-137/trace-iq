@@ -502,15 +502,16 @@ export default function Page() {
               <div><strong>Resources</strong><a href="/docs#sdk">SDKs</a><a href="/docs#mcp">MCP server</a><a href="/docs#session-replay">Session replay</a><span className="text-gray-400 cursor-not-allowed "> GitHub project</span></div>
             </div>
           </div>
-          <div className="footer-wordmark" aria-hidden="true">T r a c e  IQ</div>
+          <div className="footer-wordmark" aria-hidden="true">T r a c e  I Q</div>
           <div className="footer-bottom">
+
             <div className="footer-identity">
               <a className="brand" href="#top"><img src="/brand/logo-white-no-bg.png" alt="TraceIQ home" className="h-6 w-auto" /></a>
               <span>Make complexity legible.</span>
               <LiveFooterStatus />
             </div>
             <div className="footer-socials" aria-label="Social links">
-              <a href="https://github.com/enigma-137/trace-iq" target="_blank" rel="noreferrer" aria-label="TraceIQ on GitHub">GH</a>
+              <span className="cursor-not-allowed" aria-label="TraceIQ on GitHub">GH</span>
               <a href="mailto:traceiq.run@gmail.com" aria-label="Email TraceIQ">@</a>
               <a href="/docs" aria-label="TraceIQ documentation">?</a>
             </div>
