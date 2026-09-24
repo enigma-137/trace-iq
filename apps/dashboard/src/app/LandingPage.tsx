@@ -864,6 +864,8 @@ export default function LandingPage() {
               <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Resources</h2>
               <ul className="mt-3 space-y-2 text-sm text-zinc-500">
                 <li><a href="/docs" className={`rounded transition-colors hover:text-zinc-300 ${FOCUS_RING}`}>Docs</a></li>
+                <li><a href="/privacy" className={`rounded transition-colors hover:text-zinc-300 ${FOCUS_RING}`}>Privacy</a></li>
+                <li><a href="/terms" className={`rounded transition-colors hover:text-zinc-300 ${FOCUS_RING}`}>Terms</a></li>
                 <li><a href="#faq" className={`rounded transition-colors hover:text-zinc-300 ${FOCUS_RING}`}>FAQ</a></li>
                 <li>
                   <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={`rounded transition-colors hover:text-zinc-300 ${FOCUS_RING}`}>

@@ -19,7 +19,7 @@ export function PublicSiteHeader() {
 }
 
 export function PublicSiteFooter() {
-  return <footer className="border-t border-white/10 py-8 text-sm text-zinc-500"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 sm:px-8"><span>© {new Date().getFullYear()} TraceIQ</span><nav className="flex flex-wrap gap-5">{links.map((link) => <Link key={link.href} href={link.href} className="hover:text-zinc-200">{link.label}</Link>)}<Link href="/privacy" className="hover:text-zinc-200">Privacy</Link></nav></div></footer>;
+  return <footer className="border-t border-white/10 py-8 text-sm text-zinc-500"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 sm:px-8"><span>© {new Date().getFullYear()} TraceIQ</span><nav className="flex flex-wrap gap-5">{links.map((link) => <Link key={link.href} href={link.href} className="hover:text-zinc-200">{link.label}</Link>)}<Link href="/privacy" className="hover:text-zinc-200">Privacy</Link><Link href="/terms" className="hover:text-zinc-200">Terms</Link></nav></div></footer>;
 }
 
 export function PublicPage({ children }: { children: ReactNode }) {

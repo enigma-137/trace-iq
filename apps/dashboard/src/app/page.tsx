@@ -497,7 +497,7 @@ export default function Page() {
               )}
             </div>
             <div className="footer-links">
-              <div><strong>Help</strong><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/privacy">Privacy policy</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
+              <div><strong>Help</strong><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
               <div><strong>Explore</strong><a href="#product">Product overview</a><a href="/pricing">Pricing</a><a href="/status">System status</a><a href="/auth/login">Get started</a></div>
               <div><strong>Resources</strong><a href="/docs#sdk">SDKs</a><a href="/docs#mcp">MCP server</a><a href="/docs#session-replay">Session replay</a><span className="text-gray-400 cursor-not-allowed "> GitHub project</span></div>
             </div>
