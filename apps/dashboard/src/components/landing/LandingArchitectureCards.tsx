@@ -30,7 +30,7 @@ export function LandingArchitectureCards() {
   return (
     <section className="w-full bg-[#f3f2ee] text-[#111111] py-20 sm:py-28 lg:py-32 transition-colors">
       <div className="w-full max-w-[1880px] mx-auto px-6 sm:px-10 lg:px-14 xl:px-20 2xl:px-24">
-        
+
         {/* Top Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 pb-12 sm:pb-16 border-b border-black/[0.08]">
           <span className="text-xs sm:text-sm font-medium tracking-wide text-neutral-500 uppercase font-mono">
@@ -50,9 +50,10 @@ export function LandingArchitectureCards() {
                 <img
                   src={encodeURI(item.image)}
                   alt={`${item.title} - ${item.subtitle}`}
-                  className="w-full h-full object-cover object-center"
+                  className="w-full h-full object-cover object-center blur-sm"
                   loading="lazy"
                 />
+
 
                 {/* Subtle dark tint for center overlay */}
                 <div className="absolute inset-0 bg-black/25 transition-opacity duration-300 group-hover:bg-black/20" />

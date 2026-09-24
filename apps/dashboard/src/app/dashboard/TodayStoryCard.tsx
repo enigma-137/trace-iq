@@ -93,8 +93,8 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
     ? isUp
       ? `Activity is up ${delta}% on ${projectName}`
       : isDown
-      ? `Activity decreased by ${Math.abs(delta)}% on ${projectName}`
-      : `Daily activity overview on ${projectName}`
+        ? `Activity decreased by ${Math.abs(delta)}% on ${projectName}`
+        : `Daily activity overview on ${projectName}`
     : `Analyzing activity on ${projectName}…`;
 
   function handleOpenAi() {
@@ -121,7 +121,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
         <button
           type="button"
           onClick={() => setIsDismissed(true)}
-          title="Dismiss banner"
+          title="Temporarily dismiss banner"
           className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300 text-sm font-semibold"
         >
           ×

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
 import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
@@ -19,6 +19,7 @@ import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
 import { LandingScrollCapabilities } from '@/components/landing/LandingScrollCapabilities';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 import { TrustedTeamsSection } from '@/components/TrustedTeams';
+import { joinWaitlist } from './actions';
 
 const navItems = [
   { label: 'Product', href: '#product' },
@@ -73,6 +74,10 @@ export default function Page() {
   const [activeLanguage, setActiveLanguage] = useState<keyof typeof codeExamples>('JavaScript');
   const [copied, setCopied] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistMessage, setWaitlistMessage] = useState('');
+  const [waitlistError, setWaitlistError] = useState('');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -94,6 +99,29 @@ export default function Page() {
     await navigator.clipboard.writeText(codeExamples[activeLanguage]);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const handleWaitlistSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (waitlistLoading) return;
+
+    setWaitlistLoading(true);
+    setWaitlistMessage('');
+    setWaitlistError('');
+
+    try {
+      const result = await joinWaitlist(waitlistEmail);
+      if (result.success) {
+        setWaitlistMessage(result.message || 'You are on the list.');
+        setWaitlistEmail('');
+      } else {
+        setWaitlistError(result.error || 'We could not add that email.');
+      }
+    } catch {
+      setWaitlistError('We could not add that email. Please try again.');
+    } finally {
+      setWaitlistLoading(false);
+    }
   };
 
   const addLog = (type: 'sdk' | 'ingest' | 'error' | 'flag', message: string, payload?: any) => {
@@ -438,22 +466,55 @@ export default function Page() {
 
       {/* Footer */}
       <footer className="site-footer">
-        <div className="mx-auto max-w-[1200px] px-5 sm:px-8 grid grid-cols-1 gap-12 md:grid-cols-2">
-          <div className="footer-brand">
-            <a className="brand" href="#top"><img src="/brand/logo-white-no-bg.png" alt="TraceIQ Logo" className="h-6 w-auto" /></a>
-            <p>Make complexity legible.</p>
-            <LiveFooterStatus />
+        <div className="footer-inner">
+          <div className="footer-top">
+            <div className="footer-newsletter">
+              <span className="footer-label">Stay close to the signal</span>
+              <h2>Useful product insight,<br /><em>occasionally.</em></h2>
+              <form className="footer-waitlist-form" onSubmit={handleWaitlistSubmit}>
+                <label htmlFor="footer-email">Business email</label>
+                <div className="footer-email-control">
+                  <input
+                    id="footer-email"
+                    name="email"
+                    type="email"
+                    value={waitlistEmail}
+                    onChange={(event) => setWaitlistEmail(event.target.value)}
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                    disabled={waitlistLoading}
+                    required
+                  />
+                  <button type="submit" aria-label="Join the TraceIQ waitlist" disabled={waitlistLoading}>
+                    <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} />
+                  </button>
+                </div>
+              </form>
+              {(waitlistMessage || waitlistError) && (
+                <p className={`footer-form-feedback ${waitlistError ? 'is-error' : 'is-success'}`} aria-live="polite">
+                  {waitlistMessage || waitlistError}
+                </p>
+              )}
+            </div>
+            <div className="footer-links">
+              <div><strong>Help</strong><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/privacy">Privacy policy</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
+              <div><strong>Explore</strong><a href="#product">Product overview</a><a href="/pricing">Pricing</a><a href="/status">System status</a><a href="/auth/login">Get started</a></div>
+              <div><strong>Resources</strong><a href="/docs#sdk">SDKs</a><a href="/docs#mcp">MCP server</a><a href="/docs#session-replay">Session replay</a><span className="text-gray-400 cursor-not-allowed "> GitHub project</span></div>
+            </div>
           </div>
-          <div className="footer-links">
-            <div><strong>Explore</strong><a href="/docs">Resources</a><a href="/status">Status</a><a href="/pricing">Pricing</a><a href="/blog">Blog</a></div>
-            <div><strong>Company</strong><a href="/privacy">Privacy</a><a href="/auth/login">Get started</a><a href="mailto:traceiq.run@gmail.com">Contact</a></div>
-            <div><strong>Product</strong><a href="#product">Overview</a><a href="/auth/login">Sign in</a></div>
-          </div>
-        </div>
-        <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
+          <div className="footer-wordmark" aria-hidden="true">T r a c e  IQ</div>
           <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} TraceIQ</span>
-            <span>Built for the signal.</span>
+            <div className="footer-identity">
+              <a className="brand" href="#top"><img src="/brand/logo-white-no-bg.png" alt="TraceIQ home" className="h-6 w-auto" /></a>
+              <span>Make complexity legible.</span>
+              <LiveFooterStatus />
+            </div>
+            <div className="footer-socials" aria-label="Social links">
+              <a href="https://github.com/enigma-137/trace-iq" target="_blank" rel="noreferrer" aria-label="TraceIQ on GitHub">GH</a>
+              <a href="mailto:traceiq.run@gmail.com" aria-label="Email TraceIQ">@</a>
+              <a href="/docs" aria-label="TraceIQ documentation">?</a>
+            </div>
+            <span className="footer-copyright">© {new Date().getFullYear()} TraceIQ</span>
           </div>
         </div>
       </footer>
