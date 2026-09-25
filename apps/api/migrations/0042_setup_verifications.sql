@@ -1,7 +1,7 @@
 -- Setup Verifications table for live CLI and Dashboard onboarding verification
 CREATE TABLE IF NOT EXISTS setup_verifications (
   id VARCHAR(64) PRIMARY KEY,
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ NOT NULL,
