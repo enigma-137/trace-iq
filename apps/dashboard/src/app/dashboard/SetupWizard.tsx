@@ -145,7 +145,6 @@ export function SetupWizard({
   const [isListening, setIsListening] = useState(false);
   const [verificationData, setVerificationData] = useState<VerificationEventData | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [isSendingProbe, setIsSendingProbe] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
 
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -276,50 +275,6 @@ export function SetupWizard({
       const msg = err instanceof Error ? err.message : 'Could not reach TraceIQ verification API.';
       setVerificationError(msg);
       toast.error(msg, { title: 'Verification Error' });
-    }
-  };
-
-  // Trigger automated test probe through normal events pipeline
-  const sendTestEvent = async () => {
-    if (!verificationId) return;
-    setIsSendingProbe(true);
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (writeKey) {
-        headers['x-traceiq-write-key'] = writeKey;
-      }
-
-      const res = await fetch(`${apiUrl}/v1/events`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          projectId,
-          writeKey: writeKey || undefined,
-          eventName: 'traceiq_setup_verified',
-          anonymousId: 'anon_dashboard_setup_wizard',
-          timestamp: new Date().toISOString(),
-          properties: {
-            verification_id: verificationId,
-            source: 'dashboard-wizard',
-            environment: 'development'
-          },
-          context: {
-            environment: 'development',
-            verification_id: verificationId
-          }
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Failed to ingest test event'));
-      }
-      toast.success('Test event dispatched through normal pipeline!', { title: 'Event sent' });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send event', { title: 'Probe failed' });
-    } finally {
-      setIsSendingProbe(false);
     }
   };
 
@@ -847,23 +802,15 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
                         Waiting for your first event…
                       </h4>
                       <p className="mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-                        Launch your dev server and trigger an event in your app, or dispatch a test probe below.
+                        Launch your application and trigger an event to verify the live connection.
                       </p>
                     </div>
 
                     <div className="flex items-center justify-center gap-2 pt-2">
                       <button
                         type="button"
-                        onClick={sendTestEvent}
-                        disabled={isSendingProbe || !verificationId}
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {isSendingProbe ? 'Sending probe…' : 'Send test verification event'}
-                      </button>
-                      <button
-                        type="button"
                         onClick={startVerification}
-                        className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
                       >
                         Restart listener
                       </button>

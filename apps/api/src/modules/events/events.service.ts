@@ -216,6 +216,7 @@ export class EventsService {
           resolvedProjectId,
           {
             eventName: p.eventName,
+            occurredAt: p.occurredAt,
             properties: p.properties,
             context: p.context,
             deviceInfo: p.deviceInfo,

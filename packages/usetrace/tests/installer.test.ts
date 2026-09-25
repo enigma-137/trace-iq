@@ -11,6 +11,12 @@ describe('useTrace Installer and Idempotency', () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'usetrace-installer-test-'));
+    const sdkDir = path.join(tempDir, 'node_modules', 'traceiq-sdk-js');
+    await fs.mkdir(sdkDir, { recursive: true });
+    await fs.writeFile(
+      path.join(sdkDir, 'package.json'),
+      JSON.stringify({ name: 'traceiq-sdk-js', version: '0.1.7' })
+    );
   });
 
   afterEach(async () => {
@@ -288,6 +294,69 @@ describe('useTrace Installer and Idempotency', () => {
 
       const resolved = resolveDefaultApiUrl(explicitLocal, existingInEnv);
       expect(resolved).toBe('http://localhost:4000');
+    });
+  });
+
+  describe('Package installation and resolvability enforcement', () => {
+    it('does not treat presence in package.json alone as installed if not resolvable in node_modules', async () => {
+      // Remove node_modules
+      await fs.rm(path.join(tempDir, 'node_modules'), { recursive: true, force: true });
+
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'uninstalled-app',
+          dependencies: { next: '^14.0.0', react: '^18.0.0', 'traceiq-sdk-js': '^0.1.7' }
+        })
+      );
+
+      const adapter = new NextJsAdapter();
+      const state = await adapter.inspect(tempDir);
+
+      // Package is in package.json but not actually resolvable in node_modules
+      expect(state.sdkDetected).toBe(false);
+      expect(state.issues).toContain('TraceIQ SDK is listed in package.json but not resolvable in node_modules.');
+    });
+
+    it('detects SDK as installed when package is resolvable in node_modules', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'installed-app',
+          dependencies: { next: '^14.0.0', react: '^18.0.0', 'traceiq-sdk-js': '^0.1.7' }
+        })
+      );
+
+      const adapter = new NextJsAdapter();
+      const state = await adapter.inspect(tempDir);
+
+      expect(state.sdkDetected).toBe(true);
+      expect(state.sdkVersion).toBe('^0.1.7');
+    });
+
+    it('fails setup cleanly if package installation fails', async () => {
+      // Remove node_modules
+      await fs.rm(path.join(tempDir, 'node_modules'), { recursive: true, force: true });
+
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({ name: 'fail-app', dependencies: { next: '^14.0.0' } })
+      );
+
+      const adapter = new NextJsAdapter();
+      const installer = new TraceIQInstaller(adapter);
+
+      // Package manager command failure rejects install
+      await expect(
+        installer.install({
+          cwd: tempDir,
+          projectId: 'prj_fail',
+          writeKey: 'tiq_live_fail',
+          apiUrl: 'https://api.traceiq.run',
+          selectedProducts: ['product-analytics'],
+          packageManager: 'nonexistent-pm-xyz' as any
+        })
+      ).rejects.toThrow();
     });
   });
 });

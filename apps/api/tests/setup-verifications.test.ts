@@ -9,6 +9,9 @@ import { affected, empty, mockDatabase, rows } from './helpers/mock-db';
 describe('SetupVerificationsService Core & Ingestion', () => {
   it('creates verification session and returns id with expiration', async () => {
     const db = mockDatabase((text) => {
+      if (text.includes('SELECT id, project_id, status, created_at, expires_at')) {
+        return empty(); // no existing session
+      }
       if (text.includes('INSERT INTO setup_verifications')) {
         return rows([
           {
@@ -35,6 +38,36 @@ describe('SetupVerificationsService Core & Ingestion', () => {
     expect(result.expiresAt).toBeDefined();
   });
 
+  it('reuses active pending session for the same project (enforces one pending session)', async () => {
+    const existingSession = {
+      id: 'verify_existing_active',
+      project_id: 'proj_reuse_1',
+      status: 'pending' as const,
+      expires_at: new Date(Date.now() + 250000).toISOString(),
+      created_at: new Date(Date.now() - 50000).toISOString()
+    };
+
+    let insertCount = 0;
+    const db = mockDatabase((text) => {
+      if (text.includes('SELECT id, project_id, status, created_at, expires_at')) {
+        return rows([existingSession]);
+      }
+      if (text.includes('INSERT INTO setup_verifications')) {
+        insertCount++;
+        return empty();
+      }
+      return empty();
+    });
+
+    const service = new SetupVerificationsService(db as never);
+    const firstCall = await service.createSession('proj_reuse_1', 300);
+    const secondCall = await service.createSession('proj_reuse_1', 300);
+
+    expect(firstCall.verificationId).toBe('verify_existing_active');
+    expect(secondCall.verificationId).toBe('verify_existing_active');
+    expect(insertCount).toBe(0); // Did not create a redundant session
+  });
+
   it('authenticates writeKey and rejects if invalid for project', async () => {
     const db = mockDatabase((text) => {
       if (text.includes('FROM project_write_keys pwk')) {
@@ -48,9 +81,9 @@ describe('SetupVerificationsService Core & Ingestion', () => {
     expect(isValid).toBe(false);
   });
 
-  it('records verification when event has matching verification_id', async () => {
+  it('verifies pending session on first real event from project without needing verification_id', async () => {
     const verificationRecord = {
-      id: 'verify_abc_789',
+      id: 'verify_auto_matched',
       project_id: 'proj_1',
       status: 'pending',
       expires_at: new Date(Date.now() + 300000).toISOString(),
@@ -58,7 +91,7 @@ describe('SetupVerificationsService Core & Ingestion', () => {
       verified_event_name: null,
       verified_event_id: null,
       verified_metadata: null,
-      created_at: new Date().toISOString()
+      created_at: new Date(Date.now() - 1000).toISOString()
     };
 
     const db = mockDatabase((text) => {
@@ -67,8 +100,34 @@ describe('SetupVerificationsService Core & Ingestion', () => {
           ...verificationRecord,
           status: 'verified',
           verified_at: new Date().toISOString(),
-          verified_event_name: 'traceiq_setup_verified'
+          verified_event_name: 'button_clicked'
         }]);
+      }
+      return empty();
+    });
+
+    const service = new SetupVerificationsService(db as never);
+    // Standard normal user event from customer application (no verification_id property)
+    const verified = await service.recordVerificationIfMatching(
+      'proj_1',
+      {
+        eventName: 'button_clicked',
+        occurredAt: new Date(),
+        properties: { button_id: 'checkout_btn' }
+      },
+      { headers: { host: 'app.customer.com' } },
+      'evt_first_real_event'
+    );
+
+    expect(verified).toBe(true);
+  });
+
+  it('rejects events that occurred before the verification session started', async () => {
+    const db = mockDatabase((text, values) => {
+      if (text.includes('UPDATE setup_verifications')) {
+        // SQL query has "created_at <= eventOccurredAt"
+        // If event occurred in past, DB UPDATE returns empty
+        return empty();
       }
       return empty();
     });
@@ -77,19 +136,15 @@ describe('SetupVerificationsService Core & Ingestion', () => {
     const verified = await service.recordVerificationIfMatching(
       'proj_1',
       {
-        eventName: 'traceiq_setup_verified',
-        properties: { verification_id: 'verify_abc_789', framework: 'Next.js' },
-        environment: 'development'
-      },
-      { headers: { host: 'localhost:3000' } },
-      'evt_123'
+        eventName: 'old_historical_event',
+        occurredAt: new Date(Date.now() - 3600000) // 1 hour ago
+      }
     );
 
-    expect(verified).toBe(true);
+    expect(verified).toBe(false);
   });
 
-  it('rejects expired verification IDs', async () => {
-    // Database returns no row when updating with "expires_at > now()" because session expired
+  it('rejects expired verification IDs / sessions', async () => {
     const db = mockDatabase((text) => {
       if (text.includes('UPDATE setup_verifications')) {
         return empty(); // expired or not found
@@ -109,13 +164,12 @@ describe('SetupVerificationsService Core & Ingestion', () => {
     expect(verified).toBe(false);
   });
 
-  it('rejects verification ID belonging to another project', async () => {
-    // Session exists for proj_2, but incoming event is for proj_1
+  it('rejects verification for a different project', async () => {
     const db = mockDatabase((text, values) => {
       if (text.includes('UPDATE setup_verifications')) {
-        const targetProj = values[1];
+        const targetProj = values[3];
         if (targetProj === 'proj_2') {
-          return rows([{ id: 'verify_diff_proj', status: 'verified' }]);
+          return rows([{ id: 'verify_proj_2', status: 'verified' }]);
         }
         return empty();
       }
@@ -126,8 +180,8 @@ describe('SetupVerificationsService Core & Ingestion', () => {
     const verified = await service.recordVerificationIfMatching(
       'proj_1', // wrong project
       {
-        eventName: 'traceiq_setup_verified',
-        properties: { verification_id: 'verify_diff_proj' }
+        eventName: 'pageview',
+        occurredAt: new Date()
       }
     );
 

@@ -1,10 +1,100 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createRequire } from 'node:module';
 import { FrameworkAdapter } from './adapter.interface.js';
 import { NextJsAdapter } from './nextjs.adapter.js';
 import { ViteReactAdapter } from './vite-react.adapter.js';
 import { NodeAdapter } from './node.adapter.js';
 import { GenericWebAdapter } from './generic.adapter.js';
+
+const execAsync = promisify(exec);
+
+/**
+ * Checks if a package is actually resolvable from the target cwd.
+ * Does not rely on package.json presence alone.
+ */
+export async function isPackageResolvable(cwd: string, packageName: string): Promise<boolean> {
+  let curr = path.resolve(cwd);
+  while (true) {
+    const candidate = path.join(curr, 'node_modules', packageName, 'package.json');
+    try {
+      await fs.access(candidate);
+      return true;
+    } catch {
+      // not in this level
+    }
+    const parent = path.dirname(curr);
+    if (parent === curr) break;
+    curr = parent;
+  }
+
+  try {
+    const req = createRequire(path.join(cwd, 'package.json'));
+    req.resolve(packageName);
+    return true;
+  } catch {
+    // not resolvable
+  }
+
+  return false;
+}
+
+/**
+ * Ensures a package is installed using the project's package manager,
+ * and verifies that it is resolvable after installation.
+ */
+export async function ensurePackageInstalled(
+  cwd: string,
+  packageName: string,
+  pm: 'npm' | 'pnpm' | 'yarn' | 'bun' = 'npm',
+  dryRun?: boolean
+): Promise<boolean> {
+  const isInstalled = await isPackageResolvable(cwd, packageName);
+  if (isInstalled) {
+    return false; // Already resolvable
+  }
+
+  if (dryRun) {
+    return true;
+  }
+
+  let command: string;
+  switch (pm) {
+    case 'pnpm':
+      command = `pnpm add ${packageName}`;
+      break;
+    case 'yarn':
+      command = `yarn add ${packageName}`;
+      break;
+    case 'bun':
+      command = `bun add ${packageName}`;
+      break;
+    case 'npm':
+      command = `npm install ${packageName}`;
+      break;
+    default:
+      throw new Error(`Unsupported package manager: ${pm}`);
+  }
+
+  try {
+    await execAsync(command, { cwd });
+  } catch (error) {
+    throw new Error(
+      `Package installation failed running '${command}' in ${cwd}: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  const verified = await isPackageResolvable(cwd, packageName);
+  if (!verified) {
+    throw new Error(
+      `Failed to verify installation of '${packageName}' in ${cwd}. The package is not resolvable after running '${command}'.`
+    );
+  }
+
+  return true;
+}
 
 export async function detectPackageManager(cwd: string): Promise<'pnpm' | 'npm' | 'yarn' | 'bun'> {
   try {

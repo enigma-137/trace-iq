@@ -74,7 +74,7 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
               LIMIT 1000
             )
           `, [project.id, retentionDays]);
-          const count = result.rowCount ?? 0;
+          const count = result?.rowCount ?? 0;
           projectDeleted += count;
           if (count < 1000) break;
         }

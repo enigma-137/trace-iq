@@ -6,7 +6,9 @@ import {
   applyEnvVariables,
   detectExistingEnvCredentials,
   detectPackageManager,
+  ensurePackageInstalled,
   getProjectMetadata,
+  isPackageResolvable,
   resolveTargetEnvFile
 } from './detector.js';
 
@@ -36,8 +38,10 @@ export class NextJsAdapter implements FrameworkAdapter {
     const pm = await detectPackageManager(cwd);
     const envCreds = await detectExistingEnvCredentials(cwd);
 
-    const sdkDetected = Boolean(meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']);
-    const sdkVersion = meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js'];
+    const isResolvable = await isPackageResolvable(cwd, 'traceiq-sdk-js');
+    const inPkgJson = Boolean(meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']);
+    const sdkDetected = isResolvable;
+    const sdkVersion = inPkgJson ? (meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']) : undefined;
 
     const hasSrc = await this.directoryExists(path.join(cwd, 'src'));
     const baseDir = hasSrc ? path.join(cwd, 'src') : cwd;
@@ -121,7 +125,13 @@ export class NextJsAdapter implements FrameworkAdapter {
     const issues: string[] = [];
     const recommendations: string[] = [];
 
-    if (!sdkDetected) issues.push('TraceIQ SDK is not installed in dependencies.');
+    if (!sdkDetected) {
+      if (inPkgJson) {
+        issues.push('TraceIQ SDK is listed in package.json but not resolvable in node_modules.');
+      } else {
+        issues.push('TraceIQ SDK is not installed in dependencies.');
+      }
+    }
     if (!providerInLayout) issues.push('TraceIQ provider is not configured in root layout.');
     if (!envCreds.projectId || !envCreds.writeKey) issues.push('TraceIQ environment variables are missing.');
     if (sdkDetected && !userIdentificationConfigured) {
@@ -158,6 +168,12 @@ export class NextJsAdapter implements FrameworkAdapter {
       installedPackages: [],
       diffs: []
     };
+
+    // Ensure package is installed using package manager and verified resolvable
+    const wasInstalled = await ensurePackageInstalled(options.cwd, 'traceiq-sdk-js', options.packageManager, options.dryRun);
+    if (wasInstalled) {
+      changes.installedPackages.push('traceiq-sdk-js');
+    }
 
     const hasSrc = await this.directoryExists(path.join(options.cwd, 'src'));
     const baseDir = hasSrc ? path.join(options.cwd, 'src') : options.cwd;

@@ -6,7 +6,9 @@ import {
   applyEnvVariables,
   detectExistingEnvCredentials,
   detectPackageManager,
+  ensurePackageInstalled,
   getProjectMetadata,
+  isPackageResolvable,
   resolveTargetEnvFile
 } from './detector.js';
 
@@ -36,8 +38,10 @@ export class ViteReactAdapter implements FrameworkAdapter {
     const pm = await detectPackageManager(cwd);
     const envCreds = await detectExistingEnvCredentials(cwd);
 
-    const sdkDetected = Boolean(meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']);
-    const sdkVersion = meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js'];
+    const isResolvable = await isPackageResolvable(cwd, 'traceiq-sdk-js');
+    const inPkgJson = Boolean(meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']);
+    const sdkDetected = isResolvable;
+    const sdkVersion = inPkgJson ? (meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']) : undefined;
 
     const hasProvider =
       (await this.fileExists(path.join(cwd, 'src', 'traceiq.ts'))) ||
@@ -47,7 +51,13 @@ export class ViteReactAdapter implements FrameworkAdapter {
     const issues: string[] = [];
     const recommendations: string[] = [];
 
-    if (!sdkDetected) issues.push('TraceIQ SDK is not installed in dependencies.');
+    if (!sdkDetected) {
+      if (inPkgJson) {
+        issues.push('TraceIQ SDK is listed in package.json but not resolvable in node_modules.');
+      } else {
+        issues.push('TraceIQ SDK is not installed in dependencies.');
+      }
+    }
     if (!hasProvider) issues.push('TraceIQ initialization is missing from application entry.');
     if (!envCreds.projectId || !envCreds.writeKey) issues.push('TraceIQ environment variables are missing.');
 
@@ -78,6 +88,12 @@ export class ViteReactAdapter implements FrameworkAdapter {
       installedPackages: [],
       diffs: []
     };
+
+    // Ensure package is installed using package manager and verified resolvable
+    const wasInstalled = await ensurePackageInstalled(options.cwd, 'traceiq-sdk-js', options.packageManager, options.dryRun);
+    if (wasInstalled) {
+      changes.installedPackages.push('traceiq-sdk-js');
+    }
 
     const isTypeScript = (await this.fileExists(path.join(options.cwd, 'tsconfig.json'))) || (await this.fileExists(path.join(options.cwd, 'src', 'main.tsx')));
     const ext = isTypeScript ? 'ts' : 'js';

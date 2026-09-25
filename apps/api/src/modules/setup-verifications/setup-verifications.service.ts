@@ -57,10 +57,35 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * Create a temporary verification session for a project.
+   * Create or reuse an active temporary verification session for a project.
+   * Enforces at most one active pending session per project.
    */
   async createSession(projectId: string, ttlSeconds = 300): Promise<{ verificationId: string; expiresAt: string; projectId: string }> {
     const validTtl = Math.min(Math.max(ttlSeconds, 60), 600); // 1 - 10 minutes
+
+    // 1. Check if there is an existing pending non-expired session for this project
+    const existing = await this.database.query<SetupVerificationRecord>(
+      `
+        SELECT id, project_id, status, created_at, expires_at
+        FROM setup_verifications
+        WHERE project_id = $1
+          AND status = 'pending'
+          AND expires_at > now()
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [projectId]
+    );
+
+    if (existing.rows.length > 0) {
+      const active = existing.rows[0];
+      return {
+        verificationId: active.id,
+        expiresAt: (active.expires_at as string) ?? new Date(Date.now() + validTtl * 1000).toISOString(),
+        projectId: active.project_id
+      };
+    }
+
     const verificationId = `verify_${randomUUID().replace(/-/g, '')}`;
     const expiresAt = new Date(Date.now() + validTtl * 1000).toISOString();
 
@@ -119,11 +144,13 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
 
   /**
    * Verify an incoming event from the real ingestion pipeline against pending verification sessions.
+   * Matches any active pending session for the project where the event occurred after the session started.
    */
   async recordVerificationIfMatching(
     projectId: string,
     event: {
       eventName?: string;
+      occurredAt?: Date | string;
       properties?: Record<string, unknown>;
       context?: Record<string, unknown>;
       deviceInfo?: Record<string, unknown>;
@@ -138,24 +165,34 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
     } = {},
     eventId?: string
   ): Promise<boolean> {
+    if (!projectId) {
+      return false;
+    }
+
+    // Determine event timestamp
+    let eventTime: Date;
+    if (event.occurredAt instanceof Date) {
+      eventTime = event.occurredAt;
+    } else if (typeof event.occurredAt === 'string') {
+      const parsed = new Date(event.occurredAt);
+      eventTime = isNaN(parsed.getTime()) ? new Date() : parsed;
+    } else {
+      eventTime = new Date();
+    }
+
     const rawVerificationId =
       event.properties?.verification_id ??
       event.properties?.verificationId ??
       event.context?.verification_id ??
       event.context?.verificationId;
 
-    if (!rawVerificationId || typeof rawVerificationId !== 'string') {
-      return false;
-    }
+    const specificVerificationId =
+      typeof rawVerificationId === 'string' && rawVerificationId.trim().startsWith('verify_')
+        ? rawVerificationId.trim()
+        : null;
 
-    const verificationId = rawVerificationId.trim();
-    if (!verificationId.startsWith('verify_')) {
-      return false;
-    }
-
-    // Attempt to atomically transition from 'pending' to 'verified' matching projectId and unexpired session
     const verifiedMetadata = {
-      source: meta.headers?.['host'] ?? meta.headers?.['origin'] ?? 'localhost:3000',
+      source: meta.headers?.['host'] ?? meta.headers?.['origin'] ?? 'client-application',
       host: meta.headers?.['host'] ?? null,
       origin: meta.headers?.['origin'] ?? null,
       userAgent: meta.headers?.['user-agent'] ?? (event.deviceInfo?.userAgent as string) ?? null,
@@ -166,8 +203,11 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
       timestamp: new Date().toISOString()
     };
 
-    const updateResult = await this.database.query<SetupVerificationRecord>(
-      `
+    let query: string;
+    let params: unknown[];
+
+    if (specificVerificationId) {
+      query = `
         UPDATE setup_verifications
         SET
           status = 'verified',
@@ -179,16 +219,46 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
           AND project_id = $5
           AND status = 'pending'
           AND expires_at > now()
+          AND created_at <= ($6::timestamptz + INTERVAL '5 seconds')
         RETURNING *
-      `,
-      [event.eventName ?? 'traceiq_setup_verified', eventId ?? `evt_${randomUUID()}`, JSON.stringify(verifiedMetadata), verificationId, projectId]
-    );
+      `;
+      params = [
+        event.eventName ?? 'traceiq_setup_verified',
+        eventId ?? `evt_${randomUUID()}`,
+        JSON.stringify(verifiedMetadata),
+        specificVerificationId,
+        projectId,
+        eventTime.toISOString()
+      ];
+    } else {
+      query = `
+        UPDATE setup_verifications
+        SET
+          status = 'verified',
+          verified_at = now(),
+          verified_event_name = $1,
+          verified_event_id = $2,
+          verified_metadata = $3
+        WHERE project_id = $4
+          AND status = 'pending'
+          AND expires_at > now()
+          AND created_at <= ($5::timestamptz + INTERVAL '5 seconds')
+        RETURNING *
+      `;
+      params = [
+        event.eventName ?? 'traceiq_setup_verified',
+        eventId ?? `evt_${randomUUID()}`,
+        JSON.stringify(verifiedMetadata),
+        projectId,
+        eventTime.toISOString()
+      ];
+    }
+
+    const updateResult = await this.database.query<SetupVerificationRecord>(query, params);
 
     if (updateResult.rows.length === 0) {
       return false;
     }
-
-    const updated = updateResult.rows[0];
 
     // Fetch project name for richer feedback
     let projectName = 'TraceIQ Project';
@@ -204,36 +274,38 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
       // Non-critical fallback
     }
 
-    const payload: VerificationEventPayload = {
-      verificationId,
-      projectId,
-      projectName,
-      status: 'verified',
-      verifiedAt: (updated.verified_at as string) ?? new Date().toISOString(),
-      event: {
-        id: (updated.verified_event_id as string) ?? eventId ?? '',
-        name: (updated.verified_event_name as string) ?? event.eventName ?? 'traceiq_setup_verified',
-        source: verifiedMetadata.source,
-        environment: verifiedMetadata.environment,
-        browser: verifiedMetadata.browser ?? undefined,
-        host: verifiedMetadata.host ?? undefined,
-        userId: event.userId,
-        anonymousId: event.anonymousId,
-        properties: event.properties
+    for (const updated of updateResult.rows) {
+      const payload: VerificationEventPayload = {
+        verificationId: updated.id,
+        projectId,
+        projectName,
+        status: 'verified',
+        verifiedAt: (updated.verified_at as string) ?? new Date().toISOString(),
+        event: {
+          id: (updated.verified_event_id as string) ?? eventId ?? '',
+          name: (updated.verified_event_name as string) ?? event.eventName ?? 'traceiq_setup_verified',
+          source: verifiedMetadata.source,
+          environment: verifiedMetadata.environment,
+          browser: verifiedMetadata.browser ?? undefined,
+          host: verifiedMetadata.host ?? undefined,
+          userId: event.userId,
+          anonymousId: event.anonymousId,
+          properties: event.properties
+        }
+      };
+
+      // Emit to in-process subscribers
+      this.broadcastVerification(payload);
+
+      // Also broadcast through Postgres NOTIFY for multi-instance deployments
+      try {
+        await this.database.query(
+          `SELECT pg_notify('traceiq_setup_verified', $1)`,
+          [JSON.stringify(payload)]
+        );
+      } catch (error) {
+        this.logger.debug(`Could not send pg_notify for verification: ${error}`);
       }
-    };
-
-    // Emit to in-process subscribers
-    this.broadcastVerification(payload);
-
-    // Also broadcast through Postgres NOTIFY for multi-instance deployments
-    try {
-      await this.database.query(
-        `SELECT pg_notify('traceiq_setup_verified', $1)`,
-        [JSON.stringify(payload)]
-      );
-    } catch (error) {
-      this.logger.debug(`Could not send pg_notify for verification: ${error}`);
     }
 
     return true;
