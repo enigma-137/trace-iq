@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from '@/lib/toast';
 import { readApiError } from '@/lib/api-error';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 export interface SetupWizardProps {
-  projectId?: string;
-  projectName?: string;
+  projectId: string;
+  projectName: string;
   writeKey?: string;
   apiUrl?: string;
   userEmail?: string | null;
@@ -100,14 +101,38 @@ const PRODUCTS: ProductItem[] = [
   }
 ];
 
+function maskKey(key: string | undefined): string {
+  if (!key) return '••••••••••••••••';
+  if (key.startsWith('tr_live_')) {
+    return `tr_live_${'•'.repeat(Math.max(12, key.length - 8))}`;
+  }
+  return `${key.slice(0, 4)}${'•'.repeat(Math.max(12, key.length - 4))}`;
+}
+
 export function SetupWizard({
-  projectId = 'prj_default',
-  projectName = 'My Application',
-  writeKey = 'tiq_live_default',
+  projectId,
+  projectName,
+  writeKey: initialWriteKey,
   apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000',
   userEmail,
   onComplete
 }: SetupWizardProps) {
+  // Guard: if projectId is missing, do not render the wizard
+  if (!projectId) {
+    return (
+      <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-6 text-center text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+        <h3 className="text-base font-semibold">Project context required</h3>
+        <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+          The Setup Wizard must be scoped to an existing TraceIQ project. Please select or create a project first.
+        </p>
+      </div>
+    );
+  }
+
+  const [writeKey, setWriteKey] = useState<string>(initialWriteKey ?? '');
+  const [isKeyRevealed, setIsKeyRevealed] = useState<boolean>(false);
+  const [isGeneratingKey, setIsGeneratingKey] = useState<boolean>(false);
+
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedProducts, setSelectedProducts] = useState<string[]>(
     PRODUCTS.filter((p) => p.defaultSelected).map((p) => p.id)
@@ -131,6 +156,50 @@ export function SetupWizard({
     );
   };
 
+  const copyToClipboard = (text: string, label = 'Copied to clipboard') => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success(label);
+  };
+
+  // Generate or rotate project write key
+  const handleGenerateWriteKey = async () => {
+    setIsGeneratingKey(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token && process.env.NEXT_PUBLIC_AUTH_MODE !== 'local') {
+        throw new Error('Your dashboard session expired. Please refresh the page.');
+      }
+
+      const res = await fetch(`${apiUrl}/v1/setup/write-key/regenerate?projectId=${encodeURIComponent(projectId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error(await readApiError(res, 'Failed to generate write key'));
+      }
+
+      const data = await res.json();
+      if (data?.writeKey?.value) {
+        setWriteKey(data.writeKey.value);
+        setIsKeyRevealed(true);
+        toast.success('Generated active write key for project!', { title: 'Write key ready' });
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate write key', { title: 'Action failed' });
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
+
   // Start verification session and SSE stream
   const startVerification = async () => {
     if (isListening || verificationData) return;
@@ -138,13 +207,26 @@ export function SetupWizard({
     setVerificationError(null);
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      if (writeKey) {
+        headers['x-traceiq-write-key'] = writeKey;
+      } else {
+        const supabase = createSupabaseBrowserClient();
+        const {
+          data: { session }
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+
       const res = await fetch(`${apiUrl}/v1/setup-verifications`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-traceiq-write-key': writeKey
-        },
-        body: JSON.stringify({ projectId, writeKey, ttlSeconds: 300 })
+        headers,
+        body: JSON.stringify({ projectId, writeKey: writeKey || undefined, ttlSeconds: 300 })
       });
 
       if (!res.ok) {
@@ -152,7 +234,7 @@ export function SetupWizard({
       }
 
       const data = await res.json();
-      const vId = data.verificationId;
+      const vId = data.id || data.verificationId;
       setVerificationId(vId);
       setIsCreatingSession(false);
       setIsListening(true);
@@ -181,7 +263,7 @@ export function SetupWizard({
 
       sse.addEventListener('expired', () => {
         setIsListening(false);
-        setVerificationError('Verification session expired. Click "Try again" to start a new verification.');
+        setVerificationError('Verification session expired. Click "Restart listener" to start a new verification.');
         sse.close();
       });
 
@@ -197,21 +279,26 @@ export function SetupWizard({
     }
   };
 
-  // Trigger automated test probe
+  // Trigger automated test probe through normal events pipeline
   const sendTestEvent = async () => {
     if (!verificationId) return;
     setIsSendingProbe(true);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (writeKey) {
+        headers['x-traceiq-write-key'] = writeKey;
+      }
+
       const res = await fetch(`${apiUrl}/v1/events`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-traceiq-write-key': writeKey
-        },
+        headers,
         body: JSON.stringify({
           projectId,
-          writeKey,
+          writeKey: writeKey || undefined,
           eventName: 'traceiq_setup_verified',
+          anonymousId: 'anon_dashboard_setup_wizard',
           timestamp: new Date().toISOString(),
           properties: {
             verification_id: verificationId,
@@ -248,11 +335,6 @@ export function SetupWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
-  const copyToClipboard = (text: string, label = 'Copied to clipboard') => {
-    navigator.clipboard.writeText(text);
-    toast.success(label);
-  };
-
   const steps = [
     { num: 1, label: 'Select Products' },
     { num: 2, label: 'Install SDK' },
@@ -261,11 +343,15 @@ export function SetupWizard({
     { num: 5, label: 'Setup Report' }
   ];
 
-  const usetraceCommand = `npx traceiq-cli --project-id ${projectId} --write-key ${writeKey}`;
+  const usetraceCommand = writeKey
+    ? `npx usetrace --project-id ${projectId} --write-key ${writeKey}`
+    : `npx usetrace --project-id ${projectId}`;
+
+  const envSnippet = `NEXT_PUBLIC_TRACEIQ_PROJECT_ID=${projectId}\nNEXT_PUBLIC_TRACEIQ_WRITE_KEY=${writeKey || 'YOUR_WRITE_KEY'}\nNEXT_PUBLIC_TRACEIQ_API_URL=${apiUrl}`;
 
   return (
     <div className="w-full space-y-6">
-      {/* Step Indicator Header */}
+      {/* Project Context & Step Indicator Header */}
       <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
@@ -277,20 +363,36 @@ export function SetupWizard({
                 Connect your application
               </h2>
             </div>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              Guided integration wizard with automated verification via real-time ingestion.
-            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+              <span className="text-neutral-500">Project:</span>
+              <span className="font-semibold text-neutral-900 dark:text-white">{projectName}</span>
+              <span className="rounded border border-neutral-200 bg-neutral-100 px-2 py-0.5 font-mono text-xs text-neutral-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {projectId}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => copyToClipboard(usetraceCommand, 'useTrace CLI command copied!')}
-              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 font-mono text-xs font-medium text-neutral-800 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <span>{usetraceCommand}</span>
-              <span className="text-neutral-400">📋</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {writeKey ? (
+              <button
+                type="button"
+                onClick={() => copyToClipboard(usetraceCommand, 'useTrace CLI command copied!')}
+                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 font-mono text-xs font-medium text-neutral-800 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                title="Click to copy full CLI command with write key"
+              >
+                <span>{`npx usetrace --project-id ${projectId} --write-key ${maskKey(writeKey)}`}</span>
+                <span className="text-neutral-400">📋</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleGenerateWriteKey}
+                disabled={isGeneratingKey}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isGeneratingKey ? 'Generating Key…' : 'Generate Project Write Key'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -338,7 +440,7 @@ export function SetupWizard({
               1. What would you like to measure?
             </h3>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              Select the TraceIQ capabilities you want to enable in this project.
+              Select the TraceIQ capabilities you want to enable in <span className="font-semibold text-neutral-800 dark:text-neutral-200">{projectName}</span>.
             </p>
           </div>
 
@@ -397,7 +499,7 @@ export function SetupWizard({
               2. Install TraceIQ SDK
             </h3>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              You can run our automated CLI wizard or install manually.
+              You can run our automated CLI wizard or install manually into your codebase.
             </p>
           </div>
 
@@ -407,23 +509,25 @@ export function SetupWizard({
               <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
                 Recommended · Automated Setup
               </span>
-              <span className="font-mono text-xs text-blue-600 dark:text-blue-400">useTrace Wizard</span>
+              <span className="font-mono text-xs text-blue-600 dark:text-blue-400">useTrace CLI</span>
             </div>
             <h4 className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">
               Run useTrace in your project terminal
             </h4>
             <p className="mt-1 text-xs text-neutral-600 dark:text-slate-400">
-              Automatically detects your framework, configures provider & error tracking, and runs end-to-end event verification.
+              Automatically detects your framework, configures provider & error tracking, and runs end-to-end event verification for <span className="font-semibold">{projectName}</span>.
             </p>
 
             <div className="mt-4 flex items-center justify-between rounded-lg bg-neutral-950 p-3 text-sm text-neutral-200 dark:bg-black">
-              <code className="font-mono text-xs text-emerald-400">{usetraceCommand}</code>
+              <code className="font-mono text-xs text-emerald-400">
+                {writeKey ? `npx usetrace --project-id ${projectId} --write-key ${maskKey(writeKey)}` : `npx usetrace --project-id ${projectId}`}
+              </code>
               <button
                 type="button"
-                onClick={() => copyToClipboard(usetraceCommand, 'Command copied')}
+                onClick={() => copyToClipboard(usetraceCommand, 'Full CLI command copied with credentials!')}
                 className="rounded border border-neutral-700 bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-300 hover:bg-neutral-700"
               >
-                Copy
+                Copy Command
               </button>
             </div>
           </div>
@@ -492,9 +596,33 @@ export function SetupWizard({
               3. Configure Initialization & Provider
             </h3>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              Add your environment variables and wrap your root layout with the TraceIQ provider.
+              Add your environment variables and wrap your application root with the TraceIQ provider.
             </p>
           </div>
+
+          {/* Missing Write Key Prompt */}
+          {!writeKey ? (
+            <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                    No active write key loaded
+                  </h4>
+                  <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                    Generate an active write key for <span className="font-semibold">{projectName}</span> to complete your configuration.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateWriteKey}
+                  disabled={isGeneratingKey}
+                  className="shrink-0 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-800 disabled:opacity-50"
+                >
+                  {isGeneratingKey ? 'Generating…' : 'Generate Write Key'}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {/* Environment Variables Card */}
           <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
@@ -504,29 +632,64 @@ export function SetupWizard({
               </span>
               <button
                 type="button"
-                onClick={() =>
-                  copyToClipboard(
-                    `NEXT_PUBLIC_TRACEIQ_PROJECT_ID=${projectId}\nNEXT_PUBLIC_TRACEIQ_WRITE_KEY=${writeKey}\nNEXT_PUBLIC_TRACEIQ_API_URL=${apiUrl}`,
-                    'Environment variables copied'
-                  )
-                }
+                onClick={() => copyToClipboard(envSnippet, 'Environment variables copied!')}
                 className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
               >
                 Copy all
               </button>
             </div>
             <div className="mt-2 space-y-1.5 font-mono text-xs">
-              <div className="flex justify-between rounded bg-white p-2 border border-neutral-200 dark:border-slate-800 dark:bg-slate-950">
+              <div className="flex items-center justify-between rounded bg-white p-2 border border-neutral-200 dark:border-slate-800 dark:bg-slate-950">
                 <span className="text-neutral-600 dark:text-slate-400">NEXT_PUBLIC_TRACEIQ_PROJECT_ID</span>
-                <span className="font-semibold text-neutral-900 dark:text-white">{projectId}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-neutral-900 dark:text-white">{projectId}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(projectId, 'Project ID copied')}
+                    className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
+                  >
+                    Copy
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-between rounded bg-white p-2 border border-neutral-200 dark:border-slate-800 dark:bg-slate-950">
+              <div className="flex items-center justify-between rounded bg-white p-2 border border-neutral-200 dark:border-slate-800 dark:bg-slate-950">
                 <span className="text-neutral-600 dark:text-slate-400">NEXT_PUBLIC_TRACEIQ_WRITE_KEY</span>
-                <span className="font-semibold text-neutral-900 dark:text-white">{writeKey}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-neutral-900 dark:text-white">
+                    {isKeyRevealed ? (writeKey || 'YOUR_WRITE_KEY') : maskKey(writeKey)}
+                  </span>
+                  {writeKey ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsKeyRevealed(!isKeyRevealed)}
+                        className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
+                      >
+                        {isKeyRevealed ? 'Hide' : 'Reveal'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(writeKey, 'Write key copied')}
+                        className="text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        Copy
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex justify-between rounded bg-white p-2 border border-neutral-200 dark:border-slate-800 dark:bg-slate-950">
+              <div className="flex items-center justify-between rounded bg-white p-2 border border-neutral-200 dark:border-slate-800 dark:bg-slate-950">
                 <span className="text-neutral-600 dark:text-slate-400">NEXT_PUBLIC_TRACEIQ_API_URL</span>
-                <span className="font-semibold text-neutral-900 dark:text-white">{apiUrl}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-neutral-900 dark:text-white">{apiUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(apiUrl, 'API URL copied')}
+                    className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
+                  >
+                    Copy
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -587,8 +750,8 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
             </h3>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
               {verificationData
-                ? 'TraceIQ received an event from your application through the real ingestion pipeline.'
-                : 'Waiting for a live event to traverse the full network & ingestion route.'}
+                ? `TraceIQ received and correlated a live event for ${projectName} through the real ingestion pipeline.`
+                : `Waiting for a live event to reach TraceIQ for ${projectName}.`}
             </p>
           </div>
 
@@ -597,7 +760,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
             <div className="space-y-4">
               <div className="rounded-xl border border-emerald-300 bg-emerald-50/70 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-lg text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-lg text-white font-bold">
                     ✓
                   </div>
                   <div>
@@ -620,7 +783,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
                   <div className="pt-2 sm:pt-0 sm:px-3">
                     <span className="text-emerald-700 dark:text-emerald-400 font-medium">Source / Host</span>
                     <p className="mt-0.5 font-mono text-emerald-950 dark:text-emerald-100 truncate">
-                      {verificationData.event.source ?? verificationData.event.host ?? 'localhost:3000'}
+                      {verificationData.event.source ?? verificationData.event.host ?? 'client-application'}
                     </p>
                   </div>
                   <div className="pt-2 sm:pt-0 sm:px-3">
@@ -668,7 +831,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
                   <div className="space-y-2">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent mx-auto" />
                     <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                      Initializing verification session…
+                      Initializing verification session for {projectName}…
                     </p>
                   </div>
                 ) : (
@@ -684,7 +847,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
                         Waiting for your first event…
                       </h4>
                       <p className="mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-                        Launch your dev server and navigate to your app, or dispatch a test probe below.
+                        Launch your dev server and trigger an event in your app, or dispatch a test probe below.
                       </p>
                     </div>
 
@@ -745,8 +908,12 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
                 <span className="font-semibold text-neutral-900 dark:text-white">{projectName} ({projectId})</span>
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-900">
-                <span className="text-neutral-400">Detected SDK:</span>
-                <span>traceiq-sdk-js (v0.1.7)</span>
+                <span className="text-neutral-400">CLI & SDK:</span>
+                <span>npx usetrace / traceiq-sdk-js</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-900">
+                <span className="text-neutral-400">Write Key:</span>
+                <span className="font-mono">{maskKey(writeKey)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-900">
                 <span className="text-neutral-400">Verification Status:</span>

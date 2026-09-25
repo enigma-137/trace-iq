@@ -766,9 +766,9 @@ export function SetupPanel({
                 </p>
                 <div className="pt-2 flex items-center gap-2">
                   <code className="rounded bg-neutral-900 px-2.5 py-1 font-mono text-xs font-medium text-emerald-400 dark:bg-slate-950">
-                    npx traceiq-cli
+                    npx usetrace
                   </code>
-                  <CopyButton value="npx traceiq-cli" label="Copy CLI command" compact />
+                  <CopyButton value="npx usetrace" label="Copy CLI command" compact />
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
