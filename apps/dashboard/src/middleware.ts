@@ -80,14 +80,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAuthRoute && user) {
-    const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsStepUp = !aalError && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
+    const isResetPasswordRoute = pathname === '/auth/reset-password';
+    if (!isResetPasswordRoute) {
+      const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const needsStepUp = !aalError && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
 
-    if (!needsStepUp) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/dashboard';
-      redirectUrl.search = '';
-      return NextResponse.redirect(redirectUrl);
+      if (!needsStepUp) {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = '/dashboard';
+        redirectUrl.search = '';
+        return NextResponse.redirect(redirectUrl);
+      }
     }
   }
 
@@ -97,4 +100,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/dashboard/:path*', '/auth/:path*', '/sdk-demo'],
 };
-

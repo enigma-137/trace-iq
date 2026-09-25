@@ -1,5 +1,6 @@
 import { DashboardShell } from '../DashboardShell';
 import { SetupPanel } from '../SetupPanel';
+import { PasswordSettingsPanel } from './PasswordSettingsPanel';
 import { PersonalAccessTokensPanel } from './PersonalAccessTokensPanel';
 import { SettingsTabs } from './SettingsTabs';
 import { TwoFactorPanel } from './TwoFactorPanel';
@@ -28,6 +29,7 @@ export default async function SettingsPage({
       <SettingsTabs />
       <SetupPanel organizationId={organizationId} projectId={projectId} newProject={newProject}>
         <TwoFactorPanel />
+        <PasswordSettingsPanel userEmail={user.email} />
         <PersonalAccessTokensPanel />
       </SetupPanel>
     </DashboardShell>
@@ -37,4 +39,3 @@ export default async function SettingsPage({
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
-

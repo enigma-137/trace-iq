@@ -29,7 +29,9 @@ function createLocalBrowserClient() {
       signInWithPassword: unsupported,
       signUp: unsupported,
       resetPasswordForEmail: unsupported,
+      updateUser: unsupported,
       verifyOtp: unsupported,
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       mfa: {
         listFactors: async () => ({ data: { all: [], totp: [], phone: [] }, error: null }),
         getAuthenticatorAssuranceLevel: async () => ({

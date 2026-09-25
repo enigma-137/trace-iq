@@ -390,10 +390,11 @@ export function AuthForm() {
                     type="button"
                     role="tab"
                     aria-selected={mode === value}
-                    className={`min-h-9 rounded-md text-sm font-semibold transition ${mode === value
-                      ? 'bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
-                      }`}
+                    className={`min-h-9 rounded-md text-sm font-semibold transition ${
+                      mode === value
+                        ? 'bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
+                    }`}
                     onClick={() => setMode(value)}
                   >
                     {value === 'signin' ? 'Sign in' : 'Sign up'}
@@ -420,9 +421,19 @@ export function AuthForm() {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="password">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="password">
+                      Password
+                    </label>
+                    {mode === 'signin' ? (
+                      <Link
+                        href="/auth/forgot-password"
+                        className="text-xs text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline dark:text-neutral-400 dark:hover:text-white"
+                      >
+                        Forgot password?
+                      </Link>
+                    ) : null}
+                  </div>
                   <input
                     className={inputClass}
                     id="password"
