@@ -344,8 +344,8 @@ export function SetupWizard({
   ];
 
   const usetraceCommand = writeKey
-    ? `npx usetrace --project-id ${projectId} --write-key ${writeKey}`
-    : `npx usetrace --project-id ${projectId}`;
+    ? `npx traceiq-cli --project-id ${projectId} --write-key ${writeKey}`
+    : `npx traceiq-cli --project-id ${projectId}`;
 
   const envSnippet = `NEXT_PUBLIC_TRACEIQ_PROJECT_ID=${projectId}\nNEXT_PUBLIC_TRACEIQ_WRITE_KEY=${writeKey || 'YOUR_WRITE_KEY'}\nNEXT_PUBLIC_TRACEIQ_API_URL=${apiUrl}`;
 
@@ -376,11 +376,11 @@ export function SetupWizard({
             {writeKey ? (
               <button
                 type="button"
-                onClick={() => copyToClipboard(usetraceCommand, 'useTrace CLI command copied!')}
+                onClick={() => copyToClipboard(usetraceCommand, 'TraceIQ CLI command copied!')}
                 className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 font-mono text-xs font-medium text-neutral-800 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                 title="Click to copy full CLI command with write key"
               >
-                <span>{`npx usetrace --project-id ${projectId} --write-key ${maskKey(writeKey)}`}</span>
+                <span>{`npx traceiq-cli --project-id ${projectId} --write-key ${maskKey(writeKey)}`}</span>
                 <span className="text-neutral-400">📋</span>
               </button>
             ) : (
@@ -520,7 +520,7 @@ export function SetupWizard({
 
             <div className="mt-4 flex items-center justify-between rounded-lg bg-neutral-950 p-3 text-sm text-neutral-200 dark:bg-black">
               <code className="font-mono text-xs text-emerald-400">
-                {writeKey ? `npx usetrace --project-id ${projectId} --write-key ${maskKey(writeKey)}` : `npx usetrace --project-id ${projectId}`}
+                {writeKey ? `npx traceiq-cli --project-id ${projectId} --write-key ${maskKey(writeKey)}` : `npx traceiq-cli --project-id ${projectId}`}
               </code>
               <button
                 type="button"
@@ -909,7 +909,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-900">
                 <span className="text-neutral-400">CLI & SDK:</span>
-                <span>npx usetrace / traceiq-sdk-js</span>
+                <span>npx traceiq-cli / traceiq-sdk-js</span>
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-900">
                 <span className="text-neutral-400">Write Key:</span>

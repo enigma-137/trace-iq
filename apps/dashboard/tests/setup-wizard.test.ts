@@ -70,12 +70,11 @@ describe('Dashboard Setup Wizard and Real Project Scoping', () => {
     const realWriteKey = 'tr_live_abcdef1234567890abcdef1234567890';
     const apiUrl = 'https://api.traceiq.run';
 
-    // Verify command generation matches published package name (npx usetrace)
-    const usetraceCommand = `npx usetrace --project-id ${realProjectId} --write-key ${realWriteKey}`;
-    expect(usetraceCommand).toBe('npx usetrace --project-id proj_healthcorp_live_123 --write-key tr_live_abcdef1234567890abcdef1234567890');
+    // Verify command generation matches published package name (npx traceiq-cli)
+    const usetraceCommand = `npx traceiq-cli --project-id ${realProjectId} --write-key ${realWriteKey}`;
+    expect(usetraceCommand).toBe('npx traceiq-cli --project-id proj_healthcorp_live_123 --write-key tr_live_abcdef1234567890abcdef1234567890');
     expect(usetraceCommand).not.toContain('prj_default');
     expect(usetraceCommand).not.toContain('tiq_live_default');
-    expect(usetraceCommand).not.toContain('traceiq-cli');
 
     // Verify env snippet
     const envSnippet = `NEXT_PUBLIC_TRACEIQ_PROJECT_ID=${realProjectId}\nNEXT_PUBLIC_TRACEIQ_WRITE_KEY=${realWriteKey}\nNEXT_PUBLIC_TRACEIQ_API_URL=${apiUrl}`;
