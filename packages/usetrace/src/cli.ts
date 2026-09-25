@@ -16,7 +16,12 @@ import {
   symbols,
   textPrompt
 } from './terminal/ui.js';
-import { detectExistingEnvCredentials, detectPackageManager, resolveFrameworkAdapter } from './adapters/detector.js';
+import {
+  detectExistingEnvCredentials,
+  detectPackageManager,
+  resolveDefaultApiUrl,
+  resolveFrameworkAdapter
+} from './adapters/detector.js';
 import { TraceIQInstaller } from './installer/installer.js';
 import { TraceIQVerifier } from './verifier/verifier.js';
 import { CliOptions, TRACEIQ_PRODUCTS, TraceIQProduct } from './types.js';
@@ -48,12 +53,7 @@ export async function runCli(args: string[] = []): Promise<void> {
     }`
   );
 
-  const defaultApiUrl =
-    options.apiUrl ||
-    existingCreds.apiUrl ||
-    process.env.TRACEIQ_API_URL ||
-    process.env.NEXT_PUBLIC_TRACEIQ_API_URL ||
-    'http://localhost:4000';
+  const defaultApiUrl = resolveDefaultApiUrl(options.apiUrl, existingCreds.apiUrl);
 
   // Handle direct commands (e.g. `npx usetrace audit` or `npx usetrace verify`)
   if (command === 'audit' || command === 'doctor') {

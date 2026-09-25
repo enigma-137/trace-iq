@@ -2,7 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FrameworkAdapter, InstallOptions } from './adapter.interface.js';
 import { SetupChanges, SetupState } from '../types.js';
-import { detectExistingEnvCredentials, detectPackageManager, getProjectMetadata } from './detector.js';
+import {
+  applyEnvVariables,
+  detectExistingEnvCredentials,
+  detectPackageManager,
+  getProjectMetadata,
+  resolveTargetEnvFile
+} from './detector.js';
 
 export class NextJsAdapter implements FrameworkAdapter {
   readonly name = 'Next.js';
@@ -253,44 +259,21 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 4. Update .env.local and .env.example
-    const envLocalPath = path.join(options.cwd, '.env.local');
+    // 4. Update environment file (.env.local, .env, .env.development)
+    const envFileName = await resolveTargetEnvFile(options.cwd);
     const envVarsToAdd: Record<string, string> = {
       NEXT_PUBLIC_TRACEIQ_PROJECT_ID: options.projectId,
       NEXT_PUBLIC_TRACEIQ_WRITE_KEY: options.writeKey,
       NEXT_PUBLIC_TRACEIQ_API_URL: options.apiUrl
     };
 
-    let existingEnv = '';
-    try {
-      existingEnv = await fs.readFile(envLocalPath, 'utf8');
-    } catch {
-      // not created yet
+    const envResult = await applyEnvVariables(options.cwd, envFileName, envVarsToAdd, options.dryRun);
+    if (envResult.created) {
+      changes.createdFiles.push(envFileName);
+    } else if (envResult.modified) {
+      changes.modifiedFiles.push(envFileName);
     }
-
-    const newEnvLines: string[] = [];
-    for (const [key, val] of Object.entries(envVarsToAdd)) {
-      if (!existingEnv.includes(`${key}=`)) {
-        newEnvLines.push(`${key}=${val}`);
-        changes.addedEnvVars.push(key);
-      }
-    }
-
-    if (newEnvLines.length > 0) {
-      const appendText = (existingEnv ? (existingEnv.endsWith('\n') ? '' : '\n') : '') +
-        '\n# TraceIQ Configuration\n' +
-        newEnvLines.join('\n') +
-        '\n';
-
-      if (!options.dryRun) {
-        await fs.writeFile(envLocalPath, (existingEnv || '') + appendText, 'utf8');
-      }
-      if (existingEnv) {
-        changes.modifiedFiles.push('.env.local');
-      } else {
-        changes.createdFiles.push('.env.local');
-      }
-    }
+    changes.addedEnvVars.push(...envResult.addedVars);
 
     // 5. Update package.json dependency
     const pkgPath = path.join(options.cwd, 'package.json');

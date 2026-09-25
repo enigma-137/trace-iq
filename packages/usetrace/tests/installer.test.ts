@@ -4,6 +4,7 @@ import os from 'node:os';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { NextJsAdapter } from '../src/adapters/nextjs.adapter.js';
 import { TraceIQInstaller } from '../src/installer/installer.js';
+import { detectExistingEnvCredentials, resolveDefaultApiUrl } from '../src/adapters/detector.js';
 
 describe('useTrace Installer and Idempotency', () => {
   let tempDir: string;
@@ -121,5 +122,172 @@ describe('useTrace Installer and Idempotency', () => {
     expect(reportString).not.toContain('secret');
     expect(report.verificationStatus).toBe('verified');
     expect(report.firstVerifiedEvent?.name).toBe('traceiq_setup_verified');
+  });
+
+  describe('Environment file convention & API URL precedence', () => {
+    it('creates .env.local when no env file exists', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next: '^14.0.0', react: '^18.0.0' } })
+      );
+
+      const adapter = new NextJsAdapter();
+      const installer = new TraceIQInstaller(adapter);
+      const changes = await installer.install({
+        cwd: tempDir,
+        projectId: 'prj_test_1',
+        writeKey: 'tiq_live_key1',
+        apiUrl: 'https://api.traceiq.run',
+        selectedProducts: ['product-analytics'],
+        packageManager: 'npm'
+      });
+
+      expect(changes.createdFiles).toContain('.env.local');
+      expect(changes.modifiedFiles).not.toContain('.env.local');
+      const content = await fs.readFile(path.join(tempDir, '.env.local'), 'utf8');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_PROJECT_ID=prj_test_1');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_WRITE_KEY=tiq_live_key1');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_API_URL=https://api.traceiq.run');
+    });
+
+    it('respects existing .env file and preserves existing variables', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next: '^14.0.0', react: '^18.0.0' } })
+      );
+      await fs.writeFile(
+        path.join(tempDir, '.env'),
+        '# App Config\nDATABASE_URL=postgres://localhost:5432/mydb\nPORT=3000\n'
+      );
+
+      const adapter = new NextJsAdapter();
+      const installer = new TraceIQInstaller(adapter);
+      const changes = await installer.install({
+        cwd: tempDir,
+        projectId: 'prj_env_test',
+        writeKey: 'tiq_live_env_key',
+        apiUrl: 'https://api.traceiq.run',
+        selectedProducts: ['product-analytics'],
+        packageManager: 'npm'
+      });
+
+      expect(changes.modifiedFiles).toContain('.env');
+      expect(changes.createdFiles).not.toContain('.env');
+      expect(changes.createdFiles).not.toContain('.env.local');
+
+      const content = await fs.readFile(path.join(tempDir, '.env'), 'utf8');
+      expect(content).toContain('DATABASE_URL=postgres://localhost:5432/mydb');
+      expect(content).toContain('PORT=3000');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_PROJECT_ID=prj_env_test');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_WRITE_KEY=tiq_live_env_key');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_API_URL=https://api.traceiq.run');
+
+      const report = installer.createReport(
+        {
+          projectName: 'my-app',
+          framework: 'Next.js',
+          packageManager: 'npm',
+          sdkDetected: true,
+          providerConfigured: true,
+          projectKeyConfigured: true,
+          pageViewsConfigured: true,
+          userIdentificationConfigured: false,
+          errorTrackingConfigured: false,
+          webVitalsConfigured: false,
+          featureFlagsConfigured: false,
+          envFiles: ['.env'],
+          issues: [],
+          recommendations: []
+        },
+        changes,
+        ['product-analytics'],
+        'verified'
+      );
+      expect(report.filesChanged).toContain('.env');
+    });
+
+    it('respects existing .env.local file and updates existing TraceIQ variables without duplicating', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next: '^14.0.0', react: '^18.0.0' } })
+      );
+      await fs.writeFile(
+        path.join(tempDir, '.env.local'),
+        '# Custom settings\nAUTH_SECRET=supersecret\nNEXT_PUBLIC_TRACEIQ_PROJECT_ID=old_proj\n'
+      );
+
+      const adapter = new NextJsAdapter();
+      const installer = new TraceIQInstaller(adapter);
+      const changes = await installer.install({
+        cwd: tempDir,
+        projectId: 'prj_updated_proj',
+        writeKey: 'tiq_live_new_key',
+        apiUrl: 'https://api.traceiq.run',
+        selectedProducts: ['product-analytics'],
+        packageManager: 'npm'
+      });
+
+      expect(changes.modifiedFiles).toContain('.env.local');
+      const content = await fs.readFile(path.join(tempDir, '.env.local'), 'utf8');
+      expect(content).toContain('AUTH_SECRET=supersecret');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_PROJECT_ID=prj_updated_proj');
+      expect(content).not.toContain('old_proj');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_WRITE_KEY=tiq_live_new_key');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_API_URL=https://api.traceiq.run');
+    });
+
+    it('respects existing .env.development file when .env.local and .env do not exist', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next: '^14.0.0', react: '^18.0.0' } })
+      );
+      await fs.writeFile(
+        path.join(tempDir, '.env.development'),
+        'NODE_ENV=development\nAPI_HOST=127.0.0.1\n'
+      );
+
+      const adapter = new NextJsAdapter();
+      const installer = new TraceIQInstaller(adapter);
+      const changes = await installer.install({
+        cwd: tempDir,
+        projectId: 'prj_dev_proj',
+        writeKey: 'tiq_live_dev_key',
+        apiUrl: 'https://api.traceiq.run',
+        selectedProducts: ['product-analytics'],
+        packageManager: 'npm'
+      });
+
+      expect(changes.modifiedFiles).toContain('.env.development');
+      expect(changes.createdFiles).not.toContain('.env.local');
+      const content = await fs.readFile(path.join(tempDir, '.env.development'), 'utf8');
+      expect(content).toContain('API_HOST=127.0.0.1');
+      expect(content).toContain('NEXT_PUBLIC_TRACEIQ_PROJECT_ID=prj_dev_proj');
+    });
+
+    it('defaults to https://api.traceiq.run when no custom url or env is present', () => {
+      const resolved = resolveDefaultApiUrl(undefined, undefined);
+      expect(resolved).toBe('https://api.traceiq.run');
+    });
+
+    it('preserves and uses existing custom TraceIQ API URL from project env', async () => {
+      await fs.writeFile(
+        path.join(tempDir, '.env'),
+        'NEXT_PUBLIC_TRACEIQ_API_URL=https://custom-proxy.internal.io\n'
+      );
+
+      const existing = await detectExistingEnvCredentials(tempDir);
+      expect(existing.apiUrl).toBe('https://custom-proxy.internal.io');
+
+      const resolved = resolveDefaultApiUrl(undefined, existing.apiUrl);
+      expect(resolved).toBe('https://custom-proxy.internal.io');
+    });
+
+    it('explicit --api-url overrides both existing env and default production URL', () => {
+      const explicitLocal = 'http://localhost:4000';
+      const existingInEnv = 'https://custom-proxy.internal.io';
+
+      const resolved = resolveDefaultApiUrl(explicitLocal, existingInEnv);
+      expect(resolved).toBe('http://localhost:4000');
+    });
   });
 });

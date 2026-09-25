@@ -43,13 +43,131 @@ export async function getProjectMetadata(cwd: string): Promise<{
   }
 }
 
+/**
+ * Resolves the appropriate env file according to repository convention:
+ * if .env.local exists → use .env.local
+ * else if .env exists → use .env
+ * else if .env.development exists → use .env.development
+ * else → create .env.local
+ */
+export async function resolveTargetEnvFile(cwd: string): Promise<string> {
+  const candidates = ['.env.local', '.env', '.env.development'];
+  for (const candidate of candidates) {
+    try {
+      await fs.access(path.join(cwd, candidate));
+      return candidate;
+    } catch {
+      // does not exist
+    }
+  }
+  return '.env.local';
+}
+
+/**
+ * Resolves default TraceIQ API URL using precedence:
+ * explicit --api-url → existing project env → https://api.traceiq.run
+ */
+export function resolveDefaultApiUrl(optionsApiUrl?: string, existingEnvApiUrl?: string): string {
+  if (optionsApiUrl) return optionsApiUrl;
+  if (existingEnvApiUrl) return existingEnvApiUrl;
+  if (process.env.TRACEIQ_API_URL) return process.env.TRACEIQ_API_URL;
+  if (process.env.NEXT_PUBLIC_TRACEIQ_API_URL) return process.env.NEXT_PUBLIC_TRACEIQ_API_URL;
+  return 'https://api.traceiq.run';
+}
+
+/**
+ * Applies or updates environment variables in the selected env file,
+ * preserving existing variables, comments, and formatting.
+ */
+export async function applyEnvVariables(
+  cwd: string,
+  envFileName: string,
+  vars: Record<string, string>,
+  dryRun?: boolean
+): Promise<{ created: boolean; modified: boolean; addedVars: string[] }> {
+  const envPath = path.join(cwd, envFileName);
+  let fileExists = false;
+  let content = '';
+
+  try {
+    content = await fs.readFile(envPath, 'utf8');
+    fileExists = true;
+  } catch {
+    fileExists = false;
+  }
+
+  const addedVars: string[] = [];
+
+  if (!fileExists) {
+    const lines = ['# TraceIQ Configuration'];
+    for (const [key, val] of Object.entries(vars)) {
+      lines.push(`${key}=${val}`);
+      addedVars.push(key);
+    }
+    const newContent = lines.join('\n') + '\n';
+    if (!dryRun) {
+      await fs.writeFile(envPath, newContent, 'utf8');
+    }
+    return { created: true, modified: false, addedVars };
+  }
+
+  // Update existing file while preserving comments and non-TraceIQ variables
+  const rawLines = content.split(/\r?\n/);
+  const updatedLines: string[] = [];
+  const handledKeys = new Set<string>();
+
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      updatedLines.push(line);
+      continue;
+    }
+
+    const eqIndex = line.indexOf('=');
+    if (eqIndex === -1) {
+      updatedLines.push(line);
+      continue;
+    }
+
+    const key = line.slice(0, eqIndex).trim();
+    if (key in vars) {
+      updatedLines.push(`${key}=${vars[key]}`);
+      handledKeys.add(key);
+      addedVars.push(key);
+    } else {
+      updatedLines.push(line);
+    }
+  }
+
+  // Append any keys from vars that were not present in the existing file
+  const unhandledKeys = Object.keys(vars).filter((k) => !handledKeys.has(k));
+  if (unhandledKeys.length > 0) {
+    // Ensure newline before appending header
+    if (updatedLines.length > 0 && updatedLines[updatedLines.length - 1].trim() !== '') {
+      updatedLines.push('');
+    }
+    updatedLines.push('# TraceIQ Configuration');
+    for (const key of unhandledKeys) {
+      updatedLines.push(`${key}=${vars[key]}`);
+      addedVars.push(key);
+    }
+  }
+
+  const newContent = updatedLines.join('\n') + (content.endsWith('\n') || unhandledKeys.length > 0 ? '\n' : '');
+  if (!dryRun) {
+    await fs.writeFile(envPath, newContent, 'utf8');
+  }
+
+  return { created: false, modified: true, addedVars };
+}
+
 export async function detectExistingEnvCredentials(cwd: string): Promise<{
   projectId?: string;
   writeKey?: string;
   apiUrl?: string;
   foundInFile?: string;
 }> {
-  const envFileCandidates = ['.env.local', '.env.development.local', '.env.development', '.env'];
+  const envFileCandidates = ['.env.local', '.env', '.env.development', '.env.development.local'];
   for (const file of envFileCandidates) {
     try {
       const content = await fs.readFile(path.join(cwd, file), 'utf8');
@@ -91,7 +209,7 @@ export async function detectExistingEnvCredentials(cwd: string): Promise<{
         }
       }
 
-      if (projectId || writeKey) {
+      if (projectId || writeKey || apiUrl) {
         return { projectId, writeKey, apiUrl, foundInFile: file };
       }
     } catch {

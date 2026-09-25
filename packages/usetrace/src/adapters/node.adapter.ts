@@ -2,7 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FrameworkAdapter, InstallOptions } from './adapter.interface.js';
 import { SetupChanges, SetupState } from '../types.js';
-import { detectExistingEnvCredentials, detectPackageManager, getProjectMetadata } from './detector.js';
+import {
+  applyEnvVariables,
+  detectExistingEnvCredentials,
+  detectPackageManager,
+  getProjectMetadata,
+  resolveTargetEnvFile
+} from './detector.js';
 
 export class NodeAdapter implements FrameworkAdapter {
   readonly name = 'Node.js';
@@ -92,43 +98,21 @@ export { traceiq };
       changes.createdFiles.push(`traceiq.${ext}`);
     }
 
-    // Update .env
-    const envPath = path.join(options.cwd, '.env');
-    let existingEnv = '';
-    try {
-      existingEnv = await fs.readFile(envPath, 'utf8');
-    } catch {
-      // ignore
-    }
+    // Update environment file
+    const envFileName = await resolveTargetEnvFile(options.cwd);
+    const envVarsToAdd: Record<string, string> = {
+      TRACEIQ_PROJECT_ID: options.projectId,
+      TRACEIQ_WRITE_KEY: options.writeKey,
+      TRACEIQ_API_URL: options.apiUrl
+    };
 
-    const newLines: string[] = [];
-    if (!existingEnv.includes('TRACEIQ_PROJECT_ID=')) {
-      newLines.push(`TRACEIQ_PROJECT_ID=${options.projectId}`);
-      changes.addedEnvVars.push('TRACEIQ_PROJECT_ID');
+    const envResult = await applyEnvVariables(options.cwd, envFileName, envVarsToAdd, options.dryRun);
+    if (envResult.created) {
+      changes.createdFiles.push(envFileName);
+    } else if (envResult.modified) {
+      changes.modifiedFiles.push(envFileName);
     }
-    if (!existingEnv.includes('TRACEIQ_WRITE_KEY=')) {
-      newLines.push(`TRACEIQ_WRITE_KEY=${options.writeKey}`);
-      changes.addedEnvVars.push('TRACEIQ_WRITE_KEY');
-    }
-    if (!existingEnv.includes('TRACEIQ_API_URL=')) {
-      newLines.push(`TRACEIQ_API_URL=${options.apiUrl}`);
-      changes.addedEnvVars.push('TRACEIQ_API_URL');
-    }
-
-    if (newLines.length > 0) {
-      const append = (existingEnv ? (existingEnv.endsWith('\n') ? '' : '\n') : '') +
-        '\n# TraceIQ Configuration\n' +
-        newLines.join('\n') +
-        '\n';
-      if (!options.dryRun) {
-        await fs.writeFile(envPath, (existingEnv || '') + append, 'utf8');
-      }
-      if (existingEnv) {
-        changes.modifiedFiles.push('.env');
-      } else {
-        changes.createdFiles.push('.env');
-      }
-    }
+    changes.addedEnvVars.push(...envResult.addedVars);
 
     // Add dependency
     const pkgPath = path.join(options.cwd, 'package.json');

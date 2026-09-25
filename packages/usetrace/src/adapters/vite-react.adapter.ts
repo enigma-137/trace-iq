@@ -2,7 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FrameworkAdapter, InstallOptions } from './adapter.interface.js';
 import { SetupChanges, SetupState } from '../types.js';
-import { detectExistingEnvCredentials, detectPackageManager, getProjectMetadata } from './detector.js';
+import {
+  applyEnvVariables,
+  detectExistingEnvCredentials,
+  detectPackageManager,
+  getProjectMetadata,
+  resolveTargetEnvFile
+} from './detector.js';
 
 export class ViteReactAdapter implements FrameworkAdapter {
   readonly name = 'React (Vite)';
@@ -131,43 +137,21 @@ export { traceiq };
       }
     }
 
-    // 3. Update .env
-    const envPath = path.join(options.cwd, '.env');
-    let existingEnv = '';
-    try {
-      existingEnv = await fs.readFile(envPath, 'utf8');
-    } catch {
-      // not created yet
-    }
+    // 3. Update environment file
+    const envFileName = await resolveTargetEnvFile(options.cwd);
+    const envVarsToAdd: Record<string, string> = {
+      VITE_TRACEIQ_PROJECT_ID: options.projectId,
+      VITE_TRACEIQ_WRITE_KEY: options.writeKey,
+      VITE_TRACEIQ_API_URL: options.apiUrl
+    };
 
-    const newLines: string[] = [];
-    if (!existingEnv.includes('VITE_TRACEIQ_PROJECT_ID=')) {
-      newLines.push(`VITE_TRACEIQ_PROJECT_ID=${options.projectId}`);
-      changes.addedEnvVars.push('VITE_TRACEIQ_PROJECT_ID');
+    const envResult = await applyEnvVariables(options.cwd, envFileName, envVarsToAdd, options.dryRun);
+    if (envResult.created) {
+      changes.createdFiles.push(envFileName);
+    } else if (envResult.modified) {
+      changes.modifiedFiles.push(envFileName);
     }
-    if (!existingEnv.includes('VITE_TRACEIQ_WRITE_KEY=')) {
-      newLines.push(`VITE_TRACEIQ_WRITE_KEY=${options.writeKey}`);
-      changes.addedEnvVars.push('VITE_TRACEIQ_WRITE_KEY');
-    }
-    if (!existingEnv.includes('VITE_TRACEIQ_API_URL=')) {
-      newLines.push(`VITE_TRACEIQ_API_URL=${options.apiUrl}`);
-      changes.addedEnvVars.push('VITE_TRACEIQ_API_URL');
-    }
-
-    if (newLines.length > 0) {
-      const append = (existingEnv ? (existingEnv.endsWith('\n') ? '' : '\n') : '') +
-        '\n# TraceIQ Configuration\n' +
-        newLines.join('\n') +
-        '\n';
-      if (!options.dryRun) {
-        await fs.writeFile(envPath, (existingEnv || '') + append, 'utf8');
-      }
-      if (existingEnv) {
-        changes.modifiedFiles.push('.env');
-      } else {
-        changes.createdFiles.push('.env');
-      }
-    }
+    changes.addedEnvVars.push(...envResult.addedVars);
 
     // 4. Add dependency
     const pkgPath = path.join(options.cwd, 'package.json');
