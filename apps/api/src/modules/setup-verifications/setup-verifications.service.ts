@@ -309,8 +309,8 @@ export class SetupVerificationsService implements OnModuleInit, OnModuleDestroy 
     const result = await this.database.query(
       `
         SELECT project_id
-        FROM write_keys
-        WHERE key_hash = $1 AND project_id = $2
+        FROM project_write_keys
+        WHERE key_hash = $1 AND project_id = $2 AND revoked_at IS NULL
       `,
       [keyHash, projectId]
     );
