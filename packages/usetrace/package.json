@@ -1,0 +1,33 @@
+{
+  "name": "traceiq-cli",
+  "version": "0.1.0",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Developer-first interactive setup wizard and instrumentation tool for TraceIQ.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "traceiq-cli": "./bin/usetrace.js",
+    "traceiq": "./bin/usetrace.js",
+    "traceiqcli": "./bin/usetrace.js",
+    "usetrace": "./bin/usetrace.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,5 +1,5 @@
 import type { TraceIQReplayOptions, TraceIQReplayPrivacyMode } from '../types';
-import { sanitizeTransportEvent } from './replay-privacy';
+import { sanitizeTransportEvent } from './replay-privacy.js';
 
 type RrwebEvent = { type: number; timestamp: number; data?: unknown };
 interface RecorderConfig {

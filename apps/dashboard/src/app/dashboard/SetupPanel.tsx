@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
 import PlusSignIcon from '@hugeicons/core-free-icons/PlusSignIcon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
@@ -745,6 +746,39 @@ export function SetupPanel({
                     ) : null}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2.5: INTERACTIVE SETUP WIZARD CALLOUT */}
+          <div className="overflow-hidden rounded-xl border border-blue-500/20 bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/50 p-5 shadow-sm dark:border-blue-500/20 dark:from-blue-950/30 dark:via-slate-900 dark:to-indigo-950/20">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
+                  Guided Integration Wizard
+                </div>
+                <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+                  Connect your project with useTrace
+                </h3>
+                <p className="max-w-xl text-xs text-neutral-600 dark:text-neutral-400">
+                  Use our interactive CLI or guided web wizard to inspect your framework, select products, generate configuration, and verify live event telemetry via SSE.
+                </p>
+                <div className="pt-2 flex items-center gap-2">
+                  <code className="rounded bg-neutral-900 px-2.5 py-1 font-mono text-xs font-medium text-emerald-400 dark:bg-slate-950">
+                    npx traceiq-cli
+                  </code>
+                  <CopyButton value="npx traceiq-cli" label="Copy CLI command" compact />
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <Link
+                  href={`/dashboard/setup${setup?.project?.id ? `?projectId=${encodeURIComponent(setup.project.id)}` : ''}`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                >
+                  Launch Web Wizard
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
               </div>
             </div>
           </div>

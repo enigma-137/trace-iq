@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { DashboardUser } from '../auth/auth.service';
 import { DatabaseService } from '../../database/database.service';
@@ -8,6 +8,7 @@ import { AchievementsService } from '../achievements/achievements.service';
 import { UsageService } from '../billing/usage.service';
 import { EntitlementService } from '../billing/entitlement.service';
 import { sanitizeIngestedTraits } from '../users/users.service';
+import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
 
 type JsonObject = Record<string, unknown>;
 
@@ -49,7 +50,6 @@ export interface IngestEventResponse {
   usageWarningPercentage?: 70 | 90 | 100;
 }
 
-
 export interface BatchIngestResponse {
   accepted: true;
   results: Array<{ accepted: boolean; eventId?: string; error?: string }>;
@@ -89,7 +89,8 @@ export class EventsService {
     private readonly database: DatabaseService,
     private readonly webhooks: WebhooksService,
     private readonly achievements: AchievementsService,
-    private readonly usage: UsageService = new UsageService(new EntitlementService(database))
+    private readonly usage: UsageService = new UsageService(new EntitlementService(database)),
+    @Optional() private readonly setupVerifications?: SetupVerificationsService
   ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
@@ -207,6 +208,25 @@ export class EventsService {
         properties: p.properties ?? {},
         occurredAt: p.occurredAt.toISOString()
       });
+
+      // Match against pending verification sessions
+      const resolvedProjectId = auth.project_id ?? (auth as { projectId?: string }).projectId;
+      if (resolvedProjectId) {
+        void this.setupVerifications?.recordVerificationIfMatching(
+          resolvedProjectId,
+          {
+            eventName: p.eventName,
+            properties: p.properties,
+            context: p.context,
+            deviceInfo: p.deviceInfo,
+            networkInfo: p.networkInfo,
+            userId: p.userId,
+            anonymousId: p.anonymousId
+          },
+          meta,
+          eventId
+        );
+      }
     });
 
     // Re-evaluate workspace achievements without blocking the ingest response.
@@ -422,6 +442,25 @@ export class EventsService {
       properties: input.properties ?? {},
       occurredAt: occurredAt.toISOString()
     });
+
+    // Match against pending verification sessions
+    const resolvedProjectId = auth.project_id ?? (auth as { projectId?: string }).projectId;
+    if (resolvedProjectId) {
+      void this.setupVerifications?.recordVerificationIfMatching(
+        resolvedProjectId,
+        {
+          eventName,
+          properties: input.properties,
+          context: input.context,
+          deviceInfo: input.deviceInfo,
+          networkInfo,
+          userId,
+          anonymousId
+        },
+        meta,
+        eventId
+      );
+    }
 
     // Re-evaluate workspace achievements without blocking the ingest response.
     void this.achievements.afterProjectIngest(auth.project_id);

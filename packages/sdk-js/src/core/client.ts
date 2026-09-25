@@ -1,6 +1,6 @@
 import type { TraceIQClient, TraceIQFeatureFlags, TraceIQGroup, TraceIQIdentity, TraceIQInitOptions } from '../types';
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type MetricType } from 'web-vitals';
-import { ReplayRecorder } from './replay';
+import { ReplayRecorder } from './replay.js';
 
 const DEFAULT_ENDPOINT = 'http://localhost:4000';
 const ANONYMOUS_ID_STORAGE_KEY = 'traceiq.anonymousId';
@@ -52,7 +52,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
           anonymousId: this.anonymousId, userId: this.identity?.userId
         } : undefined,
         () => this.replayConsentGranted,
-        (message, error) => this.debug(message, error)
+        (message: string, error?: unknown) => this.debug(message, error)
       );
       void this.startReplay();
     }
