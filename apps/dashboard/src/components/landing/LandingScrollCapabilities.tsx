@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SceneCanvas } from '@/components/webgl/SceneCanvas';
 
 interface CapabilitySlide {
   eyebrow: string;
@@ -58,6 +59,9 @@ const CAPABILITIES: CapabilitySlide[] = [
 export function LandingScrollCapabilities() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // The WebGL cloud reads progress every frame. Keeping it in a ref means
+  // scrolling drives the morph without re-rendering React on each event.
+  const progressRef = useRef(0);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -71,6 +75,8 @@ export function LandingScrollCapabilities() {
       // rect.top is <= 0 when the top of the container is at or above viewport top
       const scrollProgress = -rect.top / totalScrollable;
       const clampedProgress = Math.max(0, Math.min(0.999, scrollProgress));
+      progressRef.current = clampedProgress;
+
       const nextIndex = Math.min(
         CAPABILITIES.length - 1,
         Math.floor(clampedProgress * CAPABILITIES.length)
@@ -103,63 +109,52 @@ export function LandingScrollCapabilities() {
     <section
       ref={containerRef}
       id="solutions"
-      className="relative w-full bg-[#f3f2ee] text-[#111111] select-none"
+      className="capability-stage"
       style={{ height: '420vh' }}
       aria-label="Core capabilities scroll presentation"
     >
       {/* Sticky Fullscreen Canvas */}
-      <div className="sticky top-0 z-20 h-screen w-full bg-[#f3f2ee] flex flex-col justify-between p-8 sm:p-14 lg:p-20 xl:p-24 overflow-hidden">
-        {/* Top Header Row */}
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-3">
-            <span className="text-sm sm:text-base font-normal text-[#555555] tracking-tight transition-colors duration-200">
-              {currentSlide.eyebrow}
-            </span>
-            <span className="text-xs font-mono text-[#888888] px-2.5 py-0.5 rounded-full border border-[#dedcd4] bg-[#eae8e1] transition-all duration-200">
-              {currentSlide.tag}
-            </span>
-          </div>
+      <div className="capability-sticky">
+        {/*
+          One point cloud reshapes itself through all six formations as the
+          visitor scrolls, so each capability visibly becomes the next.
+        */}
+        <SceneCanvas kind="morph" progress={progressRef} className="capability-morph" />
+        <div className="capability-scrim" aria-hidden="true" />
 
-          <div className="font-mono text-xs sm:text-sm text-[#777777] tracking-wider">
-            <strong className="text-[#111111] font-semibold">{currentSlide.number}</strong>
-            <span className="mx-1 text-[#aaaaaa]">/</span>
-            <span>06</span>
-          </div>
+        {/* Chapter slug, matching every other chapter on the page */}
+        <div className="chapter-slug capability-slug">
+          <b>03</b>
+          <s />
+          <span>{currentSlide.tag}</span>
+          <em className="capability-count">
+            <b>{currentSlide.number}</b> / 06
+          </em>
         </div>
 
         {/* Center Editorial Statement */}
-        <div className="relative my-auto max-w-6xl w-full py-8">
-          <div
-            key={currentSlide.number}
-            className="animate-in fade-in slide-in-from-bottom-2 duration-300 w-full"
-          >
-            <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-[#111111] leading-[1.22] sm:leading-[1.18]">
-              {currentSlide.textPrefix}
-              <span className="text-[#777777] font-medium">{currentSlide.highlightText}</span>
-            </h2>
-          </div>
+        <div className="capability-statement">
+          <span className="capability-eyebrow">{currentSlide.eyebrow}</span>
+          <h2 key={currentSlide.number} className="display-sm capability-copy">
+            {currentSlide.textPrefix}
+            <span>{currentSlide.highlightText}</span>
+          </h2>
         </div>
 
         {/* Bottom Step Indicator Bar */}
-        <div className="flex items-center justify-between w-full pt-6 border-t border-[#dedcd4]">
-          <div className="flex items-center gap-2 sm:gap-3">
+        <div className="capability-steps">
+          <div className="capability-dots">
             {CAPABILITIES.map((slide, i) => (
               <button
                 key={slide.number}
                 type="button"
                 onClick={() => handleStepClick(i)}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${i === activeIndex
-                    ? 'w-10 sm:w-16 bg-[#111111]'
-                    : 'w-4 sm:w-6 bg-[#d4d2c8] hover:bg-[#b0ae9f]'
-                  }`}
+                className={i === activeIndex ? 'is-active' : ''}
                 aria-label={`Go to slide ${i + 1}: ${slide.tag}`}
               />
             ))}
           </div>
-
-          <div className="text-[11px] sm:text-xs font-mono text-[#777777] uppercase tracking-widest">
-            {/* Scroll to explore ({activeIndex + 1} of 6) */}
-          </div>
+          <span className="capability-hint">Scroll to explore</span>
         </div>
       </div>
     </section>
