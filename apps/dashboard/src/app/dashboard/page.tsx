@@ -212,6 +212,35 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
+        {/* Lightweight Onboarding Setup Reminder (disappears after first event is received) */}
+        {overview?.project && (!overview.totals.events || overview.totals.events === 0) ? (
+          <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-blue-50/70 p-4 sm:p-5 shadow-sm dark:border-blue-900/50 dark:from-blue-950/30 dark:via-slate-900/50 dark:to-blue-950/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm">
+                  ◆
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                    Finish setting up TraceIQ
+                  </h3>
+                  <p className="mt-0.5 text-xs text-neutral-600 dark:text-slate-400">
+                    No events have been received from <strong className="font-semibold text-neutral-800 dark:text-neutral-200">{overview.project.name}</strong> yet. Connect your application to start receiving telemetry.
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                <Link
+                  href={`/dashboard/setup?projectId=${encodeURIComponent(canonicalProjectId!)}`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                >
+                  Set up tracking →
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Highlighted Insight Banner: Today's Story */}
         {overview?.project ? <TodayStoryCard projectId={canonicalProjectId} /> : null}
 

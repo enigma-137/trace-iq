@@ -804,23 +804,23 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
-                  href={`/dashboard/events?projectId=${encodeURIComponent(projectId)}`}
-                  className="rounded-lg bg-neutral-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                  href={`/dashboard?projectId=${encodeURIComponent(projectId)}`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
                 >
-                  View in Live Event Stream →
+                  Open Analytics →
                 </Link>
                 <Link
-                  href={`/dashboard?projectId=${encodeURIComponent(projectId)}`}
-                  className="rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  href={`/dashboard/events?projectId=${encodeURIComponent(projectId)}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 >
-                  Open Analytics Dashboard
+                  View Event
                 </Link>
                 <button
                   type="button"
                   onClick={() => setIsReportOpen(true)}
-                  className="rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 >
-                  View Setup Report
+                  Setup Report
                 </button>
               </div>
             </div>

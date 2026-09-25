@@ -808,20 +808,32 @@ export function SetupPanel({
                 <div className="grid gap-4">
                   <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                     <div>
-                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                        New Project Created — {createdProject.project.name}
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        Project created ✓
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-neutral-900 dark:text-white">
+                        Your project is ready — {createdProject.project.name}
                       </h3>
-                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                        Project ID: <span className="font-mono">{createdProject.project.id}</span>. Copy the write key now; it is shown only once.
+                      <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        Connect your application to start receiving events.
                       </p>
                     </div>
-                    <button
-                      className="h-8 shrink-0 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                      type="button"
-                      onClick={() => router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
-                    >
-                      Open project
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        className="h-8 rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        type="button"
+                        onClick={() => router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
+                      >
+                        I'll do this later
+                      </button>
+                      <button
+                        className="h-8 rounded-md bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                        type="button"
+                        onClick={() => router.push(`/dashboard/setup?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
+                      >
+                        Set up tracking →
+                      </button>
+                    </div>
                   </div>
                   {createdProject.writeKey?.value ? (
                     <div className="flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900">
@@ -1021,6 +1033,72 @@ export function SetupPanel({
                 placeholder="delete my project"
               />
             </label>
+          </div>
+        </div>
+      </DashboardDialog>
+
+      {/* Contextual Project Created Success Modal */}
+      <DashboardDialog
+        open={Boolean(createdProject?.project)}
+        title="Project created ✓"
+        description="Your project is ready."
+        onClose={() => {
+          if (createdProject?.project?.id) {
+            router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project.id)}`);
+          }
+          setCreatedProject(null);
+        }}
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <button
+              className="h-9 rounded-md border border-neutral-300 bg-white px-3.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              type="button"
+              onClick={() => {
+                if (createdProject?.project?.id) {
+                  router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project.id)}`);
+                }
+                setCreatedProject(null);
+              }}
+            >
+              I'll do this later
+            </button>
+            <button
+              className="h-9 rounded-md bg-blue-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+              type="button"
+              onClick={() => {
+                if (createdProject?.project?.id) {
+                  router.push(`/dashboard/setup?projectId=${encodeURIComponent(createdProject.project.id)}`);
+                }
+                setCreatedProject(null);
+              }}
+            >
+              Set up tracking →
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3.5">
+          <p className="text-xs text-neutral-600 dark:text-slate-300">
+            Connect your application to start receiving events for <strong className="font-semibold text-neutral-900 dark:text-white">{createdProject?.project?.name}</strong>.
+          </p>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-neutral-500 dark:text-neutral-400">Project ID:</span>
+              <span className="font-mono font-semibold text-neutral-900 dark:text-white">
+                {createdProject?.project?.id}
+              </span>
+            </div>
+            {createdProject?.writeKey?.value ? (
+              <div className="mt-2 pt-2 border-t border-neutral-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-neutral-500 dark:text-neutral-400">Write Key:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-semibold text-neutral-900 dark:text-white">
+                    {createdProject.writeKey.value}
+                  </span>
+                  <CopyButton value={createdProject.writeKey.value} label="Copy key" compact />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </DashboardDialog>
