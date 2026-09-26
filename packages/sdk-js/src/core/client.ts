@@ -52,6 +52,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     };
     this.anonymousId = this.loadOrCreateId('localStorage', ANONYMOUS_ID_STORAGE_KEY, 'anon');
     this.sessionId = this.loadOrCreateId('sessionStorage', SESSION_ID_STORAGE_KEY, 'sess');
+    this.debug(`[TraceIQ] SDK initialized (endpoint: ${this.options.endpoint})`);
 
     if (options.replay?.enabled === true || options.enableReplay === true) {
       this.replayRecorder = new ReplayRecorder(
@@ -99,6 +100,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.lastPageUrl = window.location.href;
 
     // Track initial page load
+    this.debug('[TraceIQ] Emitting initial $page');
     this.page();
 
     // Listen to browser popstate (back/forward)
@@ -532,6 +534,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
       timestamp: new Date().toISOString()
     };
 
+    this.debug(`[TraceIQ] Sending event ${eventName} to ${endpoint}`);
+
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -544,15 +548,16 @@ export class BrowserTraceIQClient implements TraceIQClient {
       });
 
       if (!response.ok) {
-        this.debug(`TraceIQ event rejected with ${response.status}.`);
+        this.debug(`[TraceIQ] Event rejected: HTTP ${response.status}`);
       } else {
+        this.debug(`[TraceIQ] Event accepted: ${response.status}`);
         // Replay flow eligibility is evaluated only after TraceIQ accepted the
         // event, allowing the API to prove the session entered a selected
         // funnel instead of trusting an SDK-supplied funnel identifier.
         this.replayRecorder?.eventAccepted(eventName);
       }
     } catch (error) {
-      this.debug('TraceIQ event delivery failed.', error);
+      this.debug('[TraceIQ] Event delivery failed:', error);
     }
   }
 
@@ -760,9 +765,13 @@ export class BrowserTraceIQClient implements TraceIQClient {
   }
 
   private debug(message: string, error?: unknown): void {
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    const isDev = typeof process === 'undefined' || process.env?.NODE_ENV !== 'production';
     if (this.options?.debug || isDev) {
-      console.warn(message, error ?? '');
+      if (error !== undefined) {
+        console.warn(message, error);
+      } else {
+        console.log(message);
+      }
     }
   }
 }

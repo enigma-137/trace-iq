@@ -1,6 +1,6 @@
 {
   "name": "traceiq-sdk-js",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -10,6 +10,14 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": "./dist/*"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepack": "npm run build",

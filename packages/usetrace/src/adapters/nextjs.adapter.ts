@@ -233,6 +233,10 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
     const writeKey = process.env.NEXT_PUBLIC_TRACEIQ_WRITE_KEY;
     const endpoint = process.env.NEXT_PUBLIC_TRACEIQ_API_URL || 'https://api.traceiq.run';
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[TraceIQ] Provider mounted');
+    }
+
     if (!projectId || !writeKey) {
       if (process.env.NODE_ENV === 'development') {
         console.warn(
