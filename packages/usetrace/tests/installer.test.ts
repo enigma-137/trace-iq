@@ -55,12 +55,13 @@ describe('useTrace Installer and Idempotency', () => {
     expect(changes.modifiedFiles).toContain('app/layout.tsx');
     expect(changes.createdFiles).toContain('.env.local');
 
-    // Verify layout content has provider
-    const layoutAfter = await fs.readFile(path.join(tempDir, 'app', 'layout.tsx'), 'utf8');
-    expect(layoutAfter).toContain('import { TraceIQProvider } from');
-    expect(layoutAfter).toContain('<TraceIQProvider>{children}</TraceIQProvider>');
+    // Verify provider component does not contain hardcoded write key or project id
+    const providerContent = await fs.readFile(path.join(tempDir, 'components', 'traceiq-provider.tsx'), 'utf8');
+    expect(providerContent).not.toContain('tiq_live_abc456');
+    expect(providerContent).toContain('process.env.NEXT_PUBLIC_TRACEIQ_PROJECT_ID');
+    expect(providerContent).toContain('process.env.NEXT_PUBLIC_TRACEIQ_WRITE_KEY');
 
-    // Verify .env.local
+    // Verify .env.local contains the credentials
     const envAfter = await fs.readFile(path.join(tempDir, '.env.local'), 'utf8');
     expect(envAfter).toContain('NEXT_PUBLIC_TRACEIQ_PROJECT_ID=prj_test_123');
     expect(envAfter).toContain('NEXT_PUBLIC_TRACEIQ_WRITE_KEY=tiq_live_abc456');

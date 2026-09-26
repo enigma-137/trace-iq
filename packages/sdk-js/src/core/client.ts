@@ -26,6 +26,9 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private replayConsentGranted = false;
   private replayRecorder?: ReplayRecorder;
 
+  private pageTrackingInstalled = false;
+  private lastPageUrl?: string;
+
   public readonly flags = {
     load: (properties?: Record<string, string | number | boolean>) => this.loadFeatureFlags(properties),
     isEnabled: (key: string, defaultValue = false) => this.isFeatureEnabled(key, defaultValue),
@@ -36,6 +39,13 @@ export class BrowserTraceIQClient implements TraceIQClient {
   };
 
   initialize(options: TraceIQInitOptions): void {
+    if (!options?.projectId || !options?.writeKey) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[TraceIQ] Initialization failed: projectId and writeKey are required.');
+      }
+      return;
+    }
+
     this.options = {
       ...options,
       endpoint: options.endpoint ?? DEFAULT_ENDPOINT
@@ -73,8 +83,58 @@ export class BrowserTraceIQClient implements TraceIQClient {
       this.installWebVitals();
     }
 
-    if (options.autoTrackPageViews) {
-      this.page();
+    if (options.autoTrackPageViews !== false) {
+      this.installPageTracking();
+    }
+  }
+
+  private installPageTracking(): void {
+    if (typeof window === 'undefined' || this.pageTrackingInstalled) {
+      if (typeof window !== 'undefined') {
+        this.page();
+      }
+      return;
+    }
+    this.pageTrackingInstalled = true;
+    this.lastPageUrl = window.location.href;
+
+    // Track initial page load
+    this.page();
+
+    // Listen to browser popstate (back/forward)
+    window.addEventListener('popstate', () => {
+      this.handleUrlChange();
+    });
+
+    // Monkey-patch history.pushState & history.replaceState for SPA / Next.js navigation
+    const self = this;
+    const originalPushState = history.pushState;
+    if (typeof originalPushState === 'function') {
+      history.pushState = function (...args: Parameters<typeof originalPushState>) {
+        const result = originalPushState.apply(this, args);
+        self.handleUrlChange();
+        return result;
+      };
+    }
+
+    const originalReplaceState = history.replaceState;
+    if (typeof originalReplaceState === 'function') {
+      history.replaceState = function (...args: Parameters<typeof originalReplaceState>) {
+        const result = originalReplaceState.apply(this, args);
+        self.handleUrlChange();
+        return result;
+      };
+    }
+  }
+
+  private handleUrlChange(): void {
+    if (typeof window === 'undefined') return;
+    const currentUrl = window.location.href;
+    if (currentUrl !== this.lastPageUrl) {
+      this.lastPageUrl = currentUrl;
+      setTimeout(() => {
+        this.page();
+      }, 0);
     }
   }
 
@@ -700,7 +760,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
   }
 
   private debug(message: string, error?: unknown): void {
-    if (this.options?.debug) {
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (this.options?.debug || isDev) {
       console.warn(message, error ?? '');
     }
   }

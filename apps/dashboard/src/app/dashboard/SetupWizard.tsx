@@ -657,19 +657,44 @@ export function SetupWizard({
             <div className="mt-2 overflow-x-auto rounded-lg bg-neutral-950 p-4 font-mono text-xs text-neutral-200 dark:bg-black">
               <pre>{`'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { traceiq } from 'traceiq-sdk-js';
 
 export function TraceIQProvider({ children }: { children: React.ReactNode }) {
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    traceiq.initialize({
-      projectId: process.env.NEXT_PUBLIC_TRACEIQ_PROJECT_ID!,
-      writeKey: process.env.NEXT_PUBLIC_TRACEIQ_WRITE_KEY!,
-      endpoint: process.env.NEXT_PUBLIC_TRACEIQ_API_URL || '${apiUrl}',
-      autoTrackPageViews: true,
-      autoCaptureExceptions: true,
-      autoCaptureWebVitals: true
-    });
+    if (initializedRef.current) return;
+
+    const projectId = process.env.NEXT_PUBLIC_TRACEIQ_PROJECT_ID;
+    const writeKey = process.env.NEXT_PUBLIC_TRACEIQ_WRITE_KEY;
+    const endpoint = process.env.NEXT_PUBLIC_TRACEIQ_API_URL || 'https://api.traceiq.run';
+
+    if (!projectId || !writeKey) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          '[TraceIQ] Initialization skipped: missing project ID or write key.\\n' +
+          'Restart the development server after changing environment variables.'
+        );
+      }
+      return;
+    }
+
+    try {
+      traceiq.initialize({
+        projectId,
+        writeKey,
+        endpoint,
+        autoTrackPageViews: true,
+        autoCaptureExceptions: true,
+        autoCaptureWebVitals: true
+      });
+      initializedRef.current = true;
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[TraceIQ] Initialization failed:', err instanceof Error ? err.message : err);
+      }
+    }
   }, []);
 
   return <>{children}</>;

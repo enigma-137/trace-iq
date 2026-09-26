@@ -91,11 +91,18 @@ export class NodeAdapter implements FrameworkAdapter {
 
     const initCode = `import { traceiq } from 'traceiq-sdk-js';
 
-const projectId = process.env.TRACEIQ_PROJECT_ID || '${options.projectId}';
-const writeKey = process.env.TRACEIQ_WRITE_KEY || '${options.writeKey}';
-const endpoint = process.env.TRACEIQ_API_URL || '${options.apiUrl}';
+const projectId = process.env.TRACEIQ_PROJECT_ID;
+const writeKey = process.env.TRACEIQ_WRITE_KEY;
+const endpoint = process.env.TRACEIQ_API_URL || 'https://api.traceiq.run';
 
-if (projectId && writeKey) {
+if (!projectId || !writeKey) {
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(
+      '[TraceIQ] Initialization skipped: missing project ID or write key.\\n' +
+      'Restart the application after changing environment variables.'
+    );
+  }
+} else {
   traceiq.initialize({
     projectId,
     writeKey,

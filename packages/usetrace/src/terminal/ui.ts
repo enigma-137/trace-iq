@@ -317,7 +317,8 @@ export function renderFileChanges(changes: {
     console.log(`  ${colors.yellow('~')} ${file}`);
   });
   if (changes.addedEnvVars.length > 0) {
-    console.log(`  ${colors.cyan(symbols.diamondOutline)} Configured environment variables: ${changes.addedEnvVars.join(', ')}`);
+    console.log(`  ${colors.cyan(symbols.diamondOutline)} Environment variables updated.`);
+    console.log(`  ${colors.yellow(symbols.warn)} ${colors.yellow('Restart your development server if it is already running.')}`);
   }
 }
 

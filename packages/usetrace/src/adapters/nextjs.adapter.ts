@@ -91,7 +91,11 @@ export class NextJsAdapter implements FrameworkAdapter {
       }
     }
 
-    if (layoutContent.includes('TraceIQProvider') || layoutContent.includes('traceiq.initialize') || hasProviderFile) {
+    const hasMountedProvider =
+      /<TraceIQProvider[\s>]/.test(layoutContent) ||
+      layoutContent.includes('traceiq.initialize');
+
+    if (hasMountedProvider) {
       providerInLayout = true;
       pageViewsConfigured = true;
     }
@@ -132,7 +136,13 @@ export class NextJsAdapter implements FrameworkAdapter {
         issues.push('TraceIQ SDK is not installed in dependencies.');
       }
     }
-    if (!providerInLayout) issues.push('TraceIQ provider is not configured in root layout.');
+    if (!providerInLayout) {
+      if (hasProviderFile) {
+        issues.push('TraceIQ provider exists but is not mounted around root application layout.');
+      } else {
+        issues.push('TraceIQ provider is not configured in root layout.');
+      }
+    }
     if (!envCreds.projectId || !envCreds.writeKey) issues.push('TraceIQ environment variables are missing.');
     if (sdkDetected && !userIdentificationConfigured) {
       recommendations.push('User identification is missing. Identify users after sign-in for unified user profiles.');
@@ -189,6 +199,7 @@ export class NextJsAdapter implements FrameworkAdapter {
     const clientCode = `import { traceiq } from 'traceiq-sdk-js';
 
 export { traceiq };
+export default traceiq;
 `;
 
     if (!(await this.fileExists(clientFilePath))) {
@@ -209,31 +220,45 @@ export { traceiq };
 
     const providerCode = `'use client';
 
-import { useEffect } from 'react';
-import { traceiq } from '@/lib/traceiq';
+import { useEffect, useRef } from 'react';
+import { traceiq } from 'traceiq-sdk-js';
 
 export function TraceIQProvider({ children }: { children: React.ReactNode }) {
+  const initializedRef = useRef(false);
+
   useEffect(() => {
+    if (initializedRef.current) return;
+
     const projectId = process.env.NEXT_PUBLIC_TRACEIQ_PROJECT_ID;
     const writeKey = process.env.NEXT_PUBLIC_TRACEIQ_WRITE_KEY;
-    const endpoint = process.env.NEXT_PUBLIC_TRACEIQ_API_URL || '${options.apiUrl}';
+    const endpoint = process.env.NEXT_PUBLIC_TRACEIQ_API_URL || 'https://api.traceiq.run';
 
     if (!projectId || !writeKey) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[TraceIQ] Missing NEXT_PUBLIC_TRACEIQ_PROJECT_ID or NEXT_PUBLIC_TRACEIQ_WRITE_KEY');
+        console.warn(
+          '[TraceIQ] Initialization skipped: missing project ID or write key.\\n' +
+          'Restart the development server after changing environment variables.'
+        );
       }
       return;
     }
 
-    traceiq.initialize({
-      projectId,
-      writeKey,
-      endpoint,
-      autoTrackPageViews: ${autoTrackPageViews},
-      autoCaptureExceptions: ${autoCaptureExceptions},
-      autoCaptureWebVitals: ${autoCaptureWebVitals},
-      autoCaptureRageClicks: true
-    });
+    try {
+      traceiq.initialize({
+        projectId,
+        writeKey,
+        endpoint,
+        autoTrackPageViews: ${autoTrackPageViews},
+        autoCaptureExceptions: ${autoCaptureExceptions},
+        autoCaptureWebVitals: ${autoCaptureWebVitals},
+        autoCaptureRageClicks: true
+      });
+      initializedRef.current = true;
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[TraceIQ] Initialization failed:', err instanceof Error ? err.message : err);
+      }
+    }
   }, []);
 
   return <>{children}</>;
@@ -251,21 +276,37 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
     const appLayoutPath = await this.findFirstExisting([
       path.join(baseDir, 'app', 'layout.tsx'),
       path.join(baseDir, 'app', 'layout.jsx'),
-      path.join(baseDir, 'app', 'layout.js')
+      path.join(baseDir, 'app', 'layout.js'),
+      path.join(baseDir, 'pages', '_app.tsx'),
+      path.join(baseDir, 'pages', '_app.jsx'),
+      path.join(baseDir, 'pages', '_app.js')
     ]);
 
     if (appLayoutPath) {
       const layoutContent = await fs.readFile(appLayoutPath, 'utf8');
-      if (!layoutContent.includes('TraceIQProvider')) {
+      const hasProviderMounted = /<TraceIQProvider[\s>]/.test(layoutContent);
+      if (!hasProviderMounted) {
         let updatedLayout = layoutContent;
 
-        // Add import
-        const importStatement = `import { TraceIQProvider } from '@/components/traceiq-provider';\n`;
-        updatedLayout = importStatement + updatedLayout;
+        // Add import if not already present
+        if (!updatedLayout.includes('TraceIQProvider')) {
+          const importStatement = `import { TraceIQProvider } from '@/components/traceiq-provider';\n`;
+          updatedLayout = importStatement + updatedLayout;
+        }
 
         // Wrap children with <TraceIQProvider>
-        if (updatedLayout.includes('{children}')) {
-          updatedLayout = updatedLayout.replace('{children}', '<TraceIQProvider>{children}</TraceIQProvider>');
+        if (/\{\s*children\s*\}/.test(updatedLayout)) {
+          updatedLayout = updatedLayout.replace(/\{\s*children\s*\}/, '<TraceIQProvider>{children}</TraceIQProvider>');
+        } else if (/<Component\s+\{\.\.\.pageProps\}\s*\/>/.test(updatedLayout)) {
+          updatedLayout = updatedLayout.replace(
+            /<Component\s+\{\.\.\.pageProps\}\s*\/>/,
+            '<TraceIQProvider><Component {...pageProps} /></TraceIQProvider>'
+          );
+        } else if (updatedLayout.includes('<body>')) {
+          updatedLayout = updatedLayout.replace(
+            /<body>([\s\S]*?)<\/body>/,
+            '<body><TraceIQProvider>$1</TraceIQProvider></body>'
+          );
         }
 
         if (!options.dryRun) {
