@@ -15,6 +15,7 @@ export interface InsightChartRendererProps {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  onConfigure?: () => void;
   className?: string;
   height?: number;
 }
@@ -26,6 +27,7 @@ export function InsightChartRenderer({
   loading = false,
   error = null,
   onRetry,
+  onConfigure,
   className = '',
   height = 240
 }: InsightChartRendererProps) {
@@ -75,22 +77,77 @@ export function InsightChartRenderer({
     );
   }
 
-  if (!data) {
+  // Check for project-specific unconfigured funnel or metric
+  if (type === 'funnel' && (!data || !data.steps || data.steps.length === 0)) {
     return (
       <div
-        className={`flex w-full items-center justify-center rounded-lg border border-dashed border-neutral-200 p-6 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600 ${className}`}
+        className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-neutral-50/30 p-6 text-center dark:border-neutral-800 dark:bg-neutral-900/20 ${className}`}
         style={{ minHeight: height }}
       >
-        No chart data available
+        <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+        </div>
+        <p className="text-xs font-semibold text-neutral-900 dark:text-white">Configure this chart</p>
+        <p className="mt-1 max-w-xs text-[11px] text-neutral-500 dark:text-neutral-400">
+          Choose the event(s) that represent this metric for your product.
+        </p>
+        {onConfigure && (
+          <button
+            type="button"
+            onClick={onConfigure}
+            className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+          >
+            Configure
+          </button>
+        )}
       </div>
     );
   }
 
-  const chartType = (visualization?.chartType || visualization?.type || 'line') as VisualizationType;
+  // Check for API performance without telemetry
+  if (type === 'api_performance' && data && (!data.summary || data.summary.totalRequests === 0)) {
+    return (
+      <div
+        className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-neutral-50/20 p-6 text-center dark:border-neutral-800 dark:bg-neutral-900/10 ${className}`}
+        style={{ minHeight: height }}
+      >
+        <div className="mb-2 text-neutral-400 dark:text-neutral-500">
+          <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+          </svg>
+        </div>
+        <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">No API performance telemetry has been received</p>
+        <p className="mt-1 max-w-xs text-[11px] text-neutral-500 dark:text-neutral-400">
+          Capture endpoint latency and HTTP status using the TraceIQ backend SDK.
+        </p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div
+        className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 p-6 text-center text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-500 ${className}`}
+        style={{ minHeight: height }}
+      >
+        <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">No events received in this time range</p>
+        <p className="mt-1 text-[11px] text-neutral-400 dark:text-neutral-500">Change date range to view earlier telemetry.</p>
+      </div>
+    );
+  }
+
+  const chartType = (visualization?.chartType || visualization?.type || (type === 'event_breakdown' ? 'bar' : 'line')) as VisualizationType;
 
   // Single KPI / Number View
-  if (chartType === 'kpi' || type === 'kpi' || data.kind === 'kpi') {
-    const value = data.value ?? data.current ?? data.summary?.current ?? 0;
+  if (chartType === 'kpi' || chartType === 'number' || type === 'kpi' || data.kind === 'kpi') {
+    let value = data.value ?? data.current ?? data.summary?.current;
+    if (value === undefined && Array.isArray(data.issues)) {
+      value = data.issues.reduce((acc: number, i: any) => acc + (i.occurrences || 0), 0);
+    }
+    if (value === undefined) value = 0;
+
     const previous = data.previous ?? data.summary?.previous;
     const label = data.label || visualization?.unit || '';
     let delta = 0;
@@ -146,12 +203,13 @@ export function InsightChartRenderer({
   }
 
   // Retention View
-  if (type === 'retention' || chartType === 'retention' || data.matrix) {
-    const matrix = data.matrix || [];
-    if (matrix.length === 0) {
+  if (type === 'retention' || chartType === 'retention' || data.cohorts || data.matrix) {
+    const cohorts = data.cohorts || data.matrix || [];
+    if (cohorts.length === 0) {
       return (
-        <div className="flex items-center justify-center p-6 text-xs text-neutral-400" style={{ minHeight: height }}>
-          No retention data available
+        <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-neutral-400" style={{ minHeight: height }}>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300">No cohort retention data yet</p>
+          <p className="mt-1 text-[11px] text-neutral-500">Requires activity across multiple consecutive weeks.</p>
         </div>
       );
     }
@@ -164,13 +222,13 @@ export function InsightChartRenderer({
               <th className="py-2 pr-4 font-medium">Users</th>
               {Array.from({ length: 8 }).map((_, i) => (
                 <th key={i} className="py-2 px-2 text-center font-medium">
-                  {i === 0 ? 'Day 0' : `+${i}d`}
+                  {i === 0 ? 'Week 0' : `+${i}w`}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-850">
-            {matrix.map((row: any, rIdx: number) => (
+            {cohorts.map((row: any, rIdx: number) => (
               <tr key={rIdx}>
                 <td className="py-2 pr-4 font-mono text-[11px] text-neutral-800 dark:text-neutral-200">{row.cohort || `Cohort ${rIdx + 1}`}</td>
                 <td className="py-2 pr-4 font-mono text-[11px] text-neutral-500">{row.size || row.users || 0}</td>
@@ -196,15 +254,16 @@ export function InsightChartRenderer({
     );
   }
 
-  // Table View
-  if (chartType === 'table' || type === 'table' || data.rows) {
-    const rows = data.rows || data.items || [];
-    const columns = data.columns || (rows.length > 0 ? Object.keys(rows[0]) : []);
+  // Table View (Errors or General Tables)
+  if (chartType === 'table' || type === 'table' || type === 'error_metric' || data.issues || data.rows) {
+    const rawRows = data.issues || data.rows || data.items || [];
+    const rows = Array.isArray(rawRows) ? rawRows : [];
+    const columns = data.columns || (rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== 'sparkline') : []);
 
     if (rows.length === 0) {
       return (
-        <div className="flex items-center justify-center p-6 text-xs text-neutral-400" style={{ minHeight: height }}>
-          No records found
+        <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-neutral-400" style={{ minHeight: height }}>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300">No records found for this period</p>
         </div>
       );
     }
@@ -216,7 +275,7 @@ export function InsightChartRenderer({
             <tr className="border-b border-neutral-200 bg-neutral-50/70 text-[11px] font-medium text-neutral-500 dark:border-neutral-800 dark:bg-neutral-850/50 dark:text-neutral-400">
               {columns.map((col: string) => (
                 <th key={col} className="px-3 py-2 font-medium capitalize">
-                  {col.replace(/_/g, ' ')}
+                  {col.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}
                 </th>
               ))}
             </tr>
@@ -246,10 +305,21 @@ export function InsightChartRenderer({
     if (Array.isArray(data.items)) {
       items = data.items;
     } else if (Array.isArray(data.series)) {
-      items = data.series.map((s: any) => ({
-        label: s.key,
-        value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
-      }));
+      items = data.series
+        .map((s: any) => ({
+          label: s.key,
+          value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
+        }))
+        .filter((i: any) => i.value > 0);
+    }
+
+    if (items.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-neutral-400" style={{ minHeight: height }}>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300">No dimension data recorded</p>
+          <p className="mt-1 text-[11px] text-neutral-500">Capture device and client context with events.</p>
+        </div>
+      );
     }
 
     return (
@@ -259,13 +329,28 @@ export function InsightChartRenderer({
     );
   }
 
-  // Bar View (Event Breakdown or Time-Series Bar)
-  if (chartType === 'bar' && Array.isArray(data.items)) {
-    return (
-      <div className={`w-full p-2 ${className}`}>
-        <BarChart items={data.items} height={height} showValues />
-      </div>
-    );
+  // Bar View (Event Breakdown or Top Events)
+  if (chartType === 'bar' || type === 'event_breakdown') {
+    let items: Array<{ label: string; value: number }> = [];
+    if (Array.isArray(data.items)) {
+      items = data.items;
+    } else if (Array.isArray(data.series)) {
+      items = data.series
+        .map((s: any) => ({
+          label: s.key,
+          value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
+        }))
+        .filter((i: any) => i.value > 0)
+        .sort((a: any, b: any) => b.value - a.value);
+    }
+
+    if (items.length > 0) {
+      return (
+        <div className={`w-full p-2 ${className}`}>
+          <BarChart items={items} height={height} showValues />
+        </div>
+      );
+    }
   }
 
   // Trend / Area / Line Chart
@@ -298,7 +383,7 @@ export function InsightChartRenderer({
   }
 
   // Fallback if items array exists
-  if (Array.isArray(data.items)) {
+  if (Array.isArray(data.items) && data.items.length > 0) {
     return (
       <div className={`w-full p-2 ${className}`}>
         <BarChart items={data.items} height={height} showValues />
@@ -307,8 +392,9 @@ export function InsightChartRenderer({
   }
 
   return (
-    <div className="flex items-center justify-center p-6 text-xs text-neutral-400" style={{ minHeight: height }}>
-      No compatible visualization for query result
+    <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-neutral-400" style={{ minHeight: height }}>
+      <p className="font-medium text-neutral-700 dark:text-neutral-300">No chart data available</p>
+      <p className="mt-1 text-[11px] text-neutral-500">Change date range or check event telemetry.</p>
     </div>
   );
 }

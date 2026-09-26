@@ -9,7 +9,9 @@ import {
   updateInsight,
   duplicateInsight,
   executeInsightQuery,
-  fetchInsight
+  fetchInsight,
+  fetchEventNames,
+  fetchEventProperties
 } from '@/lib/analytics-api';
 import type {
   SavedInsightView,
@@ -56,7 +58,7 @@ export function InsightBuilder({
   );
 
   // Query configuration state
-  const [event, setEvent] = useState(initialInsight?.query?.event || '$pageview');
+  const [event, setEvent] = useState(initialInsight?.query?.event || '*');
   const [measure, setMeasure] = useState(initialInsight?.query?.measure || 'count');
   const [property, setProperty] = useState(initialInsight?.query?.property || '');
   const [breakdown, setBreakdown] = useState(initialInsight?.query?.breakdown || '');
@@ -65,6 +67,10 @@ export function InsightBuilder({
     initialInsight?.dateConfig?.interval || initialInsight?.query?.interval || 'day'
   );
   const [compare, setCompare] = useState(Boolean(initialInsight?.dateConfig?.compare ?? true));
+
+  // Dynamic project telemetry schemas
+  const [availableEvents, setAvailableEvents] = useState<Array<{ eventName: string; total: number; actors: number }>>([]);
+  const [availableProperties, setAvailableProperties] = useState<Array<{ key: string; sampleType: string }>>([]);
 
   // Funnel steps state (when type === 'funnel')
   const [funnelSteps, setFunnelSteps] = useState<string[]>(
@@ -82,6 +88,24 @@ export function InsightBuilder({
   const [savedInsightId, setSavedInsightId] = useState<string | null>(initialInsight?.id || insightId || null);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load project events
+  useEffect(() => {
+    fetchEventNames(projectId).then(({ data }) => {
+      if (data?.eventNames) {
+        setAvailableEvents(data.eventNames);
+      }
+    });
+  }, [projectId]);
+
+  // Load properties when event changes
+  useEffect(() => {
+    fetchEventProperties(event, projectId).then(({ data }) => {
+      if (data?.properties) {
+        setAvailableProperties(data.properties);
+      }
+    });
+  }, [event, projectId]);
 
   // Run reactive query on config change
   useEffect(() => {
@@ -128,8 +152,8 @@ export function InsightBuilder({
     setIsQuerying(false);
     if (error) {
       setQueryError(error);
-    } else if (data?.result) {
-      setQueryResult(data.result);
+    } else if (data) {
+      setQueryResult(data.data !== undefined ? data.data : data.result !== undefined ? data.result : data);
     }
   }
 
@@ -298,14 +322,28 @@ export function InsightBuilder({
               {/* Event / Action */}
               {type !== 'funnel' && (
                 <div>
-                  <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Event / Metric</label>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="font-medium text-neutral-700 dark:text-neutral-300">Event / Metric</label>
+                    {availableEvents.length > 0 && (
+                      <span className="text-[10px] text-neutral-400">
+                        {availableEvents.length} events in project
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
+                    list="project-events-list"
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
-                    placeholder="e.g., $pageview, letter_published, user_signup"
+                    placeholder="* (All Events), letter_published, $pageview..."
                     className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   />
+                  <datalist id="project-events-list">
+                    <option value="*" label="* (All Events)" />
+                    {availableEvents.map((e) => (
+                      <option key={e.eventName} value={e.eventName} label={`${e.eventName} (${e.total} events)`} />
+                    ))}
+                  </datalist>
                 </div>
               )}
 
@@ -332,11 +370,17 @@ export function InsightBuilder({
                   <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Property</label>
                   <input
                     type="text"
+                    list="project-properties-list"
                     value={property}
                     onChange={(e) => setProperty(e.target.value)}
                     placeholder="e.g., duration_ms, amount, score"
                     className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   />
+                  <datalist id="project-properties-list">
+                    {availableProperties.map((p) => (
+                      <option key={p.key} value={p.key} label={`${p.key} (${p.sampleType})`} />
+                    ))}
+                  </datalist>
                 </div>
               )}
 
@@ -346,11 +390,23 @@ export function InsightBuilder({
                   <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Breakdown By</label>
                   <input
                     type="text"
+                    list="project-breakdown-list"
                     value={breakdown}
                     onChange={(e) => setBreakdown(e.target.value)}
-                    placeholder="e.g., theme, browser, country, $current_url"
+                    placeholder="e.g., $event_name, $os, $browser, $device"
                     className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   />
+                  <datalist id="project-breakdown-list">
+                    <option value="$event_name" label="Event Name ($event_name)" />
+                    <option value="$os" label="Operating System ($os)" />
+                    <option value="$browser" label="Browser ($browser)" />
+                    <option value="$device" label="Device Type ($device)" />
+                    <option value="$country" label="Country ($country)" />
+                    <option value="$path" label="Page Path ($path)" />
+                    {availableProperties.map((p) => (
+                      <option key={p.key} value={p.key} label={`Property: ${p.key}`} />
+                    ))}
+                  </datalist>
                 </div>
               )}
 

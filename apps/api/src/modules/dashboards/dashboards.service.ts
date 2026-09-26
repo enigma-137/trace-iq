@@ -127,29 +127,29 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Active Users Trend (30d)',
           type: 'trend',
-          query: { event: '$pageview', measure: 'unique', interval: 'day', days: '30' },
+          query: { event: '*', measure: 'unique', interval: 'day', days: '30' },
           visualization: { chartType: 'line' }
         },
         layout: { x: 0, y: 0, w: 8, h: 4 }
       },
       {
-        title: 'Total Monthly Sessions',
-        description: '30-day session volume',
+        title: 'Monthly Active Users',
+        description: '30-day unique user volume',
         insight: {
-          name: 'Total Sessions (30d)',
+          name: 'Total Active Users (30d)',
           type: 'kpi',
-          query: { event: '$pageview', measure: 'unique', days: '30' },
+          query: { event: '*', measure: 'unique', days: '30' },
           visualization: { chartType: 'number' }
         },
         layout: { x: 8, y: 0, w: 4, h: 2 }
       },
       {
-        title: 'Total Event Volume',
+        title: 'Total Ingested Events',
         description: 'Overall activity count',
         insight: {
           name: 'Total Event Volume (30d)',
           type: 'kpi',
-          query: { event: '$pageview', measure: 'count', days: '30' },
+          query: { event: '*', measure: 'count', days: '30' },
           visualization: { chartType: 'number' }
         },
         layout: { x: 8, y: 2, w: 4, h: 2 }
@@ -158,9 +158,9 @@ export const DASHBOARD_TEMPLATES = [
         title: 'Top Events Volume',
         description: 'Distribution of high-frequency events',
         insight: {
-          name: 'Top Events by Day',
-          type: 'trend',
-          query: { event: '$pageview', measure: 'count', interval: 'day', days: '14' },
+          name: 'Top Events by Name',
+          type: 'event_breakdown',
+          query: { event: '*', breakdown: '$event_name', days: '14' },
           visualization: { chartType: 'bar' }
         },
         layout: { x: 0, y: 4, w: 6, h: 4 }
@@ -171,8 +171,8 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Traffic by Browser',
           type: 'event_breakdown',
-          query: { event: '$pageview', breakdown: '$browser', days: '30' },
-          visualization: { chartType: 'pie' }
+          query: { event: '*', breakdown: '$browser', days: '30' },
+          visualization: { chartType: 'donut' }
         },
         layout: { x: 6, y: 4, w: 6, h: 4 }
       },
@@ -197,7 +197,7 @@ export const DASHBOARD_TEMPLATES = [
     tags: ['Growth', 'Funnels', 'Conversion'],
     widgets: [
       {
-        title: 'Primary User Funnel',
+        title: 'Core Activation Funnel',
         description: 'Step-by-step conversion and drop-off rate',
         insight: {
           name: 'Core Conversion Funnel',
@@ -208,12 +208,12 @@ export const DASHBOARD_TEMPLATES = [
         layout: { x: 0, y: 0, w: 7, h: 5 }
       },
       {
-        title: 'Daily Conversion Volume',
-        description: 'Completed goal actions over time',
+        title: 'Daily Event Traffic',
+        description: 'Overall event activity over time',
         insight: {
-          name: 'Goal Completions Trend',
+          name: 'Daily Event Traffic Trend',
           type: 'trend',
-          query: { event: '$pageview', measure: 'count', interval: 'day', days: '30' },
+          query: { event: '*', measure: 'count', interval: 'day', days: '30' },
           visualization: { chartType: 'area' }
         },
         layout: { x: 7, y: 0, w: 5, h: 5 }
@@ -235,8 +235,8 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Device Type Breakdown',
           type: 'event_breakdown',
-          query: { event: '$pageview', breakdown: '$device', days: '30' },
-          visualization: { chartType: 'pie' }
+          query: { event: '*', breakdown: '$device', days: '30' },
+          visualization: { chartType: 'donut' }
         },
         layout: { x: 6, y: 5, w: 6, h: 4 }
       }
@@ -255,7 +255,7 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Overview Active Users',
           type: 'kpi',
-          query: { event: '$pageview', measure: 'unique', days: '30' },
+          query: { event: '*', measure: 'unique', days: '30' },
           visualization: { chartType: 'number' }
         },
         layout: { x: 0, y: 0, w: 4, h: 2 }
@@ -266,7 +266,7 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Overview Event Volume',
           type: 'kpi',
-          query: { event: '$pageview', measure: 'count', days: '30' },
+          query: { event: '*', measure: 'count', days: '30' },
           visualization: { chartType: 'number' }
         },
         layout: { x: 4, y: 0, w: 4, h: 2 }
@@ -276,8 +276,8 @@ export const DASHBOARD_TEMPLATES = [
         description: 'Recent error counts across all services',
         insight: {
           name: 'Overview Error Count',
-          type: 'errors',
-          query: { days: '7' },
+          type: 'error_metric',
+          query: { days: '30' },
           visualization: { chartType: 'number' }
         },
         layout: { x: 8, y: 0, w: 4, h: 2 }
@@ -288,10 +288,21 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Overview Traffic Trend',
           type: 'trend',
-          query: { event: '$pageview', measure: 'count', interval: 'day', days: '30' },
+          query: { event: '*', measure: 'count', interval: 'day', days: '30' },
           visualization: { chartType: 'area' }
         },
         layout: { x: 0, y: 2, w: 8, h: 4 }
+      },
+      {
+        title: 'Top Events',
+        description: 'Most frequent events in the last 30 days',
+        insight: {
+          name: 'Overview Top Events',
+          type: 'event_breakdown',
+          query: { event: '*', breakdown: '$event_name', days: '30' },
+          visualization: { chartType: 'bar' }
+        },
+        layout: { x: 8, y: 2, w: 4, h: 4 }
       },
       {
         title: 'Operating System Split',
@@ -299,10 +310,21 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Overview OS Split',
           type: 'event_breakdown',
-          query: { event: '$pageview', breakdown: '$os', days: '30' },
-          visualization: { chartType: 'pie' }
+          query: { event: '*', breakdown: '$os', days: '30' },
+          visualization: { chartType: 'donut' }
         },
-        layout: { x: 8, y: 2, w: 4, h: 4 }
+        layout: { x: 0, y: 6, w: 6, h: 4 }
+      },
+      {
+        title: 'Browser Distribution',
+        description: 'Client browser breakdown',
+        insight: {
+          name: 'Overview Browser Distribution',
+          type: 'event_breakdown',
+          query: { event: '*', breakdown: '$browser', days: '30' },
+          visualization: { chartType: 'donut' }
+        },
+        layout: { x: 6, y: 6, w: 6, h: 4 }
       }
     ]
   },
@@ -329,7 +351,7 @@ export const DASHBOARD_TEMPLATES = [
         description: 'Top error occurrences',
         insight: {
           name: 'Top Service Exceptions',
-          type: 'errors',
+          type: 'error_metric',
           query: { days: '7' },
           visualization: { chartType: 'table' }
         },
@@ -372,7 +394,7 @@ export const DASHBOARD_TEMPLATES = [
         insight: {
           name: 'Daily Active Users (DAU)',
           type: 'trend',
-          query: { event: '$pageview', measure: 'unique', interval: 'day', days: '30' },
+          query: { event: '*', measure: 'unique', interval: 'day', days: '30' },
           visualization: { chartType: 'line' }
         },
         layout: { x: 0, y: 0, w: 8, h: 4 }
@@ -389,6 +411,17 @@ export const DASHBOARD_TEMPLATES = [
         layout: { x: 8, y: 0, w: 4, h: 4 }
       },
       {
+        title: 'Operating System Split',
+        description: 'User operating systems',
+        insight: {
+          name: 'User OS Split',
+          type: 'event_breakdown',
+          query: { event: '*', breakdown: '$os', days: '30' },
+          visualization: { chartType: 'donut' }
+        },
+        layout: { x: 0, y: 4, w: 6, h: 4 }
+      },
+      {
         title: 'Weekly Retention Heatmap',
         description: 'Cohort activity retention',
         insight: {
@@ -397,7 +430,7 @@ export const DASHBOARD_TEMPLATES = [
           query: { weeks: '6' },
           visualization: { chartType: 'retention' }
         },
-        layout: { x: 0, y: 4, w: 12, h: 4 }
+        layout: { x: 6, y: 4, w: 6, h: 4 }
       }
     ]
   }

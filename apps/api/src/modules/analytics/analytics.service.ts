@@ -714,6 +714,40 @@ export class AnalyticsService {
     return { project, eventNames: result.rows };
   }
 
+  async listEventProperties(user: DashboardUser, eventName?: string, projectId?: string) {
+    const project = await this.projects.resolveActiveProject(user, projectId);
+
+    if (!project) {
+      return { project: null, properties: [] as Array<{ key: string; sampleType: string; occurrences: number }> };
+    }
+
+    const params: unknown[] = [project.id];
+    let eventFilter = '';
+    if (eventName && eventName !== '*' && eventName !== '$all' && eventName !== 'all') {
+      params.push(eventName);
+      eventFilter = ` AND e.event_name = $2`;
+    }
+
+    const result = await this.database.query<{ key: string; sampleType: string; occurrences: number }>(
+      `
+        SELECT
+          p.key AS key,
+          jsonb_typeof(p.value) AS "sampleType",
+          count(*)::int AS occurrences
+        FROM events e,
+        LATERAL jsonb_each(COALESCE(e.properties, '{}'::jsonb)) p
+        WHERE e.project_id = $1 ${eventFilter}
+          AND e.occurred_at >= now() - interval '30 days'
+        GROUP BY p.key, jsonb_typeof(p.value)
+        ORDER BY occurrences DESC
+        LIMIT 100
+      `,
+      params
+    );
+
+    return { project, properties: result.rows };
+  }
+
   async getTrends(
     user: DashboardUser,
     params: {
@@ -729,7 +763,9 @@ export class AnalyticsService {
       projectId?: string;
     }
   ): Promise<TrendsResponse> {
-    const event = this.requiredString(params.event, 'event');
+    const rawEvent = (params.event ?? '').trim();
+    const isWildcard = !rawEvent || rawEvent === '*' || rawEvent === '$all' || rawEvent === 'all' || rawEvent === 'All Events';
+    const event = isWildcard ? '*' : rawEvent;
     const interval = this.parseInterval(params.interval);
     const measure = this.parseMeasure(params.measure);
     const filters = parseFiltersParam(params.filters);
@@ -752,7 +788,16 @@ export class AnalyticsService {
 
     if (breakdown) {
       const dimensionSource = DIMENSION_SOURCES[breakdown.toLowerCase()];
-      const queryParams: unknown[] = [project.id, event, interval, from.toISOString(), to.toISOString()];
+      let queryParams: unknown[];
+      let eventWhere = '';
+
+      if (isWildcard) {
+        queryParams = [project.id, interval, from.toISOString(), to.toISOString()];
+        eventWhere = '';
+      } else {
+        queryParams = [project.id, event, interval, from.toISOString(), to.toISOString()];
+        eventWhere = ' AND event_name = $2';
+      }
 
       let breakdownExpr: string;
       if (dimensionSource) {
@@ -764,17 +809,20 @@ export class AnalyticsService {
 
       const valueExpr = buildMeasureExpr(measure, property, queryParams);
       const filterClause = buildFilterClause(filters, queryParams);
+      const intervalParam = isWildcard ? '$2' : '$3';
+      const fromParam = isWildcard ? '$3' : '$4';
+      const toParam = isWildcard ? '$4' : '$5';
 
       const rows = await this.database.query<{ bucket: string; breakdown_key: string; total: number; value: number }>(
         `
           SELECT
-            to_char(date_trunc($3, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+            to_char(date_trunc(${intervalParam}, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
             ${breakdownExpr} AS breakdown_key,
             count(*)::int AS total,
             ${valueExpr} AS value
           FROM events
-          WHERE project_id = $1 AND event_name = $2
-            AND occurred_at >= $4 AND occurred_at < $5${filterClause}
+          WHERE project_id = $1${eventWhere}
+            AND occurred_at >= ${fromParam} AND occurred_at < ${toParam}${filterClause}
           GROUP BY 1, 2
           ORDER BY 1 ASC
         `,
@@ -796,27 +844,34 @@ export class AnalyticsService {
         })
       }));
     } else {
-      const queryParams: unknown[] = [project.id, event, interval, from.toISOString(), to.toISOString()];
+      const queryParams: unknown[] = isWildcard
+        ? [project.id, interval, from.toISOString(), to.toISOString()]
+        : [project.id, event, interval, from.toISOString(), to.toISOString()];
+      const eventWhere = isWildcard ? '' : ' AND event_name = $2';
+      const intervalParam = isWildcard ? '$2' : '$3';
+      const fromParam = isWildcard ? '$3' : '$4';
+      const toParam = isWildcard ? '$4' : '$5';
+
       const valueExpr = buildMeasureExpr(measure, property, queryParams);
       const filterClause = buildFilterClause(filters, queryParams);
 
       const rows = await this.database.query<{ bucket: string; total: number; uniques: number; value: number }>(
         `
           SELECT
-            to_char(date_trunc($3, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+            to_char(date_trunc(${intervalParam}, occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
             count(*)::int AS total,
             count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS uniques,
             ${valueExpr} AS value
           FROM events
-          WHERE project_id = $1 AND event_name = $2
-            AND occurred_at >= $4 AND occurred_at < $5${filterClause}
+          WHERE project_id = $1${eventWhere}
+            AND occurred_at >= ${fromParam} AND occurred_at < ${toParam}${filterClause}
           GROUP BY 1
           ORDER BY 1 ASC
         `,
         queryParams
       );
 
-      series = [{ key: event, points: this.zeroFill(buckets, rows.rows) }];
+      series = [{ key: isWildcard ? 'All Events' : event, points: this.zeroFill(buckets, rows.rows) }];
     }
 
     const previousFrom = new Date(from.getTime() - range.rangeMs);
@@ -853,15 +908,22 @@ export class AnalyticsService {
     property: string | null,
     filters: FilterCondition[] = []
   ): Promise<number> {
-    const queryParams: unknown[] = [projectId, event, from.toISOString(), to.toISOString()];
+    const isWildcard = !event || event === '*' || event === '$all' || event === 'all' || event === 'All Events';
+    const queryParams: unknown[] = isWildcard
+      ? [projectId, from.toISOString(), to.toISOString()]
+      : [projectId, event, from.toISOString(), to.toISOString()];
     const valueExpr = buildMeasureExpr(measure, property, queryParams);
     const filterClause = buildFilterClause(filters, queryParams);
+    const eventWhere = isWildcard ? '' : ' AND event_name = $2';
+    const fromParam = isWildcard ? '$2' : '$3';
+    const toParam = isWildcard ? '$3' : '$4';
+
     const result = await this.database.query<{ value: number }>(
       `
         SELECT ${valueExpr} AS value
         FROM events
-        WHERE project_id = $1 AND event_name = $2
-          AND occurred_at >= $3 AND occurred_at < $4${filterClause}
+        WHERE project_id = $1${eventWhere}
+          AND occurred_at >= ${fromParam} AND occurred_at < ${toParam}${filterClause}
       `,
       queryParams
     );

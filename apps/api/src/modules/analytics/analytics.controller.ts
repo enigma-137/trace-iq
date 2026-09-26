@@ -61,6 +61,17 @@ export class AnalyticsController {
     return this.analyticsService.listEventNames(user, projectId);
   }
 
+  @Get('insights/event-properties')
+  async listEventProperties(
+    @Headers('authorization') authorization?: string,
+    @Query('event') event?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'insights:read');
+    return this.analyticsService.listEventProperties(user, event, projectId);
+  }
+
   @Get('retention')
   async getRetention(
     @Headers('authorization') authorization?: string,

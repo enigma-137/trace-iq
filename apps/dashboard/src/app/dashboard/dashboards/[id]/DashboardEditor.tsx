@@ -570,6 +570,7 @@ function DashboardWidgetCard({
   onEdit: () => void;
   onRemove: () => void;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -606,8 +607,8 @@ function DashboardWidgetCard({
     setLoading(false);
     if (err) {
       setError(err);
-    } else if (res?.result) {
-      setData(res.result);
+    } else if (res) {
+      setData(res.data !== undefined ? res.data : res.result !== undefined ? res.result : res);
     }
   }
 
@@ -810,6 +811,11 @@ function DashboardWidgetCard({
           loading={loading}
           error={error}
           onRetry={runWidgetQuery}
+          onConfigure={
+            insight?.id
+              ? () => router.push(withProjectId(`/dashboard/insights/${insight.id}?dashboardId=${dashboardId}`, projectId))
+              : undefined
+          }
           height={chartHeight}
         />
       </div>

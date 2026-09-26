@@ -277,4 +277,53 @@ describe('now activity', () => {
     expect(result.events[0].path).toBe('/pricing');
     expect(result.events[0].country).toBe('Brazil');
   });
+
+  it('supports universal wildcard analytics and top events breakdown', async () => {
+    let capturedSql = '';
+    let capturedParams: unknown[] = [];
+
+    const db = mockDatabase((text, params) => {
+      capturedSql = text;
+      capturedParams = params ?? [];
+      if (/breakdown_key/.test(text)) {
+        return rows([
+          { bucket: '2026-09-26T00:00:00Z', breakdown_key: 'letter_published', total: 42, value: 42 },
+          { bucket: '2026-09-26T00:00:00Z', breakdown_key: 'letter_viewed', total: 18, value: 18 }
+        ]);
+      }
+      return rows([{ value: 60, total: 60, uniques: 15 }]);
+    });
+
+    const projects = {
+      requireActiveProject: vi.fn().mockResolvedValue(PROJECT),
+      resolveActiveProject: vi.fn().mockResolvedValue(PROJECT)
+    } as unknown as ProjectsService;
+    const analytics = new (await import('../src/modules/analytics/analytics.service')).AnalyticsService(
+      db as unknown as DatabaseService,
+      projects
+    );
+    const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
+
+    // 1. Total Ingested Events (Universal wildcard)
+    const result = await analytics.getTrends(user, {
+      event: '*',
+      measure: 'count',
+      days: '30',
+      projectId: 'proj1'
+    });
+
+    expect(result.summary.current).toBe(60);
+    expect(result.series[0].key).toBe('All Events');
+
+    // 2. Top Events breakdown (Universal wildcard with $event_name)
+    const breakdownResult = await analytics.getTrends(user, {
+      event: '*',
+      breakdown: '$event_name',
+      days: '30',
+      projectId: 'proj1'
+    });
+
+    expect(breakdownResult.series.length).toBe(2);
+    expect(breakdownResult.series.map((s) => s.key)).toEqual(['letter_published', 'letter_viewed']);
+  });
 });

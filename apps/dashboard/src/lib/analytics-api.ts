@@ -136,11 +136,32 @@ export async function duplicateInsight(id: string, projectId?: string) {
   }));
 }
 
+export async function fetchEventNames(projectId?: string) {
+  const q = projectId ? `?projectId=${projectId}` : '';
+  return clientFetch<{ project: any; eventNames: Array<{ eventName: string; total: number; actors: number }> }>(
+    `/v1/dashboard/insights/event-names${q}`
+  );
+}
+
+export async function fetchEventProperties(event?: string, projectId?: string) {
+  const params = new URLSearchParams();
+  if (event) params.set('event', event);
+  if (projectId) params.set('projectId', projectId);
+  const q = params.toString() ? `?${params.toString()}` : '';
+  return clientFetch<{ project: any; properties: Array<{ key: string; sampleType: string; occurrences: number }> }>(
+    `/v1/dashboard/insights/event-properties${q}`
+  );
+}
+
 export async function executeInsightQuery(payload: ExecuteInsightQueryPayload) {
-  return clientFetch<{ result: any }>(`/v1/dashboard/insights/query`, {
+  return clientFetch<any>(`/v1/dashboard/insights/query`, {
     method: 'POST',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? (res.data.data !== undefined ? res.data.data : res.data.result !== undefined ? res.data.result : res.data) : null,
+    raw: res.data
+  }));
 }
 
 // ----------------- Dashboards API -----------------

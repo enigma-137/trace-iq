@@ -13,10 +13,12 @@ export type InsightType =
   | 'funnel'
   | 'retention'
   | 'event_breakdown'
+  | 'top_events'
   | 'user_metric'
   | 'web_analytics'
   | 'revenue'
   | 'error_metric'
+  | 'errors'
   | 'api_performance'
   | 'web_vitals'
   | 'feature_adoption'
@@ -391,10 +393,10 @@ export class SavedInsightsService {
     const from = overrides.from || (query.from as string) || (dateConfig.from as string);
     const to = overrides.to || (query.to as string) || (dateConfig.to as string);
     const interval = overrides.interval || (query.interval as string) || 'day';
-    const event = (query.event as string) || '$pageview';
+    const event = (query.event as string) || '*';
     const measure = (query.measure as string) || 'count';
     const property = (query.property as string) || undefined;
-    const breakdown = (query.breakdown as string) || undefined;
+    const breakdown = (query.breakdown as string) || (type === 'top_events' ? '$event_name' : undefined);
 
     let mergedFiltersStr: string | undefined = undefined;
     if (overrides.filters) {
@@ -437,11 +439,13 @@ export class SavedInsightsService {
         return { type: 'api_performance', data: apiData };
       }
 
+      case 'errors':
       case 'error_metric': {
         const errorData = await this.errors.listIssues(user, days, project.id);
         return { type: 'error_metric', data: errorData };
       }
 
+      case 'top_events':
       case 'trend':
       case 'kpi':
       case 'event_breakdown':
