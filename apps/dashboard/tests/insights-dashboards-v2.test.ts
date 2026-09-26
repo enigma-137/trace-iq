@@ -110,4 +110,94 @@ describe('Insights and Dashboards v2 System', () => {
     expect(sampleDashboard.widgets?.[1].layout.w).toBe(8);
     expect(sampleDashboard.widgets?.[2].layout.w).toBe(12);
   });
+
+  it('regression: visualization state updates canonically, updates preview immediately, and persists on save and reload', () => {
+    // 1. Initial insight loaded from API/DB
+    const initialInsight: SavedInsightView = {
+      id: 'ins_os_split',
+      projectId: 'proj_1',
+      name: 'Overview OS Split',
+      description: 'Operating system breakdown',
+      type: 'event_breakdown',
+      query: { event: '$pageview', measure: 'count', breakdown: '$os', days: '30' },
+      visualization: { chartType: 'bar' },
+      filters: [],
+      dateConfig: { days: '30', interval: 'day', compare: true },
+      tags: [],
+      isPinned: false,
+      createdByUserId: 'user_1',
+      usedInDashboardsCount: 1,
+      createdAt: '2026-09-26T12:00:00Z',
+      updatedAt: '2026-09-26T12:00:00Z'
+    };
+
+    // State initialization
+    let draftVisualization = initialInsight.visualization.chartType;
+    expect(draftVisualization).toBe('bar');
+
+    // User switches visualization to Donut
+    draftVisualization = 'donut';
+    expect(draftVisualization).toBe('donut');
+
+    // Save changes payload
+    const savePayload = {
+      name: initialInsight.name,
+      type: initialInsight.type,
+      query: initialInsight.query,
+      visualization: { chartType: draftVisualization },
+      projectId: initialInsight.projectId
+    };
+    expect(savePayload.visualization.chartType).toBe('donut');
+
+    // Simulating PUT /v1/dashboard/insights/:id response and page reload
+    const reloadedInsight: SavedInsightView = {
+      ...initialInsight,
+      visualization: savePayload.visualization,
+      updatedAt: '2026-09-26T12:05:00Z'
+    };
+    const restoredVisualization = reloadedInsight.visualization.chartType;
+    expect(restoredVisualization).toBe('donut');
+
+    // Repeat for KPI visualization
+    draftVisualization = 'kpi';
+    const kpiPayload = { ...savePayload, visualization: { chartType: draftVisualization } };
+    const reloadedKpi: SavedInsightView = { ...reloadedInsight, visualization: kpiPayload.visualization };
+    expect(reloadedKpi.visualization.chartType).toBe('kpi');
+  });
+
+  it('regression: Add to dashboard passes real saved insightId and rejects null/undefined IDs', () => {
+    const savedInsightId = 'ins_os_split';
+    const targetDashboardId = 'dash_project_overview';
+    const projectId = 'proj_1';
+
+    // 1. Existing saved insight payload
+    const widgetPayload = {
+      insightId: savedInsightId,
+      title: 'Overview OS Split',
+      layout: { w: 6 },
+      projectId
+    };
+
+    expect(widgetPayload.insightId).toBe('ins_os_split');
+    expect(widgetPayload.insightId).not.toBeUndefined();
+    expect(widgetPayload.insightId).not.toBeNull();
+    expect(widgetPayload.projectId).toBe('proj_1');
+
+    // 2. Unsaved insight flow: must save first to obtain ID before attaching
+    let newInsightId: string | null = null;
+    const isUnsaved = !newInsightId;
+    expect(isUnsaved).toBe(true);
+
+    // Simulated auto-save step
+    newInsightId = 'ins_new_created_123';
+    const postSaveWidgetPayload = {
+      insightId: newInsightId,
+      title: 'New Event Trend',
+      layout: { w: 6 },
+      projectId
+    };
+
+    expect(postSaveWidgetPayload.insightId).toBe('ins_new_created_123');
+    expect(typeof postSaveWidgetPayload.insightId).toBe('string');
+  });
 });

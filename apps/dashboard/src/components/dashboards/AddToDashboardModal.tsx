@@ -122,6 +122,7 @@ export function AddToDashboardModal({
 
         if (widgetErr) {
           setError(widgetErr);
+          toast.error(widgetErr || 'Could not add insight to dashboard.');
           setSubmitting(false);
           return;
         }
@@ -146,6 +147,7 @@ export function AddToDashboardModal({
 
         if (widgetErr) {
           setError(widgetErr);
+          toast.error(widgetErr || 'Could not add insight to dashboard.');
           setSubmitting(false);
           return;
         }
@@ -155,7 +157,9 @@ export function AddToDashboardModal({
       onSuccess?.(targetDashboardId);
       onClose();
     } catch (err: any) {
-      setError(err?.message || 'An unexpected error occurred.');
+      const msg = err?.message || 'An unexpected error occurred.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }

@@ -326,4 +326,121 @@ describe('now activity', () => {
     expect(breakdownResult.series.length).toBe(2);
     expect(breakdownResult.series.map((s) => s.key)).toEqual(['letter_published', 'letter_viewed']);
   });
+
+  it('persists canonical visualization updates on insights', async () => {
+    let updatedVisualization: any = null;
+    const db = mockDatabase((text, params) => {
+      if (/UPDATE\s+insights/i.test(text)) {
+        updatedVisualization = JSON.parse(params?.[6] as string);
+        return rows([]);
+      }
+      if (/FROM\s+insights/i.test(text)) {
+        return rows([
+          {
+            id: 'ins_1',
+            projectId: 'proj1',
+            name: 'OS Split',
+            description: null,
+            type: 'event_breakdown',
+            query: { event: '$pageview', breakdown: '$os' },
+            visualization: updatedVisualization || { chartType: 'bar' },
+            filters: [],
+            dateConfig: { days: '30' },
+            tags: [],
+            isPinned: false,
+            createdByUserId: 'user1',
+            usedInDashboardsCount: 0,
+            createdAt: '2026-09-26T12:00:00Z',
+            updatedAt: '2026-09-26T12:00:00Z'
+          }
+        ]);
+      }
+      return empty();
+    });
+
+    const projects = {
+      requireWritableProject: vi.fn().mockResolvedValue(PROJECT),
+      requireActiveProject: vi.fn().mockResolvedValue(PROJECT)
+    } as unknown as ProjectsService;
+    const savedInsights = new (await import('../src/modules/insights/saved-insights.service')).SavedInsightsService(
+      db as unknown as DatabaseService,
+      projects,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
+
+    // Update visualization from bar to donut
+    const updated = await savedInsights.update(user, 'ins_1', {
+      visualization: { chartType: 'donut' },
+      projectId: 'proj1'
+    });
+
+    expect(updated.visualization.chartType).toBe('donut');
+    expect(updatedVisualization).toEqual({ chartType: 'donut' });
+  });
+
+  it('rejects cross-project insight attachment and requires insightId', async () => {
+    const db = mockDatabase((text, params) => {
+      if (/FROM\s+dashboards/i.test(text)) {
+        return rows([
+          {
+            id: 'dash_1',
+            projectId: 'proj1',
+            name: 'Overview',
+            description: null,
+            ownerId: 'user1',
+            isShared: false,
+            isPinned: false,
+            tags: [],
+            filters: {},
+            layout: [],
+            definition: {},
+            widgetsCount: 0,
+            createdAt: '2026-09-26T12:00:00Z',
+            updatedAt: '2026-09-26T12:00:00Z'
+          }
+        ]);
+      }
+      return empty();
+    });
+
+    const projects = {
+      requireWritableProject: vi.fn().mockResolvedValue(PROJECT),
+      requireActiveProject: vi.fn().mockResolvedValue(PROJECT)
+    } as unknown as ProjectsService;
+
+    const savedInsights = {
+      get: vi.fn().mockImplementation(async (_user, insightId, projectId) => {
+        if (insightId === 'ins_other_proj') {
+          throw new (await import('@nestjs/common')).NotFoundException('Insight not found.');
+        }
+        return { id: insightId, projectId };
+      })
+    } as any;
+
+    const dashboardsService = new (await import('../src/modules/dashboards/dashboards.service')).DashboardsService(
+      db as unknown as DatabaseService,
+      projects,
+      {} as any,
+      savedInsights
+    );
+    const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
+
+    // 1. Cross-project insight attachment rejected
+    await expect(
+      dashboardsService.addWidget(user, 'dash_1', {
+        insightId: 'ins_other_proj',
+        projectId: 'proj1'
+      })
+    ).rejects.toThrow('Insight not found.');
+
+    // 2. Missing insightId without newInsight rejected
+    await expect(
+      dashboardsService.addWidget(user, 'dash_1', {
+        projectId: 'proj1'
+      })
+    ).rejects.toThrow('insightId or newInsight is required to add a widget.');
+  });
 });

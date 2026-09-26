@@ -107,7 +107,7 @@ export function InsightBuilder({
     });
   }, [event, projectId]);
 
-  // Run reactive query on config change
+  // Run reactive query on config change (chartType changes presentation immediately without re-querying)
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -119,7 +119,7 @@ export function InsightBuilder({
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [type, event, measure, property, breakdown, days, interval, compare, funnelSteps, chartType]);
+  }, [type, event, measure, property, breakdown, days, interval, compare, funnelSteps]);
 
   async function runQuery() {
     setIsQuerying(true);
@@ -230,6 +230,63 @@ export function InsightBuilder({
     }
   }
 
+  async function handleAddToDashboardClick() {
+    if (savedInsightId) {
+      setIsAddToDashboardOpen(true);
+      return;
+    }
+
+    // Unsaved insight: persist it first to acquire canonical insight ID
+    if (!name.trim()) {
+      toast.error('Please specify an insight name before adding to a dashboard');
+      return;
+    }
+
+    setIsSaving(true);
+    const queryPayload: Record<string, any> = {
+      event,
+      measure,
+      property: property || undefined,
+      breakdown: breakdown || undefined,
+      days,
+      interval,
+      steps: type === 'funnel' ? funnelSteps : undefined
+    };
+
+    const visualizationPayload: InsightVisualizationConfig = {
+      chartType
+    };
+
+    const dateConfigPayload: InsightDateConfig = {
+      days,
+      interval,
+      compare
+    };
+
+    const { data, error } = await createInsight({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      type,
+      query: queryPayload,
+      visualization: visualizationPayload,
+      dateConfig: dateConfigPayload,
+      projectId
+    });
+
+    setIsSaving(false);
+    if (error || !data?.insight) {
+      toast.error(error || 'Could not save insight before adding to dashboard');
+      return;
+    }
+
+    toast.success('Insight saved');
+    setSavedInsightId(data.insight.id);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', withProjectId(`/dashboard/insights/${data.insight.id}`, projectId));
+    }
+    setIsAddToDashboardOpen(true);
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -261,15 +318,14 @@ export function InsightBuilder({
         </div>
 
         <div className="flex items-center gap-2">
-          {savedInsightId && (
-            <button
-              type="button"
-              onClick={() => setIsAddToDashboardOpen(true)}
-              className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            >
-              + Add to dashboard
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleAddToDashboardClick}
+            disabled={isSaving}
+            className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          >
+            + Add to dashboard
+          </button>
 
           <button
             type="button"

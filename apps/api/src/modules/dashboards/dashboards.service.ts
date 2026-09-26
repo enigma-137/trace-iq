@@ -978,6 +978,13 @@ export class DashboardsService {
       insightId = createdInsight.id;
     }
 
+    if (insightId) {
+      // Validate that the insight belongs to the active project and user has access
+      await this.savedInsights.get(user, insightId, project.id);
+    } else {
+      throw new BadRequestException('insightId or newInsight is required to add a widget.');
+    }
+
     const widgetId = `wid_${randomUUID()}`;
     const title = body.title?.trim() || null;
     const description = body.description?.trim() || null;

@@ -138,18 +138,38 @@ export function InsightChartRenderer({
     );
   }
 
-  const chartType = (visualization?.chartType || visualization?.type || (type === 'event_breakdown' ? 'bar' : 'line')) as VisualizationType;
+  const chartType = (visualization?.chartType ||
+    visualization?.type ||
+    (type === 'funnel'
+      ? 'funnel'
+      : type === 'retention'
+        ? 'retention'
+        : type === 'kpi'
+          ? 'kpi'
+          : type === 'table'
+            ? 'table'
+            : type === 'event_breakdown'
+              ? 'bar'
+              : 'line')) as VisualizationType;
 
-  // Single KPI / Number View
-  if (chartType === 'kpi' || chartType === 'number' || type === 'kpi' || data.kind === 'kpi') {
+  // 1. KPI / Number View
+  if (chartType === 'kpi' || chartType === 'number') {
     let value = data.value ?? data.current ?? data.summary?.current;
+    if (value === undefined && Array.isArray(data.series)) {
+      value = data.series.reduce((sum: number, s: any) => {
+        return sum + (s.points || []).reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0);
+      }, 0);
+    }
+    if (value === undefined && Array.isArray(data.items)) {
+      value = data.items.reduce((acc: number, i: any) => acc + (i.value || 0), 0);
+    }
     if (value === undefined && Array.isArray(data.issues)) {
       value = data.issues.reduce((acc: number, i: any) => acc + (i.occurrences || 0), 0);
     }
     if (value === undefined) value = 0;
 
     const previous = data.previous ?? data.summary?.previous;
-    const label = data.label || visualization?.unit || '';
+    const label = data.label || visualization?.unit || (data.series?.length === 1 ? data.series[0].key : '');
     let delta = 0;
     let deltaFormatted = '';
     if (typeof previous === 'number' && previous > 0) {
@@ -185,8 +205,8 @@ export function InsightChartRenderer({
     );
   }
 
-  // Funnel View
-  if (type === 'funnel' || chartType === 'funnel' || data.steps) {
+  // 2. Funnel View
+  if (chartType === 'funnel' || type === 'funnel') {
     const steps = data.steps || [];
     if (steps.length === 0) {
       return (
@@ -202,8 +222,8 @@ export function InsightChartRenderer({
     );
   }
 
-  // Retention View
-  if (type === 'retention' || chartType === 'retention' || data.cohorts || data.matrix) {
+  // 3. Retention View
+  if (chartType === 'retention' || type === 'retention') {
     const cohorts = data.cohorts || data.matrix || [];
     if (cohorts.length === 0) {
       return (
@@ -254,11 +274,49 @@ export function InsightChartRenderer({
     );
   }
 
-  // Table View (Errors or General Tables)
-  if (chartType === 'table' || type === 'table' || type === 'error_metric' || data.issues || data.rows) {
-    const rawRows = data.issues || data.rows || data.items || [];
-    const rows = Array.isArray(rawRows) ? rawRows : [];
-    const columns = data.columns || (rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== 'sparkline') : []);
+  // 4. Table View
+  if (chartType === 'table' || type === 'table' || type === 'error_metric') {
+    let rows: any[] = [];
+    let columns: string[] = [];
+
+    if (Array.isArray(data.issues)) {
+      rows = data.issues;
+      columns = ['title', 'occurrences', 'affectedUsers', 'lastSeen'];
+    } else if (Array.isArray(data.rows)) {
+      rows = data.rows;
+      columns = data.columns || (rows.length > 0 ? Object.keys(rows[0]) : []);
+    } else if (Array.isArray(data.items)) {
+      const grandTotal = data.items.reduce((acc: number, i: any) => acc + (i.value || 0), 0) || 1;
+      rows = data.items.map((i: any) => ({
+        Dimension: i.label,
+        Count: i.value,
+        Share: `${((i.value / grandTotal) * 100).toFixed(1)}%`
+      }));
+      columns = ['Dimension', 'Count', 'Share'];
+    } else if (Array.isArray(data.series)) {
+      if (data.series.length > 1) {
+        const grandTotal = data.series.reduce((sum: number, s: any) => {
+          return sum + (s.points || []).reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0);
+        }, 0) || 1;
+        rows = data.series
+          .map((s: any) => {
+            const count = (s.points || []).reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0);
+            return {
+              Segment: s.key,
+              Events: count,
+              Share: `${((count / grandTotal) * 100).toFixed(1)}%`
+            };
+          })
+          .sort((a: any, b: any) => b.Events - a.Events);
+        columns = ['Segment', 'Events', 'Share'];
+      } else if (data.series.length === 1 && data.series[0]?.points) {
+        rows = data.series[0].points.map((p: any) => ({
+          Interval: p.bucket,
+          Events: p.value || p.total || 0
+        }));
+        columns = ['Interval', 'Events'];
+      }
+    }
 
     if (rows.length === 0) {
       return (
@@ -299,18 +357,27 @@ export function InsightChartRenderer({
     );
   }
 
-  // Pie / Donut View
+  // 5. Pie / Donut View
   if (chartType === 'donut' || chartType === 'pie') {
     let items: Array<{ label: string; value: number }> = [];
     if (Array.isArray(data.items)) {
       items = data.items;
     } else if (Array.isArray(data.series)) {
-      items = data.series
-        .map((s: any) => ({
-          label: s.key,
-          value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
-        }))
-        .filter((i: any) => i.value > 0);
+      if (data.series.length > 1) {
+        items = data.series
+          .map((s: any) => ({
+            label: s.key,
+            value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
+          }))
+          .filter((i: any) => i.value > 0);
+      } else if (data.series.length === 1 && data.series[0]?.points) {
+        items = data.series[0].points
+          .map((p: any) => ({
+            label: p.bucket,
+            value: p.value || p.total || 0
+          }))
+          .filter((i: any) => i.value > 0);
+      }
     }
 
     if (items.length === 0) {
@@ -329,19 +396,28 @@ export function InsightChartRenderer({
     );
   }
 
-  // Bar View (Event Breakdown or Top Events)
-  if (chartType === 'bar' || type === 'event_breakdown') {
+  // 6. Bar View
+  if (chartType === 'bar') {
     let items: Array<{ label: string; value: number }> = [];
     if (Array.isArray(data.items)) {
       items = data.items;
     } else if (Array.isArray(data.series)) {
-      items = data.series
-        .map((s: any) => ({
-          label: s.key,
-          value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
-        }))
-        .filter((i: any) => i.value > 0)
-        .sort((a: any, b: any) => b.value - a.value);
+      if (data.series.length > 1) {
+        items = data.series
+          .map((s: any) => ({
+            label: s.key,
+            value: s.points.reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0)
+          }))
+          .filter((i: any) => i.value > 0)
+          .sort((a: any, b: any) => b.value - a.value);
+      } else if (data.series.length === 1 && data.series[0]?.points) {
+        items = data.series[0].points
+          .map((p: any) => ({
+            label: p.bucket,
+            value: p.value || p.total || 0
+          }))
+          .filter((i: any) => i.value > 0);
+      }
     }
 
     if (items.length > 0) {
@@ -353,27 +429,22 @@ export function InsightChartRenderer({
     }
   }
 
-  // Trend / Area / Line Chart
-  if (data.buckets && data.series) {
+  // 7. Area Chart
+  if (chartType === 'area') {
+    if (data.buckets && data.series && data.series.length > 0) {
+      return (
+        <div className={`w-full ${className}`}>
+          <AreaChart buckets={data.buckets} series={data.series} interval={data.interval || 'day'} height={height} />
+        </div>
+      );
+    }
+  }
+
+  // 8. Line / Trend Chart (Default)
+  if (data.buckets && data.series && data.series.length > 0) {
     const buckets: string[] = data.buckets;
     const series = data.series;
     const interval = data.interval || 'day';
-
-    if (buckets.length === 0 || series.length === 0) {
-      return (
-        <div className="flex items-center justify-center p-6 text-xs text-neutral-400" style={{ minHeight: height }}>
-          No time-series data for this period
-        </div>
-      );
-    }
-
-    if (chartType === 'area') {
-      return (
-        <div className={`w-full ${className}`}>
-          <AreaChart buckets={buckets} series={series} interval={interval} height={height} />
-        </div>
-      );
-    }
 
     return (
       <div className={`w-full ${className}`}>
