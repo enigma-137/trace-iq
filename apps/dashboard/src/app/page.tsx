@@ -240,7 +240,7 @@ export default function Page() {
           <div className="product-shot-bar">
             <span><i /> Product overview</span>
           </div>
-          <LandingOverviewDemo />
+          {/* <LandingOverviewDemo /> */}
           <p className="product-shot-caption">See product behavior, system health, and incoming activity in one place.</p>
         </div>
       </section>
@@ -265,7 +265,7 @@ export default function Page() {
             <h3>Follow every request through the stack.</h3>
           </div>
           <div className="product-shot product-shot-secondary product-flow-preview">
-            <LandingApiFlow />
+            {/* <LandingApiFlow /> */}
           </div>
           <div className="product-detail-footer">
             <p>Compare traffic, errors, and latency, then inspect how requests move from your SDKs through processing and storage.</p>
