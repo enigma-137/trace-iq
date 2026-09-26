@@ -27,25 +27,27 @@ export default async function EditInsightPage({
   );
 
   const queryParams = projectId ? `?projectId=${projectId}` : '';
-  const { data, error } = await dashboardGet<{ insight: SavedInsightView }>(
+  const { data, error } = await dashboardGet<any>(
     `/v1/dashboard/insights/${id}${queryParams}`,
     session.token
   );
 
-  if (error || !data?.insight) {
+  const insight: SavedInsightView | null = (data?.insight ?? data) as SavedInsightView | null;
+
+  if (error || !insight || !insight.id) {
     notFound();
   }
 
   return (
     <DashboardShell
-      title={data.insight.name}
+      title={insight.name}
       projectId={projectId}
       activeNavKey="insights"
       userEmail={session.user.email}
     >
       <InsightBuilder
         projectId={projectId}
-        initialInsight={data.insight}
+        initialInsight={insight}
         insightId={id}
         returnDashboardId={dashboardId}
       />

@@ -85,26 +85,38 @@ export async function fetchInsights(params: {
   if (params.type) q.set('type', params.type);
   if (params.tag) q.set('tag', params.tag);
 
-  return clientFetch<{ insights: SavedInsightView[] }>(`/v1/dashboard/insights?${q.toString()}`);
+  return clientFetch<any>(`/v1/dashboard/insights?${q.toString()}`).then((res) => ({
+    ...res,
+    data: res.data ? { insights: res.data.insights ?? (Array.isArray(res.data) ? res.data : []) } : null
+  }));
 }
 
 export async function fetchInsight(id: string, projectId?: string) {
   const q = projectId ? `?projectId=${projectId}` : '';
-  return clientFetch<{ insight: SavedInsightView }>(`/v1/dashboard/insights/${id}${q}`);
+  return clientFetch<any>(`/v1/dashboard/insights/${id}${q}`).then((res) => ({
+    ...res,
+    data: res.data ? { insight: res.data.insight ?? res.data } : null
+  }));
 }
 
 export async function createInsight(payload: CreateInsightPayload) {
-  return clientFetch<{ insight: SavedInsightView }>(`/v1/dashboard/insights`, {
+  return clientFetch<any>(`/v1/dashboard/insights`, {
     method: 'POST',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { insight: res.data.insight ?? res.data } : null
+  }));
 }
 
 export async function updateInsight(id: string, payload: UpdateInsightPayload) {
-  return clientFetch<{ insight: SavedInsightView }>(`/v1/dashboard/insights/${id}`, {
+  return clientFetch<any>(`/v1/dashboard/insights/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { insight: res.data.insight ?? res.data } : null
+  }));
 }
 
 export async function deleteInsight(id: string, projectId?: string) {
@@ -116,9 +128,12 @@ export async function deleteInsight(id: string, projectId?: string) {
 
 export async function duplicateInsight(id: string, projectId?: string) {
   const q = projectId ? `?projectId=${projectId}` : '';
-  return clientFetch<{ insight: SavedInsightView }>(`/v1/dashboard/insights/${id}/duplicate${q}`, {
+  return clientFetch<any>(`/v1/dashboard/insights/${id}/duplicate${q}`, {
     method: 'POST'
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { insight: res.data.insight ?? res.data } : null
+  }));
 }
 
 export async function executeInsightQuery(payload: ExecuteInsightQueryPayload) {
@@ -142,26 +157,38 @@ export async function fetchDashboards(params: {
   if (params.tab) q.set('tab', params.tab);
   if (params.tag) q.set('tag', params.tag);
 
-  return clientFetch<{ dashboards: DashboardView[] }>(`/v1/dashboard/dashboards?${q.toString()}`);
+  return clientFetch<any>(`/v1/dashboard/dashboards?${q.toString()}`).then((res) => ({
+    ...res,
+    data: res.data ? { dashboards: res.data.dashboards ?? (Array.isArray(res.data) ? res.data : []) } : null
+  }));
 }
 
 export async function fetchDashboard(id: string, projectId?: string) {
   const q = projectId ? `?projectId=${projectId}` : '';
-  return clientFetch<{ dashboard: DashboardView }>(`/v1/dashboard/dashboards/${id}${q}`);
+  return clientFetch<any>(`/v1/dashboard/dashboards/${id}${q}`).then((res) => ({
+    ...res,
+    data: res.data ? { dashboard: res.data.dashboard ?? res.data } : null
+  }));
 }
 
 export async function createDashboard(payload: CreateDashboardPayload) {
-  return clientFetch<{ dashboard: DashboardView }>(`/v1/dashboard/dashboards`, {
+  return clientFetch<any>(`/v1/dashboard/dashboards`, {
     method: 'POST',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { dashboard: res.data.dashboard ?? res.data } : null
+  }));
 }
 
 export async function updateDashboard(id: string, payload: UpdateDashboardPayload) {
-  return clientFetch<{ dashboard: DashboardView }>(`/v1/dashboard/dashboards/${id}`, {
+  return clientFetch<any>(`/v1/dashboard/dashboards/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { dashboard: res.data.dashboard ?? res.data } : null
+  }));
 }
 
 export async function deleteDashboard(id: string, projectId?: string) {
@@ -173,23 +200,32 @@ export async function deleteDashboard(id: string, projectId?: string) {
 
 export async function duplicateDashboard(id: string, projectId?: string) {
   const q = projectId ? `?projectId=${projectId}` : '';
-  return clientFetch<{ dashboard: DashboardView }>(`/v1/dashboard/dashboards/${id}/duplicate${q}`, {
+  return clientFetch<any>(`/v1/dashboard/dashboards/${id}/duplicate${q}`, {
     method: 'POST'
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { dashboard: res.data.dashboard ?? res.data } : null
+  }));
 }
 
 export async function addDashboardWidget(dashboardId: string, payload: AddWidgetPayload) {
-  return clientFetch<{ widget: DashboardWidgetView }>(`/v1/dashboard/dashboards/${dashboardId}/widgets`, {
+  return clientFetch<any>(`/v1/dashboard/dashboards/${dashboardId}/widgets`, {
     method: 'POST',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { widget: res.data.widget ?? res.data?.widgets?.[res.data.widgets.length - 1] ?? res.data } : null
+  }));
 }
 
 export async function updateDashboardWidget(dashboardId: string, widgetId: string, payload: UpdateWidgetPayload) {
-  return clientFetch<{ widget: DashboardWidgetView }>(`/v1/dashboard/dashboards/${dashboardId}/widgets/${widgetId}`, {
+  return clientFetch<any>(`/v1/dashboard/dashboards/${dashboardId}/widgets/${widgetId}`, {
     method: 'PUT',
     body: JSON.stringify(payload)
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { widget: res.data.widget ?? res.data } : null
+  }));
 }
 
 export async function removeDashboardWidget(dashboardId: string, widgetId: string, projectId?: string) {
@@ -207,12 +243,18 @@ export async function updateDashboardLayout(dashboardId: string, layout: any[], 
 }
 
 export async function fetchDashboardTemplates() {
-  return clientFetch<{ templates: DashboardTemplateDefinition[] }>(`/v1/dashboard/dashboards/templates`);
+  return clientFetch<any>(`/v1/dashboard/dashboards/templates`).then((res) => ({
+    ...res,
+    data: res.data ? { templates: Array.isArray(res.data) ? res.data : (res.data.templates ?? []) } : null
+  }));
 }
 
 export async function instantiateDashboardTemplate(templateId: string, name?: string, projectId?: string) {
-  return clientFetch<{ dashboard: DashboardView }>(`/v1/dashboard/dashboards/template`, {
+  return clientFetch<any>(`/v1/dashboard/dashboards/template`, {
     method: 'POST',
     body: JSON.stringify({ templateId, name, projectId })
-  });
+  }).then((res) => ({
+    ...res,
+    data: res.data ? { dashboard: res.data.dashboard ?? res.data } : null
+  }));
 }

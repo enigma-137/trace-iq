@@ -26,25 +26,27 @@ export default async function DashboardWorkspacePage({
   );
 
   const queryParams = projectId ? `?projectId=${projectId}` : '';
-  const { data, error } = await dashboardGet<{ dashboard: DashboardView }>(
+  const { data, error } = await dashboardGet<any>(
     `/v1/dashboard/dashboards/${id}${queryParams}`,
     session.token
   );
 
-  if (error || !data?.dashboard) {
+  const dashboard: DashboardView | null = (data?.dashboard ?? data) as DashboardView | null;
+
+  if (error || !dashboard || !dashboard.id) {
     notFound();
   }
 
   return (
     <DashboardShell
-      title={data.dashboard.name}
+      title={dashboard.name}
       projectId={projectId}
       activeNavKey="dashboards"
       userEmail={session.user.email}
     >
       <DashboardEditor
         projectId={projectId}
-        initialDashboard={data.dashboard}
+        initialDashboard={dashboard}
       />
     </DashboardShell>
   );
