@@ -9,6 +9,96 @@ import {
   AiToolCall
 } from './ai-provider.interface';
 
+export type AiErrorClassification =
+  | 'missing_model'
+  | 'unsupported_model'
+  | 'provider_not_configured'
+  | 'upstream_5xx'
+  | 'rate_limited'
+  | 'timeout'
+  | 'invalid_response';
+
+export interface ClassifiedAiError {
+  classification: AiErrorClassification;
+  statusCode?: number;
+  providerError: string;
+  isTransient: boolean;
+}
+
+export function classifyCencoriError(err: any, model?: string): ClassifiedAiError {
+  if (!model || !model.trim() || model === 'unknown') {
+    return {
+      classification: 'missing_model',
+      statusCode: 400,
+      providerError: 'No valid AI model specified in request payload.',
+      isTransient: false
+    };
+  }
+
+  const rawStatus = err?.statusCode || err?.status;
+  const statusCode = typeof rawStatus === 'number' ? rawStatus : undefined;
+  const msg = (err?.message || '').toLowerCase();
+  const errorCode = (err?.code || '').toLowerCase();
+
+  // Credit exhausted, quota exceeded, or 429 rate limit
+  if (
+    statusCode === 429 ||
+    statusCode === 403 ||
+    msg.includes('credit balance exhausted') ||
+    msg.includes('rate limit') ||
+    msg.includes('quota') ||
+    errorCode.includes('credit_balance_exhausted') ||
+    errorCode.includes('rate_limit')
+  ) {
+    return {
+      classification: 'rate_limited',
+      statusCode: statusCode || 429,
+      providerError: err?.message || 'Rate limit or AI credit balance reached.',
+      isTransient: statusCode === 429
+    };
+  }
+
+  // Unsupported or unknown model
+  if (
+    statusCode === 404 ||
+    (statusCode === 400 && (msg.includes('model') || msg.includes('not found') || msg.includes('unsupported')))
+  ) {
+    return {
+      classification: 'unsupported_model',
+      statusCode: statusCode || 400,
+      providerError: err?.message || `Model '${model}' is unsupported or unavailable on provider.`,
+      isTransient: false
+    };
+  }
+
+  // Timeout
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return {
+      classification: 'timeout',
+      statusCode: 504,
+      providerError: 'AI provider request timed out.',
+      isTransient: true
+    };
+  }
+
+  // Upstream 5xx
+  if (statusCode && statusCode >= 500 && statusCode < 600) {
+    return {
+      classification: 'upstream_5xx',
+      statusCode,
+      providerError: err?.message || 'AI provider upstream error.',
+      isTransient: true
+    };
+  }
+
+  return {
+    classification: 'upstream_5xx',
+    statusCode: statusCode || 500,
+    providerError: err?.message || 'Unknown provider error',
+    isTransient: false
+  };
+}
+
 @Injectable()
 export class CencoriProvider implements AiProvider {
   readonly name = 'cencori';
@@ -23,6 +113,7 @@ export class CencoriProvider implements AiProvider {
   private getClient(): Cencori {
     const currentKey = process.env.CENCORI_API_KEY?.trim() || null;
     if (!currentKey) {
+      this.logger.error('[AI_ERROR:provider_not_configured] CENCORI_API_KEY is not configured on the API service.');
       throw new ServiceUnavailableException('AI gateway is not configured. Set CENCORI_API_KEY on the API service.');
     }
 
@@ -35,6 +126,12 @@ export class CencoriProvider implements AiProvider {
   }
 
   async complete(options: AiCompletionOptions): Promise<AiCompletionResponse> {
+    const effectiveModel = options.model?.trim() || 'gemini-2.5-flash-lite';
+    if (!effectiveModel || effectiveModel === 'unknown') {
+      this.logger.error('[AI_ERROR:missing_model] Outbound completion payload missing valid model identifier.');
+      throw new ServiceUnavailableException('AI analysis is temporarily unavailable. Try again shortly.');
+    }
+
     const client = this.getClient();
     const timeoutMs = options.timeoutMs ?? 15_000;
     const maxRetries = 2;
@@ -51,7 +148,7 @@ export class CencoriProvider implements AiProvider {
       try {
         const start = Date.now();
         const completionPromise = client.chat.completions.create({
-          model: options.model,
+          model: effectiveModel,
           temperature: options.temperature ?? 0.3,
           max_tokens: options.maxTokens ?? 300,
           messages: [
@@ -68,11 +165,11 @@ export class CencoriProvider implements AiProvider {
           throw new Error('AI gateway returned an empty completion response.');
         }
 
-        const routedModel = response.model || options.model;
+        const routedModel = response.model || effectiveModel;
 
         return {
           content,
-          requestedModel: options.model,
+          requestedModel: effectiveModel,
           routedModel,
           inputTokens: response.usage?.prompt_tokens ?? response.usage?.promptTokens,
           outputTokens: response.usage?.completion_tokens ?? response.usage?.completionTokens,
@@ -81,23 +178,32 @@ export class CencoriProvider implements AiProvider {
         };
       } catch (err: any) {
         lastError = err;
-        const statusCode = err?.statusCode || err?.status;
-        const isTransient = statusCode === 429 || (statusCode >= 500 && statusCode < 600) || err?.message?.includes('timeout');
+        const classified = classifyCencoriError(err, effectiveModel);
+        this.logger.warn(
+          `Cencori completion attempt ${attempt + 1}/${maxRetries + 1} failed [${classified.classification}] (status=${classified.statusCode}): ${err?.message || err}`
+        );
 
-        this.logger.warn(`Cencori completion attempt ${attempt + 1}/${maxRetries + 1} failed: ${err?.message || err}`);
-
-        if (!isTransient || attempt === maxRetries) {
+        if (!classified.isTransient || attempt === maxRetries) {
           break;
         }
       }
     }
 
+    const finalClassified = classifyCencoriError(lastError, effectiveModel);
     const elapsed = Date.now() - overallStart;
-    this.logger.error(`All Cencori completion attempts failed after ${elapsed}ms: ${lastError instanceof Error ? lastError.stack : lastError}`);
+    this.logger.error(
+      `All Cencori completion attempts failed after ${elapsed}ms [${finalClassified.classification}] (status=${finalClassified.statusCode}): ${lastError instanceof Error ? lastError.stack : lastError}`
+    );
     throw new ServiceUnavailableException('AI analysis is temporarily unavailable. Try again shortly.');
   }
 
   async chat(options: AiChatOptions): Promise<AiChatResponse> {
+    const effectiveModel = options.model?.trim() || 'gemini-2.5-flash-lite';
+    if (!effectiveModel || effectiveModel === 'unknown') {
+      this.logger.error('[AI_ERROR:missing_model] Outbound chat payload missing valid model identifier.');
+      throw new ServiceUnavailableException('Ask TraceIQ is temporarily unavailable. Try again shortly.');
+    }
+
     const client = this.getClient();
     const timeoutMs = options.timeoutMs ?? 25_000;
     const maxRetries = 2;
@@ -114,7 +220,7 @@ export class CencoriProvider implements AiProvider {
       try {
         const start = Date.now();
         const requestPayload: any = {
-          model: options.model,
+          model: effectiveModel,
           temperature: options.temperature ?? 0.3,
           max_tokens: options.maxTokens ?? 1000,
           messages: options.messages.map((msg) => {
@@ -151,14 +257,14 @@ export class CencoriProvider implements AiProvider {
           }
         }));
 
-        const routedModel = response.model || options.model;
+        const routedModel = response.model || effectiveModel;
         const finishReason = choice?.finish_reason || response.finishReason || (toolCalls.length > 0 ? 'tool_calls' : 'stop');
 
         return {
           content,
           toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
           finishReason,
-          requestedModel: options.model,
+          requestedModel: effectiveModel,
           routedModel,
           inputTokens: response.usage?.prompt_tokens ?? response.usage?.promptTokens,
           outputTokens: response.usage?.completion_tokens ?? response.usage?.completionTokens,
@@ -167,19 +273,22 @@ export class CencoriProvider implements AiProvider {
         };
       } catch (err: any) {
         lastError = err;
-        const statusCode = err?.statusCode || err?.status;
-        const isTransient = statusCode === 429 || (statusCode >= 500 && statusCode < 600) || err?.message?.includes('timeout');
+        const classified = classifyCencoriError(err, effectiveModel);
+        this.logger.warn(
+          `Cencori chat attempt ${attempt + 1}/${maxRetries + 1} failed [${classified.classification}] (status=${classified.statusCode}): ${err?.message || err}`
+        );
 
-        this.logger.warn(`Cencori chat attempt ${attempt + 1}/${maxRetries + 1} failed: ${err?.message || err}`);
-
-        if (!isTransient || attempt === maxRetries) {
+        if (!classified.isTransient || attempt === maxRetries) {
           break;
         }
       }
     }
 
+    const finalClassified = classifyCencoriError(lastError, effectiveModel);
     const elapsed = Date.now() - overallStart;
-    this.logger.error(`All Cencori chat attempts failed after ${elapsed}ms: ${lastError instanceof Error ? lastError.stack : lastError}`);
+    this.logger.error(
+      `All Cencori chat attempts failed after ${elapsed}ms [${finalClassified.classification}] (status=${finalClassified.statusCode}): ${lastError instanceof Error ? lastError.stack : lastError}`
+    );
     throw new ServiceUnavailableException('Ask TraceIQ is temporarily unavailable. Try again shortly.');
   }
 

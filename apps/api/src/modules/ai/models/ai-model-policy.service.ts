@@ -4,8 +4,8 @@ export type AiCapability = 'funnel_analysis' | 'story_analysis' | 'assistant' | 
 
 @Injectable()
 export class AiModelPolicyService {
-  private readonly defaultFastModel = 'gpt-4o-mini';
-  private readonly defaultReasoningModel = 'gpt-4o';
+  private readonly defaultFastModel = 'gemini-2.5-flash-lite';
+  private readonly defaultReasoningModel = 'gemini-2.5-flash-lite';
   private readonly defaultTimeoutMs = 15_000;
 
   isAiEnabled(): boolean {
@@ -16,26 +16,42 @@ export class AiModelPolicyService {
   }
 
   getFastModel(): string {
-    const configured = process.env.TRACEIQ_AI_FAST_MODEL?.trim();
-    return configured || this.defaultFastModel;
+    const configured =
+      process.env.TRACEIQ_AI_FAST_MODEL?.trim() ||
+      process.env.AI_MODEL?.trim() ||
+      process.env.CENCORI_MODEL?.trim();
+    if (configured && configured !== 'unknown') {
+      return configured;
+    }
+    return this.defaultFastModel;
   }
 
   getReasoningModel(): string {
-    const configured = process.env.TRACEIQ_AI_REASONING_MODEL?.trim();
-    return configured || this.defaultReasoningModel;
+    const configured =
+      process.env.TRACEIQ_AI_REASONING_MODEL?.trim() ||
+      process.env.AI_MODEL?.trim() ||
+      process.env.CENCORI_MODEL?.trim();
+    if (configured && configured !== 'unknown') {
+      return configured;
+    }
+    return this.defaultReasoningModel;
   }
 
   getModelForCapability(capability: AiCapability): string {
+    let resolved: string;
     switch (capability) {
       case 'funnel_analysis':
       case 'story_analysis':
-        return this.getFastModel();
+        resolved = this.getFastModel();
+        break;
       case 'assistant':
       case 'alert_investigation':
-        return this.getReasoningModel();
+        resolved = this.getReasoningModel();
+        break;
       default:
-        return this.getFastModel();
+        resolved = this.getFastModel();
     }
+    return resolved || 'gemini-2.5-flash-lite';
   }
 
   getTimeoutMs(): number {

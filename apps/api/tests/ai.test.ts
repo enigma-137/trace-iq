@@ -90,10 +90,20 @@ describe('AiModelPolicyService', () => {
     expect(policy.isAiEnabled()).toBe(false);
   });
 
-  it('resolves fast and reasoning models with overrides', () => {
+  it('resolves fast and reasoning models with overrides and fallbacks', () => {
     const policy = new AiModelPolicyService();
-    expect(policy.getFastModel()).toBe('gpt-4o-mini');
-    expect(policy.getReasoningModel()).toBe('gpt-4o');
+    expect(policy.getFastModel()).toBe('gemini-2.5-flash-lite');
+    expect(policy.getReasoningModel()).toBe('gemini-2.5-flash-lite');
+
+    process.env.AI_MODEL = 'gemini-2.5-flash';
+    expect(policy.getFastModel()).toBe('gemini-2.5-flash');
+    expect(policy.getReasoningModel()).toBe('gemini-2.5-flash');
+    delete process.env.AI_MODEL;
+
+    process.env.CENCORI_MODEL = 'gemini-2.5-pro';
+    expect(policy.getFastModel()).toBe('gemini-2.5-pro');
+    expect(policy.getReasoningModel()).toBe('gemini-2.5-pro');
+    delete process.env.CENCORI_MODEL;
 
     process.env.TRACEIQ_AI_FAST_MODEL = 'custom-fast-model';
     process.env.TRACEIQ_AI_REASONING_MODEL = 'custom-reasoning-model';
@@ -241,11 +251,51 @@ describe('CencoriProvider', () => {
     const provider = new CencoriProvider();
     await expect(
       provider.complete({
-        model: 'gpt-4o-mini',
+        model: 'gemini-2.5-flash-lite',
         systemPrompt: 'System',
         userPrompt: 'User'
       })
     ).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('classifies missing model correctly', async () => {
+    const { classifyCencoriError } = await import('../src/modules/ai/providers/cencori.provider');
+    const result = classifyCencoriError(new Error('fail'), '');
+    expect(result.classification).toBe('missing_model');
+    expect(result.isTransient).toBe(false);
+  });
+
+  it('classifies credit balance exhaustion and rate limits as rate_limited', async () => {
+    const { classifyCencoriError } = await import('../src/modules/ai/providers/cencori.provider');
+    const creditErr = {
+      statusCode: 403,
+      message: 'Credit balance exhausted',
+      code: 'credit_balance_exhausted'
+    };
+    const classified = classifyCencoriError(creditErr, 'gemini-2.5-flash-lite');
+    expect(classified.classification).toBe('rate_limited');
+  });
+
+  it('classifies unsupported model errors as unsupported_model', async () => {
+    const { classifyCencoriError } = await import('../src/modules/ai/providers/cencori.provider');
+    const modelErr = {
+      statusCode: 404,
+      message: 'Model not found'
+    };
+    const classified = classifyCencoriError(modelErr, 'non-existent-model');
+    expect(classified.classification).toBe('unsupported_model');
+    expect(classified.isTransient).toBe(false);
+  });
+
+  it('classifies upstream 5xx errors as upstream_5xx and marks as transient', async () => {
+    const { classifyCencoriError } = await import('../src/modules/ai/providers/cencori.provider');
+    const gatewayErr = {
+      statusCode: 502,
+      message: 'Bad Gateway'
+    };
+    const classified = classifyCencoriError(gatewayErr, 'gemini-2.5-flash-lite');
+    expect(classified.classification).toBe('upstream_5xx');
+    expect(classified.isTransient).toBe(true);
   });
 });
 
