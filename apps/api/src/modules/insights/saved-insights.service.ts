@@ -193,10 +193,8 @@ export class SavedInsightsService {
           i.created_by_user_id AS "createdByUserId",
           i.created_at AS "createdAt",
           i.updated_at AS "updatedAt",
-          u.email AS "createdByUserEmail",
           (SELECT COUNT(DISTINCT w.dashboard_id) FROM dashboard_widgets w WHERE w.insight_id = i.id) AS "usedInDashboardsCount"
         FROM insights i
-        LEFT JOIN users u ON u.id = i.created_by_user_id
         ${whereClause}
         ORDER BY i.is_pinned DESC, i.updated_at DESC
         LIMIT ${Number(options.limit) || 100} OFFSET ${Number(options.offset) || 0}
@@ -230,10 +228,8 @@ export class SavedInsightsService {
           i.created_by_user_id AS "createdByUserId",
           i.created_at AS "createdAt",
           i.updated_at AS "updatedAt",
-          u.email AS "createdByUserEmail",
           (SELECT COUNT(DISTINCT w.dashboard_id) FROM dashboard_widgets w WHERE w.insight_id = i.id) AS "usedInDashboardsCount"
         FROM insights i
-        LEFT JOIN users u ON u.id = i.created_by_user_id
         WHERE i.id = $1 AND i.project_id = $2
       `,
       [id, project.id]

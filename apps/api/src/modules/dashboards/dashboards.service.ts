@@ -583,10 +583,8 @@ export class DashboardsService {
           d.definition,
           d.created_at AS "createdAt",
           d.updated_at AS "updatedAt",
-          u.email AS "ownerEmail",
           (SELECT COUNT(*) FROM dashboard_widgets w WHERE w.dashboard_id = d.id) AS "widgetsCount"
         FROM dashboards d
-        LEFT JOIN users u ON u.id = d.owner_id
         ${whereClause}
         ORDER BY d.is_pinned DESC, d.updated_at DESC
       `,
@@ -614,10 +612,8 @@ export class DashboardsService {
           d.definition,
           d.created_at AS "createdAt",
           d.updated_at AS "updatedAt",
-          u.email AS "ownerEmail",
           (SELECT COUNT(*) FROM dashboard_widgets w WHERE w.dashboard_id = d.id) AS "widgetsCount"
         FROM dashboards d
-        LEFT JOIN users u ON u.id = d.owner_id
         WHERE d.id = $1 AND d.project_id = $2
       `,
       [id, project.id]
