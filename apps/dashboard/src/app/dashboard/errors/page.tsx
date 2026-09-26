@@ -3,6 +3,7 @@ import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { MiniBars } from '@/components/charts/MiniBars';
 import { RankedList } from '@/components/charts/RankedList';
+import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,11 +73,20 @@ export default async function ErrorsPage({
       ) : null}
 
       <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Issues</h2>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
-            Grouped <code className="font-mono">$exception</code> events from the SDK · last {days}d
-          </p>
+        <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Issues</h2>
+            <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
+              Grouped <code className="font-mono">$exception</code> events from the SDK · last {days}d
+            </p>
+          </div>
+          <AddCurrentViewToDashboardButton
+            title="Application Exceptions & Errors"
+            type="error_metric"
+            chartType="line"
+            query={{ event: '$exception', days, interval: 'day' }}
+            dateConfig={{ days }}
+          />
         </div>
 
         {issues.length === 0 ? (

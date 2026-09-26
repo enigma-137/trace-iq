@@ -9,7 +9,7 @@ import DashboardSpeed01Icon from '@hugeicons/core-free-icons/DashboardSpeed01Ico
 import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01Icon';
 import Download04Icon from '@hugeicons/core-free-icons/Download04Icon';
 import Flag02Icon from '@hugeicons/core-free-icons/Flag02Icon';
-import Pulse01Icon from '@hugeicons/core-free-icons/Pulse01Icon';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
 import FunnelIcon from '@hugeicons/core-free-icons/FunnelIcon';
 import Globe02Icon from '@hugeicons/core-free-icons/Globe02Icon';
 import Home01Icon from '@hugeicons/core-free-icons/Home01Icon';
@@ -26,7 +26,7 @@ const ICONS: Record<string, IconSvgElement> = {
   insights: AnalyticsUpIcon,
   dashboards: DashboardSquare01Icon,
   events: Activity01Icon,
-  logs: Pulse01Icon,
+  logs: FlashIcon,
   funnels: FunnelIcon,
   retention: Clock03Icon,
   cohorts: Layers01Icon,

@@ -4,6 +4,7 @@ import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import type { FilterCondition } from '@/components/SegmentFilters';
 import { RetentionGrid } from './RetentionGrid';
 import { RetentionFilterModal } from './RetentionFilterModal';
+import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,27 +115,37 @@ export default async function RetentionPage({
             </p>
           </div>
 
-          {/* Integrated Time Range Selector & Segment Modal Trigger */}
+          {/* Integrated Time Range Selector, Filter Modal Trigger & Add to Dashboard */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end shrink-0">
-            <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-50/80 p-1 dark:border-slate-800 dark:bg-slate-900/60">
-              {RANGES.map((range) => {
-                const isSelected = weeks === range.value;
-                const targetUrl = filtersParam
-                  ? `/dashboard/retention?weeks=${range.value}&filters=${encodeURIComponent(filtersParam)}`
-                  : `/dashboard/retention?weeks=${range.value}`;
-                return (
-                  <Link
-                    key={range.value}
-                    href={targetUrl}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${isSelected
-                        ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
-                        : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                      }`}
-                  >
-                    {range.label}
-                  </Link>
-                );
-              })}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-50/80 p-1 dark:border-slate-800 dark:bg-slate-900/60">
+                {RANGES.map((range) => {
+                  const isSelected = weeks === range.value;
+                  const targetUrl = filtersParam
+                    ? `/dashboard/retention?weeks=${range.value}&filters=${encodeURIComponent(filtersParam)}`
+                    : `/dashboard/retention?weeks=${range.value}`;
+                  return (
+                    <Link
+                      key={range.value}
+                      href={targetUrl}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${isSelected
+                          ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
+                          : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                        }`}
+                    >
+                      {range.label}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <AddCurrentViewToDashboardButton
+                title="Weekly User Retention"
+                type="retention"
+                chartType="retention"
+                query={{ weeks, filters }}
+                dateConfig={{ days: String(Number(weeks) * 7) }}
+              />
             </div>
 
             <RetentionFilterModal

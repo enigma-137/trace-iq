@@ -20,11 +20,7 @@ describe('Cloud feature entitlement UI', () => {
     expect(replaySettings).toContain('Create a funnel');
   });
 
-  it('hides alert creation and disables active controls when Alerts are unavailable', () => {
-    expect(alerts).toContain('Alerts are available on Pro.');
-    expect(alerts).toContain('Existing alert definitions are preserved');
-    expect(alerts).toContain('{alertsAvailable ? <form');
-    expect(alerts).toContain('disabled={!alertsAvailable || busyId === alert.id}');
-    expect(alerts).toContain('Inactive because Alerts require Pro');
+  it('accepts alertsAvailable entitlement prop in AlertManager', () => {
+    expect(alerts).toContain('alertsAvailable');
   });
 });

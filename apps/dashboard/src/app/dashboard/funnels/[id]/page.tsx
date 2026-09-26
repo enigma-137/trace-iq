@@ -6,6 +6,7 @@ import { FunnelChart } from '@/components/charts/FunnelChart';
 import { FunnelEventFlow } from '@/components/charts/FunnelEventFlow';
 import { FunnelAiSummary } from './FunnelAiSummary';
 import { FunnelDebugPanel, type FunnelDebugData } from './FunnelDebugPanel';
+import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,6 +119,14 @@ export default async function FunnelResultsPage({
             >
               Edit funnel
             </Link>
+            <AddCurrentViewToDashboardButton
+              title={`${data.funnel.name} Funnel`}
+              type="funnel"
+              chartType="funnel"
+              query={{ funnelId: data.funnel.id, days }}
+              dateConfig={{ days }}
+              className="h-9"
+            />
           </div>
         ) : null}
       </div>

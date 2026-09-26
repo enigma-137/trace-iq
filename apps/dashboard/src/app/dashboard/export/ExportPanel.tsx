@@ -256,7 +256,7 @@ export function ExportPanel({ eventNames, userEmail, projectId, projectName }: E
         <div className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
           <div className="flex items-center justify-between pb-3">
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">cURL API Export</h3>
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Programmatic API Export</h3>
               <p className="text-xs text-neutral-500 dark:text-slate-400">
                 Automate raw data ingestion into your warehouse with scheduled cron jobs.
               </p>

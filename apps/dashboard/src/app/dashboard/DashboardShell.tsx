@@ -6,7 +6,8 @@ import { AskTraceIQProvider } from '@/components/ai/AskTraceIQContext';
 import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
 
 export interface DashboardShellProps {
-  active: string;
+  active?: string;
+  activeNavKey?: string;
   title?: string;
   organizationName?: string | null;
   projectName?: string | null;
@@ -20,6 +21,7 @@ export interface DashboardShellProps {
 
 export function DashboardShell({
   active,
+  activeNavKey,
   title,
   organizationName,
   projectName,
@@ -30,6 +32,7 @@ export function DashboardShell({
   headerActions,
   children
 }: DashboardShellProps) {
+  const effectiveActive = activeNavKey || active || 'overview';
   const localMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
 
   return (
@@ -37,11 +40,11 @@ export function DashboardShell({
       <AskTraceIQProvider projectId={projectId}>
         <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
           <div className="flex min-h-screen w-full">
-            <Sidebar active={active} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
+            <Sidebar active={effectiveActive} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
 
             <section className="min-w-0 flex-1">
               <DashboardHeader
-                active={active}
+                active={effectiveActive}
                 title={title}
                 organizationName={organizationName}
                 projectName={projectName}

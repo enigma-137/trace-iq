@@ -4,10 +4,11 @@ import { ProjectsModule } from '../projects/projects.module';
 import { DashboardsController } from './dashboards.controller';
 import { DashboardsService } from './dashboards.service';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { InsightsModule } from '../insights/insights.module';
 import { PublicDashboardsController } from './public-dashboards.controller';
 
 @Module({
-  imports: [AuthModule, ProjectsModule, AnalyticsModule],
+  imports: [AuthModule, ProjectsModule, AnalyticsModule, InsightsModule],
   controllers: [DashboardsController, PublicDashboardsController],
   providers: [DashboardsService],
   exports: [DashboardsService]

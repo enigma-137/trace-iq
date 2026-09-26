@@ -6,6 +6,7 @@ import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { buildApiFlowGraph } from '@/lib/apiFlowGraph';
 import { StatTile } from '@/components/charts/StatTile';
 import { SvgNodeFlowGraph } from '@/components/charts/SvgNodeFlowGraph';
+import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,20 +86,31 @@ export default async function ApiPerformancePage({
           Latency, errors, and traffic per endpoint — from <code className="font-mono text-xs">$api_request</code> events
           sent by the SDK middleware or browser autocapture.
         </p>
-        <div className="flex items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-slate-800">
-          {RANGES.map((range) => (
-            <Link
-              key={range.value}
-              href={withProjectId(`/dashboard/api-performance?days=${range.value}`, canonicalProjectId)}
-              className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
-                days === range.value
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
-                  : 'text-neutral-500 hover:bg-neutral-100 dark:text-slate-400 dark:hover:bg-neutral-900'
-              }`}
-            >
-              {range.label}
-            </Link>
-          ))}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-slate-800">
+            {RANGES.map((range) => (
+              <Link
+                key={range.value}
+                href={withProjectId(`/dashboard/api-performance?days=${range.value}`, canonicalProjectId)}
+                className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
+                  days === range.value
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
+                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-slate-400 dark:hover:bg-neutral-900'
+                }`}
+              >
+                {range.label}
+              </Link>
+            ))}
+          </div>
+
+          <AddCurrentViewToDashboardButton
+            title="API Requests & Latency"
+            type="api_performance"
+            chartType="line"
+            query={{ event: '$api_request', days, interval: days === '1' ? 'hour' : 'day' }}
+            dateConfig={{ days }}
+            projectId={canonicalProjectId}
+          />
         </div>
       </div>
 
