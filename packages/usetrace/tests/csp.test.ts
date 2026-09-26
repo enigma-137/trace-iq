@@ -156,4 +156,101 @@ export default nextConfig;
     const stateAfter = await adapter.inspect(tmpDir);
     expect(stateAfter.cspAllowsTraceiq).toBe(true);
   });
+
+  it('leaves dynamic template-interpolated CSP untouched and provides actionable advice', async () => {
+    const dynamicNextConfig = `
+const allowedOrigins = ['https://api.supabase.co', process.env.EXTRA_ORIGIN];
+const nextConfig = {
+  headers: async () => [
+    {
+      source: '/(.*)',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: \`default-src 'self'; connect-src 'self' \${allowedOrigins.join(' ')};\`,
+        }
+      ]
+    }
+  ]
+};
+export default nextConfig;
+`;
+    await fs.writeFile(path.join(tmpDir, 'next.config.mjs'), dynamicNextConfig, 'utf8');
+
+    const inspection = await inspectProjectCsp(tmpDir, 'https://api.traceiq.run');
+    expect(inspection.cspDetected).toBe(true);
+    expect(inspection.cspAllowsTraceiq).toBe(false);
+    expect(inspection.filePath).toBe('next.config.mjs');
+
+    const patchResult = await patchProjectCsp(tmpDir, 'https://api.traceiq.run');
+    // Safety check: dynamic template expression must NOT be modified
+    expect(patchResult.modified).toBe(false);
+
+    // File content must remain completely unmodified
+    const contentAfter = await fs.readFile(path.join(tmpDir, 'next.config.mjs'), 'utf8');
+    expect(contentAfter).toBe(dynamicNextConfig);
+  });
+
+  it('leaves multi-branch or ambiguous connect-src CSP untouched', async () => {
+    const conditionalConfig = `
+const isDev = process.env.NODE_ENV === 'development';
+const nextConfig = {
+  headers: async () => [
+    {
+      source: '/(.*)',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: isDev ? "connect-src 'self' http://localhost:8080" : "connect-src 'self' https://api.production.com",
+        }
+      ]
+    }
+  ]
+};
+module.exports = nextConfig;
+`;
+    await fs.writeFile(path.join(tmpDir, 'next.config.js'), conditionalConfig, 'utf8');
+
+    const inspection = await inspectProjectCsp(tmpDir, 'https://api.traceiq.run');
+    expect(inspection.cspDetected).toBe(true);
+    expect(inspection.cspAllowsTraceiq).toBe(false);
+
+    const patchResult = await patchProjectCsp(tmpDir, 'https://api.traceiq.run');
+    // Safety check: multiple conditional directives must NOT be modified automatically
+    expect(patchResult.modified).toBe(false);
+
+    const contentAfter = await fs.readFile(path.join(tmpDir, 'next.config.js'), 'utf8');
+    expect(contentAfter).toBe(conditionalConfig);
+  });
+
+  it('handles default-src only CSP safely without rewriting', async () => {
+    const defaultSrcOnlyConfig = `
+module.exports = {
+  headers: async () => [
+    {
+      source: '/(.*)',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: "default-src 'self' https://cdn.example.com;",
+        }
+      ]
+    }
+  ]
+};
+`;
+    await fs.writeFile(path.join(tmpDir, 'next.config.js'), defaultSrcOnlyConfig, 'utf8');
+
+    const inspection = await inspectProjectCsp(tmpDir, 'https://api.traceiq.run');
+    expect(inspection.cspDetected).toBe(true);
+    expect(inspection.cspAllowsTraceiq).toBe(false);
+    expect(inspection.issue).toContain('default-src blocks https://api.traceiq.run');
+    expect(inspection.recommendation).toContain('Add connect-src directive');
+
+    const patchResult = await patchProjectCsp(tmpDir, 'https://api.traceiq.run');
+    expect(patchResult.modified).toBe(false);
+
+    const contentAfter = await fs.readFile(path.join(tmpDir, 'next.config.js'), 'utf8');
+    expect(contentAfter).toBe(defaultSrcOnlyConfig);
+  });
 });

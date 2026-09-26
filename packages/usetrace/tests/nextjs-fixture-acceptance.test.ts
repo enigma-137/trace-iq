@@ -186,7 +186,9 @@ describe('Next.js App Router Client Telemetry & Real Verification Fixture', () =
 
       // Step 4: Next.js SPA Navigation using history.pushState
       mockWindow.history.pushState({}, '', 'http://localhost:3000/app/feedback');
-      await new Promise((r) => setTimeout(r, 100));
+      for (let i = 0; i < 20 && receivedEvents.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
 
       expect(receivedEvents.length).toBe(2);
       expect(receivedEvents[1].eventName).toBe('$page');

@@ -160,7 +160,43 @@ export async function inspectProjectCsp(cwd: string, targetApiUrl = 'https://api
 }
 
 /**
+ * Validate that a connect-src directive is composed strictly of static CSP tokens
+ * and contains no dynamic JavaScript expressions, template interpolations, functions, or variables.
+ */
+export function isSafeStaticDirective(directive: string): boolean {
+  if (!directive || typeof directive !== 'string') return false;
+
+  // Reject anything containing dynamic JS or template interpolation characters
+  if (/[\${}\[\]()+?!=&|<>\\`]/.test(directive)) {
+    return false;
+  }
+
+  const tokens = directive.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+
+  // Valid static tokens:
+  // - Single-quoted CSP keywords: 'self', 'none', 'unsafe-inline', 'unsafe-eval', 'strict-dynamic', 'report-sample'
+  // - Nonce/hash tokens: 'nonce-...', 'sha256-...'
+  // - Schemes: https:, http:, ws:, wss:, data:, blob:
+  // - Wildcard / URLs / hosts: *, https://..., http://..., *.domain.com, domain.com, localhost:3000
+  const validTokenPattern = /^('self'|'unsafe-inline'|'unsafe-eval'|'none'|'strict-dynamic'|'report-sample'|'nonce-[A-Za-z0-9+/=]+'|'sha(256|384|512)-[A-Za-z0-9+/=]+'|\*|https?:|http?:|wss?:|ws?:|data:|blob:|https?:\/\/[a-zA-Z0-9_\-.:*]+|[a-zA-Z0-9_\-.:*]+)$/i;
+
+  for (const token of tokens) {
+    if (!validTokenPattern.test(token)) {
+      return false;
+    }
+    // Explicitly reject common JS identifiers that might match the word pattern
+    if (/^(process|env|undefined|null|true|false|function|const|let|var)$/i.test(token)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Safely and deterministically apply the minimal additive change to allow TraceIQ in connect-src.
+ * Only patches when a single, unambiguous, static connect-src directive is found.
  */
 export async function patchProjectCsp(
   cwd: string,
@@ -176,27 +212,35 @@ export async function patchProjectCsp(
   try {
     const content = await fs.readFile(fullPath, 'utf8');
 
-    // Find the connect-src match
-    const connectSrcRegex = /(connect-src\s+)([^;"`\\}\r\n]+)/i;
-    const match = content.match(connectSrcRegex);
+    // Find all connect-src occurrences to guard against ambiguous/multiple configurations
+    const connectSrcMatches = Array.from(content.matchAll(/(connect-src\s+)([^;"`\\}\r\n]+)/gi));
+    if (connectSrcMatches.length !== 1) {
+      // Multiple or zero connect-src matches -> ambiguous or only in default-src; do not auto-patch
+      return { modified: false, filePath: inspection.filePath };
+    }
 
-    if (match) {
-      const [fullMatch, prefix, existingTokens] = match;
-      if (!connectSrcAllowsOrigin(existingTokens, inspection.targetOrigin)) {
-        const updatedTokens = `${existingTokens.trim()} ${inspection.targetOrigin}`;
-        const updatedMatch = `${prefix}${updatedTokens}`;
-        const updatedContent = content.replace(connectSrcRegex, updatedMatch);
+    const match = connectSrcMatches[0];
+    const [fullMatch, prefix, existingTokens] = match;
 
-        if (!dryRun) {
-          await fs.writeFile(fullPath, updatedContent, 'utf8');
-        }
+    // Verify directive is purely static and safe to modify
+    if (!isSafeStaticDirective(existingTokens)) {
+      return { modified: false, filePath: inspection.filePath };
+    }
 
-        return {
-          modified: true,
-          filePath: inspection.filePath,
-          diff: `- ${fullMatch}\n+ ${updatedMatch}`
-        };
+    if (!connectSrcAllowsOrigin(existingTokens, inspection.targetOrigin)) {
+      const updatedTokens = `${existingTokens.trim()} ${inspection.targetOrigin}`;
+      const updatedMatch = `${prefix}${updatedTokens}`;
+      const updatedContent = content.replace(fullMatch, updatedMatch);
+
+      if (!dryRun) {
+        await fs.writeFile(fullPath, updatedContent, 'utf8');
       }
+
+      return {
+        modified: true,
+        filePath: inspection.filePath,
+        diff: `- ${fullMatch}\n+ ${updatedMatch}`
+      };
     }
   } catch {
     // If automated patch fails, caller will fall back to manual instructions

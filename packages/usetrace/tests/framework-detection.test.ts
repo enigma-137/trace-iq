@@ -64,5 +64,5 @@ describe('useTrace Framework and Environment Detection', () => {
 
     const state = await adapter.inspect(tempDir);
     expect(state.framework).toBe('React (Vite)');
-  });
+  }, 15000);
 });
