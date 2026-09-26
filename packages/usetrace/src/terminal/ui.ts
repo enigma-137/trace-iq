@@ -389,5 +389,8 @@ export function renderSetupReport(report: {
     report.recommendations.forEach((r) => console.log(`   ${colors.cyan(symbols.diamondOutline)} ${r}`));
   }
 
+  console.log(`\n  ${colors.bold('Browser CSP requirement:')}`);
+  console.log(`  connect-src must allow https://api.traceiq.run`);
+
   console.log(`\n${colors.dim('═════════════════════════════')}\n`);
 }

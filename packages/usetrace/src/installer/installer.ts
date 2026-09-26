@@ -29,6 +29,9 @@ export class TraceIQInstaller {
     if (!state.projectKeyConfigured && changes.addedEnvVars.length === 0) {
       warnings.push('TraceIQ environment variables may need to be deployed to your hosting platform (Vercel, Render, etc.).');
     }
+    if (state.cspDetected && state.cspAllowsTraceiq === false) {
+      warnings.push(`Content Security Policy in ${state.cspFile ?? 'config'} blocks TraceIQ API requests.`);
+    }
 
     const recommendations: string[] = [];
     if (!selectedProducts.includes('user-identification')) {
@@ -36,6 +39,9 @@ export class TraceIQInstaller {
     }
     if (!selectedProducts.includes('error-tracking')) {
       recommendations.push('Enable error tracking to automatically record uncaught exceptions in production.');
+    }
+    if (state.cspDetected && state.cspAllowsTraceiq === false) {
+      recommendations.push(`Add https://api.traceiq.run to your connect-src directive: connect-src 'self' ... https://api.traceiq.run;`);
     }
 
     return {
@@ -47,6 +53,11 @@ export class TraceIQInstaller {
       filesChanged: allFilesChanged,
       envVarsConfigured: changes.addedEnvVars,
       verificationStatus,
+      cspStatus: {
+        allowsTraceiq: state.cspAllowsTraceiq !== false,
+        filePath: state.cspFile,
+        requiredDirective: 'connect-src must allow https://api.traceiq.run'
+      },
       firstVerifiedEvent,
       warnings,
       recommendations

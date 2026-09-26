@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FrameworkAdapter, InstallOptions } from './adapter.interface.js';
 import { SetupChanges, SetupState } from '../types.js';
+import { inspectProjectCsp, patchProjectCsp } from './csp.js';
 import {
   applyEnvVariables,
   detectExistingEnvCredentials,
@@ -147,8 +148,18 @@ export class NextJsAdapter implements FrameworkAdapter {
     if (sdkDetected && !userIdentificationConfigured) {
       recommendations.push('User identification is missing. Identify users after sign-in for unified user profiles.');
     }
-    if (sdkDetected && !errorTrackingConfigured) {
-      recommendations.push('Error tracking is not enabled. Turn on autoCaptureExceptions to track unhandled errors.');
+    const targetApiUrl = envCreds.apiUrl || 'https://api.traceiq.run';
+    const cspResult = await inspectProjectCsp(cwd, targetApiUrl);
+
+    if (cspResult.cspDetected && !cspResult.cspAllowsTraceiq) {
+      issues.push(
+        cspResult.issue ||
+          `Content Security Policy in ${cspResult.filePath ?? 'config'} blocks TraceIQ.`
+      );
+      recommendations.push(
+        cspResult.recommendation ||
+          `Add ${cspResult.targetOrigin} to your connect-src directive: connect-src 'self' ... ${cspResult.targetOrigin};`
+      );
     }
 
     return {
@@ -159,6 +170,10 @@ export class NextJsAdapter implements FrameworkAdapter {
       sdkVersion,
       providerConfigured: providerInLayout,
       projectKeyConfigured: Boolean(envCreds.projectId && envCreds.writeKey),
+      apiEndpointConfigured: Boolean(envCreds.projectId && envCreds.writeKey),
+      cspDetected: cspResult.cspDetected,
+      cspAllowsTraceiq: cspResult.cspAllowsTraceiq,
+      cspFile: cspResult.filePath,
       pageViewsConfigured,
       userIdentificationConfigured,
       errorTrackingConfigured,
@@ -352,6 +367,18 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       // ignore
+    }
+
+    // 6. Check and patch Content Security Policy if connect-src blocks TraceIQ
+    const cspPatch = await patchProjectCsp(options.cwd, options.apiUrl, options.dryRun);
+    if (cspPatch.modified && cspPatch.filePath) {
+      const cleanPath = cspPatch.filePath.replace(/\\/g, '/');
+      if (!changes.modifiedFiles.includes(cleanPath)) {
+        changes.modifiedFiles.push(cleanPath);
+      }
+      if (cspPatch.diff) {
+        changes.diffs.push({ path: cleanPath, diff: cspPatch.diff });
+      }
     }
 
     return changes;

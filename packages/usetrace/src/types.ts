@@ -68,6 +68,10 @@ export interface SetupState {
   sdkVersion?: string;
   providerConfigured: boolean;
   projectKeyConfigured: boolean;
+  apiEndpointConfigured?: boolean;
+  cspDetected?: boolean;
+  cspAllowsTraceiq?: boolean;
+  cspFile?: string;
   pageViewsConfigured: boolean;
   userIdentificationConfigured: boolean;
   errorTrackingConfigured: boolean;
@@ -95,6 +99,11 @@ export interface SetupReport {
   filesChanged: string[];
   envVarsConfigured: string[];
   verificationStatus: 'verified' | 'failed' | 'skipped' | 'timeout';
+  cspStatus?: {
+    allowsTraceiq: boolean;
+    filePath?: string;
+    requiredDirective: string;
+  };
   firstVerifiedEvent?: {
     name: string;
     id?: string;

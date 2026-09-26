@@ -232,7 +232,13 @@ export async function runCli(args: string[] = []): Promise<void> {
     console.log(`\n  ${colors.yellow('Troubleshooting:')}`);
     console.log(`  1. Confirm your development server is running and accessible.`);
     console.log(`  2. Ensure NEXT_PUBLIC_TRACEIQ_API_URL or TRACEIQ_API_URL points to ${defaultApiUrl}.`);
-    console.log(`  3. Run ${colors.bold('npx traceiq-cli verify')} once your app is active.`);
+    if (state.cspDetected && state.cspAllowsTraceiq === false) {
+      console.log(`  3. ${colors.red(colors.bold('! Content Security Policy blocks TraceIQ'))}`);
+      console.log(`     Add ${colors.cyan('https://api.traceiq.run')} to your ${colors.bold('connect-src')} directive in ${state.cspFile ?? 'config'}.`);
+    } else {
+      console.log(`  3. Check browser DevTools Console for CSP or network errors (e.g. connect-src blocking ${defaultApiUrl}).`);
+    }
+    console.log(`  4. Run ${colors.bold('npx traceiq-cli verify')} once your app is active.`);
 
     const report = installer.createReport(state, changes, selectedProducts, 'timeout');
     renderSetupReport(report);
@@ -242,13 +248,28 @@ export async function runCli(args: string[] = []): Promise<void> {
 
 async function runAuditFlow(state: any) {
   logStep('TraceIQ Audit & Diagnostics');
-  console.log(`  Framework:             ${state.framework}`);
-  console.log(`  SDK Installed:         ${state.sdkDetected ? colors.green('✓ Yes') : colors.red('✕ No')}`);
-  console.log(`  Provider Configured:   ${state.providerConfigured ? colors.green('✓ Yes') : colors.yellow('! No')}`);
-  console.log(`  Project Key Set:       ${state.projectKeyConfigured ? colors.green('✓ Yes') : colors.red('✕ No')}`);
-  console.log(`  Pageviews Auto-Track:  ${state.pageViewsConfigured ? colors.green('✓ Active') : colors.dim('Inactive')}`);
-  console.log(`  Error Tracking:        ${state.errorTrackingConfigured ? colors.green('✓ Active') : colors.dim('Inactive')}`);
-  console.log(`  Web Vitals:            ${state.webVitalsConfigured ? colors.green('✓ Active') : colors.dim('Inactive')}`);
+  console.log(`  Framework:               ${state.framework}`);
+  console.log(`  SDK installed:           ${state.sdkDetected ? colors.green('✓') : colors.red('✕')}`);
+  console.log(`  Provider configured:     ${state.providerConfigured ? colors.green('✓') : colors.yellow('!')}`);
+  console.log(`  Project credentials:     ${state.projectKeyConfigured ? colors.green('✓') : colors.red('✕')}`);
+  console.log(`  API endpoint configured: ${state.apiEndpointConfigured !== false ? colors.green('✓') : colors.yellow('!')}`);
+  console.log(
+    `  CSP allows TraceIQ:      ${
+      state.cspAllowsTraceiq !== false ? colors.green('✓') : colors.red('✕')
+    }`
+  );
+  console.log(`  Pageviews Auto-Track:    ${state.pageViewsConfigured ? colors.green('✓ Active') : colors.dim('Inactive')}`);
+  console.log(`  Error Tracking:          ${state.errorTrackingConfigured ? colors.green('✓ Active') : colors.dim('Inactive')}`);
+  console.log(`  Web Vitals:              ${state.webVitalsConfigured ? colors.green('✓ Active') : colors.dim('Inactive')}`);
+
+  if (state.cspDetected && state.cspAllowsTraceiq === false) {
+    console.log(`\n  ${colors.yellow(colors.bold('! Content Security Policy blocks TraceIQ'))}`);
+    console.log(`\n  Add ${colors.cyan('https://api.traceiq.run')} to your ${colors.bold('connect-src')} directive:\n`);
+    console.log(`  ${colors.dim("connect-src 'self' ... https://api.traceiq.run;")}`);
+    if (state.cspFile) {
+      console.log(`\n  Detected in: ${colors.bold(state.cspFile)}`);
+    }
+  }
 
   if (state.issues.length > 0) {
     console.log(`\n  ${colors.yellow(colors.bold('Issues Found:'))}`);
