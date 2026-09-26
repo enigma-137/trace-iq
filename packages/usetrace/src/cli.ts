@@ -182,7 +182,7 @@ export async function runCli(args: string[] = []): Promise<void> {
     verifySpinner.succeed(`Verification session ready (${session.verificationId})`);
   } catch (error) {
     verifySpinner.warn(`Could not connect to backend verification API (${defaultApiUrl}).`);
-    logInfo('Make sure your TraceIQ API is running, then verify with `npx usetrace verify`.');
+    logInfo('Make sure your TraceIQ API is running, then verify with `npx traceiq-cli verify`.');
     const report = installer.createReport(state, changes, selectedProducts, 'skipped');
     renderSetupReport(report);
     return;
@@ -232,7 +232,7 @@ export async function runCli(args: string[] = []): Promise<void> {
     console.log(`\n  ${colors.yellow('Troubleshooting:')}`);
     console.log(`  1. Confirm your development server is running and accessible.`);
     console.log(`  2. Ensure NEXT_PUBLIC_TRACEIQ_API_URL or TRACEIQ_API_URL points to ${defaultApiUrl}.`);
-    console.log(`  3. Run ${colors.bold('npx usetrace verify')} once your app is active.`);
+    console.log(`  3. Run ${colors.bold('npx traceiq-cli verify')} once your app is active.`);
 
     const report = installer.createReport(state, changes, selectedProducts, 'timeout');
     renderSetupReport(report);
