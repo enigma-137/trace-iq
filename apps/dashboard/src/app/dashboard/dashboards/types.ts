@@ -47,7 +47,7 @@ export const RECOMMENDED_TEMPLATES: DashboardTemplate[] = [
     iconName: 'product',
     definition: {
       source: 'trend',
-      event: '$pageview',
+      event: '*',
       interval: 'day',
       days: '30',
       measure: 'unique'
@@ -62,11 +62,11 @@ export const RECOMMENDED_TEMPLATES: DashboardTemplate[] = [
     iconName: 'acquisition',
     definition: {
       source: 'trend',
-      event: '$pageview',
+      event: '*',
       interval: 'day',
       days: '30',
       measure: 'count',
-      breakdown: '$initial_referrer'
+      breakdown: '$referrer'
     }
   },
   {
@@ -74,11 +74,11 @@ export const RECOMMENDED_TEMPLATES: DashboardTemplate[] = [
     name: 'Retention',
     description: 'Measure user return cadence, weekly cohort stickiness, and recurring feature engagement over time.',
     category: 'Engagement',
-    badge: '30d · Identified users',
+    badge: '30d · Active users',
     iconName: 'retention',
     definition: {
       source: 'trend',
-      event: '$identify',
+      event: '*',
       interval: 'day',
       days: '30',
       measure: 'unique'

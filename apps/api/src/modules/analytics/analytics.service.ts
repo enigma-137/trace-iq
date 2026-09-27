@@ -703,7 +703,7 @@ export class AnalyticsService {
           count(*)::int AS total,
           count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS actors
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
+        WHERE project_id = $1
         GROUP BY event_name
         ORDER BY total DESC
         LIMIT 200
@@ -728,7 +728,8 @@ export class AnalyticsService {
       eventFilter = ` AND e.event_name = $2`;
     }
 
-    const result = await this.database.query<{ key: string; sampleType: string; occurrences: number }>(
+    // 1. Discover custom jsonb properties
+    const customPropsResult = await this.database.query<{ key: string; sampleType: string; occurrences: number }>(
       `
         SELECT
           p.key AS key,
@@ -737,7 +738,6 @@ export class AnalyticsService {
         FROM events e,
         LATERAL jsonb_each(COALESCE(e.properties, '{}'::jsonb)) p
         WHERE e.project_id = $1 ${eventFilter}
-          AND e.occurred_at >= now() - interval '30 days'
         GROUP BY p.key, jsonb_typeof(p.value)
         ORDER BY occurrences DESC
         LIMIT 100
@@ -745,7 +745,63 @@ export class AnalyticsService {
       params
     );
 
-    return { project, properties: result.rows };
+    // 2. Discover standard context dimensions that actually exist with values in the project telemetry
+    const dimensionsResult = await this.database.query<{
+      has_os: number;
+      has_browser: number;
+      has_device: number;
+      has_country: number;
+      has_city: number;
+      has_region: number;
+      has_path: number;
+      has_referrer: number;
+    }>(
+      `
+        SELECT
+          count(*) FILTER (WHERE NULLIF(e.device_info->>'os', '') IS NOT NULL)::int AS has_os,
+          count(*) FILTER (WHERE NULLIF(e.device_info->>'browser', '') IS NOT NULL)::int AS has_browser,
+          count(*) FILTER (WHERE NULLIF(COALESCE(e.device_info->>'deviceType', e.device_info->>'device'), '') IS NOT NULL)::int AS has_device,
+          count(*) FILTER (WHERE NULLIF(e.network_info->>'country', '') IS NOT NULL)::int AS has_country,
+          count(*) FILTER (WHERE NULLIF(e.network_info->>'city', '') IS NOT NULL)::int AS has_city,
+          count(*) FILTER (WHERE NULLIF(e.network_info->>'region', '') IS NOT NULL)::int AS has_region,
+          count(*) FILTER (WHERE NULLIF(e.context->'page'->>'path', '') IS NOT NULL)::int AS has_path,
+          count(*) FILTER (WHERE NULLIF(e.context->'page'->>'referrer', '') IS NOT NULL)::int AS has_referrer
+        FROM events e
+        WHERE e.project_id = $1 ${eventFilter}
+      `,
+      params
+    );
+
+    const dimRow = dimensionsResult.rows[0];
+    const standardProps: Array<{ key: string; sampleType: string; occurrences: number }> = [];
+
+    if (dimRow) {
+      if (dimRow.has_browser > 0) standardProps.push({ key: 'browser', sampleType: 'string', occurrences: dimRow.has_browser });
+      if (dimRow.has_os > 0) standardProps.push({ key: 'os', sampleType: 'string', occurrences: dimRow.has_os });
+      if (dimRow.has_path > 0) standardProps.push({ key: 'path', sampleType: 'string', occurrences: dimRow.has_path });
+      if (dimRow.has_country > 0) standardProps.push({ key: 'country', sampleType: 'string', occurrences: dimRow.has_country });
+      if (dimRow.has_device > 0) standardProps.push({ key: 'device_type', sampleType: 'string', occurrences: dimRow.has_device });
+      if (dimRow.has_city > 0) standardProps.push({ key: 'city', sampleType: 'string', occurrences: dimRow.has_city });
+      if (dimRow.has_region > 0) standardProps.push({ key: 'region', sampleType: 'string', occurrences: dimRow.has_region });
+      if (dimRow.has_referrer > 0) standardProps.push({ key: 'referrer', sampleType: 'string', occurrences: dimRow.has_referrer });
+    }
+
+    if (!eventName || eventName === '*' || eventName === '$all' || eventName === 'all') {
+      standardProps.unshift({ key: '$event_name', sampleType: 'string', occurrences: 1 });
+    }
+
+    const seen = new Set<string>();
+    const merged: Array<{ key: string; sampleType: string; occurrences: number }> = [];
+
+    for (const p of [...standardProps, ...customPropsResult.rows]) {
+      const lower = p.key.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        merged.push(p);
+      }
+    }
+
+    return { project, properties: merged };
   }
 
   async getTrends(

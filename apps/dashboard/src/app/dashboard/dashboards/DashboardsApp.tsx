@@ -86,7 +86,7 @@ export function DashboardsApp({
   // Create Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
-  const [createEvent, setCreateEvent] = useState('$pageview');
+  const [createEvent, setCreateEvent] = useState('*');
   const [createMeasure, setCreateMeasure] = useState('count');
   const [createDays, setCreateDays] = useState('30');
   const [createInterval, setCreateInterval] = useState<'hour' | 'day' | 'week'>('day');
@@ -189,7 +189,7 @@ export function DashboardsApp({
     } else {
       setSelectedTemplatePreset(null);
       setCreateName('');
-      setCreateEvent('$pageview');
+      setCreateEvent('*');
       setCreateMeasure('count');
       setCreateDays('30');
       setCreateInterval('day');
@@ -208,7 +208,7 @@ export function DashboardsApp({
     try {
       const definition: TrendDefinition = {
         source: 'trend',
-        event: createEvent.trim() || '$pageview',
+        event: createEvent.trim() || '*',
         measure: createMeasure,
         interval: createInterval,
         days: createDays

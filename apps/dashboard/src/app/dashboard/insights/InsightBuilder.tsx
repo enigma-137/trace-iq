@@ -20,6 +20,7 @@ import type {
   InsightVisualizationConfig,
   InsightDateConfig
 } from '@/types/analytics';
+import { InsightTypeIcon } from '@/components/insights/InsightTypeIcon';
 import { InsightChartRenderer } from '@/components/charts/InsightChartRenderer';
 import { AddToDashboardModal } from '@/components/dashboards/AddToDashboardModal';
 import { toast } from '@/lib/toast';
@@ -33,12 +34,12 @@ interface InsightBuilderProps {
 }
 
 const VISUALIZATIONS: Array<{ id: VisualizationType; label: string; icon: string }> = [
-  { id: 'line', label: 'Line', icon: 'M4 19L9 14L14 17L20 7' },
-  { id: 'area', label: 'Area', icon: 'M4 19L9 14L14 17L20 7v12H4z' },
-  { id: 'bar', label: 'Bar', icon: 'M4 20h16M7 20V10m5 10V4m5 10V8' },
+  { id: 'line', label: 'Line', icon: 'M3 17l6-6 4 4 8-8' },
+  { id: 'area', label: 'Area', icon: 'M3 17l6-6 4 4 8-8v10H3z' },
+  { id: 'bar', label: 'Bar', icon: 'M4 20h16M7 20V12m5 8V6m5 14v-9' },
   { id: 'donut', label: 'Donut', icon: 'M11 3.055A9 9 0 1020.945 13H11V3.055z' },
-  { id: 'kpi', label: 'KPI', icon: 'M7 7h10v10H7z' },
-  { id: 'table', label: 'Table', icon: 'M3 10h18M3 14h18M3 6h18v12H3z' }
+  { id: 'kpi', label: 'KPI', icon: 'M4 5h16v14H4z M8 12h4m-4-3h8' },
+  { id: 'table', label: 'Table', icon: 'M3 4h18v16H3V4zM3 10h18M10 4v16' }
 ];
 
 export function InsightBuilder({
@@ -291,30 +292,33 @@ export function InsightBuilder({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-3 border-b border-neutral-200 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Link
-              href={withProjectId('/dashboard/insights', projectId)}
-              className="text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
-            >
-              ← Insights
-            </Link>
-            <span className="text-neutral-300 dark:text-neutral-700">/</span>
+        <div className="flex items-center gap-3">
+          <InsightTypeIcon type={type} size="md" />
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <Link
+                href={withProjectId('/dashboard/insights', projectId)}
+                className="text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
+              >
+                ← Insights
+              </Link>
+              <span className="text-neutral-300 dark:text-neutral-700">/</span>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Insight name..."
+                className="rounded bg-transparent px-1.5 py-0.5 text-base font-semibold text-neutral-900 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
+              />
+            </div>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Insight name..."
-              className="rounded bg-transparent px-1.5 py-0.5 text-base font-semibold text-neutral-900 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add a description for this chart..."
+              className="w-full max-w-lg rounded bg-transparent px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-neutral-400 dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
             />
           </div>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add a description for this chart..."
-            className="w-full max-w-lg rounded bg-transparent px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-neutral-400 dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
-          />
         </div>
 
         <div className="flex items-center gap-2">
@@ -382,24 +386,25 @@ export function InsightBuilder({
                     <label className="font-medium text-neutral-700 dark:text-neutral-300">Event / Metric</label>
                     {availableEvents.length > 0 && (
                       <span className="text-[10px] text-neutral-400">
-                        {availableEvents.length} events in project
+                        {availableEvents.length} events found
                       </span>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    list="project-events-list"
+                  <select
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
-                    placeholder="* (All Events), letter_published, $pageview..."
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
-                  />
-                  <datalist id="project-events-list">
-                    <option value="*" label="* (All Events)" />
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                  >
+                    <option value="*">* (All Events)</option>
                     {availableEvents.map((e) => (
-                      <option key={e.eventName} value={e.eventName} label={`${e.eventName} (${e.total} events)`} />
+                      <option key={e.eventName} value={e.eventName}>
+                        {e.eventName} ({e.total} events)
+                      </option>
                     ))}
-                  </datalist>
+                    {event && event !== '*' && !availableEvents.some((e) => e.eventName === event) && (
+                      <option value={event}>{event}</option>
+                    )}
+                  </select>
                 </div>
               )}
 
@@ -424,19 +429,21 @@ export function InsightBuilder({
               {(measure === 'avg' || measure === 'sum') && (
                 <div>
                   <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Property</label>
-                  <input
-                    type="text"
-                    list="project-properties-list"
+                  <select
                     value={property}
                     onChange={(e) => setProperty(e.target.value)}
-                    placeholder="e.g., duration_ms, amount, score"
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
-                  />
-                  <datalist id="project-properties-list">
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                  >
+                    <option value="">Select numeric property...</option>
                     {availableProperties.map((p) => (
-                      <option key={p.key} value={p.key} label={`${p.key} (${p.sampleType})`} />
+                      <option key={p.key} value={p.key}>
+                        {p.key} ({p.sampleType})
+                      </option>
                     ))}
-                  </datalist>
+                    {property && !availableProperties.some((p) => p.key === property) && (
+                      <option value={property}>{property}</option>
+                    )}
+                  </select>
                 </div>
               )}
 
@@ -444,25 +451,25 @@ export function InsightBuilder({
               {type !== 'funnel' && type !== 'retention' && (
                 <div>
                   <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Breakdown By</label>
-                  <input
-                    type="text"
-                    list="project-breakdown-list"
+                  <select
                     value={breakdown}
                     onChange={(e) => setBreakdown(e.target.value)}
-                    placeholder="e.g., $event_name, $os, $browser, $device"
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
-                  />
-                  <datalist id="project-breakdown-list">
-                    <option value="$event_name" label="Event Name ($event_name)" />
-                    <option value="$os" label="Operating System ($os)" />
-                    <option value="$browser" label="Browser ($browser)" />
-                    <option value="$device" label="Device Type ($device)" />
-                    <option value="$country" label="Country ($country)" />
-                    <option value="$path" label="Page Path ($path)" />
-                    {availableProperties.map((p) => (
-                      <option key={p.key} value={p.key} label={`Property: ${p.key}`} />
-                    ))}
-                  </datalist>
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                  >
+                    <option value="">(None)</option>
+                    {availableProperties.map((p) => {
+                      const isDimension = ['os', 'browser', 'device_type', 'country', 'city', 'region', 'path', 'referrer', '$event_name'].includes(p.key);
+                      const label = isDimension ? `${p.key} (dimension)` : `${p.key} (${p.sampleType})`;
+                      return (
+                        <option key={p.key} value={p.key}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                    {breakdown && !availableProperties.some((p) => p.key === breakdown) && (
+                      <option value={breakdown}>{breakdown}</option>
+                    )}
+                  </select>
                 </div>
               )}
 
@@ -525,14 +532,14 @@ export function InsightBuilder({
                     key={vis.id}
                     type="button"
                     onClick={() => setChartType(vis.id)}
-                    className={`flex flex-col items-center justify-center gap-1.5 rounded-md border p-2 text-xs transition ${
+                    className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-3 text-xs transition-all ${
                       isSelected
-                        ? 'border-blue-500/50 bg-blue-50/80 font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
-                        : 'border-neutral-200 bg-neutral-50/40 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-850/40 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                        ? 'border-blue-500 bg-blue-50/80 font-semibold text-blue-700 shadow-sm ring-1 ring-blue-500 dark:bg-blue-950/50 dark:text-blue-300'
+                        : 'border-neutral-200 bg-neutral-50/40 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-850/40 dark:text-neutral-400 dark:hover:bg-neutral-800'
                     }`}
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={vis.icon} />
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={vis.icon} />
                     </svg>
                     <span>{vis.label}</span>
                   </button>

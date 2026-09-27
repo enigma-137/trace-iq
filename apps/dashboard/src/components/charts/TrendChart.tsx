@@ -48,7 +48,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
   const plotWidth = WIDTH - PAD.left - PAD.right;
   const plotHeight = HEIGHT - PAD.top - PAD.bottom;
 
-  const maxY = Math.max(1, ...series.flatMap((s) => s.points.map((p) => p.value)));
+  const maxY = Math.max(1, ...series.flatMap((s) => s.points.map((p) => Number(p.value ?? p.total ?? 0))));
   const stepCount = Math.max(buckets.length - 1, 1);
 
   const xFor = (index: number) => PAD.left + (index / stepCount) * plotWidth;
@@ -56,7 +56,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
 
   const gridValues = [0, maxY / 2, maxY];
   const labelIndexes = pickLabelIndexes(buckets.length);
-  const total = series.reduce((sum, s) => sum + s.points.reduce((inner, p) => inner + p.value, 0), 0);
+  const total = series.reduce((sum, s) => sum + s.points.reduce((inner, p) => inner + Number(p.value ?? p.total ?? 0), 0), 0);
 
   if (total === 0) {
     return (
@@ -130,7 +130,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
           {series.map((s, seriesIndex) => {
             const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
             const path = s.points
-              .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(point.value)}`)
+              .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(Number(point.value ?? point.total ?? 0))}`)
               .join(' ');
             return (
               <path
@@ -163,7 +163,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                   <circle
                     key={s.key}
                     cx={xFor(hover)}
-                    cy={yFor(s.points[hover].value)}
+                    cy={yFor(Number(s.points[hover].value ?? s.points[hover].total ?? 0))}
                     r={3.5}
                     className={`${style.fill} stroke-white dark:stroke-slate-950`}
                     strokeWidth={1.5}
@@ -197,7 +197,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                         className="fill-neutral-900 text-[11px] dark:fill-white"
                       >
                         <tspan className="fill-neutral-500 dark:fill-slate-400">{truncate(s.key)}: </tspan>
-                        {fmt(s.points[hover].value)}
+                        {fmt(Number(s.points[hover].value ?? s.points[hover].total ?? 0))}
                       </text>
                     ))}
                   </g>
@@ -212,7 +212,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
         <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
           {series.map((s, seriesIndex) => {
             const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
-            const seriesTotal = s.points.reduce((sum, p) => sum + p.value, 0);
+            const seriesTotal = s.points.reduce((sum, p) => sum + Number(p.value ?? p.total ?? 0), 0);
             return (
               <li key={s.key} className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
                 <svg width="20" height="8" aria-hidden>

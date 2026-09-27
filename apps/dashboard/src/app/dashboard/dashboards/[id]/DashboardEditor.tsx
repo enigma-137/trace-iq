@@ -19,7 +19,10 @@ import type {
   DashboardWidgetView,
   SavedInsightView
 } from '@/types/analytics';
+import { InsightTypeIcon } from '@/components/insights/InsightTypeIcon';
 import { InsightChartRenderer } from '@/components/charts/InsightChartRenderer';
+import { EmptyDashboardBuilder } from '../EmptyDashboardBuilder';
+import { NewDashboardModal } from '../NewDashboardModal';
 import { DashboardDialog } from '../../DashboardDialog';
 import { toast } from '@/lib/toast';
 
@@ -41,7 +44,8 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
   const [draggedWidgetIndex, setDraggedWidgetIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // Add Chart Drawer / Modal state
+  // Modals state
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
   const [availableInsights, setAvailableInsights] = useState<SavedInsightView[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -295,24 +299,22 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
 
       {/* Main Responsive Grid Canvas */}
       {widgets.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white p-12 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="mb-3 rounded-full bg-blue-50 p-3 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">This dashboard has no charts</h3>
-          <p className="mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-            Add saved insights from your project or build a new chart to monitor here.
-          </p>
-          <button
-            type="button"
-            onClick={() => setIsAddChartOpen(true)}
-            className="mt-4 rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
-          >
-            + Add first chart
-          </button>
-        </div>
+        <EmptyDashboardBuilder
+          dashboardId={dashboard.id}
+          projectId={projectId}
+          onAddExistingChart={() => setIsAddChartOpen(true)}
+          onBrowseTemplates={() => setIsTemplateModalOpen(true)}
+          onWidgetAdded={(w) => setWidgets((prev) => [...prev, w])}
+          onCreateNewInsight={(starterQuestion) => {
+            const query = starterQuestion ? `&goal=${encodeURIComponent(starterQuestion)}` : '';
+            router.push(
+              withProjectId(
+                `/dashboard/insights/new?returnDashboardId=${dashboard.id}${query}`,
+                projectId
+              )
+            );
+          }}
+        />
       ) : (
         <div className="grid grid-cols-12 gap-4">
           {widgets.map((widget, idx) => {
@@ -535,6 +537,15 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
           </div>
         </DashboardDialog>
       )}
+
+      {/* Browse / Instantiate Templates Dialog */}
+      {isTemplateModalOpen && (
+        <NewDashboardModal
+          isOpen={isTemplateModalOpen}
+          onClose={() => setIsTemplateModalOpen(false)}
+          projectId={projectId}
+        />
+      )}
     </div>
   );
 }
@@ -658,7 +669,7 @@ function DashboardWidgetCard({
   return (
     <div
       ref={cardRef}
-      className={`group relative flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition-all dark:border-neutral-800 dark:bg-neutral-900 ${
+      className={`group relative flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 ${
         isResizing ? 'ring-2 ring-blue-500' : ''
       }`}
     >
@@ -677,6 +688,8 @@ function DashboardWidgetCard({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
             </svg>
           </div>
+
+          <InsightTypeIcon type={type} size="sm" />
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

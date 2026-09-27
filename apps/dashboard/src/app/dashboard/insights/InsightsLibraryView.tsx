@@ -13,6 +13,7 @@ import {
 import type { SavedInsightView, InsightType } from '@/types/analytics';
 import { AddToDashboardModal } from '@/components/dashboards/AddToDashboardModal';
 import { DashboardDialog } from '../DashboardDialog';
+import { InsightTypeIcon } from '@/components/insights/InsightTypeIcon';
 import { toast } from '@/lib/toast';
 
 const INSIGHT_TYPE_LABELS: Record<string, string> = {
@@ -274,29 +275,34 @@ export function InsightsLibraryView({
                       className="group transition hover:bg-neutral-50/50 dark:hover:bg-neutral-850/30"
                     >
                       <td className="py-3 pl-4 pr-3">
-                        <Link
-                          href={withProjectId(`/dashboard/insights/${insight.id}`, projectId)}
-                          className="font-medium text-neutral-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
-                        >
-                          {insight.name}
-                        </Link>
-                        {insight.description && (
-                          <div className="line-clamp-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-                            {insight.description}
+                        <div className="flex items-start gap-3">
+                          <InsightTypeIcon type={insight.type} size="md" className="mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <Link
+                              href={withProjectId(`/dashboard/insights/${insight.id}`, projectId)}
+                              className="font-medium text-neutral-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
+                            >
+                              {insight.name}
+                            </Link>
+                            {insight.description && (
+                              <div className="line-clamp-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                                {insight.description}
+                              </div>
+                            )}
+                            {insight.tags && insight.tags.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {insight.tags.map((t) => (
+                                  <span
+                                    key={t}
+                                    className="rounded bg-neutral-100 px-1.5 py-0.2 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {insight.tags && insight.tags.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {insight.tags.map((t) => (
-                              <span
-                                key={t}
-                                className="rounded bg-neutral-100 px-1.5 py-0.2 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium ${badgeClass}`}>

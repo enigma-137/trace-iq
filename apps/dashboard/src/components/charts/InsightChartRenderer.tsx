@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useId, useRef, useState } from 'react';
+import React, { useId, useState } from 'react';
+import Link from 'next/link';
 import { TrendChart } from './TrendChart';
 import { BarChart } from './BarChart';
 import { DonutChart } from './DonutChart';
 import { FunnelChart } from './FunnelChart';
-import type { InsightType, VisualizationType, InsightVisualizationConfig } from '@/types/analytics';
-import { compactNumber, formatCount } from '@/lib/metrics';
+import type { InsightType, VisualizationType, InsightVisualizationConfig } from '../../types/analytics';
+import { compactNumber, formatCount } from '../../lib/metrics';
 
 export interface InsightChartRendererProps {
   type?: InsightType;
@@ -18,19 +19,29 @@ export interface InsightChartRendererProps {
   onConfigure?: () => void;
   className?: string;
   height?: number;
+  projectId?: string;
+  eventName?: string;
+  propertyName?: string;
 }
+
+import { normalizeInsightData } from '../../lib/insightNormalization';
+export { normalizeInsightData };
 
 export function InsightChartRenderer({
   type = 'trend',
   visualization = {},
-  data,
+  data: rawData,
   loading = false,
   error = null,
   onRetry,
   onConfigure,
   className = '',
-  height = 240
+  height = 240,
+  projectId,
+  eventName,
+  propertyName
 }: InsightChartRendererProps) {
+  // Skeleton loading state
   if (loading) {
     return (
       <div className={`flex w-full flex-col justify-center space-y-3 p-4 ${className}`} style={{ minHeight: height }}>
@@ -51,6 +62,7 @@ export function InsightChartRenderer({
     );
   }
 
+  // Contextual Empty State 1: Query failed
   if (error) {
     return (
       <div
@@ -62,13 +74,13 @@ export function InsightChartRenderer({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">Failed to calculate chart</p>
+        <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Query failed</p>
         <p className="mt-1 max-w-sm text-[11px] text-neutral-500 dark:text-neutral-400">{error}</p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+            className="mt-3 rounded border border-neutral-300 bg-white px-3 py-1 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
           >
             Retry
           </button>
@@ -77,19 +89,21 @@ export function InsightChartRenderer({
     );
   }
 
-  // Check for project-specific unconfigured funnel or metric
+  const data = normalizeInsightData(rawData, type);
+
+  // Contextual Empty State 2: Chart needs configuration (Funnel or unconfigured product metric)
   if (type === 'funnel' && (!data || !data.steps || data.steps.length === 0)) {
     return (
       <div
         className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-neutral-50/30 p-6 text-center dark:border-neutral-800 dark:bg-neutral-900/20 ${className}`}
         style={{ minHeight: height }}
       >
-        <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 4h18l-6.5 8.5v6.5l-5-2.5v-4L3 4z" />
           </svg>
         </div>
-        <p className="text-xs font-semibold text-neutral-900 dark:text-white">Configure this chart</p>
+        <p className="text-xs font-semibold text-neutral-900 dark:text-white">This chart needs configuration</p>
         <p className="mt-1 max-w-xs text-[11px] text-neutral-500 dark:text-neutral-400">
           Choose the event(s) that represent this metric for your product.
         </p>
@@ -97,7 +111,7 @@ export function InsightChartRenderer({
           <button
             type="button"
             onClick={onConfigure}
-            className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+            className="mt-3 rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
           >
             Configure
           </button>
@@ -106,34 +120,88 @@ export function InsightChartRenderer({
     );
   }
 
-  // Check for API performance without telemetry
-  if (type === 'api_performance' && data && (!data.summary || data.summary.totalRequests === 0)) {
+  // Contextual Empty State 3: API performance telemetry is not instrumented
+  if (type === 'api_performance' && (!data || !data.summary || data.summary.totalRequests === 0)) {
     return (
       <div
         className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-neutral-50/20 p-6 text-center dark:border-neutral-800 dark:bg-neutral-900/10 ${className}`}
         style={{ minHeight: height }}
       >
-        <div className="mb-2 text-neutral-400 dark:text-neutral-500">
-          <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+        <div className="mb-2 text-cyan-500 dark:text-cyan-400">
+          <svg className="mx-auto h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
         </div>
-        <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">No API performance telemetry has been received</p>
+        <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">API performance telemetry is not instrumented</p>
         <p className="mt-1 max-w-xs text-[11px] text-neutral-500 dark:text-neutral-400">
           Capture endpoint latency and HTTP status using the TraceIQ backend SDK.
         </p>
+        <Link
+          href={`/dashboard/setup${projectId ? `?projectId=${projectId}` : ''}`}
+          className="mt-3 inline-flex items-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+        >
+          View setup guide
+        </Link>
       </div>
     );
   }
 
-  if (!data) {
+  // Contextual Empty State 4: Selected property does not exist
+  if (propertyName && propertyName.trim() && data && (!data.series || data.series.length === 0) && (!data.items || data.items.length === 0)) {
     return (
       <div
-        className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 p-6 text-center text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-500 ${className}`}
+        className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 p-6 text-center text-xs dark:border-neutral-800 ${className}`}
         style={{ minHeight: height }}
       >
-        <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">No events received in this time range</p>
-        <p className="mt-1 text-[11px] text-neutral-400 dark:text-neutral-500">Change date range to view earlier telemetry.</p>
+        <p className="font-semibold text-neutral-800 dark:text-neutral-200">Selected property does not exist</p>
+        <p className="mt-1 max-w-xs text-[11px] text-neutral-500 dark:text-neutral-400">
+          Property &quot;{propertyName}&quot; was not found in matching telemetry.
+        </p>
+        {onConfigure && (
+          <button
+            type="button"
+            onClick={onConfigure}
+            className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+          >
+            Choose property
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Check if data is completely missing or empty
+  if (!data) {
+    if (eventName && eventName !== '*' && eventName !== '$all') {
+      return (
+        <div
+          className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 p-6 text-center text-xs dark:border-neutral-800 ${className}`}
+          style={{ minHeight: height }}
+        >
+          <p className="font-semibold text-neutral-800 dark:text-neutral-200">Selected event has no matching rows</p>
+          <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+            No events named &quot;{eventName}&quot; were recorded in this project.
+          </p>
+          {onConfigure && (
+            <button
+              type="button"
+              onClick={onConfigure}
+              className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+            >
+              Choose event
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 p-6 text-center text-xs dark:border-neutral-800 ${className}`}
+        style={{ minHeight: height }}
+      >
+        <p className="font-semibold text-neutral-800 dark:text-neutral-200">No telemetry in this date range</p>
+        <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">Change date range to view earlier telemetry.</p>
       </div>
     );
   }
@@ -154,25 +222,49 @@ export function InsightChartRenderer({
 
   // 1. KPI / Number View
   if (chartType === 'kpi' || chartType === 'number') {
-    let value = data.value ?? data.current ?? data.summary?.current;
-    if (value === undefined && Array.isArray(data.series)) {
-      value = data.series.reduce((sum: number, s: any) => {
-        return sum + (s.points || []).reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0);
+    let rawValue = data.value;
+    if (rawValue === undefined) {
+      if (typeof data.current === 'number') {
+        rawValue = data.current;
+      } else if (data.current && typeof data.current === 'object') {
+        rawValue = data.current.visitors ?? data.current.pageviews ?? data.current.total ?? data.current.count ?? data.current.value;
+      }
+    }
+    if (rawValue === undefined) {
+      if (typeof data.summary?.current === 'number') {
+        rawValue = data.summary.current;
+      } else if (data.summary?.current && typeof data.summary.current === 'object') {
+        rawValue = data.summary.current.visitors ?? data.summary.current.pageviews ?? data.summary.current.total ?? data.summary.current.count;
+      }
+    }
+    if (rawValue === undefined) {
+      rawValue = data.totalRequests ?? data.summary?.totalRequests ?? data.totalVisitors ?? data.totalViews;
+    }
+    if (rawValue === undefined && Array.isArray(data.series)) {
+      rawValue = data.series.reduce((sum: number, s: any) => {
+        return sum + (s.points || []).reduce((acc: number, p: any) => acc + Number(p.value ?? p.total ?? 0), 0);
       }, 0);
     }
-    if (value === undefined && Array.isArray(data.items)) {
-      value = data.items.reduce((acc: number, i: any) => acc + (i.value || 0), 0);
+    if (rawValue === undefined && Array.isArray(data.items)) {
+      rawValue = data.items.reduce((acc: number, i: any) => acc + Number(i.value ?? 0), 0);
     }
-    if (value === undefined && Array.isArray(data.issues)) {
-      value = data.issues.reduce((acc: number, i: any) => acc + (i.occurrences || 0), 0);
+    if (rawValue === undefined && Array.isArray(data.issues)) {
+      rawValue = data.issues.reduce((acc: number, i: any) => acc + Number(i.occurrences ?? 0), 0);
     }
-    if (value === undefined) value = 0;
+    const value = typeof rawValue === 'number' ? rawValue : typeof rawValue === 'string' ? rawValue : 0;
 
-    const previous = data.previous ?? data.summary?.previous;
+    const rawPrev = data.previous ?? data.summary?.previous;
+    const previous =
+      typeof rawPrev === 'number'
+        ? rawPrev
+        : rawPrev && typeof rawPrev === 'object'
+          ? (rawPrev.visitors ?? rawPrev.pageviews ?? rawPrev.total ?? rawPrev.count ?? rawPrev.value)
+          : undefined;
+
     const label = data.label || visualization?.unit || (data.series?.length === 1 ? data.series[0].key : '');
     let delta = 0;
     let deltaFormatted = '';
-    if (typeof previous === 'number' && previous > 0) {
+    if (typeof value === 'number' && typeof previous === 'number' && previous > 0) {
       delta = ((value - previous) / previous) * 100;
       deltaFormatted = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
     }
@@ -181,7 +273,7 @@ export function InsightChartRenderer({
       <div className={`flex w-full flex-col justify-center p-4 ${className}`} style={{ minHeight: height }}>
         <div className="flex items-baseline gap-3">
           <div className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-            {typeof value === 'number' ? compactNumber(value) : value}
+            {typeof value === 'number' ? compactNumber(value) : String(value ?? 0)}
           </div>
           {deltaFormatted && (
             <span
@@ -345,7 +437,7 @@ export function InsightChartRenderer({
                   const val = row[col];
                   return (
                     <td key={col} className="px-3 py-2 font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
-                      {typeof val === 'number' ? val.toLocaleString() : String(val ?? '')}
+                      {typeof val === 'number' ? val.toLocaleString() : typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val ?? '')}
                     </td>
                   );
                 })}
@@ -383,7 +475,7 @@ export function InsightChartRenderer({
     if (items.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-neutral-400" style={{ minHeight: height }}>
-          <p className="font-medium text-neutral-700 dark:text-neutral-300">No dimension data recorded</p>
+          <p className="font-semibold text-neutral-800 dark:text-neutral-200">No dimension data recorded</p>
           <p className="mt-1 text-[11px] text-neutral-500">Capture device and client context with events.</p>
         </div>
       );
@@ -432,11 +524,14 @@ export function InsightChartRenderer({
   // 7. Area Chart
   if (chartType === 'area') {
     if (data.buckets && data.series && data.series.length > 0) {
-      return (
-        <div className={`w-full ${className}`}>
-          <AreaChart buckets={data.buckets} series={data.series} interval={data.interval || 'day'} height={height} />
-        </div>
-      );
+      const totalPoints = data.series.reduce((sum: number, s: any) => sum + (s.points || []).reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0), 0);
+      if (totalPoints > 0) {
+        return (
+          <div className={`w-full ${className}`}>
+            <AreaChart buckets={data.buckets} series={data.series} interval={data.interval || 'day'} height={height} />
+          </div>
+        );
+      }
     }
   }
 
@@ -445,12 +540,15 @@ export function InsightChartRenderer({
     const buckets: string[] = data.buckets;
     const series = data.series;
     const interval = data.interval || 'day';
+    const totalPoints = series.reduce((sum: number, s: any) => sum + (s.points || []).reduce((acc: number, p: any) => acc + (p.value || p.total || 0), 0), 0);
 
-    return (
-      <div className={`w-full ${className}`}>
-        <TrendChart buckets={buckets} series={series} interval={interval} />
-      </div>
-    );
+    if (totalPoints > 0) {
+      return (
+        <div className={`w-full ${className}`}>
+          <TrendChart buckets={buckets} series={series} interval={interval} />
+        </div>
+      );
+    }
   }
 
   // Fallback if items array exists
@@ -464,8 +562,8 @@ export function InsightChartRenderer({
 
   return (
     <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-neutral-400" style={{ minHeight: height }}>
-      <p className="font-medium text-neutral-700 dark:text-neutral-300">No chart data available</p>
-      <p className="mt-1 text-[11px] text-neutral-500">Change date range or check event telemetry.</p>
+      <p className="font-semibold text-neutral-800 dark:text-neutral-200">No telemetry in this date range</p>
+      <p className="mt-1 text-[11px] text-neutral-500">Change date range to view earlier telemetry.</p>
     </div>
   );
 }
@@ -568,10 +666,17 @@ function AreaChart({
         })}
 
         {/* X labels */}
-        {points.filter((_, i) => i === 0 || i === Math.floor(points.length / 2) || i === points.length - 1).map((p, i, arr) => {
+        {points.filter((_, i) => i === 0 || i === Math.floor(points.length / 2) || i === points.length - 1).map((p, i) => {
           const origIdx = points.indexOf(p);
           const cx = xFor(origIdx);
           const anchor = origIdx === 0 ? 'start' : origIdx === points.length - 1 ? 'end' : 'middle';
+          let label = p.bucket;
+          if (/^\d{4}-\d{2}-\d{2}/.test(label) || (!Number.isNaN(Date.parse(label)) && label.includes('-'))) {
+            const d = new Date(label);
+            if (!Number.isNaN(d.getTime())) {
+              label = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(d);
+            }
+          }
           return (
             <text
               key={i}
@@ -580,7 +685,7 @@ function AreaChart({
               textAnchor={anchor}
               className="fill-neutral-400 text-[10px] font-mono"
             >
-              {p.bucket}
+              {label}
             </text>
           );
         })}

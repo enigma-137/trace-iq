@@ -200,4 +200,123 @@ describe('Insights and Dashboards v2 System', () => {
     expect(postSaveWidgetPayload.insightId).toBe('ins_new_created_123');
     expect(typeof postSaveWidgetPayload.insightId).toBe('string');
   });
+
+  it('normalizes various insight response shapes for InsightChartRenderer', async () => {
+    const { normalizeInsightData } = await import('../src/lib/insightNormalization');
+
+    // 1. Nested data wrapper normalization
+    const wrappedResponse = {
+      data: {
+        buckets: ['2026-09-20', '2026-09-21'],
+        series: [
+          {
+            key: 'letter_published',
+            points: [
+              { bucket: '2026-09-20', total: 20, value: 20 },
+              { bucket: '2026-09-21', total: 28, value: 28 }
+            ]
+          }
+        ],
+        summary: { current: 48, previous: 30 }
+      }
+    };
+
+    const normalizedTrend = normalizeInsightData(wrappedResponse, 'trend');
+    expect(normalizedTrend?.buckets).toEqual(['2026-09-20', '2026-09-21']);
+    expect(normalizedTrend?.series[0].points[1].value).toBe(28);
+
+    // 2. Web analytics top referrers normalization to items
+    const webAnalyticsResponse = {
+      totalVisitors: 120,
+      totalViews: 450,
+      topReferrers: [
+        { referrer: 'google.com', count: 80 },
+        { referrer: 'direct', count: 40 }
+      ]
+    };
+
+    const normalizedWeb = normalizeInsightData(webAnalyticsResponse, 'web_analytics');
+    expect(normalizedWeb?.items).toEqual([
+      { label: 'google.com', value: 80 },
+      { label: 'direct', value: 40 }
+    ]);
+
+    // 3. API performance latencySeries normalization
+    const apiPerfResponse = {
+      summary: { totalRequests: 1500, p50: 45, p95: 120, p99: 250 },
+      latencySeries: [
+        { bucket: '2026-09-20', p50: 40, p95: 110, p99: 230 },
+        { bucket: '2026-09-21', p50: 50, p95: 130, p99: 270 }
+      ],
+      statusBreakdown: { ok200: 1450, rateLimit429: 30, error500: 20, other: 0 }
+    };
+
+    // 4. Web analytics WebTotals object normalization for KPI and charts
+    const webTotalsResponse = {
+      current: {
+        visitors: 120,
+        pageviews: 450,
+        sessions: 110,
+        avgSessionDuration: 45,
+        bounceRate: 0.3,
+        bandwidthBytes: 1024,
+        onlineNow: 5
+      },
+      previous: {
+        visitors: 100,
+        pageviews: 380,
+        sessions: 90,
+        avgSessionDuration: 40,
+        bounceRate: 0.35,
+        bandwidthBytes: 900,
+        onlineNow: 2
+      },
+      topBrowsers: [
+        { browser: 'Chrome', count: 90 },
+        { browser: 'Safari', count: 30 }
+      ]
+    };
+
+    const normalizedWebTotals = normalizeInsightData(webTotalsResponse, 'web_analytics');
+    expect(normalizedWebTotals?.value).toBe(120);
+    expect(normalizedWebTotals?.previous).toBe(100);
+    expect(normalizedWebTotals?.items).toEqual([
+      { label: 'Chrome', value: 90 },
+      { label: 'Safari', value: 30 }
+    ]);
+  });
+
+  it('validates empty dashboard builder state and starter question pathways', () => {
+    const emptyDashboard: DashboardView = {
+      id: 'dash_new_blank',
+      projectId: 'proj_traceiq',
+      name: 'Executive Overview',
+      description: 'Blank dashboard ready for widgets',
+      ownerId: 'user_1',
+      isShared: false,
+      isPinned: false,
+      tags: [],
+      filters: { days: '30' },
+      layout: [],
+      definition: {},
+      widgetsCount: 0,
+      widgets: [],
+      createdAt: '2026-09-27T07:00:00Z',
+      updatedAt: '2026-09-27T07:00:00Z'
+    };
+
+    expect(emptyDashboard.widgets?.length).toBe(0);
+
+    // Starter question mapping
+    const starterQuestions = [
+      { id: 'activity-week', q: 'What does user activity look like this week?', type: 'trend' },
+      { id: 'feature-adoption', q: 'How is my feature being adopted?', type: 'funnel' },
+      { id: 'retention-signup', q: 'What brings users back after they sign up?', type: 'retention' },
+      { id: 'activation-paths', q: 'Which paths lead users to activation?', type: 'funnel' }
+    ];
+
+    expect(starterQuestions.length).toBe(4);
+    expect(starterQuestions[0].type).toBe('trend');
+    expect(starterQuestions[2].type).toBe('retention');
+  });
 });

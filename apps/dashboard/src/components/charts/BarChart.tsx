@@ -36,6 +36,49 @@ function formatCompact(value: number): string {
   return String(value);
 }
 
+function formatBarLabel(label: string, detailed = false): string {
+  if (!label) return '';
+  // Check if string is an ISO date / date-like string
+  if (/^\d{4}-\d{2}-\d{2}/.test(label) || (!Number.isNaN(Date.parse(label)) && label.includes('-'))) {
+    const d = new Date(label);
+    if (!Number.isNaN(d.getTime())) {
+      if (label.includes('T') && !label.endsWith('00:00:00.000Z') && !label.endsWith('T00:00:00Z')) {
+        return new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: detailed ? 'numeric' : undefined,
+          timeZone: 'UTC'
+        }).format(d);
+      }
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: detailed ? 'numeric' : undefined,
+        timeZone: 'UTC'
+      }).format(d);
+    }
+  }
+
+  if (!detailed && label.length > 12) {
+    return `${label.slice(0, 11)}…`;
+  }
+  return label;
+}
+
+function pickBarLabelIndexes(count: number, maxLabels = 6): Set<number> {
+  const result = new Set<number>();
+  if (count <= 0) return result;
+  if (count <= maxLabels) {
+    for (let i = 0; i < count; i++) result.add(i);
+    return result;
+  }
+  const step = (count - 1) / (maxLabels - 1);
+  for (let i = 0; i < maxLabels; i++) {
+    result.add(Math.round(i * step));
+  }
+  return result;
+}
+
 export function BarChart({
   items,
   height = 200,
@@ -63,7 +106,7 @@ export function BarChart({
   const highlightColor = toneHighlight[tone];
   const gradId = `barchart-${uid}-${tone}`;
   const gradHoverId = `barchart-hover-${uid}-${tone}`;
-  const labelEvery = items.length > 14 ? 2 : 1;
+  const visibleLabelIndexes = pickBarLabelIndexes(items.length, 6);
 
   function updateHover(clientX: number) {
     const svg = svgRef.current;
@@ -158,7 +201,7 @@ export function BarChart({
               ) : null}
 
               {/* X-axis label */}
-              {i % labelEvery === 0 ? (
+              {visibleLabelIndexes.has(i) ? (
                 <text
                   x={x + barW / 2}
                   y={height - 8}
@@ -167,7 +210,7 @@ export function BarChart({
                   fontWeight={isHovered ? '600' : '400'}
                   fill={isHovered ? 'rgb(255 255 255)' : 'rgb(148 163 184)'}
                 >
-                  {item.label}
+                  {formatBarLabel(item.label)}
                 </text>
               ) : null}
             </g>
@@ -178,8 +221,8 @@ export function BarChart({
         {hoveredIndex !== null && items[hoveredIndex] ? (() => {
           const hoveredItem = items[hoveredIndex];
           const xCenter = hoveredIndex * slot + slot / 2;
-          const tipWidth = 110;
-          const tipHeight = 42;
+          const tipWidth = 124;
+          const tipHeight = 44;
           let tipX = xCenter - tipWidth / 2;
           // Keep tooltip inside horizontal margins
           if (tipX < 10) tipX = 10;
@@ -189,6 +232,8 @@ export function BarChart({
           const barTopY = padTop + chartH - barH;
           let tipY = barTopY - tipHeight - 8;
           if (tipY < 4) tipY = barTopY + 12; // Flip below if too high
+
+          const formattedTooltipLabel = formatBarLabel(hoveredItem.label, true);
 
           return (
             <g className="pointer-events-none transition-all duration-100">
@@ -202,7 +247,7 @@ export function BarChart({
                 strokeWidth={1}
               />
               <text x={tipX + tipWidth / 2} y={tipY + 16} textAnchor="middle" fontSize="10" fill="rgb(148 163 184)" fontWeight="500">
-                {hoveredItem.label}
+                {formattedTooltipLabel.length > 18 ? `${formattedTooltipLabel.slice(0, 17)}…` : formattedTooltipLabel}
               </text>
               <text x={tipX + tipWidth / 2} y={tipY + 32} textAnchor="middle" fontSize="12" fill="#ffffff" fontWeight="700">
                 {hoveredItem.value.toLocaleString()}{' '}

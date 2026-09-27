@@ -443,4 +443,90 @@ describe('now activity', () => {
       })
     ).rejects.toThrow('insightId or newInsight is required to add a widget.');
   });
+
+  it('discovers real event names and properties including telemetry context dimensions', async () => {
+    const db = mockDatabase((text, params) => {
+      if (/FROM\s+events/i.test(text)) {
+        if (/SELECT\s+event_name/i.test(text)) {
+          return rows([
+            { eventName: 'letter_published', total: 48, actors: 12 },
+            { eventName: 'letter_started', total: 110, actors: 25 },
+            { eventName: '$page', total: 320, actors: 50 }
+          ]);
+        }
+        if (/jsonb_each/i.test(text)) {
+          return rows([
+            { key: 'theme', sampleType: 'string', occurrences: 48 },
+            { key: 'word_count', sampleType: 'number', occurrences: 48 }
+          ]);
+        }
+        if (/has_os/i.test(text)) {
+          return rows([
+            {
+              has_os: 48,
+              has_browser: 48,
+              has_device: 40,
+              has_country: 45,
+              has_city: 30,
+              has_region: 20,
+              has_path: 48,
+              has_referrer: 15
+            }
+          ]);
+        }
+      }
+      return empty();
+    });
+
+    const projects = {
+      resolveActiveProject: vi.fn().mockResolvedValue(PROJECT),
+      requireActiveProject: vi.fn().mockResolvedValue(PROJECT)
+    } as unknown as ProjectsService;
+
+    const analyticsService = new (await import('../src/modules/analytics/analytics.service')).AnalyticsService(
+      db as unknown as DatabaseService,
+      projects
+    );
+    const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
+
+    // 1. List Event Names
+    const eventsRes = await analyticsService.listEventNames(user, 'proj1');
+    expect(eventsRes.eventNames.length).toBe(3);
+    expect(eventsRes.eventNames[0].eventName).toBe('letter_published');
+    expect(eventsRes.eventNames[0].total).toBe(48);
+
+    // 2. List Event Properties (returns standard telemetry dimensions + custom properties)
+    const propsRes = await analyticsService.listEventProperties(user, 'letter_published', 'proj1');
+    const propKeys = propsRes.properties.map((p) => p.key);
+
+    expect(propKeys).toContain('browser');
+    expect(propKeys).toContain('os');
+    expect(propKeys).toContain('path');
+    expect(propKeys).toContain('country');
+    expect(propKeys).toContain('device_type');
+    expect(propKeys).toContain('theme');
+    expect(propKeys).toContain('word_count');
+  });
+
+  it('validates universal dashboard templates use generic wildcard queries and canonical dimensions', async () => {
+    const { DASHBOARD_TEMPLATES } = await import('../src/modules/dashboards/dashboards.service');
+
+    const overviewTemplate = DASHBOARD_TEMPLATES.find((t) => t.id === 'project-overview');
+    expect(overviewTemplate).toBeDefined();
+
+    const osSplitWidget = overviewTemplate?.widgets.find((w) => w.title === 'Operating System Split');
+    expect(osSplitWidget).toBeDefined();
+    expect(osSplitWidget?.insight.query.event).toBe('*');
+    expect(osSplitWidget?.insight.query.breakdown).toBe('$os');
+
+    const totalEventsWidget = overviewTemplate?.widgets.find((w) => w.title === 'Total Ingested Events');
+    expect(totalEventsWidget).toBeDefined();
+    expect(totalEventsWidget?.insight.query.event).toBe('*');
+    expect(totalEventsWidget?.insight.query.measure).toBe('count');
+
+    const topEventsWidget = overviewTemplate?.widgets.find((w) => w.title === 'Top Events');
+    expect(topEventsWidget).toBeDefined();
+    expect(topEventsWidget?.insight.query.event).toBe('*');
+    expect(topEventsWidget?.insight.query.breakdown).toBe('$event_name');
+  });
 });
