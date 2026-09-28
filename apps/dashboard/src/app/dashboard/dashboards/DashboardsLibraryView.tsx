@@ -13,6 +13,8 @@ import {
 import type { DashboardView } from '@/types/analytics';
 import { NewDashboardModal } from './NewDashboardModal';
 import { DashboardDialog } from '../DashboardDialog';
+import { EmptyState } from '@/components/EmptyState';
+import { PageBanner } from '@/components/PageBanner';
 import { toast } from '@/lib/toast';
 
 export function DashboardsLibraryView({
@@ -132,38 +134,63 @@ export function DashboardsLibraryView({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Cloudflare/PostHog-style Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Dashboards</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
+            Dashboards
+          </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Create and manage your customized dashboard workspaces.
+            Create, customize, and share real-time analytics workspaces.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setIsNewModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500 active:scale-[0.98]"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" />
             </svg>
             New dashboard
           </button>
         </div>
       </div>
 
+      {/* Reusable In-App Banner */}
+      <PageBanner
+        dismissId="dashboards_banner_v1"
+        badge="Workspace Canvas"
+        title="Custom Analytics Dashboards"
+        description="Assemble charts, funnels, retention cohorts, and KPI meters into shared executive boards or private workspaces."
+        illustrationSrc="/dashboards/banner-create-dashboard.png"
+        illustrationAlt="Create Dashboard Banner Artwork"
+        primaryAction={{
+          label: 'Create dashboard',
+          onClick: () => setIsNewModalOpen(true),
+          icon: (
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          )
+        }}
+        secondaryAction={{
+          label: 'Browse insights',
+          href: withProjectId('/dashboard/insights', projectId)
+        }}
+      />
+
       {/* Control Bar */}
-      <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200/90 bg-white p-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center gap-1">
           {(['all', 'mine', 'pinned'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded px-2.5 py-1 text-xs font-medium capitalize transition ${
+              className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${
                 activeTab === tab
-                  ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+                  ? 'bg-neutral-100 text-neutral-900 font-semibold shadow-2xs dark:bg-neutral-800 dark:text-white'
                   : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
               }`}
             >
@@ -174,25 +201,30 @@ export function DashboardsLibraryView({
 
         <div className="relative min-w-[220px]">
           <svg
-            className="absolute left-2.5 top-2 h-3.5 w-3.5 text-neutral-400"
+            className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dashboards..."
-            className="w-full rounded border border-neutral-200 bg-neutral-50/50 py-1 pl-8 pr-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-white"
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50/60 py-1.5 pl-8 pr-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-white"
           />
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      {/* Main Content Container */}
+      <div className="overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         {loading ? (
           <div className="divide-y divide-neutral-100 p-4 space-y-3 dark:divide-neutral-800">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -206,26 +238,29 @@ export function DashboardsLibraryView({
             ))}
           </div>
         ) : filteredDashboards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <div className="mb-3 rounded-full bg-blue-50 p-3 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">No dashboards found</h3>
-            <p className="mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-              {search
-                ? 'No dashboards match your search.'
-                : 'Get started by creating a dashboard from our curated templates or build a custom board from scratch.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => setIsNewModalOpen(true)}
-              className="mt-4 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
-            >
-              + Create dashboard
-            </button>
-          </div>
+          <EmptyState
+            illustrationSrc="/dashboards/no-dashboard.png"
+            illustrationAlt="No dashboards found"
+            title={search ? 'No dashboards match your search' : 'No dashboards created yet'}
+            description={
+              search
+                ? 'Try adjusting your search query or clear the filter to view all project boards.'
+                : 'Get started by creating a dashboard from our curated templates or build a custom board from scratch.'
+            }
+            primaryAction={{
+              label: 'Create dashboard',
+              onClick: () => setIsNewModalOpen(true),
+              icon: (
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              )
+            }}
+            secondaryAction={{
+              label: 'Browse insights',
+              href: withProjectId('/dashboard/insights', projectId)
+            }}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -242,7 +277,7 @@ export function DashboardsLibraryView({
                 {filteredDashboards.map((dash) => (
                   <tr
                     key={dash.id}
-                    className="group transition hover:bg-neutral-50/50 dark:hover:bg-neutral-850/30"
+                    className="group transition hover:bg-neutral-50/60 dark:hover:bg-neutral-850/40"
                   >
                     <td className="py-3 pl-4 pr-3">
                       <div className="flex items-center gap-3">
@@ -250,7 +285,9 @@ export function DashboardsLibraryView({
                           type="button"
                           onClick={() => handleTogglePin(dash)}
                           title={dash.isPinned ? 'Unpin' : 'Pin to top'}
-                          className={`text-neutral-400 hover:text-amber-500 ${dash.isPinned ? 'text-amber-500' : ''}`}
+                          className={`text-neutral-400 hover:text-amber-500 ${
+                            dash.isPinned ? 'text-amber-500' : ''
+                          }`}
                         >
                           <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 20 20">
                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -310,7 +347,7 @@ export function DashboardsLibraryView({
                       <div className="flex items-center justify-end gap-1.5">
                         <Link
                           href={withProjectId(`/dashboard/dashboards/${dash.id}`, projectId)}
-                          className="rounded border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          className="rounded-md border border-neutral-200 px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           Open
                         </Link>
@@ -323,7 +360,12 @@ export function DashboardsLibraryView({
                           className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                            />
                           </svg>
                         </button>
 
@@ -338,7 +380,12 @@ export function DashboardsLibraryView({
                           className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            />
                           </svg>
                         </button>
 
@@ -349,7 +396,12 @@ export function DashboardsLibraryView({
                           className="rounded p-1 text-neutral-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:text-rose-400"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                         </button>
                       </div>

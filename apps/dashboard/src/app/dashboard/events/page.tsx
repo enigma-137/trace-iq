@@ -6,6 +6,7 @@ import { MiniBars } from '@/components/charts/MiniBars';
 import { BarChart } from '@/components/charts/BarChart';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { RankedList } from '@/components/charts/RankedList';
+import { EmptyState } from '@/components/EmptyState';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,17 +66,17 @@ export default async function DashboardEventsPage() {
       ) : null}
 
       {!project && !error ? (
-        <section className="rounded-md border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">No project yet</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
-            Create your first tracking project from Overview, then install the SDK snippet on a website.
-          </p>
-          <a
-            className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            href="/dashboard"
-          >
-            Go to setup
-          </a>
+        <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <EmptyState
+            illustrationSrc="/dashboards/connect-app.png"
+            illustrationAlt="No project connected"
+            title="No project selected"
+            description="Create your first tracking project or select an existing project from your workspace to start capturing live events."
+            primaryAction={{
+              label: 'Go to setup',
+              href: '/dashboard/setup'
+            }}
+          />
         </section>
       ) : null}
 
@@ -139,7 +140,7 @@ export default async function DashboardEventsPage() {
             <p className="font-mono text-xs text-neutral-500 dark:text-slate-400">{project.id}</p>
             <p className="text-xs text-neutral-400 dark:text-slate-500">{events.length} loaded</p>
           </div>
-          <EventsTable events={events} />
+          <EventsTable events={events} projectId={project.id} />
         </section>
       ) : null}
     </DashboardShell>

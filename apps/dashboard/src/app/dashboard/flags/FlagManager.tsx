@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from '../DashboardDialog';
+import { PageBanner } from '@/components/PageBanner';
+import { EmptyState } from '@/components/EmptyState';
 import { toast } from '@/lib/toast';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -256,6 +258,24 @@ export function FlagManager({
         </div>
       </div>
 
+      {/* Reusable Feature Release Banner */}
+      <PageBanner
+        dismissId="flags_release_banner_v1"
+        badge="Progressive Delivery"
+        title="Safe Rollouts & Feature Releases"
+        description="Ship code behind targeted feature flags, rollout gradually by percentage or user segment, and observe real-time error and conversion telemetry."
+        illustrationSrc="/dashboards/banner-feature-release.png"
+        illustrationAlt="Feature Release Banner Artwork"
+        primaryAction={{
+          label: 'Create flag',
+          onClick: () => setIsCreateOpen(true)
+        }}
+        secondaryAction={{
+          label: 'Flag documentation',
+          href: '/docs?page=flags'
+        }}
+      />
+
       {/* Summary Metrics Bar */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <MetricCard label="Total flags" value={activeMetrics.total} />
@@ -325,31 +345,29 @@ export function FlagManager({
 
       {/* Flags List Table / Cards */}
       {filteredFlags.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-950">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
-              <line x1="4" y1="22" x2="4" y2="15"></line>
-            </svg>
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">
-            {searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'
-              ? 'No matching feature flags found'
-              : 'You haven’t created any feature flags yet'}
-          </h3>
-          <p className="mx-auto mt-1 max-w-sm text-xs text-neutral-500 dark:text-slate-400">
-            {searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'
-              ? 'Try changing your filters or search term to locate the flag.'
-              : 'Ship code safely behind a flag, test with real users, roll out deterministically, and observe conversion and error signals.'}
-          </p>
-          <div className="mt-6 flex justify-center gap-3">
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            >
-              + Create your first flag
-            </button>
-          </div>
+        <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <EmptyState
+            illustrationSrc="/dashboards/banner-feature-release.png"
+            illustrationAlt="No feature flags"
+            title={
+              searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'
+                ? 'No matching feature flags found'
+                : 'You haven’t created any feature flags yet'
+            }
+            description={
+              searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'
+                ? 'Try adjusting your filters or search term to locate the flag.'
+                : 'Ship code safely behind a flag, test with real users, roll out deterministically, and observe conversion and error signals.'
+            }
+            primaryAction={{
+              label: '+ Create your first flag',
+              onClick: () => setIsCreateOpen(true)
+            }}
+            secondaryAction={{
+              label: 'Read docs',
+              href: '/docs?page=flags'
+            }}
+          />
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">

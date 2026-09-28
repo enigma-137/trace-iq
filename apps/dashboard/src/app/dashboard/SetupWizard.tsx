@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { toast } from '@/lib/toast';
 import { readApiError } from '@/lib/api-error';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -738,45 +739,62 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
           {/* Verification Box */}
           {verificationData ? (
             <div className="space-y-4">
-              <div className="rounded-xl border border-emerald-300 bg-emerald-50/70 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-lg text-white font-bold">
-                    ✓
-                  </div>
-                  <div>
-                    <h4 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">
-                      Connection Verified
-                    </h4>
-                    <p className="text-xs text-emerald-800 dark:text-emerald-300/80">
-                      TraceIQ received and matched a verification event from your client application.
-                    </p>
-                  </div>
-                </div>
+              <div className="relative overflow-hidden rounded-2xl border border-emerald-300/80 bg-gradient-to-r from-emerald-50/90 via-teal-50/40 to-white p-6 shadow-sm dark:border-emerald-900/70 dark:from-emerald-950/30 dark:via-neutral-900 dark:to-neutral-900">
+                <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-lg font-bold text-white shadow-sm">
+                        ✓
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-emerald-950 dark:text-emerald-200">
+                          Connection Verified Successfully
+                        </h4>
+                        <p className="text-xs text-emerald-800 dark:text-emerald-300/80">
+                          TraceIQ received and validated your live telemetry event from your application.
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="mt-4 grid gap-3 divide-y divide-emerald-200/60 border-t border-emerald-200/60 pt-3 text-xs sm:grid-cols-4 sm:divide-y-0 sm:divide-x dark:divide-emerald-900/60 dark:border-emerald-900/60">
-                  <div className="pt-2 sm:pt-0 sm:pr-3">
-                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">Event Name</span>
-                    <p className="mt-0.5 font-mono font-semibold text-emerald-950 dark:text-emerald-100">
-                      {verificationData.event.name}
-                    </p>
+                    <div className="grid gap-3 divide-y divide-emerald-200/60 border-t border-emerald-200/60 pt-3 text-xs sm:grid-cols-4 sm:divide-y-0 sm:divide-x dark:divide-emerald-900/60 dark:border-emerald-900/60">
+                      <div className="pt-2 sm:pt-0 sm:pr-3">
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">Event Name</span>
+                        <p className="mt-0.5 font-mono font-semibold text-emerald-950 dark:text-emerald-100">
+                          {verificationData.event.name}
+                        </p>
+                      </div>
+                      <div className="pt-2 sm:pt-0 sm:px-3">
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">Source / Host</span>
+                        <p className="mt-0.5 truncate font-mono text-emerald-950 dark:text-emerald-100">
+                          {verificationData.event.source ?? verificationData.event.host ?? 'client-application'}
+                        </p>
+                      </div>
+                      <div className="pt-2 sm:pt-0 sm:px-3">
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">Environment</span>
+                        <p className="mt-0.5 font-mono text-emerald-950 dark:text-emerald-100">
+                          {verificationData.event.environment ?? 'development'}
+                        </p>
+                      </div>
+                      <div className="pt-2 sm:pt-0 sm:pl-3">
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">Received</span>
+                        <p className="mt-0.5 font-mono text-emerald-950 dark:text-emerald-100">
+                          {new Date(verificationData.verifiedAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="pt-2 sm:pt-0 sm:px-3">
-                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">Source / Host</span>
-                    <p className="mt-0.5 font-mono text-emerald-950 dark:text-emerald-100 truncate">
-                      {verificationData.event.source ?? verificationData.event.host ?? 'client-application'}
-                    </p>
-                  </div>
-                  <div className="pt-2 sm:pt-0 sm:px-3">
-                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">Environment</span>
-                    <p className="mt-0.5 font-mono text-emerald-950 dark:text-emerald-100">
-                      {verificationData.event.environment ?? 'development'}
-                    </p>
-                  </div>
-                  <div className="pt-2 sm:pt-0 sm:pl-3">
-                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">Received</span>
-                    <p className="mt-0.5 font-mono text-emerald-950 dark:text-emerald-100">
-                      {new Date(verificationData.verifiedAt).toLocaleTimeString()}
-                    </p>
+
+                  {/* Artwork Illustration - Transparent PNG */}
+                  <div className="relative shrink-0 flex items-center justify-center">
+                    <div className="pointer-events-none absolute -inset-2 rounded-full bg-emerald-500/10 opacity-70 blur-xl" />
+                    <Image
+                      src="/dashboards/setup-success.png"
+                      alt="Setup Success Celebration"
+                      width={160}
+                      height={160}
+                      className="relative z-10 max-h-[140px] w-auto object-contain drop-shadow-md transition-transform duration-300 hover:scale-105"
+                      priority
+                    />
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { SetupWizard } from '../SetupWizard';
+import { EmptyState } from '@/components/EmptyState';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -46,31 +47,22 @@ export default async function SetupPage({
             userEmail={user.email}
           />
         ) : (
-          <div className="mx-auto max-w-xl py-12 text-center">
-            <div className="rounded-xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-xl text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-                ⚠️
-              </div>
-              <h2 className="mt-4 text-lg font-semibold text-neutral-900 dark:text-white">
-                No Project Selected
-              </h2>
-              <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                The Setup Wizard must be scoped to an existing TraceIQ project. Please select or create a project first before continuing integration.
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  href="/dashboard/settings?newProject=1"
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                >
-                  Create New Project →
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                >
-                  Return to Dashboard
-                </Link>
-              </div>
+          <div className="mx-auto max-w-xl py-8">
+            <div className="rounded-2xl border border-neutral-200/90 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+              <EmptyState
+                illustrationSrc="/dashboards/connect-app.png"
+                illustrationAlt="Connect your application"
+                title="Select or create a project"
+                description="The Setup Wizard requires an active TraceIQ project. Select a project from your workspace or create a new project to generate your SDK keys and verify incoming telemetry."
+                primaryAction={{
+                  label: 'Create new project',
+                  href: '/dashboard/settings?newProject=1'
+                }}
+                secondaryAction={{
+                  label: 'Return to dashboard',
+                  href: '/dashboard'
+                }}
+              />
             </div>
           </div>
         )}

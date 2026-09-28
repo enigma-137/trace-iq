@@ -4,6 +4,7 @@ import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { MiniBars } from '@/components/charts/MiniBars';
 import { RankedList } from '@/components/charts/RankedList';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
+import { EmptyState } from '@/components/EmptyState';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,9 +91,21 @@ export default async function ErrorsPage({
         </div>
 
         {issues.length === 0 ? (
-          <div className="p-6 text-sm text-neutral-500 dark:text-slate-500">
-            No errors captured. The SDK auto-captures uncaught exceptions, or call{' '}
-            <code className="font-mono">traceiq.captureException(err)</code>.
+          <div className="p-4">
+            <EmptyState
+              illustrationSrc="/dashboards/no-errors.png"
+              illustrationAlt="No errors found"
+              title="All systems healthy — zero exceptions recorded"
+              description="TraceIQ hasn't detected any unhandled exceptions or error events in the selected time window. Your application is running smoothly."
+              primaryAction={{
+                label: 'View live events stream',
+                href: '/dashboard/events'
+              }}
+              secondaryAction={{
+                label: 'Error tracking docs',
+                href: '/docs'
+              }}
+            />
           </div>
         ) : (
           <>

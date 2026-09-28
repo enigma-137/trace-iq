@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { withProjectId } from '../nav';
 import { createInsight, addDashboardWidget } from '@/lib/analytics-api';
@@ -189,16 +190,19 @@ export function EmptyDashboardBuilder({
   return (
     <div className="mx-auto w-full max-w-6xl py-4 sm:py-8">
       <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-14">
-        {/* Left Column: TraceIQ Bot Illustration (No heavy box, seamless transparent look) */}
+        {/* Left Column: TraceIQ Bot Illustration */}
         <div className="flex flex-col items-center justify-center lg:col-span-5">
           <div className="group relative flex w-full flex-col items-center">
             {/* Ambient background glow */}
             <div className="pointer-events-none absolute -inset-4 rounded-full bg-gradient-to-tr from-blue-500/15 via-cyan-500/10 to-indigo-500/15 opacity-60 blur-3xl transition-opacity duration-500 group-hover:opacity-90 dark:from-blue-600/25 dark:via-cyan-600/15 dark:to-indigo-600/25" />
 
-            <img
+            <Image
               src="/dashboards/new-dashboard.png"
               alt="TraceIQ Dashboard Builder Assistant"
+              width={340}
+              height={340}
               className="relative z-10 max-h-[280px] w-auto object-contain drop-shadow-xl transition-transform duration-300 group-hover:scale-105 sm:max-h-[340px] lg:max-h-[380px]"
+              priority
             />
 
             {/* Bottom Caption Pill */}
@@ -235,7 +239,7 @@ export function EmptyDashboardBuilder({
                   setPrompt(e.target.value);
                   setSelectedQuestionId(null);
                 }}
-                placeholder="For example, which pages convert best?"
+                placeholder="For example, which features are driving retention?"
                 rows={2}
                 className="w-full resize-none bg-transparent text-xs leading-relaxed text-neutral-900 placeholder:text-neutral-400 focus:outline-none dark:text-white dark:placeholder:text-neutral-500 sm:text-sm"
               />
@@ -281,10 +285,11 @@ export function EmptyDashboardBuilder({
                 return (
                   <div
                     key={q.id}
-                    className={`group flex flex-col rounded-xl border transition-all duration-150 ${isSelected
+                    className={`group flex flex-col rounded-xl border transition-all duration-150 ${
+                      isSelected
                         ? 'border-blue-500 bg-blue-50/50 shadow-sm ring-1 ring-blue-500/30 dark:border-blue-500 dark:bg-blue-950/30'
                         : 'border-neutral-200/90 bg-white hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-neutral-50/80 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 dark:hover:bg-neutral-850'
-                      }`}
+                    }`}
                   >
                     <button
                       type="button"

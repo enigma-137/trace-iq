@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sdkDocsSections } from './sdk-docs';
+import { sdkDocsSections } from '../src/app/docs/sdk-docs';
 
 describe('SDK documentation navigation', () => {
   it('keeps every shipped SDK discoverable', () => {

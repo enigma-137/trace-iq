@@ -10,10 +10,12 @@ import {
   duplicateInsight,
   updateInsight
 } from '@/lib/analytics-api';
-import type { SavedInsightView, InsightType } from '@/types/analytics';
+import type { SavedInsightView } from '@/types/analytics';
 import { AddToDashboardModal } from '@/components/dashboards/AddToDashboardModal';
 import { DashboardDialog } from '../DashboardDialog';
 import { InsightTypeIcon } from '@/components/insights/InsightTypeIcon';
+import { EmptyState } from '@/components/EmptyState';
+import { PageBanner } from '@/components/PageBanner';
 import { toast } from '@/lib/toast';
 
 const INSIGHT_TYPE_LABELS: Record<string, string> = {
@@ -34,13 +36,15 @@ const INSIGHT_TYPE_LABELS: Record<string, string> = {
 
 const TYPE_BADGE_STYLES: Record<string, string> = {
   trend: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900',
-  kpi: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900',
-  funnel: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900',
-  retention: 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-900',
+  kpi: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200 dark:border-sky-900',
+  funnel: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900',
+  retention: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900',
+  user_metric: 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border-violet-200 dark:border-violet-900',
   event_breakdown: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900',
-  web_analytics: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900',
+  web_analytics: 'bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200 dark:border-teal-900',
+  revenue: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900',
   error_metric: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-900',
-  api_performance: 'bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300 border-orange-200 dark:border-orange-900'
+  api_performance: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900'
 };
 
 export function InsightsLibraryView({
@@ -109,7 +113,9 @@ export function InsightsLibraryView({
 
     if (data?.insight) {
       toast.success('Renamed insight');
-      setInsights((prev) => prev.map((item) => (item.id === renamingInsight.id ? data.insight : item)));
+      setInsights((prev) =>
+        prev.map((item) => (item.id === renamingInsight.id ? data.insight : item))
+      );
       setRenamingInsight(null);
     } else {
       toast.error(error || 'Failed to rename insight');
@@ -147,38 +153,63 @@ export function InsightsLibraryView({
       {/* Cloudflare-style Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Insights</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
+            Insights Library
+          </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Analyze your product and save reusable charts.
+            Create, save, and embed reusable analytical charts into your dashboards.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={withProjectId('/dashboard/insights/new', projectId)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500 active:scale-[0.98]"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" />
             </svg>
             New insight
           </Link>
         </div>
       </div>
 
+      {/* Reusable In-App Banner */}
+      <PageBanner
+        dismissId="insights_banner_v1"
+        badge="Analytics Engine"
+        title="Deep-Dive Product Insights"
+        description="Query time-series event trends, measure step-by-step conversion funnels, track 4-week cohort retention, and monitor API performance."
+        illustrationSrc="/dashboards/banner-insights.png"
+        illustrationAlt="Insights Banner Artwork"
+        primaryAction={{
+          label: 'Create insight',
+          href: withProjectId('/dashboard/insights/new', projectId),
+          icon: (
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          )
+        }}
+        secondaryAction={{
+          label: 'View dashboards',
+          href: withProjectId('/dashboard/dashboards', projectId)
+        }}
+      />
+
       {/* Control Bar: Tabs + Search + Type Filter */}
-      <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200/90 bg-white p-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center gap-1">
           {(['all', 'mine', 'pinned'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded px-2.5 py-1 text-xs font-medium capitalize transition ${
+              className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${
                 activeTab === tab
-                  ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+                  ? 'bg-neutral-100 text-neutral-900 font-semibold shadow-2xs dark:bg-neutral-800 dark:text-white'
                   : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
               }`}
             >
-              {tab === 'all' ? 'All' : tab === 'mine' ? 'My insights' : 'Pinned'}
+              {tab === 'all' ? 'All insights' : tab === 'mine' ? 'My insights' : 'Pinned'}
             </button>
           ))}
         </div>
@@ -186,26 +217,31 @@ export function InsightsLibraryView({
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1 sm:flex-none">
             <svg
-              className="absolute left-2.5 top-2 h-3.5 w-3.5 text-neutral-400"
+              className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search insights..."
-              className="w-full rounded border border-neutral-200 bg-neutral-50/50 py-1 pl-8 pr-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-white dark:focus:bg-neutral-900"
+              className="w-full rounded-lg border border-neutral-200 bg-neutral-50/60 py-1.5 pl-8 pr-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-white dark:focus:bg-neutral-900"
             />
           </div>
 
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="rounded border border-neutral-200 bg-neutral-50/50 py-1 px-2.5 text-xs text-neutral-700 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-300"
+            className="rounded-lg border border-neutral-200 bg-neutral-50/60 py-1.5 px-3 text-xs text-neutral-700 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-300"
           >
             <option value="all">All types</option>
             {Object.entries(INSIGHT_TYPE_LABELS).map(([val, label]) => (
@@ -217,8 +253,8 @@ export function InsightsLibraryView({
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      {/* Main Table Container */}
+      <div className="overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         {loading ? (
           <div className="divide-y divide-neutral-100 p-4 space-y-3 dark:divide-neutral-800">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -232,25 +268,29 @@ export function InsightsLibraryView({
             ))}
           </div>
         ) : filteredInsights.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <div className="mb-3 rounded-full bg-blue-50 p-3 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">No insights found</h3>
-            <p className="mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-              {search || selectedType !== 'all'
-                ? 'Try adjusting your search or filters.'
-                : 'Create your first insight to analyze event trends, KPIs, funnels, and retention.'}
-            </p>
-            <Link
-              href={withProjectId('/dashboard/insights/new', projectId)}
-              className="mt-4 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
-            >
-              + Create insight
-            </Link>
-          </div>
+          <EmptyState
+            illustrationSrc="/dashboards/no-insights.png"
+            illustrationAlt="No insights found"
+            title={search || selectedType !== 'all' ? 'No matching insights' : 'No insights created yet'}
+            description={
+              search || selectedType !== 'all'
+                ? 'Try adjusting your search keywords or clearing the category filter.'
+                : 'Create your first insight to analyze event trends, KPIs, conversion funnels, and retention cohorts.'
+            }
+            primaryAction={{
+              label: 'Create insight',
+              href: withProjectId('/dashboard/insights/new', projectId),
+              icon: (
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              )
+            }}
+            secondaryAction={{
+              label: 'View dashboards',
+              href: withProjectId('/dashboard/dashboards', projectId)
+            }}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -272,7 +312,7 @@ export function InsightsLibraryView({
                   return (
                     <tr
                       key={insight.id}
-                      className="group transition hover:bg-neutral-50/50 dark:hover:bg-neutral-850/30"
+                      className="group transition hover:bg-neutral-50/60 dark:hover:bg-neutral-850/40"
                     >
                       <td className="py-3 pl-4 pr-3">
                         <div className="flex items-start gap-3">
@@ -305,7 +345,9 @@ export function InsightsLibraryView({
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium ${badgeClass}`}>
+                        <span
+                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium ${badgeClass}`}
+                        >
                           {INSIGHT_TYPE_LABELS[insight.type] || insight.type}
                         </span>
                       </td>
@@ -329,7 +371,7 @@ export function InsightsLibraryView({
                           <button
                             type="button"
                             onClick={() => setAddToDashboardInsight(insight)}
-                            className="rounded border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                            className="rounded-md border border-neutral-200 px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
                           >
                             + Dashboard
                           </button>
@@ -342,7 +384,12 @@ export function InsightsLibraryView({
                             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
                             </svg>
                           </button>
 
@@ -356,7 +403,12 @@ export function InsightsLibraryView({
                             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
                             </svg>
                           </button>
 
@@ -367,7 +419,12 @@ export function InsightsLibraryView({
                             className="rounded p-1 text-neutral-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:text-rose-400"
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
                             </svg>
                           </button>
                         </div>
