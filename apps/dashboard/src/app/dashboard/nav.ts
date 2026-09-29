@@ -14,6 +14,8 @@ export const navItems = [
   { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' },
   { label: 'Replays', href: '/dashboard/replays', key: 'replays' },
   { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },
+  { label: 'Experiments', href: '/dashboard/experiments', key: 'experiments' },
+  { label: 'Surveys', href: '/dashboard/surveys', key: 'surveys' },
   { label: 'Webhooks', href: '/dashboard/webhooks', key: 'webhooks' },
   { label: 'Achievements', href: '/dashboard/achievements', key: 'achievements' },
   { label: 'Export', href: '/dashboard/export', key: 'export' }

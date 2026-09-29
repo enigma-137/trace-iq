@@ -71,6 +71,33 @@ export interface TraceIQFlagsApi {
   recordExposure(key: string): void;
 }
 
+export interface ExperimentVariantEvaluation<T = unknown> {
+  experimentKey: string;
+  variantKey: string;
+  variantName: string;
+  isControl: boolean;
+  isEligible: boolean;
+  payload?: T;
+}
+
+export interface TraceIQExperimentsApi {
+  getVariant<T = unknown>(
+    experimentKey: string,
+    options?: { properties?: Record<string, unknown>; trackExposure?: boolean }
+  ): Promise<ExperimentVariantEvaluation<T>>;
+  recordExposure(experimentKey: string, variantKey: string): void;
+}
+
+export interface TraceIQSurveysApi {
+  getEligibleSurveys(options?: {
+    properties?: Record<string, unknown>;
+    eventName?: string;
+  }): Promise<Array<any>>;
+  recordImpression(surveyId: string): void;
+  recordDismissal(surveyId: string): void;
+  submitResponse(surveyId: string, answers: Array<{ questionId: string; questionType: string; prompt: string; answerText?: string; selectedOptions?: string[]; rating?: number; score?: number }>): Promise<boolean>;
+}
+
 export interface TraceIQClient {
   initialize(options: TraceIQInitOptions): void;
   identify(identity: TraceIQIdentity): void;
@@ -97,8 +124,13 @@ export interface TraceIQClient {
   recordFlagExposure(key: string): void;
   /** Feature flags API namespace. */
   flags: TraceIQFlagsApi;
+  /** Experiments API namespace. */
+  experiments: TraceIQExperimentsApi;
+  /** Surveys API namespace. */
+  surveys: TraceIQSurveysApi;
   grantReplayConsent(): void;
   revokeReplayConsent(): void;
   startReplay(): Promise<boolean>;
   stopReplay(): void;
 }
+

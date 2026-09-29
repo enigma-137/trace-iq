@@ -6,7 +6,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "paths": {
+      "@traceiq/types": ["../../packages/types/dist/index"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

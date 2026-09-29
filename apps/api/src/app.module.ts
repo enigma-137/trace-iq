@@ -23,6 +23,8 @@ import { MfaModule } from './modules/mfa/mfa.module';
 import { ErrorsModule } from './modules/errors/errors.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { InsightsModule } from './modules/insights/insights.module';
+import { ExperimentsModule } from './modules/experiments/experiments.module';
+import { SurveysModule } from './modules/surveys/surveys.module';
 import { SetupVerificationsModule } from './modules/setup-verifications/setup-verifications.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
@@ -49,6 +51,8 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     DashboardsModule,
     AlertsModule,
     FlagsModule,
+    ExperimentsModule,
+    SurveysModule,
     WebhooksModule,
     ExportModule,
     ObservabilityModule,

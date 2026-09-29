@@ -38,6 +38,22 @@ export class BrowserTraceIQClient implements TraceIQClient {
     recordExposure: (key: string) => this.recordFlagExposure(key)
   };
 
+  public readonly experiments = {
+    getVariant: <T = unknown>(
+      experimentKey: string,
+      options?: { properties?: Record<string, unknown>; trackExposure?: boolean }
+    ) => this.getExperimentVariant<T>(experimentKey, options),
+    recordExposure: (experimentKey: string, variantKey: string) => this.recordExperimentExposure(experimentKey, variantKey)
+  };
+
+  public readonly surveys = {
+    getEligibleSurveys: (options?: { properties?: Record<string, unknown>; eventName?: string }) =>
+      this.getEligibleSurveys(options),
+    recordImpression: (surveyId: string) => this.recordSurveyImpression(surveyId),
+    recordDismissal: (surveyId: string) => this.recordSurveyDismissal(surveyId),
+    submitResponse: (surveyId: string, answers: any[]) => this.submitSurveyResponse(surveyId, answers)
+  };
+
   initialize(options: TraceIQInitOptions): void {
     if (!options?.projectId || !options?.writeKey) {
       if (typeof console !== 'undefined' && console.warn) {
@@ -480,6 +496,230 @@ export class BrowserTraceIQClient implements TraceIQClient {
     }).catch((err) => {
       this.debug('TraceIQ flag exposure tracking error', err);
     });
+  }
+
+  async getExperimentVariant<T = unknown>(
+    experimentKey: string,
+    options?: { properties?: Record<string, unknown>; trackExposure?: boolean }
+  ): Promise<{
+    experimentKey: string;
+    variantKey: string;
+    variantName: string;
+    isControl: boolean;
+    isEligible: boolean;
+    payload?: T;
+  }> {
+    const defaultResult = {
+      experimentKey,
+      variantKey: 'control',
+      variantName: 'Control',
+      isControl: true,
+      isEligible: false,
+      payload: undefined
+    };
+
+    const clientOpts = this.options;
+    if (!clientOpts) {
+      this.debug('[TraceIQ] getExperimentVariant: SDK not initialized.');
+      return defaultResult;
+    }
+
+    try {
+      const endpoint = `${(clientOpts.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/experiments/evaluate`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-traceiq-write-key': clientOpts.writeKey,
+          ...(clientOpts.environment ? { 'x-traceiq-environment': clientOpts.environment } : {})
+        },
+        body: JSON.stringify({
+          projectId: clientOpts.projectId,
+          experimentKey,
+          distinctId: this.distinctId(),
+          environment: clientOpts.environment ?? 'production',
+          properties: options?.properties ?? this.identity?.traits
+        })
+      });
+
+      if (!response.ok) {
+        this.debug(`[TraceIQ] Experiment evaluation returned HTTP ${response.status}`);
+        return defaultResult;
+      }
+
+      const result = await response.json();
+      if (options?.trackExposure !== false && result.isEligible && result.variantKey) {
+        this.recordExperimentExposure(experimentKey, result.variantKey);
+      }
+
+      return {
+        experimentKey,
+        variantKey: result.variantKey ?? 'control',
+        variantName: result.variantName ?? 'Control',
+        isControl: Boolean(result.isControl),
+        isEligible: Boolean(result.isEligible),
+        payload: result.payload as T | undefined
+      };
+    } catch (err) {
+      this.debug('[TraceIQ] Experiment evaluation failed:', err);
+      return defaultResult;
+    }
+  }
+
+  recordExperimentExposure(experimentKey: string, variantKey: string): void {
+    const clientOpts = this.options;
+    if (!clientOpts) return;
+
+    const dedupKey = `exp:${experimentKey}:${this.distinctId()}:${variantKey}`;
+    if (this.recordedExposures.has(dedupKey)) {
+      return;
+    }
+    this.recordedExposures.add(dedupKey);
+
+    const endpoint = `${(clientOpts.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/experiments/exposure`;
+    void fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-traceiq-write-key': clientOpts.writeKey,
+        ...(clientOpts.environment ? { 'x-traceiq-environment': clientOpts.environment } : {})
+      },
+      body: JSON.stringify({
+        projectId: clientOpts.projectId,
+        experimentKey,
+        variantKey,
+        distinctId: this.distinctId(),
+        userId: this.identity?.userId,
+        anonymousId: this.anonymousId,
+        sessionId: this.sessionId,
+        environment: clientOpts.environment ?? 'production'
+      })
+    }).catch((err) => {
+      this.debug('[TraceIQ] Experiment exposure tracking failed:', err);
+    });
+  }
+
+  async getEligibleSurveys(options?: {
+    properties?: Record<string, unknown>;
+    eventName?: string;
+  }): Promise<Array<any>> {
+    const clientOpts = this.options;
+    if (!clientOpts) return [];
+
+    try {
+      const endpoint = `${(clientOpts.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/surveys/eligible`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-traceiq-write-key': clientOpts.writeKey,
+          ...(clientOpts.environment ? { 'x-traceiq-environment': clientOpts.environment } : {})
+        },
+        body: JSON.stringify({
+          projectId: clientOpts.projectId,
+          distinctId: this.distinctId(),
+          properties: options?.properties ?? this.identity?.traits,
+          eventName: options?.eventName,
+          environment: clientOpts.environment ?? 'production'
+        })
+      });
+
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data.surveys) ? data.surveys : [];
+    } catch (err) {
+      this.debug('[TraceIQ] Failed to load eligible surveys:', err);
+      return [];
+    }
+  }
+
+  recordSurveyImpression(surveyId: string): void {
+    const clientOpts = this.options;
+    if (!clientOpts) return;
+
+    const endpoint = `${(clientOpts.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/surveys/impression`;
+    void fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-traceiq-write-key': clientOpts.writeKey
+      },
+      body: JSON.stringify({
+        projectId: clientOpts.projectId,
+        surveyId,
+        distinctId: this.distinctId(),
+        userId: this.identity?.userId,
+        anonymousId: this.anonymousId,
+        sessionId: this.sessionId
+      })
+    }).catch((err) => {
+      this.debug('[TraceIQ] Survey impression tracking failed:', err);
+    });
+  }
+
+  recordSurveyDismissal(surveyId: string): void {
+    const clientOpts = this.options;
+    if (!clientOpts) return;
+
+    const endpoint = `${(clientOpts.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/surveys/dismiss`;
+    void fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-traceiq-write-key': clientOpts.writeKey
+      },
+      body: JSON.stringify({
+        projectId: clientOpts.projectId,
+        surveyId,
+        distinctId: this.distinctId(),
+        userId: this.identity?.userId,
+        anonymousId: this.anonymousId,
+        sessionId: this.sessionId
+      })
+    }).catch((err) => {
+      this.debug('[TraceIQ] Survey dismissal tracking failed:', err);
+    });
+  }
+
+  async submitSurveyResponse(
+    surveyId: string,
+    answers: Array<{
+      questionId: string;
+      questionType: string;
+      prompt: string;
+      answerText?: string;
+      selectedOptions?: string[];
+      rating?: number;
+      score?: number;
+    }>
+  ): Promise<boolean> {
+    const clientOpts = this.options;
+    if (!clientOpts) return false;
+
+    try {
+      const endpoint = `${(clientOpts.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/surveys/response`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-traceiq-write-key': clientOpts.writeKey
+        },
+        body: JSON.stringify({
+          projectId: clientOpts.projectId,
+          surveyId,
+          distinctId: this.distinctId(),
+          userId: this.identity?.userId,
+          anonymousId: this.anonymousId,
+          sessionId: this.sessionId,
+          answers
+        })
+      });
+
+      return response.ok;
+    } catch (err) {
+      this.debug('[TraceIQ] Survey response submission failed:', err);
+      return false;
+    }
   }
 
   private distinctId(): string | undefined {

@@ -10,6 +10,8 @@ import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01I
 import Download04Icon from '@hugeicons/core-free-icons/Download04Icon';
 import Flag02Icon from '@hugeicons/core-free-icons/Flag02Icon';
 import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import FlaskConicalIcon from '@hugeicons/core-free-icons/FlaskConicalIcon';
+import Comment01Icon from '@hugeicons/core-free-icons/Comment01Icon';
 import FunnelIcon from '@hugeicons/core-free-icons/FunnelIcon';
 import Globe02Icon from '@hugeicons/core-free-icons/Globe02Icon';
 import Home01Icon from '@hugeicons/core-free-icons/Home01Icon';
@@ -36,6 +38,8 @@ const ICONS: Record<string, IconSvgElement> = {
   errors: Alert02Icon,
   alerts: Notification02Icon,
   flags: Flag02Icon,
+  experiments: FlaskConicalIcon,
+  surveys: Comment01Icon,
   webhooks: WebhookIcon,
   achievements: ChampionIcon,
   export: Download04Icon,
