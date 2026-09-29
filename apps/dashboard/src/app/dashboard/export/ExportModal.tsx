@@ -159,7 +159,7 @@ export function ExportModal({
 
       setSuccessMessage(
         `Successfully downloaded ${data.count.toLocaleString()} event${data.count === 1 ? '' : 's'}.` +
-          (data.truncated ? ` (Hit the ${Number(limit).toLocaleString()}-row cap; narrow your range for remaining events.)` : '')
+        (data.truncated ? ` (Hit the ${Number(limit).toLocaleString()}-row cap; narrow your range for remaining events.)` : '')
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed. Please try again.');
@@ -221,7 +221,7 @@ export function ExportModal({
 
       setSuccessMessage(
         result.message ??
-          `Export containing ${result.count.toLocaleString()} events has been emailed to ${result.recipient}.`
+        `Export containing ${result.count.toLocaleString()} events has been emailed to ${result.recipient}.`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Email export failed. Please try again.');
@@ -282,11 +282,10 @@ export function ExportModal({
         <div className="mt-5 grid grid-cols-2 gap-2 rounded-lg bg-neutral-100 p-1 dark:bg-slate-900">
           <button
             type="button"
-            className={`flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition ${
-              deliveryMethod === 'download'
+            className={`flex items-center justify-center gap-2 rounded-md py-2 text-xs font-semibold transition ${deliveryMethod === 'download'
                 ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
                 : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
+              }`}
             onClick={() => setDeliveryMethod('download')}
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -299,11 +298,10 @@ export function ExportModal({
 
           <button
             type="button"
-            className={`flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-semibold transition ${
-              deliveryMethod === 'email'
+            className={`flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-semibold transition ${deliveryMethod === 'email'
                 ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
                 : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
+              }`}
             onClick={() => setDeliveryMethod('email')}
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -352,11 +350,10 @@ export function ExportModal({
                       key={preset}
                       type="button"
                       onClick={() => setLimit(preset)}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-mono transition ${
-                        limit === preset
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-mono transition ${limit === preset
                           ? 'bg-neutral-900 text-white dark:bg-white dark:text-black font-semibold'
                           : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
-                      }`}
+                        }`}
                     >
                       {Number(preset) >= 1000 ? `${Number(preset) / 1000}k` : preset}
                     </button>
@@ -381,11 +378,10 @@ export function ExportModal({
                 <button
                   type="button"
                   onClick={() => setFormat('csv')}
-                  className={`flex flex-col items-start rounded-md border p-2 text-left transition ${
-                    format === 'csv'
+                  className={`flex flex-col items-start rounded-md border p-2 text-left transition ${format === 'csv'
                       ? 'border-neutral-900 bg-neutral-50/70 text-neutral-900 ring-1 ring-neutral-900 dark:border-white dark:bg-slate-900 dark:text-white dark:ring-white'
                       : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400'
-                  }`}
+                    }`}
                 >
                   <span className="text-xs font-bold">CSV</span>
                   <span className="text-[10px] text-neutral-400 dark:text-slate-500">Spreadsheet ready</span>
@@ -394,11 +390,10 @@ export function ExportModal({
                 <button
                   type="button"
                   onClick={() => setFormat('json')}
-                  className={`flex flex-col items-start rounded-md border p-2 text-left transition ${
-                    format === 'json'
+                  className={`flex flex-col items-start rounded-md border p-2 text-left transition ${format === 'json'
                       ? 'border-neutral-900 bg-neutral-50/70 text-neutral-900 ring-1 ring-neutral-900 dark:border-white dark:bg-slate-900 dark:text-white dark:ring-white'
                       : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400'
-                  }`}
+                    }`}
                 >
                   <span className="text-xs font-bold">JSON</span>
                   <span className="text-[10px] text-neutral-400 dark:text-slate-500">Full payload fidelity</span>
@@ -438,7 +433,7 @@ export function ExportModal({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Email Exports with TraceIQ Pro</h4>
-                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                         PRO PLAN
                       </span>
                     </div>

@@ -252,7 +252,7 @@ export function CohortModal({
                     key={prop}
                     type="button"
                     onClick={() => addCondition(prop)}
-                    className="rounded bg-neutral-200/60 px-1.5 py-0.5 text-[11px] font-medium text-neutral-700 hover:bg-blue-100 hover:text-blue-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-950 dark:hover:text-blue-300 transition"
+                    className="rounded bg-neutral-200/60 px-1.5 py-0.5 text-[11px] font-medium text-neutral-700 hover:hover:text-blue-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-950 dark:hover:text-blue-300 transition"
                   >
                     +{prop}
                   </button>

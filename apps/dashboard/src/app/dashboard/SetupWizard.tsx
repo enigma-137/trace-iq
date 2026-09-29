@@ -362,22 +362,20 @@ export function SetupWizard({
                 key={step.num}
                 type="button"
                 onClick={() => setCurrentStep(step.num)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition ${
-                  isCurrent
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition ${isCurrent
                     ? 'border-blue-600 bg-blue-50/50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/20 dark:text-blue-200'
                     : isDone
                       ? 'border-neutral-200 bg-white text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100'
                       : 'border-transparent text-neutral-400 dark:text-slate-600'
-                }`}
+                  }`}
               >
                 <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                    isDone
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${isDone
                       ? 'bg-emerald-600 text-white dark:bg-emerald-500'
                       : isCurrent
                         ? 'bg-blue-600 text-white'
                         : 'bg-neutral-200 text-neutral-600 dark:bg-slate-800 dark:text-slate-400'
-                  }`}
+                    }`}
                 >
                   {isDone ? '✓' : step.num}
                 </span>
@@ -407,11 +405,10 @@ export function SetupWizard({
                 <div
                   key={prod.id}
                   onClick={() => toggleProduct(prod.id)}
-                  className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition ${
-                    selected
+                  className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition ${selected
                       ? 'border-neutral-900 bg-neutral-50/80 shadow-sm dark:border-white dark:bg-slate-900'
                       : 'border-neutral-200 bg-white opacity-70 hover:border-neutral-300 hover:opacity-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <div>
                     <div className="flex items-center justify-between">
@@ -419,7 +416,7 @@ export function SetupWizard({
                       <input
                         type="checkbox"
                         checked={selected}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700"
                       />
                     </div>
@@ -462,7 +459,7 @@ export function SetupWizard({
           {/* Option A: Automated CLI Banner */}
           <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-5 dark:border-blue-900/50 dark:from-blue-950/20 dark:to-slate-900">
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
                 Recommended · Automated Setup
               </span>
               <span className="font-mono text-xs text-blue-600 dark:text-blue-400">useTrace CLI</span>
@@ -500,11 +497,10 @@ export function SetupWizard({
                     key={fw}
                     type="button"
                     onClick={() => setSelectedFramework(fw)}
-                    className={`rounded px-2.5 py-1 text-xs font-medium transition ${
-                      selectedFramework === fw
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition ${selectedFramework === fw
                         ? 'bg-neutral-900 text-white dark:bg-white dark:text-black'
                         : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                    }`}
+                      }`}
                   >
                     {fw === 'nextjs' ? 'Next.js' : fw === 'vite' ? 'Vite / React' : fw === 'node' ? 'Node.js' : 'Script tag'}
                   </button>

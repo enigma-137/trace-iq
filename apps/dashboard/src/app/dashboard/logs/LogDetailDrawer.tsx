@@ -87,13 +87,12 @@ export function LogDetailDrawer({
       <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 dark:border-slate-800">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span
-            className={`rounded px-2 py-0.5 font-mono text-xs font-bold ${
-              log.level === 'error' || log.level === 'fatal'
-                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                : log.level === 'warn'
+            className={`rounded px-2 py-0.5 font-mono text-xs font-bold ${log.level === 'error' || log.level === 'fatal'
+              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+              : log.level === 'warn'
                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-            }`}
+                : 'text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+              }`}
           >
             {log.level.toUpperCase()}
           </span>
@@ -118,22 +117,20 @@ export function LogDetailDrawer({
         <button
           type="button"
           onClick={() => setActiveTab('overview')}
-          className={`border-b-2 py-3 px-3 transition ${
-            activeTab === 'overview'
-              ? 'border-blue-600 font-semibold text-blue-600 dark:border-blue-400 dark:text-blue-400'
-              : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-          }`}
+          className={`border-b-2 py-3 px-3 transition ${activeTab === 'overview'
+            ? 'border-blue-600 font-semibold text-blue-600 dark:border-blue-400 dark:text-blue-400'
+            : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
         >
           Overview
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('trace')}
-          className={`flex items-center gap-1.5 border-b-2 py-3 px-3 transition ${
-            activeTab === 'trace'
-              ? 'border-blue-600 font-semibold text-blue-600 dark:border-blue-400 dark:text-blue-400'
-              : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-          }`}
+          className={`flex items-center gap-1.5 border-b-2 py-3 px-3 transition ${activeTab === 'trace'
+            ? 'border-blue-600 font-semibold text-blue-600 dark:border-blue-400 dark:text-blue-400'
+            : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
         >
           <span>Trace Waterfall</span>
           {traceData?.spans && (
@@ -145,11 +142,10 @@ export function LogDetailDrawer({
         <button
           type="button"
           onClick={() => setActiveTab('payload')}
-          className={`border-b-2 py-3 px-3 transition ${
-            activeTab === 'payload'
-              ? 'border-blue-600 font-semibold text-blue-600 dark:border-blue-400 dark:text-blue-400'
-              : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-          }`}
+          className={`border-b-2 py-3 px-3 transition ${activeTab === 'payload'
+            ? 'border-blue-600 font-semibold text-blue-600 dark:border-blue-400 dark:text-blue-400'
+            : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
         >
           Metadata & Headers
         </button>
@@ -157,11 +153,10 @@ export function LogDetailDrawer({
           <button
             type="button"
             onClick={() => setActiveTab('error')}
-            className={`flex items-center gap-1 border-b-2 py-3 px-3 transition ${
-              activeTab === 'error'
-                ? 'border-rose-600 font-semibold text-rose-600 dark:border-rose-400 dark:text-rose-400'
-                : 'border-transparent text-rose-600 hover:text-rose-700 dark:text-rose-400'
-            }`}
+            className={`flex items-center gap-1 border-b-2 py-3 px-3 transition ${activeTab === 'error'
+              ? 'border-rose-600 font-semibold text-rose-600 dark:border-rose-400 dark:text-rose-400'
+              : 'border-transparent text-rose-600 hover:text-rose-700 dark:text-rose-400'
+              }`}
           >
             <span>Error Details</span>
             <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -285,7 +280,7 @@ export function LogDetailDrawer({
                     </div>
                     <Link
                       href={`/dashboard/replays?session=${log.sessionId}`}
-                      className="rounded bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300"
+                      className="rounded px-2 py-1 text-[11px] font-medium text-blue-700 hover:dark:bg-blue-950/60 dark:text-blue-300"
                     >
                       View Session Replay →
                     </Link>
@@ -348,21 +343,19 @@ export function LogDetailDrawer({
                   return (
                     <div
                       key={span.id}
-                      className={`relative rounded-md border p-3 transition ${
-                        isCurrent
-                          ? 'border-blue-500 bg-blue-50/50 shadow-sm dark:border-blue-500/50 dark:bg-blue-950/30'
-                          : 'border-neutral-200 bg-white hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-800/40'
-                      }`}
+                      className={`relative rounded-md border p-3 transition ${isCurrent
+                        ? 'border-blue-500 bg-blue-50/50 shadow-sm dark:border-blue-500/50 dark:bg-blue-950/30'
+                        : 'border-neutral-200 bg-white hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-800/40'
+                        }`}
                     >
                       {/* Left dot indicator */}
                       <span
-                        className={`absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-slate-900 ${
-                          span.status === 'error'
-                            ? 'bg-rose-500'
-                            : span.status === 'warning'
+                        className={`absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-slate-900 ${span.status === 'error'
+                          ? 'bg-rose-500'
+                          : span.status === 'warning'
                             ? 'bg-amber-500'
                             : 'bg-emerald-500'
-                        }`}
+                          }`}
                       />
 
                       <div className="flex items-start justify-between gap-2">

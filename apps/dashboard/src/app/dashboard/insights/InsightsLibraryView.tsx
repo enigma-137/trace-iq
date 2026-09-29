@@ -35,7 +35,7 @@ const INSIGHT_TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_BADGE_STYLES: Record<string, string> = {
-  trend: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900',
+  trend: 'text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900',
   kpi: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200 dark:border-sky-900',
   funnel: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900',
   retention: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900',
@@ -203,11 +203,10 @@ export function InsightsLibraryView({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${
-                activeTab === tab
+              className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${activeTab === tab
                   ? 'bg-neutral-100 text-neutral-900 font-semibold shadow-2xs dark:bg-neutral-800 dark:text-white'
                   : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
-              }`}
+                }`}
             >
               {tab === 'all' ? 'All insights' : tab === 'mine' ? 'My insights' : 'Pinned'}
             </button>

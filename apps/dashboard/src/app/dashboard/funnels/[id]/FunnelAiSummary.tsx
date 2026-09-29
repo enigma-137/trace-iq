@@ -23,7 +23,7 @@ export function FunnelAiSummary({ funnelId, days }: { funnelId: string; days: st
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Ask TraceIQ</h3>
-            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
               Intelligence
             </span>
           </div>

@@ -250,7 +250,7 @@ export function TrendControls({ eventNames, cohorts = [], initialFilters = [], s
             </svg>
             <span>Filters & Breakdown</span>
             {hasAdvancedOptions ? (
-              <span className="rounded-full bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <span className="rounded-full px-1.5 py-0.2 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 {activeFiltersCount > 0 ? `${activeFiltersCount} filter${activeFiltersCount === 1 ? '' : 's'}` : 'Breakdown active'}
               </span>
             ) : null}

@@ -172,7 +172,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
           {story ? (
             <div className="mt-3.5 flex flex-wrap items-center gap-2">
               {delta !== null && delta !== undefined ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                <span className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                   Today {delta > 0 ? `+${delta}%` : `${delta}%`}
                 </span>
               ) : null}

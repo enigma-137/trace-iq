@@ -151,8 +151,8 @@ function renderBlock(block: BlockType, key: number) {
         block.level === 1
           ? 'text-base font-bold text-neutral-900 dark:text-white mt-2'
           : block.level === 2
-          ? 'text-sm font-semibold text-neutral-900 dark:text-white mt-1.5'
-          : 'text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mt-1';
+            ? 'text-sm font-semibold text-neutral-900 dark:text-white mt-1.5'
+            : 'text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mt-1';
 
       return (
         <Tag key={key} className={sizeClasses}>
@@ -230,7 +230,7 @@ function renderInline(text: string): React.ReactNode[] {
   // Special section highlight tags at start of lines or phrases
   // e.g. **OBSERVED:**, **CORRELATED:**, **HYPOTHESIS:**, **Executive Summary:**
   const parts: React.ReactNode[] = [];
-  
+
   // Regex to match markdown tokens:
   // 1: `code`
   // 2: **bold** or __bold__
@@ -264,13 +264,13 @@ function renderInline(text: string): React.ReactNode[] {
     // Bold **...** or __...__
     else if ((token.startsWith('**') && token.endsWith('**')) || (token.startsWith('__') && token.endsWith('__'))) {
       const boldText = token.slice(2, -2);
-      
+
       // Check for specialized section label styling
       if (/^OBSERVED:?$/i.test(boldText.trim())) {
         parts.push(
           <span
             key={match.index}
-            className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/60 dark:text-blue-300"
+            className="inline-flex items-center rounded border border-blue-200 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/60 dark:text-blue-300"
           >
             {boldText}
           </span>

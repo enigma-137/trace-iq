@@ -27,7 +27,7 @@ const LEVEL_BADGES: Record<LogLevel, { label: string; className: string }> = {
   },
   info: {
     label: 'INFO',
-    className: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60'
+    className: 'text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60'
   },
   debug: {
     label: 'DEBUG',
@@ -153,11 +153,10 @@ export function LogStreamTable({
               key={log.id}
               type="button"
               onClick={() => onSelectLog(log)}
-              className={`grid w-full grid-cols-1 items-center gap-2 px-3.5 py-2.5 text-left text-xs transition focus:outline-none lg:grid-cols-[110px_70px_100px_1.4fr_2fr_80px_70px] lg:gap-3 ${
-                isSelected
+              className={`grid w-full grid-cols-1 items-center gap-2 px-3.5 py-2.5 text-left text-xs transition focus:outline-none lg:grid-cols-[110px_70px_100px_1.4fr_2fr_80px_70px] lg:gap-3 ${isSelected
                   ? 'bg-blue-50/80 dark:bg-blue-950/40 ring-1 ring-inset ring-blue-500/50'
                   : 'hover:bg-neutral-50 dark:hover:bg-slate-800/50'
-              }`}
+                }`}
             >
               {/* Timestamp */}
               <span
@@ -203,8 +202,8 @@ export function LogStreamTable({
                       log.durationMs > 1000
                         ? 'text-rose-600 dark:text-rose-400 font-semibold'
                         : log.durationMs > 300
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-neutral-600 dark:text-slate-400'
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-neutral-600 dark:text-slate-400'
                     }
                   >
                     {log.durationMs}ms

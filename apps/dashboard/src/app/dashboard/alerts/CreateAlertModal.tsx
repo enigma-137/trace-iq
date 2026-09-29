@@ -181,7 +181,7 @@ export function CreateAlertModal({
         {/* Section 1: What to monitor */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2 dark:border-slate-800/80">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               1
             </span>
             <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-white">
@@ -251,7 +251,7 @@ export function CreateAlertModal({
         {/* Section 2: When to trigger */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2 dark:border-slate-800/80">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               2
             </span>
             <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-white">
@@ -338,7 +338,7 @@ export function CreateAlertModal({
         {/* Section 3: Who should receive it */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 border-b border-neutral-200/80 pb-2 dark:border-slate-800/80">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
               3
             </span>
             <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-white">
