@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
-import { CreateSurveyDto, SurveysService, UpdateSurveyDto } from './surveys.service';
-import type { SurveyStatus } from '@traceiq/types';
+import { CreateSurveyDto, SurveyStatus, SurveysService, UpdateSurveyDto } from './surveys.service';
 
 @Controller('v1/dashboard/surveys')
 export class SurveysController {

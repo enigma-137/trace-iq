@@ -3,14 +3,81 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
-import type {
-  Experiment,
-  ExperimentAudienceRule,
-  ExperimentResults,
-  ExperimentStatus,
-  ExperimentVariant,
-  VariantResultMetric
-} from '@traceiq/types';
+export type ExperimentStatus = 'draft' | 'running' | 'paused' | 'completed' | 'archived';
+
+export interface ExperimentVariant {
+  id: string;
+  key: string;
+  name: string;
+  weight: number;
+  isControl: boolean;
+  payload?: unknown;
+}
+
+export interface ExperimentAudienceRule {
+  property: string;
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'not_contains' | 'exists' | 'not_exists';
+  value: string | number | boolean;
+}
+
+export interface Experiment {
+  id: string;
+  projectId: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  status: ExperimentStatus;
+  environment: string;
+  primaryMetric: string;
+  secondaryMetrics: string[];
+  variants: ExperimentVariant[];
+  audienceFilter?: {
+    rules?: ExperimentAudienceRule[];
+  };
+  targetPercentage: number;
+  winnerVariantKey?: string | null;
+  startedAt?: string | null;
+  pausedAt?: string | null;
+  completedAt?: string | null;
+  archivedAt?: string | null;
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VariantResultMetric {
+  variantKey: string;
+  variantName: string;
+  isControl: boolean;
+  weight: number;
+  exposures: number;
+  conversions: number;
+  conversionRate: number;
+  uplift: number | null;
+  zScore: number | null;
+  pValue: number | null;
+  confidence: number | null;
+  isSignificant: boolean;
+  sampleStatus: 'insufficient_data' | 'collecting' | 'significant' | 'neutral';
+}
+
+export interface ExperimentResults {
+  experimentId: string;
+  primaryMetric: string;
+  totalExposures: number;
+  totalConversions: number;
+  overallConversionRate: number;
+  variants: VariantResultMetric[];
+  status: ExperimentStatus;
+  hasEnoughData: boolean;
+  recommendedWinner?: string | null;
+  timeseries?: Array<{
+    date: string;
+    variantKey: string;
+    exposures: number;
+    conversions: number;
+  }>;
+}
 
 export interface CreateExperimentDto {
   projectId?: string;

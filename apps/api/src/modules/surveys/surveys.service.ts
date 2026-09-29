@@ -3,16 +3,122 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
-import type {
-  Survey,
-  SurveyAnswer,
-  SurveyQuestion,
-  SurveyQuestionDistribution,
-  SurveyResponseRecord,
-  SurveyResults,
-  SurveyStatus,
-  SurveyTargeting
-} from '@traceiq/types';
+export type SurveyStatus = 'draft' | 'published' | 'paused' | 'closed' | 'archived';
+export type SurveyQuestionType =
+  | 'single_choice'
+  | 'multiple_choice'
+  | 'short_text'
+  | 'long_text'
+  | 'rating_scale'
+  | 'nps';
+
+export interface SurveyChoiceOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface SurveyQuestion {
+  id: string;
+  type: SurveyQuestionType;
+  prompt: string;
+  description?: string;
+  required: boolean;
+  options?: SurveyChoiceOption[];
+  minRating?: number;
+  maxRating?: number;
+  minLabel?: string;
+  maxLabel?: string;
+}
+
+export interface SurveyTargeting {
+  type: 'all' | 'property' | 'event';
+  propertyKey?: string;
+  propertyOperator?: string;
+  propertyValue?: string | number | boolean;
+  eventName?: string;
+}
+
+export interface Survey {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string | null;
+  status: SurveyStatus;
+  environment: string;
+  questions: SurveyQuestion[];
+  targeting: SurveyTargeting;
+  displayTrigger?: {
+    type: 'immediate' | 'event' | 'delay';
+    delaySeconds?: number;
+    eventName?: string;
+  };
+  publishedAt?: string | null;
+  closedAt?: string | null;
+  archivedAt?: string | null;
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SurveyAnswer {
+  questionId: string;
+  questionType: SurveyQuestionType;
+  prompt: string;
+  answerText?: string;
+  selectedOptions?: string[];
+  rating?: number;
+  score?: number;
+}
+
+export interface SurveyResponseRecord {
+  id: string;
+  surveyId: string;
+  distinctId: string;
+  userId?: string | null;
+  anonymousId?: string | null;
+  sessionId?: string | null;
+  answers: SurveyAnswer[];
+  metadata?: Record<string, unknown>;
+  occurredAt: string;
+  receivedAt: string;
+}
+
+export interface SurveyQuestionDistribution {
+  questionId: string;
+  prompt: string;
+  type: SurveyQuestionType;
+  totalResponses: number;
+  options?: Array<{
+    optionId: string;
+    label: string;
+    count: number;
+    percentage: number;
+  }>;
+  averageRating?: number;
+  npsScore?: number;
+  promoters?: number;
+  passives?: number;
+  detractors?: number;
+  recentTextAnswers?: Array<{
+    id: string;
+    distinctId: string;
+    text: string;
+    occurredAt: string;
+  }>;
+}
+
+export interface SurveyResults {
+  surveyId: string;
+  surveyName: string;
+  status: SurveyStatus;
+  impressionsCount: number;
+  responsesCount: number;
+  responseRate: number;
+  completionRate: number;
+  questions: SurveyQuestionDistribution[];
+  recentResponses: SurveyResponseRecord[];
+}
 
 export interface CreateSurveyDto {
   projectId?: string;

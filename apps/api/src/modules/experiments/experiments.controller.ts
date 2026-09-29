@@ -3,9 +3,9 @@ import { AuthService } from '../auth/auth.service';
 import {
   CreateExperimentDto,
   ExperimentsService,
+  ExperimentStatus,
   UpdateExperimentDto
 } from './experiments.service';
-import type { ExperimentStatus } from '@traceiq/types';
 
 @Controller('v1/dashboard/experiments')
 export class ExperimentsController {
