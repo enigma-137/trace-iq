@@ -14,8 +14,9 @@ import TerminalIcon from '@hugeicons/core-free-icons/TerminalIcon';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { LandingHero } from '@/components/landing/LandingHero';
 import { LandingArchitectureCards } from '@/components/landing/LandingArchitectureCards';
-import { LandingApiFlow } from '@/components/LandingApiFlow';
-import { LandingOverviewDemo } from '@/components/LandingOverviewDemo';
+import { LandingProductOverview } from '@/components/landing/LandingProductOverview';
+import { LandingDevExperience } from '@/components/landing/LandingDevExperience';
+import { LandingSdkSection } from '@/components/landing/LandingSdkSection';
 import { LandingScrollCapabilities } from '@/components/landing/LandingScrollCapabilities';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 import { TrustedTeamsSection } from '@/components/TrustedTeams';
@@ -42,12 +43,6 @@ const faqs = [
   ['Is using TraceIQ automatically GDPR or CCPA compliant?', 'No analytics tool makes an implementation automatically compliant. Operators control what they collect and must configure notices, consent or another legal basis, retention, access, and deletion processes for their users and jurisdictions.']
 ];
 
-const codeExamples = {
-  JavaScript: `import { traceiq } from 'traceiq-sdk-js'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.track('checkout_started', {\n  cartValue: 4200,\n  currency: 'USD',\n})`,
-  'React Native': `import { traceiq } from 'traceiq-react-native'\n\ntraceiq.initialize({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: 'YOUR_WRITE_KEY',\n})\n\ntraceiq.capture({\n  event: 'checkout_started',\n  properties: { cartValue: 4200, currency: 'USD' },\n})`,
-  Node: `import { TraceIQ } from '@traceiq/node'\n\nconst traceiq = new TraceIQ({\n  projectId: 'YOUR_PROJECT_ID',\n  writeKey: process.env.TRACEIQ_WRITE_KEY!,\n})\n\ntraceiq.capture({\n  event: 'checkout_started',\n  properties: { cartValue: 4200 },\n})`
-} as const;
-
 const mcpConfig = `{
   "mcpServers": {
     "traceiq": {
@@ -71,8 +66,6 @@ interface LogEntry {
 export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [activeLanguage, setActiveLanguage] = useState<keyof typeof codeExamples>('JavaScript');
-  const [copied, setCopied] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState('');
   const [waitlistLoading, setWaitlistLoading] = useState(false);
@@ -95,11 +88,6 @@ export default function Page() {
     { id: '2', time: '22:54:09', type: 'ingest', message: 'Established connection to telemetry endpoint http://localhost:4000' }
   ]);
 
-  const copyCode = async () => {
-    await navigator.clipboard.writeText(codeExamples[activeLanguage]);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  };
 
   const handleWaitlistSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -229,21 +217,8 @@ export default function Page() {
       {/* Full-width white background section with architecture images & captions */}
       <LandingArchitectureCards />
 
-      {/* Product preview */}
-      <section className="traceiq-frame mx-auto w-full max-w-[1880px] px-6 sm:px-10 lg:px-14 xl:px-20 2xl:px-24 py-24 sm:py-28 lg:py-36" id="product">
-        <div className="section-kicker">01 / Inside TraceIQ</div>
-        <div className="intro-grid">
-          <h2>Traffic, behavior, and health.<br /><em>One inspectable view.</em></h2>
-          <p>Start with visitors and referrers, follow real session paths, then connect conversion behavior to errors, API latency, feature flags, and alerts.</p>
-        </div>
-        <div className="product-shot product-shot-primary">
-          <div className="product-shot-bar">
-            <span><i /> Product overview</span>
-          </div>
-          {/* <LandingOverviewDemo /> */}
-          <p className="product-shot-caption">See product behavior, system health, and incoming activity in one place.</p>
-        </div>
-      </section>
+      {/* Product preview & interactive overview */}
+      <LandingProductOverview />
 
       {/* Full-bleed Editorial Photographic Break */}
       <section className="relative w-full h-[70vh] sm:h-[85vh] lg:h-[95vh] min-h-[500px] overflow-hidden bg-black select-none" aria-hidden="true">
@@ -257,57 +232,11 @@ export default function Page() {
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent pointer-events-none" />
       </section>
 
-      {/* API performance */}
-      <section className="traceiq-frame mx-auto w-full max-w-[1880px] px-6 sm:px-10 lg:px-14 xl:px-20 2xl:px-24 py-24 sm:py-28 lg:py-36" id="performance">
-        <div className="product-detail mt-0">
-          <div className="product-detail-copy">
-            <span className="product-detail-label">API performance</span>
-            <h3>Follow every request through the stack.</h3>
-          </div>
-          <div className="product-shot product-shot-secondary product-flow-preview">
-            {/* <LandingApiFlow /> */}
-          </div>
-          <div className="product-detail-footer">
-            <p>Compare traffic, errors, and latency, then inspect how requests move from your SDKs through processing and storage.</p>
-            <a className="quiet-link" href="/auth/login">Explore TraceIQ <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} /></a>
-          </div>
-        </div>
-      </section>
+      {/* Developer experience & live sandbox / webhooks */}
+      <LandingDevExperience />
 
-      {/* SDK quickstart */}
-      <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-28" id="docs">
-        <div className="section-kicker">02 / Meet your stack</div>
-        <div className="sdk-heading">
-          <h2>Instrument once.<br /><em>See everything.</em></h2>
-          <p>TraceIQ fits into the tools you already use. Add a few lines, ship with confidence, and keep the signal close to the code.</p>
-        </div>
-        <div className="code-window overflow-hidden rounded-xl shadow-2xl">
-          <div className="code-window-top">
-            <div className="window-dots"><i /><i /><i /></div>
-            <span className="window-title">traceiq / quickstart</span>
-            <button className="copy-button" onClick={copyCode} aria-label="Copy code">
-              {copied ? <HugeiconsIcon icon={Tick02Icon} size={14} /> : <HugeiconsIcon icon={Copy01Icon} size={14} />} {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <div className="code-window-body">
-            <div className="language-tabs" role="tablist" aria-label="Choose SDK language">
-              {(Object.keys(codeExamples) as Array<keyof typeof codeExamples>).map((language) => (
-                <button key={language} role="tab" aria-selected={activeLanguage === language} className={activeLanguage === language ? 'is-active' : ''} onClick={() => setActiveLanguage(language)}>
-                  {language}
-                </button>
-              ))}
-            </div>
-            <pre aria-label={`${activeLanguage} TraceIQ example`}><code>{codeExamples[activeLanguage]}</code></pre>
-          </div>
-          <div className="code-window-foot">
-            <span>traceiq-sdk</span>
-            <a href="/docs">Read the docs <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} /></a>
-          </div>
-        </div>
-        <div className="sdk-pills">
-          <span>Web Vitals</span><span>Exception capture</span><span>User timelines</span><span>Browser, mobile, and Node</span>
-        </div>
-      </section>
+      {/* SDK quickstart & supported integrations */}
+      <LandingSdkSection />
 
       {/* MCP / AI copilot */}
       <section className="traceiq-frame section mx-auto max-w-[1060px] px-5 py-24 sm:px-8 lg:py-28" id="ai">
