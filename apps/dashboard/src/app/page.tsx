@@ -20,6 +20,7 @@ import { LandingSdkSection } from '@/components/landing/LandingSdkSection';
 import { LandingScrollCapabilities } from '@/components/landing/LandingScrollCapabilities';
 import { LiveFooterStatus } from '@/components/LiveFooterStatus';
 import { TrustedTeamsSection } from '@/components/TrustedTeams';
+import { FeatureSpotlightCard } from '@/components/FeatureSpotlightCard';
 import { joinWaitlist } from './actions';
 
 const navItems = [
@@ -448,6 +449,7 @@ export default function Page() {
           </div>
         </div>
       </footer>
+      <FeatureSpotlightCard surface="public-landing" delayMs={1000} />
     </main>
   );
 }

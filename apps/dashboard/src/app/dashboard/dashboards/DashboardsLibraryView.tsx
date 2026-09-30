@@ -15,7 +15,6 @@ import { NewDashboardModal } from './NewDashboardModal';
 import { DashboardDialog } from '../DashboardDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { PageBanner } from '@/components/PageBanner';
-import { ContextualGuideCard } from '@/components/ContextualGuideCard';
 import { toast } from '@/lib/toast';
 
 export function DashboardsLibraryView({
@@ -504,27 +503,6 @@ export function DashboardsLibraryView({
             </button>
           </div>
         </DashboardDialog>
-      )}
-
-      {/* Contextual Onboarding Guide Card */}
-      {dashboards.length === 0 && !loading && (
-        <ContextualGuideCard
-          guideId="dashboard-library-onboarding"
-          surface="dashboards"
-          imageSrc="/dashboards/banner-create-dashboard.png"
-          imageAlt="TraceIQ Dashboard Mascot"
-          title="Build your first dashboard"
-          description="Start with a template or create one from scratch. Add charts from your events, funnels, users, revenue and errors, then arrange everything into one view."
-          primaryAction={{
-            label: 'Browse Templates',
-            onClick: () => setIsNewModalOpen(true)
-          }}
-          secondaryAction={{
-            label: 'Start Blank',
-            onClick: () => setIsNewModalOpen(true)
-          }}
-          placement="bottom-right"
-        />
       )}
     </div>
   );

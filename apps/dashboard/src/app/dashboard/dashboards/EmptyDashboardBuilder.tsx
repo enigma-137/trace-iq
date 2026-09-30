@@ -8,7 +8,6 @@ import { withProjectId } from '../nav';
 import { createInsight, addDashboardWidget } from '@/lib/analytics-api';
 import type { DashboardWidgetView, InsightType, VisualizationType } from '@/types/analytics';
 import { toast } from '@/lib/toast';
-import { ContextualGuideCard } from '@/components/ContextualGuideCard';
 
 export interface EmptyDashboardBuilderProps {
   dashboardId: string;
@@ -417,28 +416,6 @@ export function EmptyDashboardBuilder({
           </div>
         </div>
       </div>
-
-      {/* Contextual Onboarding Guide Card */}
-      <ContextualGuideCard
-        guideId="dashboard-builder-onboarding"
-        surface="dashboards"
-        imageSrc="/dashboards/banner-create-dashboard.png"
-        imageAlt="TraceIQ Dashboard Creation Mascot"
-        title="Build your first dashboard"
-        description="Start with a template or create one from scratch. Add charts from your events, funnels, users, revenue and errors, then arrange everything into one view."
-        primaryAction={{
-          label: 'Browse Templates',
-          onClick: onBrowseTemplates
-        }}
-        secondaryAction={{
-          label: 'Start Blank',
-          onClick: () => {
-            const textarea = document.querySelector('textarea');
-            textarea?.focus();
-          }
-        }}
-        placement="bottom-right"
-      />
     </div>
   );
 }

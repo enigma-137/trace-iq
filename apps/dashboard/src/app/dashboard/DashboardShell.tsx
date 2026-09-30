@@ -4,6 +4,7 @@ import { DashboardHeader } from './DashboardHeader';
 import { DashboardPlanProvider } from './DashboardPlan';
 import { AskTraceIQProvider } from '@/components/ai/AskTraceIQContext';
 import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
+import { FeatureSpotlightCard } from '@/components/FeatureSpotlightCard';
 
 export interface DashboardShellProps {
   active?: string;
@@ -66,6 +67,7 @@ export function DashboardShell({
             </section>
           </div>
           <AskTraceIQDrawer />
+          <FeatureSpotlightCard projectId={projectId ?? undefined} surface="dashboard-shell" />
         </main>
       </AskTraceIQProvider>
     </DashboardPlanProvider>
