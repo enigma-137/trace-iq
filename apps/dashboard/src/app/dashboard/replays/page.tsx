@@ -1,12 +1,13 @@
-import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import type { ReplayListItem } from '@/features/replay/types';
-import { ReplayDeleteButton } from './ReplayDeleteButton';
+import { ReplaysWorkspace } from './ReplaysWorkspace';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ReplaysPage({ searchParams }: {
+export default async function ReplaysPage({
+  searchParams
+}: {
   searchParams: { projectId?: string; sessionId?: string; userId?: string; anonymousId?: string };
 }) {
   const { user, token } = await requireDashboardSession('/dashboard/replays');
@@ -15,67 +16,34 @@ export default async function ReplaysPage({ searchParams }: {
   if (searchParams.sessionId) query.set('sessionId', searchParams.sessionId);
   if (searchParams.userId) query.set('userId', searchParams.userId);
   if (searchParams.anonymousId) query.set('anonymousId', searchParams.anonymousId);
+
   const { data, error } = await dashboardGet<{
-    project: { id: string; organizationId: string }; replays: ReplayListItem[];
+    project: { id: string; organizationId: string };
+    replays: ReplayListItem[];
   }>(`/v1/dashboard/replays?${query}`, token);
+
   const project = data?.project;
 
   return (
-    <DashboardShell active="replays" title="Session Replays" userEmail={user.email}
-      projectId={project?.id ?? searchParams.projectId} organizationId={project?.organizationId}>
-      <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <p className="max-w-2xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
-            Inspect a session in context. Browser replays use rrweb; mobile replays use content-free structural events. Both expire on their retention schedule.
-          </p>
-          {searchParams.sessionId ? <p className="mt-2 font-mono text-xs text-neutral-500">Session: {searchParams.sessionId}</p> : null}
-        </div>
-        <Link href={`/dashboard/settings/replay${project?.id ? `?projectId=${encodeURIComponent(project.id)}` : ''}`}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-semibold hover:bg-neutral-50 dark:border-slate-700 dark:hover:bg-slate-900">
-          Replay settings
-        </Link>
-      </div>
-      {error ? <p className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-      <section className="overflow-hidden rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] uppercase tracking-wider text-neutral-500 dark:border-slate-800 dark:bg-slate-900/70">
-              <tr><th className="px-4 py-3">Visitor</th><th>Entry page</th><th>Started</th><th>Duration</th><th>Device</th><th>Location</th><th>Size</th><th className="px-4 text-right">Actions</th></tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-slate-900">
-              {(data?.replays ?? []).map((replay) => (
-                <tr key={replay.id}>
-                  <td className="px-4 py-3">
-                    <p className="max-w-52 truncate font-semibold">{replay.identity}</p>
-                    <p className="font-mono text-[10px] text-neutral-400">{replay.sessionId}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-neutral-500">
-                      {replay.recordingFormat === 'mobile-structural-v1' ? 'Mobile structural' : 'Browser rrweb'}
-                    </p>
-                    <p className="mt-1 max-w-52 truncate text-[11px] text-neutral-500" title={replay.matchedFlows.map((flow) => flow.name).join(', ')}>
-                      {replay.matchedFlows.length > 0 ? `Flows: ${replay.matchedFlows.map((flow) => flow.name).join(', ')}` : 'Flow no longer available'}
-                    </p>
-                  </td>
-                  <td className="max-w-60 truncate">{replay.entryPage ?? '—'}</td>
-                  <td>{formatDate(replay.startedAt)}</td><td>{formatDuration(replay.durationMs)}</td>
-                  <td>{[replay.deviceType, replay.browser].filter(Boolean).join(' · ') || '—'}</td><td>{replay.country ?? '—'}</td>
-                  <td>{formatBytes(replay.compressedSizeBytes)}</td>
-                  <td className="px-4 text-right">
-                    <div className="flex items-start justify-end gap-4">
-                      <Link className="font-semibold text-blue-600 hover:underline" href={`/dashboard/replays/${encodeURIComponent(replay.id)}?projectId=${encodeURIComponent(project?.id ?? searchParams.projectId ?? '')}`}>Watch replay</Link>
-                      <ReplayDeleteButton replayId={replay.id} projectId={project?.id ?? searchParams.projectId} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!data?.replays?.length ? <p className="p-8 text-center text-sm text-neutral-500">No matching replays. Recording is disabled by default until configured.</p> : null}
-      </section>
+    <DashboardShell
+      active="replays"
+      title="Session Replays"
+      userEmail={user.email}
+      projectId={project?.id ?? searchParams.projectId}
+      organizationId={project?.organizationId}
+    >
+      {error ? (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </p>
+      ) : null}
+
+      <ReplaysWorkspace
+        initialReplays={data?.replays ?? []}
+        projectId={project?.id ?? searchParams.projectId}
+        organizationId={project?.organizationId}
+        initialSessionId={searchParams.sessionId}
+      />
     </DashboardShell>
   );
 }
-
-const formatDuration = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1_000) % 60).padStart(2, '0')}`;
-const formatBytes = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1_048_576 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/1_048_576).toFixed(1)} MB`;
-const formatDate = (value: string) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
