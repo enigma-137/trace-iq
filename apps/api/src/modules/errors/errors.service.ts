@@ -28,6 +28,7 @@ type IssueAggregateRow = {
 
 export type ErrorSample = {
   id: string;
+  sessionId?: string | null;
   message: string | null;
   stack: string | null;
   browser: string | null;
@@ -35,6 +36,7 @@ export type ErrorSample = {
   country: string | null;
   actor: string | null;
   externalId: string | null;
+  url?: string | null;
   occurredAt: string;
 };
 
@@ -139,6 +141,7 @@ export class ErrorsService {
     const samples = await this.database.query<ErrorSample>(
       `SELECT
         e.id,
+        e.session_id AS "sessionId",
         e.properties->>'message' AS message,
         e.properties->>'stack' AS stack,
         e.device_info->>'browser' AS browser,
@@ -146,6 +149,7 @@ export class ErrorsService {
         e.network_info->>'country' AS country,
         COALESCE(e.user_id::text, e.anonymous_id) AS actor,
         u.external_id AS "externalId",
+        COALESCE(e.properties->>'pathname', e.properties->>'$current_url', e.properties->>'url') AS url,
         e.occurred_at AS "occurredAt"
        FROM events e
        LEFT JOIN users u ON u.id = e.user_id
@@ -155,8 +159,31 @@ export class ErrorsService {
       filterValues
     );
 
+    const timelineDaily = await this.database.query<{ day: string; count: number }>(
+      `SELECT
+        to_char(date_trunc('day', e.occurred_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
+        count(*)::int AS count
+       FROM events e
+       WHERE ${filter}
+       GROUP BY 1
+       ORDER BY 1 ASC`,
+      filterValues
+    );
+
+    const buckets = this.dayBuckets(days);
+    const dayMap = new Map<string, number>();
+    for (const row of timelineDaily.rows) {
+      dayMap.set(row.day, row.count);
+    }
+    const timeline = buckets.map((day) => ({
+      day,
+      count: dayMap.get(day) ?? 0
+    }));
+
     const browsers = await this.breakdown(filter, filterValues, "e.device_info->>'browser'");
     const operatingSystems = await this.breakdown(filter, filterValues, "e.device_info->>'os'");
+    const pages = await this.breakdown(filter, filterValues, "COALESCE(NULLIF(e.properties->>'pathname', ''), NULLIF(e.properties->>'$current_url', ''), NULLIF(e.properties->>'url', ''), '/')");
+    const releases = await this.breakdown(filter, filterValues, "COALESCE(NULLIF(e.properties->>'release', ''), NULLIF(e.device_info->>'appVersion', ''), 'v1.0.0')");
 
     return {
       project,
@@ -164,8 +191,11 @@ export class ErrorsService {
       days,
       totals: totals.rows[0] ?? { occurrences: 0, sessions: 0, users: 0, firstSeen: '', lastSeen: '' },
       samples: samples.rows,
+      timeline,
       browsers,
-      operatingSystems
+      operatingSystems,
+      pages,
+      releases
     };
   }
 
