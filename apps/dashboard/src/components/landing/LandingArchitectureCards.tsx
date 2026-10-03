@@ -34,7 +34,7 @@ export function LandingArchitectureCards() {
         {/* Top Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 pb-12 sm:pb-16 border-b border-black/[0.08]">
           <span className="text-xs sm:text-sm font-medium tracking-wide text-neutral-500 uppercase font-mono">
-            For developers
+            For product teams
           </span>
           <p className="text-lg sm:text-xl md:text-2xl font-semibold text-neutral-900 tracking-tight max-w-[580px] leading-snug">
             Learn more on how engineering teams deploy TraceIQ to capture, query, and scale telemetry on their own terms.
