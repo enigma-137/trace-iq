@@ -37,7 +37,7 @@ export function LandingArchitectureCards() {
             For product teams
           </span>
           <p className="text-lg sm:text-xl md:text-2xl font-semibold text-neutral-900 tracking-tight max-w-[580px] leading-snug">
-            Learn more on how engineering teams deploy TraceIQ to capture, query, and scale telemetry on their own terms.
+            Your engineering team can deploy TraceIQ to capture, query, and scale telemetry on their own terms.
           </p>
         </div>
 
