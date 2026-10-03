@@ -282,7 +282,14 @@ export class UsersService {
   async listPersons(
     user: DashboardUser,
     params: { search?: string; limit?: string; offset?: string; projectId?: string }
-  ): Promise<{ project: unknown; persons: PersonSummary[]; limit: number; offset: number }> {
+  ): Promise<{
+    project: unknown;
+    persons: PersonSummary[];
+    limit: number;
+    offset: number;
+    totalCount?: number;
+    stats?: { totalUsers: number; activeUsers14d: number; newUsers14d: number; returningUsers: number };
+  }> {
     const project = await this.projects.resolveActiveProject(user, params.projectId);
     const limit = this.clamp(params.limit, 25, 1, 100);
     const offset = this.clamp(params.offset, 0, 0, 100000);
@@ -373,8 +380,39 @@ export class UsersService {
         lastCity: row.lastCity ?? null
       };
     });
+    const countResult = await this.database.query<{
+      totalUsers: number;
+      activeUsers14d: number;
+      newUsers14d: number;
+      returningUsers: number;
+    }>(
+      `
+        SELECT
+          count(*)::int AS "totalUsers",
+          count(CASE WHEN u.last_seen_at >= now() - interval '14 days' THEN 1 END)::int AS "activeUsers14d",
+          count(CASE WHEN u.first_seen_at >= now() - interval '14 days' THEN 1 END)::int AS "newUsers14d",
+          count(CASE WHEN u.first_seen_at < now() - interval '14 days' AND u.last_seen_at >= now() - interval '14 days' THEN 1 END)::int AS "returningUsers"
+        FROM users u
+        WHERE u.project_id = $1
+      `,
+      [project.id]
+    );
 
-    return { project, persons, limit, offset };
+    const stats = countResult.rows[0] ?? {
+      totalUsers: 0,
+      activeUsers14d: 0,
+      newUsers14d: 0,
+      returningUsers: 0
+    };
+
+    return {
+      project,
+      persons,
+      limit,
+      offset,
+      totalCount: stats.totalUsers,
+      stats
+    };
   }
 
   async searchPersons(

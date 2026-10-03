@@ -63,7 +63,7 @@ export function DashboardHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 px-5 py-3.5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-8">
+      <header className="sticky top-0 z-10 bg-white/90 px-5 py-3.5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-8">
         <div className="flex items-center justify-between gap-4">
           {/* Far Left: Breadcrumb Organization > Project Name (Clickable for Project ID modal, no visible ID) */}
           <div className="flex min-w-0 items-center gap-3">
@@ -100,8 +100,8 @@ export function DashboardHeader({
             {/* 1. Alerts rules status indicator (beeping/pulsing dot) */}
             <div
               className={`hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${hasFiringAlerts
-                  ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
-                  : 'border-neutral-200 bg-neutral-50/70 text-neutral-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300'
+                ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
+                : 'border-neutral-200 bg-neutral-50/70 text-neutral-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300'
                 }`}
             >
               <span
