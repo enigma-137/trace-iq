@@ -31,9 +31,11 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
   const [targetingType, setTargetingType] = useState<'all' | 'property' | 'event'>(
     initialSurvey?.targeting?.type || 'all'
   );
-  const [propertyKey, setPropertyKey] = useState(initialSurvey?.targeting?.propertyKey || 'plan');
-  const [propertyValue, setPropertyValue] = useState(String(initialSurvey?.targeting?.propertyValue || 'enterprise'));
-  const [eventName, setEventName] = useState(initialSurvey?.targeting?.eventName || 'feature_completed');
+  const [propertyKey, setPropertyKey] = useState(initialSurvey?.targeting?.propertyKey || '');
+  const [propertyValue, setPropertyValue] = useState(
+    initialSurvey?.targeting?.propertyValue !== undefined ? String(initialSurvey.targeting.propertyValue) : ''
+  );
+  const [eventName, setEventName] = useState(initialSurvey?.targeting?.eventName || '');
 
   const [questions, setQuestions] = useState<SurveyQuestion[]>(
     initialSurvey?.questions && initialSurvey.questions.length > 0
@@ -68,8 +70,50 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
   const [previewQuestionIndex, setPreviewQuestionIndex] = useState(0);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, any>>({});
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isQuestionAnswered = (q: SurveyQuestion, answers: Record<string, any>): boolean => {
+    const ans = answers[q.id];
+    if (ans === undefined || ans === null) return false;
+    if (q.type === 'single_choice') {
+      return typeof ans === 'string' && ans.trim().length > 0;
+    }
+    if (q.type === 'multiple_choice') {
+      return Array.isArray(ans) && ans.length > 0;
+    }
+    if (q.type === 'rating_scale' || q.type === 'nps') {
+      return typeof ans === 'number';
+    }
+    if (q.type === 'short_text' || q.type === 'long_text') {
+      return typeof ans === 'string' && ans.trim().length > 0;
+    }
+    return Boolean(ans);
+  };
+
+  const handlePreviewAnswer = (qId: string, value: any) => {
+    setPreviewAnswers((prev) => ({ ...prev, [qId]: value }));
+    setPreviewError(null);
+  };
+
+  const handlePreviewNext = () => {
+    if (currentPreviewQ?.required && !isQuestionAnswered(currentPreviewQ, previewAnswers)) {
+      setPreviewError('Please answer this required question before continuing.');
+      return;
+    }
+    setPreviewError(null);
+    setPreviewQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1));
+  };
+
+  const handlePreviewSubmit = () => {
+    if (currentPreviewQ?.required && !isQuestionAnswered(currentPreviewQ, previewAnswers)) {
+      setPreviewError('Please answer this required question before submitting.');
+      return;
+    }
+    setPreviewError(null);
+    alert('Survey submission test complete!');
+  };
 
   const addQuestion = (type: SurveyQuestionType = 'single_choice') => {
     const nextIdx = questions.length + 1;
@@ -170,6 +214,14 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
       setError('Please add at least one question.');
       return;
     }
+    if (targetingType === 'event' && !eventName.trim()) {
+      setError('Trigger event name is required when targeting by event.');
+      return;
+    }
+    if (targetingType === 'property' && (!propertyKey.trim() || !propertyValue.trim())) {
+      setError('User property name and value are required when targeting by property.');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -178,9 +230,9 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
 
     const targeting: SurveyTargeting = {
       type: targetingType,
-      propertyKey: targetingType === 'property' ? propertyKey : undefined,
-      propertyValue: targetingType === 'property' ? propertyValue : undefined,
-      eventName: targetingType === 'event' ? eventName : undefined
+      propertyKey: targetingType === 'property' ? propertyKey.trim() : undefined,
+      propertyValue: targetingType === 'property' ? propertyValue.trim() : undefined,
+      eventName: targetingType === 'event' ? eventName.trim() : undefined
     };
 
     try {
@@ -591,7 +643,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                 <div className="grid grid-cols-2 gap-3 rounded-lg border border-neutral-100 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900">
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-slate-300">
-                      User Property Name
+                      User Property Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -603,7 +655,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-slate-300">
-                      Equals Value
+                      Equals Value <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -619,7 +671,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
               {targetingType === 'event' && (
                 <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900">
                   <label className="text-[11px] font-semibold text-neutral-700 dark:text-slate-300">
-                    Trigger Event Name
+                    Trigger Event Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -697,6 +749,12 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                     </h4>
                   </div>
 
+                  {previewError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300">
+                      {previewError}
+                    </div>
+                  )}
+
                   {/* Interactive Question Types */}
                   {currentPreviewQ?.type === 'single_choice' && (
                     <div className="space-y-1.5">
@@ -709,9 +767,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                             type="radio"
                             name={`preview_${currentPreviewQ.id}`}
                             checked={previewAnswers[currentPreviewQ.id] === opt.value}
-                            onChange={() =>
-                              setPreviewAnswers({ ...previewAnswers, [currentPreviewQ.id]: opt.value })
-                            }
+                            onChange={() => handlePreviewAnswer(currentPreviewQ.id, opt.value)}
                             className="text-blue-600"
                           />
                           <span>{opt.label}</span>
@@ -737,7 +793,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                                 const next = selected
                                   ? current.filter((v: string) => v !== opt.value)
                                   : [...current, opt.value];
-                                setPreviewAnswers({ ...previewAnswers, [currentPreviewQ.id]: next });
+                                handlePreviewAnswer(currentPreviewQ.id, next);
                               }}
                               className="rounded-sm text-blue-600"
                             />
@@ -755,9 +811,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                           <button
                             key={score}
                             type="button"
-                            onClick={() =>
-                              setPreviewAnswers({ ...previewAnswers, [currentPreviewQ.id]: score })
-                            }
+                            onClick={() => handlePreviewAnswer(currentPreviewQ.id, score)}
                             className={`flex h-8 items-center justify-center rounded-md border text-xs font-bold transition ${
                               previewAnswers[currentPreviewQ.id] === score
                                 ? 'border-blue-600 bg-blue-600 text-white'
@@ -782,9 +836,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                           <button
                             key={star}
                             type="button"
-                            onClick={() =>
-                              setPreviewAnswers({ ...previewAnswers, [currentPreviewQ.id]: star })
-                            }
+                            onClick={() => handlePreviewAnswer(currentPreviewQ.id, star)}
                             className={`flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-bold transition ${
                               previewAnswers[currentPreviewQ.id] === star
                                 ? 'border-blue-600 bg-blue-600 text-white'
@@ -807,9 +859,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                       type="text"
                       placeholder="Type your answer here..."
                       value={previewAnswers[currentPreviewQ.id] || ''}
-                      onChange={(e) =>
-                        setPreviewAnswers({ ...previewAnswers, [currentPreviewQ.id]: e.target.value })
-                      }
+                      onChange={(e) => handlePreviewAnswer(currentPreviewQ.id, e.target.value)}
                       className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                     />
                   )}
@@ -819,9 +869,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                       rows={3}
                       placeholder="Write your feedback..."
                       value={previewAnswers[currentPreviewQ.id] || ''}
-                      onChange={(e) =>
-                        setPreviewAnswers({ ...previewAnswers, [currentPreviewQ.id]: e.target.value })
-                      }
+                      onChange={(e) => handlePreviewAnswer(currentPreviewQ.id, e.target.value)}
                       className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                     />
                   )}
@@ -831,7 +879,10 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                     <button
                       type="button"
                       disabled={previewQuestionIndex === 0}
-                      onClick={() => setPreviewQuestionIndex((prev) => Math.max(0, prev - 1))}
+                      onClick={() => {
+                        setPreviewError(null);
+                        setPreviewQuestionIndex((prev) => Math.max(0, prev - 1));
+                      }}
                       className="rounded-md px-2 py-1 text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-30 dark:text-slate-400 dark:hover:text-white"
                     >
                       Back
@@ -840,7 +891,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                     {previewQuestionIndex < questions.length - 1 ? (
                       <button
                         type="button"
-                        onClick={() => setPreviewQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1))}
+                        onClick={handlePreviewNext}
                         className="rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500"
                       >
                         Next
@@ -848,7 +899,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                     ) : (
                       <button
                         type="button"
-                        onClick={() => alert('Survey submission test complete!')}
+                        onClick={handlePreviewSubmit}
                         className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
                       >
                         Submit Feedback

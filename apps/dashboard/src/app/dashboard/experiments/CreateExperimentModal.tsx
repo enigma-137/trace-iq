@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import type { ExperimentVariant } from '@traceiq/types';
 
@@ -26,7 +26,8 @@ export function CreateExperimentModal({
   const [key, setKey] = useState('');
   const [description, setDescription] = useState('');
   const [environment, setEnvironment] = useState('production');
-  const [primaryMetric, setPrimaryMetric] = useState('checkout_completed');
+  const [primaryMetric, setPrimaryMetric] = useState('');
+  const [knownEvents, setKnownEvents] = useState<string[]>([]);
   const [targetPercentage, setTargetPercentage] = useState(100);
   const [variants, setVariants] = useState<Array<{ id: string; key: string; name: string; weight: number; isControl: boolean }>>([
     { id: 'v_ctrl', key: 'control', name: 'Control (Original)', weight: 50, isControl: true },
@@ -34,6 +35,25 @@ export function CreateExperimentModal({
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    async function loadEvents() {
+      try {
+        const token = initialToken || (await supabase.auth.getSession()).data.session?.access_token;
+        const res = await fetch(`${apiBaseUrl}/v1/dashboard/events/recent?limit=50${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const eventsList = (data?.events || []) as Array<{ eventName?: string }>;
+          const uniqueNames = Array.from(new Set(eventsList.map((e) => e.eventName).filter((n): n is string => Boolean(n))));
+          setKnownEvents(uniqueNames);
+        }
+      } catch {}
+    }
+    loadEvents();
+  }, [isOpen, projectId, initialToken, supabase]);
 
   if (!isOpen) return null;
 
@@ -259,12 +279,18 @@ export function CreateExperimentModal({
               </label>
               <input
                 type="text"
+                list="known-events-list"
                 placeholder="e.g. checkout_completed or signup"
                 value={primaryMetric}
                 onChange={(e) => setPrimaryMetric(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-mono text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 required
               />
+              <datalist id="known-events-list">
+                {knownEvents.map((evt) => (
+                  <option key={evt} value={evt} />
+                ))}
+              </datalist>
             </div>
           </div>
 

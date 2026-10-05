@@ -38,6 +38,103 @@ describe('SurveysService - Unit & Integration Tests', () => {
     await expect(service.get(USER, 'srv_1', 'other_proj')).rejects.toThrow(NotFoundException);
   });
 
+  it('validates targeting rules and prevents empty event triggers from persisting', async () => {
+    const { service } = makeService((sql) => {
+      if (sql.includes('SELECT * FROM surveys')) {
+        return rows([{
+          id: 'srv_test_1',
+          project_id: PROJECT.id,
+          name: 'Test Survey',
+          targeting: { type: 'all' },
+          questions: []
+        }]);
+      }
+      return rows([]);
+    });
+
+    // Empty event name on create
+    await expect(
+      service.create(USER, {
+        projectId: PROJECT.id,
+        name: 'Event Triggered Survey',
+        targeting: {
+          type: 'event',
+          eventName: ''
+        }
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    // Whitespace event name on create
+    await expect(
+      service.create(USER, {
+        projectId: PROJECT.id,
+        name: 'Event Triggered Survey',
+        targeting: {
+          type: 'event',
+          eventName: '   '
+        }
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    // Empty event name on update
+    await expect(
+      service.update(USER, 'srv_test_1', {
+        targeting: {
+          type: 'event',
+          eventName: ''
+        }
+      }, PROJECT.id)
+    ).rejects.toThrow(BadRequestException);
+
+    // Incomplete property targeting on create
+    await expect(
+      service.create(USER, {
+        projectId: PROJECT.id,
+        name: 'Property Survey',
+        targeting: {
+          type: 'property',
+          propertyKey: '',
+          propertyValue: 'enterprise'
+        }
+      })
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('supports direct navigation lookup by survey id across accessible projects', async () => {
+    const { service } = makeService((sql) => {
+      if (sql.includes('SELECT s.project_id FROM surveys s')) {
+        return rows([{ project_id: PROJECT.id }]);
+      }
+      if (sql.includes('SELECT * FROM surveys WHERE id = $1')) {
+        return rows([
+          {
+            id: 'srv_direct_1',
+            project_id: PROJECT.id,
+            name: 'Direct Survey',
+            status: 'draft',
+            environment: 'production',
+            questions: [],
+            targeting: { type: 'all' },
+            display_trigger: { type: 'immediate' },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]);
+      }
+      if (sql.includes('FROM survey_interactions')) {
+        return rows([]);
+      }
+      if (sql.includes('FROM survey_responses')) {
+        return rows([]);
+      }
+      return rows([]);
+    });
+
+    const res = await service.get(USER, 'srv_direct_1');
+    expect(res.survey.id).toBe('srv_direct_1');
+    expect(res.project.id).toBe(PROJECT.id);
+  });
+
   it('creates a survey with question types and targeting', async () => {
     let insertedRow: any = null;
     const { service } = makeService((sql, params) => {

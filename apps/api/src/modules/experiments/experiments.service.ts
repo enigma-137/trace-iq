@@ -243,14 +243,32 @@ export class ExperimentsService {
   }
 
   async get(user: DashboardUser, id: string, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const expRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT e.project_id
+          FROM experiments e
+          JOIN projects p ON p.id = e.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE (e.id = $1 OR e.key = $1) AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (expRes.rows[0]) {
+        resolvedProjectId = expRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const result = await this.database.query<any>(
       `
         SELECT *
         FROM experiments
-        WHERE id = $1 AND project_id = $2
+        WHERE (id = $1 OR key = $1) AND project_id = $2
         LIMIT 1;
       `,
       [id, project.id]
@@ -373,11 +391,29 @@ export class ExperimentsService {
   }
 
   async update(user: DashboardUser, id: string, dto: UpdateExperimentDto, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const expRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT e.project_id
+          FROM experiments e
+          JOIN projects p ON p.id = e.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE (e.id = $1 OR e.key = $1) AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (expRes.rows[0]) {
+        resolvedProjectId = expRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const existing = await this.database.query<any>(
-      `SELECT * FROM experiments WHERE id = $1 AND project_id = $2 LIMIT 1;`,
+      `SELECT * FROM experiments WHERE (id = $1 OR key = $1) AND project_id = $2 LIMIT 1;`,
       [id, project.id]
     );
     if (!existing.rows[0]) throw new NotFoundException('Experiment not found');
@@ -388,6 +424,9 @@ export class ExperimentsService {
     const description = dto.description !== undefined ? dto.description.trim() : current.description;
     const environment = dto.environment !== undefined ? dto.environment : current.environment;
     const primaryMetric = dto.primaryMetric !== undefined ? dto.primaryMetric.trim() : current.primary_metric;
+    if (dto.primaryMetric !== undefined && !primaryMetric) {
+      throw new BadRequestException('Primary success metric event name is required.');
+    }
     const secondaryMetrics = dto.secondaryMetrics !== undefined ? dto.secondaryMetrics : current.secondary_metrics;
     const targetPercentage = dto.targetPercentage !== undefined ? Math.max(1, Math.min(100, dto.targetPercentage)) : current.target_percentage;
     const audienceFilter = dto.audienceFilter !== undefined ? dto.audienceFilter : current.audience_filter;
@@ -424,7 +463,7 @@ export class ExperimentsService {
         JSON.stringify(audienceFilter),
         targetPercentage,
         winnerVariantKey,
-        id,
+        current.id,
         project.id
       ]
     );
@@ -439,14 +478,34 @@ export class ExperimentsService {
     winnerVariantKey?: string | null,
     projectId?: string
   ) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const expRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT e.project_id
+          FROM experiments e
+          JOIN projects p ON p.id = e.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE (e.id = $1 OR e.key = $1) AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (expRes.rows[0]) {
+        resolvedProjectId = expRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const existing = await this.database.query<any>(
-      `SELECT * FROM experiments WHERE id = $1 AND project_id = $2 LIMIT 1;`,
+      `SELECT * FROM experiments WHERE (id = $1 OR key = $1) AND project_id = $2 LIMIT 1;`,
       [id, project.id]
     );
     if (!existing.rows[0]) throw new NotFoundException('Experiment not found');
+
+    const actualId = existing.rows[0].id;
 
     let startedAtClause = '';
     let pausedAtClause = '';
@@ -478,18 +537,36 @@ export class ExperimentsService {
         WHERE id = $2 AND project_id = $3
         RETURNING *;
       `,
-      [status, id, project.id]
+      [status, actualId, project.id]
     );
 
     return this.mapRow(result.rows[0]);
   }
 
   async remove(user: DashboardUser, id: string, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const expRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT e.project_id
+          FROM experiments e
+          JOIN projects p ON p.id = e.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE (e.id = $1 OR e.key = $1) AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (expRes.rows[0]) {
+        resolvedProjectId = expRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     await this.database.query(
-      `DELETE FROM experiments WHERE id = $1 AND project_id = $2;`,
+      `DELETE FROM experiments WHERE (id = $1 OR key = $1) AND project_id = $2;`,
       [id, project.id]
     );
 
@@ -501,11 +578,29 @@ export class ExperimentsService {
   // --------------------------------------------------------------------------
 
   async getResults(user: DashboardUser, id: string, projectId?: string): Promise<ExperimentResults> {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const expRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT e.project_id
+          FROM experiments e
+          JOIN projects p ON p.id = e.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE (e.id = $1 OR e.key = $1) AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (expRes.rows[0]) {
+        resolvedProjectId = expRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const existing = await this.database.query<any>(
-      `SELECT * FROM experiments WHERE id = $1 AND project_id = $2 LIMIT 1;`,
+      `SELECT * FROM experiments WHERE (id = $1 OR key = $1) AND project_id = $2 LIMIT 1;`,
       [id, project.id]
     );
     if (!existing.rows[0]) throw new NotFoundException('Experiment not found');

@@ -259,7 +259,25 @@ export class SurveysService {
   }
 
   async get(user: DashboardUser, id: string, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const srvRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT s.project_id
+          FROM surveys s
+          JOIN projects p ON p.id = s.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE s.id = $1 AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (srvRes.rows[0]) {
+        resolvedProjectId = srvRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const result = await this.database.query<any>(
@@ -287,6 +305,16 @@ export class SurveysService {
     const name = dto.name?.trim();
     if (!name || name.length > 128) {
       throw new BadRequestException('Survey name is required (max 128 characters).');
+    }
+
+    if (dto.targeting?.type === 'event' && (!dto.targeting.eventName || !dto.targeting.eventName.trim())) {
+      throw new BadRequestException('Trigger event name is required when targeting by event.');
+    }
+    if (
+      dto.targeting?.type === 'property' &&
+      (!dto.targeting.propertyKey?.trim() || dto.targeting.propertyValue === undefined || String(dto.targeting.propertyValue).trim() === '')
+    ) {
+      throw new BadRequestException('Property key and value are required when targeting by property.');
     }
 
     const questions = this.normalizeQuestions(dto.questions || []);
@@ -335,7 +363,25 @@ export class SurveysService {
   }
 
   async update(user: DashboardUser, id: string, dto: UpdateSurveyDto, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const srvRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT s.project_id
+          FROM surveys s
+          JOIN projects p ON p.id = s.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE s.id = $1 AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (srvRes.rows[0]) {
+        resolvedProjectId = srvRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const existing = await this.database.query<any>(
@@ -350,6 +396,15 @@ export class SurveysService {
     const description = dto.description !== undefined ? dto.description.trim() : current.description;
     const environment = dto.environment !== undefined ? dto.environment : current.environment;
     const targeting = dto.targeting !== undefined ? dto.targeting : current.targeting;
+    if (targeting?.type === 'event' && (!targeting.eventName || !targeting.eventName.trim())) {
+      throw new BadRequestException('Trigger event name is required when targeting by event.');
+    }
+    if (
+      targeting?.type === 'property' &&
+      (!targeting.propertyKey?.trim() || targeting.propertyValue === undefined || String(targeting.propertyValue).trim() === '')
+    ) {
+      throw new BadRequestException('Property key and value are required when targeting by property.');
+    }
     const displayTrigger = dto.displayTrigger !== undefined ? dto.displayTrigger : current.display_trigger;
 
     let questions = current.questions;
@@ -386,7 +441,25 @@ export class SurveysService {
   }
 
   async updateStatus(user: DashboardUser, id: string, status: SurveyStatus, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const srvRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT s.project_id
+          FROM surveys s
+          JOIN projects p ON p.id = s.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE s.id = $1 AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (srvRes.rows[0]) {
+        resolvedProjectId = srvRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     let publishedClause = '';
@@ -420,7 +493,25 @@ export class SurveysService {
   }
 
   async remove(user: DashboardUser, id: string, projectId?: string) {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const srvRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT s.project_id
+          FROM surveys s
+          JOIN projects p ON p.id = s.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE s.id = $1 AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (srvRes.rows[0]) {
+        resolvedProjectId = srvRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     await this.database.query(`DELETE FROM surveys WHERE id = $1 AND project_id = $2;`, [id, project.id]);
@@ -432,7 +523,25 @@ export class SurveysService {
   // --------------------------------------------------------------------------
 
   async getResults(user: DashboardUser, id: string, projectId?: string): Promise<SurveyResults> {
-    const project = await this.projects.resolveActiveProject(user, projectId);
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const srvRes = await this.database.query<{ project_id: string }>(
+        `
+          SELECT s.project_id
+          FROM surveys s
+          JOIN projects p ON p.id = s.project_id
+          JOIN organization_members om ON om.organization_id = p.organization_id
+          WHERE s.id = $1 AND om.user_id = $2
+          LIMIT 1;
+        `,
+        [id, user.id]
+      );
+      if (srvRes.rows[0]) {
+        resolvedProjectId = srvRes.rows[0].project_id;
+      }
+    }
+
+    const project = await this.projects.resolveActiveProject(user, resolvedProjectId);
     if (!project) throw new NotFoundException('Project not found');
 
     const result = await this.database.query<any>(

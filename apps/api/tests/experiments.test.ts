@@ -38,8 +38,20 @@ describe('ExperimentsService - Unit & Integration Tests', () => {
     await expect(service.get(USER, 'exp_1', 'other_proj')).rejects.toThrow(NotFoundException);
   });
 
-  it('validates experiment key format and name on create', async () => {
-    const { service } = makeService();
+  it('validates experiment key format, name, and primary metric on create and update', async () => {
+    const { service } = makeService((sql) => {
+      if (sql.includes('SELECT * FROM experiments')) {
+        return rows([{
+          id: 'exp_1',
+          project_id: PROJECT.id,
+          key: 'valid-key',
+          name: 'Valid Exp',
+          primary_metric: 'existing_metric',
+          variants: []
+        }]);
+      }
+      return rows([]);
+    });
 
     await expect(
       service.create(USER, {
@@ -58,6 +70,76 @@ describe('ExperimentsService - Unit & Integration Tests', () => {
         primaryMetric: 'signup_completed'
       })
     ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      service.create(USER, {
+        projectId: PROJECT.id,
+        key: 'valid-key',
+        name: 'Valid Name',
+        primaryMetric: '' // Missing primary metric
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      service.create(USER, {
+        projectId: PROJECT.id,
+        key: 'valid-key',
+        name: 'Valid Name',
+        primaryMetric: '   ' // Blank whitespace metric
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      service.update(USER, 'exp_1', {
+        primaryMetric: '' // Cannot update to empty metric
+      }, PROJECT.id)
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('supports direct navigation lookup by experiment id or key across accessible projects', async () => {
+    const { service } = makeService((sql) => {
+      if (sql.includes('SELECT e.project_id FROM experiments e') || sql.includes('FROM experiments e')) {
+        return rows([{ project_id: PROJECT.id }]);
+      }
+      if (sql.includes('FROM experiments')) {
+        return rows([
+          {
+            id: 'exp_direct_1',
+            project_id: PROJECT.id,
+            key: 'direct-slug',
+            name: 'Direct Route Exp',
+            status: 'draft',
+            environment: 'production',
+            primary_metric: 'checkout_success',
+            secondary_metrics: [],
+            variants: [{ id: 'v1', key: 'control', name: 'Control', weight: 100, isControl: true }],
+            target_percentage: 100,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]);
+      }
+      if (sql.includes('SELECT variant_key, count(DISTINCT distinct_id)')) {
+        return rows([]);
+      }
+      if (sql.includes('SELECT exp.variant_key, count(DISTINCT ev.distinct_id)')) {
+        return rows([]);
+      }
+      if (sql.includes('SELECT to_char(exp.occurred_at')) {
+        return rows([]);
+      }
+      return rows([]);
+    });
+
+    // Lookup by ID without explicit projectId (e.g. direct URL navigation)
+    const byId = await service.get(USER, 'exp_direct_1');
+    expect(byId.experiment.id).toBe('exp_direct_1');
+    expect(byId.project.id).toBe(PROJECT.id);
+
+    // Lookup by Key without explicit projectId
+    const byKey = await service.get(USER, 'direct-slug');
+    expect(byKey.experiment.key).toBe('direct-slug');
+    expect(byKey.project.id).toBe(PROJECT.id);
   });
 
   it('creates an experiment with default control and variant with normalized weights', async () => {
@@ -171,7 +253,7 @@ describe('ExperimentsService - Unit & Integration Tests', () => {
 
   it('calculates conversion results with uplift and statistical significance', async () => {
     const { service } = makeService((sql) => {
-      if (sql.includes('SELECT * FROM experiments WHERE id = $1')) {
+      if (sql.includes('FROM experiments')) {
         return rows([
           {
             id: 'exp_stats_1',
@@ -226,12 +308,12 @@ describe('ExperimentsService - Unit & Integration Tests', () => {
   it('handles lifecycle status updates (running, paused, completed)', async () => {
     let updatedStatus: any = null;
     const { service } = makeService((sql, params) => {
-      if (sql.includes('SELECT * FROM experiments WHERE id = $1')) {
-        return rows([{ id: 'exp_1', project_id: PROJECT.id, status: 'draft' }]);
-      }
       if (sql.includes('UPDATE experiments')) {
         updatedStatus = params?.[0];
         return rows([{ id: 'exp_1', project_id: PROJECT.id, status: updatedStatus, variants: [] }]);
+      }
+      if (sql.includes('FROM experiments')) {
+        return rows([{ id: 'exp_1', project_id: PROJECT.id, status: 'draft', variants: [] }]);
       }
       return rows([]);
     });
