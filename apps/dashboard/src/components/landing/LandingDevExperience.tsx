@@ -52,7 +52,7 @@ export function LandingDevExperience() {
     const newUuid = `${Math.random().toString(36).substring(2, 10)}-${Math.random().toString(36).substring(2, 6)}-44a9-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 14)}`;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    
+
     const newLog: TestLog = {
       id: Math.random().toString(),
       uuid: newUuid,
@@ -68,204 +68,394 @@ export function LandingDevExperience() {
   };
 
   return (
-    <section className="traceiq-frame mx-auto w-full max-w-[1240px] px-5 py-24 sm:px-8 lg:py-32" id="performance">
+    <section className="traceiq-frame mx-auto w-full max-w-[1240px] px-4 py-24 sm:px-8 lg:py-32" id="performance">
+
       {/* Header */}
+
       <div className="max-w-2xl mb-12 sm:mb-16">
+
         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+
           First-class<br />
+
           <em className="italic font-serif font-normal text-zinc-400">developer experience.</em>
+
         </h2>
+
         <p className="mt-4 text-sm sm:text-base leading-relaxed text-zinc-400">
+
           We are engineers building tools for engineers. Our goal is to create the analytics and telemetry platform we have always wished we had — fast, inspectable, and zero lock-in.
+
         </p>
+
       </div>
+
+
 
       {/* Two Column Grid */}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-stretch">
-        
+
+
+
         {/* Card 1: Test Mode / Live Ingest Simulation */}
-        <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#09090b] p-6 sm:p-8 shadow-xl">
+
+        <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#09090b] p-4 sm:p-8 shadow-xl">
+
           {/* Top Visual Panel */}
-          <div className="relative rounded-xl border border-white/10 bg-[#0d0e11] p-5 sm:p-6 min-h-[260px] flex flex-col justify-between overflow-hidden">
+
+          <div className="relative rounded-xl border border-white/10 bg-[#0d0e11] p-4 sm:p-6 min-h-[260px] flex flex-col justify-between overflow-hidden">
+
             {/* Control Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] text-emerald-400">
+
+            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-4 sm:gap-3">
+
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 whitespace-nowrap sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
+
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+
                   Live Ingest
+
                 </span>
+
                 <select
+
                   aria-label="Select test event"
+
                   value={selectedEvent}
+
                   onChange={(e) => setSelectedEvent(e.target.value)}
-                  className="rounded-md border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-mono text-zinc-300 outline-none hover:border-white/20 transition-colors"
+
+                  className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-black/40 px-2 py-1 text-[10px] font-mono text-zinc-300 outline-none transition-colors hover:border-white/20 sm:px-2.5 sm:text-xs"
+
                 >
+
                   {SAMPLE_EVENTS.map((evt) => (
+
                     <option key={evt} value={evt} className="bg-[#09090b] text-zinc-300">
+
                       {evt}
+
                     </option>
+
                   ))}
+
                 </select>
+
               </div>
+
+
 
               <button
+
                 type="button"
+
                 onClick={sendTestEvent}
+
                 disabled={isSending}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50"
+
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-50 sm:gap-1.5 sm:px-3 sm:text-xs"
+
               >
+
                 <span>{isSending ? 'Sending...' : 'Send event'}</span>
+
                 <HugeiconsIcon icon={RocketIcon} size={14} className="text-zinc-950" />
+
               </button>
+
             </div>
+
+
 
             {/* Simulated HTTP Log Stream */}
+
             <div className="mt-4 space-y-2 font-mono text-xs overflow-hidden">
+
               {logs.map((log, idx) => (
+
                 <div
+
                   key={log.id}
-                  className={`flex items-center gap-2 truncate transition-all duration-300 ${
-                    idx === 0 ? 'text-zinc-200 bg-white/[0.04] p-1.5 rounded' : 'text-zinc-500'
-                  }`}
+
+                  className={`flex items-center gap-2 truncate transition-all duration-300 ${idx === 0 ? 'text-zinc-200 bg-white/[0.04] p-1.5 rounded' : 'text-zinc-500'
+
+                    }`}
+
                 >
+
                   <span className="font-semibold text-emerald-400 flex-shrink-0">HTTP {log.status}:</span>
+
                   <span className="text-zinc-400 truncate">
+
                     &#123; &quot;id&quot;: &quot;{log.uuid}&quot;, &quot;event&quot;: &quot;{log.event}&quot; &#125;
+
                   </span>
+
                 </div>
+
               ))}
+
             </div>
+
+
 
             {/* Subtle Gradient Shadow Bottom */}
+
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[#0d0e11] to-transparent" />
+
           </div>
 
+
+
           {/* Bottom Card Content */}
+
           <div className="mt-6 pt-2">
+
             <div className="flex items-center gap-2 text-zinc-300 mb-2">
+
               <HugeiconsIcon icon={TerminalIcon} size={18} className="text-zinc-400" />
+
               <h3 className="text-base font-bold text-white tracking-tight">Test mode &amp; local simulation</h3>
+
             </div>
+
             <p className="text-sm text-zinc-400 leading-relaxed font-normal">
+
               Simulate events and experiment with our API and SDKs locally without polluting production metrics or billing quotas.
+
             </p>
+
             <div className="mt-4">
+
               <a
+
                 href="/docs?page=quickstart"
+
                 className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-zinc-300 hover:text-white underline-offset-4 hover:underline transition-colors"
+
               >
+
                 <span>Learn more about testing</span>
+
                 <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} />
+
               </a>
+
             </div>
+
           </div>
+
         </div>
+
+
 
         {/* Card 2: Modular Webhooks & Real-time Dispatch */}
-        <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#09090b] p-6 sm:p-8 shadow-xl">
+
+        <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#09090b] p-4 sm:p-8 shadow-xl">
+
           {/* Top Visual Panel */}
-          <div className="relative rounded-xl border border-white/10 bg-[#0d0e11] p-5 sm:p-6 min-h-[260px] flex flex-col justify-between overflow-hidden">
+
+          <div className="relative rounded-xl border border-white/10 bg-[#0d0e11] p-4 sm:p-6 min-h-[260px] flex flex-col justify-between overflow-hidden">
+
             {/* Timeline Stream */}
+
             <div className="space-y-3 font-mono text-xs">
+
               {/* Webhook 1 */}
+
               <div
-                className={`relative rounded-lg border p-3 transition-all duration-300 ${
-                  activeWebhookIdx === 0
+
+                className={`relative rounded-lg border p-2.5 transition-all duration-300 sm:p-3 ${activeWebhookIdx === 0
+
                     ? 'border-emerald-500/30 bg-emerald-500/[0.04]'
+
                     : 'border-white/5 bg-white/[0.01]'
-                }`}
+
+                  }`}
+
               >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+
+                <div className="flex min-w-0 items-center gap-1.5 mb-1.5 sm:gap-2">
+
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+
                       <HugeiconsIcon icon={Tick02Icon} size={11} />
+
                     </span>
-                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400 font-semibold">
+
+                    <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold text-emerald-400 sm:text-[10px]">
+
                       Delivered
+
                     </span>
-                    <span className="text-[11px] text-zinc-300 font-medium truncate">user.signup</span>
+
+                    <span className="min-w-0 truncate text-[10px] font-medium text-zinc-300 sm:text-[11px]">user.signup</span>
+
                   </div>
-                  <span className="text-[10px] text-zinc-500">08:12:54</span>
+
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-[9px] text-zinc-500 sm:text-[10px]">08:12:54</span>
+
                 </div>
-                <p className="text-[11px] text-zinc-400 truncate">
+
+                <p className="truncate text-[10px] text-zinc-400 sm:text-[11px]">
+
                   to <span className="text-zinc-300">https://api.acme.com/webhooks</span> · 200 OK (38ms)
+
                 </p>
+
               </div>
+
+
 
               {/* Webhook 2 */}
+
               <div
-                className={`relative rounded-lg border p-3 transition-all duration-300 ${
-                  activeWebhookIdx === 1
+
+                className={`relative rounded-lg border p-2.5 transition-all duration-300 sm:p-3 ${activeWebhookIdx === 1
+
                     ? 'border-blue-500/30 bg-blue-500/[0.04]'
+
                     : 'border-white/5 bg-white/[0.01]'
-                }`}
+
+                  }`}
+
               >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+
+                <div className="flex min-w-0 items-center gap-1.5 mb-1.5 sm:gap-2">
+
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-blue-500/20 bg-blue-500/10 text-blue-400">
+
                       <HugeiconsIcon icon={Notification02Icon} size={11} />
+
                     </span>
-                    <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400 font-semibold">
+
+                    <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold text-blue-400 sm:text-[10px]">
+
                       Alert Triggered
+
                     </span>
-                    <span className="text-[11px] text-zinc-300 font-medium truncate">latency.spike</span>
+
+                    <span className="min-w-0 truncate text-[10px] font-medium text-zinc-300 sm:text-[11px]">latency.spike</span>
+
                   </div>
-                  <span className="text-[10px] text-zinc-500">08:12:51</span>
+
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-[9px] text-zinc-500 sm:text-[10px]">08:12:51</span>
+
                 </div>
-                <p className="text-[11px] text-zinc-400 truncate">
+
+                <p className="truncate text-[10px] text-zinc-400 sm:text-[11px]">
+
                   to <span className="text-zinc-300">Slack / #engineering-alerts</span> · threshold: &gt;100ms
+
                 </p>
+
               </div>
+
+
 
               {/* Webhook 3 */}
+
               <div
-                className={`relative rounded-lg border p-3 transition-all duration-300 ${
-                  activeWebhookIdx === 2
+
+                className={`relative rounded-lg border p-2.5 transition-all duration-300 sm:p-3 ${activeWebhookIdx === 2
+
                     ? 'border-purple-500/30 bg-purple-500/[0.04]'
+
                     : 'border-white/5 bg-white/[0.01]'
-                }`}
+
+                  }`}
+
               >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+
+                <div className="flex min-w-0 items-center gap-1.5 mb-1.5 sm:gap-2">
+
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-purple-500/20 bg-purple-500/10 text-purple-400">
+
                       <HugeiconsIcon icon={WebhookIcon} size={11} />
+
                     </span>
-                    <span className="rounded bg-purple-500/10 px-1.5 py-0.5 text-[10px] text-purple-400 font-semibold">
+
+                    <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold text-purple-400 sm:text-[10px]">
+
                       Batch Export
+
                     </span>
-                    <span className="text-[11px] text-zinc-300 font-medium truncate">s3.parquet</span>
+
+                    <span className="min-w-0 truncate text-[10px] font-medium text-zinc-300 sm:text-[11px]">s3.parquet</span>
+
                   </div>
-                  <span className="text-[10px] text-zinc-500">08:12:45</span>
+
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-[9px] text-zinc-500 sm:text-[10px]">08:12:45</span>
+
                 </div>
-                <p className="text-[11px] text-zinc-400 truncate">
+
+                <p className="truncate text-[10px] text-zinc-400 sm:text-[11px]">
+
                   to <span className="text-zinc-300">s3://data-warehouse/traceiq</span> · 500 records
+
                 </p>
+
               </div>
+
             </div>
+
           </div>
+
+
 
           {/* Bottom Card Content */}
+
           <div className="mt-6 pt-2">
+
             <div className="flex items-center gap-2 text-zinc-300 mb-2">
+
               <HugeiconsIcon icon={WebhookIcon} size={18} className="text-zinc-400" />
+
               <h3 className="text-base font-bold text-white tracking-tight">Modular webhooks &amp; pipeline</h3>
+
             </div>
+
             <p className="text-sm text-zinc-400 leading-relaxed font-normal">
+
               Receive real-time notifications directly to your server whenever an event is ingested, a conversion occurs, or an error is flagged.
+
             </p>
+
             <div className="mt-4">
+
               <a
+
                 href="/docs?page=webhooks"
+
                 className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-zinc-300 hover:text-white underline-offset-4 hover:underline transition-colors"
+
               >
+
                 <span>Explore webhooks docs</span>
+
                 <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} />
+
               </a>
+
             </div>
+
           </div>
+
         </div>
 
+
+
       </div>
+
     </section>
   );
 }

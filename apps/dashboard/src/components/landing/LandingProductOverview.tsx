@@ -80,19 +80,17 @@ export function LandingProductOverview() {
                 aria-selected={isActive}
                 aria-controls={`overview-panel-${tab.key}`}
                 onClick={() => setActiveTab(tab.key)}
-                className={`group flex items-center justify-between rounded-xl border p-3.5 sm:p-4 transition-all duration-200 text-left outline-none select-none ${
-                  isActive
+                className={`group flex items-center justify-between rounded-xl border p-3.5 sm:p-4 transition-all duration-200 text-left outline-none select-none ${isActive
                     ? 'border-white/30 bg-white/[0.06] text-white shadow-sm'
                     : 'border-white/10 bg-[#0c0d0e]/60 text-zinc-400 hover:border-white/20 hover:bg-white/[0.02] hover:text-zinc-200'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${
-                      isActive
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${isActive
                         ? 'border-white/25 bg-white/10 text-white'
                         : 'border-white/10 bg-white/[0.02] text-zinc-400 group-hover:text-zinc-200 group-hover:border-white/20'
-                    }`}
+                      }`}
                   >
                     <HugeiconsIcon icon={tab.icon} size={18} />
                   </div>
@@ -107,9 +105,8 @@ export function LandingProductOverview() {
                 </div>
 
                 <div
-                  className={`h-2 w-2 rounded-full transition-all ${
-                    isActive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-transparent'
-                  }`}
+                  className={`h-2 w-2 rounded-full transition-all ${isActive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-transparent'
+                    }`}
                   aria-hidden="true"
                 />
               </button>
@@ -173,11 +170,10 @@ export function LandingProductOverview() {
                   <button
                     key={item.key}
                     onClick={() => setActiveTab(item.key as TabKey)}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 font-medium transition-all ${
-                      isItemActive
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 font-medium transition-all ${isItemActive
                         ? 'bg-white/[0.08] text-white shadow-sm font-semibold'
                         : 'text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200'
-                    }`}
+                      }`}
                   >
                     <HugeiconsIcon icon={item.icon} size={15} />
                     <span>{item.label}</span>
@@ -281,36 +277,68 @@ function AnalyticsMockView() {
       </div>
 
       {/* Clean SVG Trend Chart */}
-      <div className="rounded-xl border border-white/5 bg-white/[0.015] p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-mono text-zinc-300 font-medium">
+      <div className="rounded-xl border border-white/5 bg-white/[0.015] p-3 sm:p-5">
+        {/* Chart Header */}
+        <div className="mb-4 flex w-full items-center gap-2 sm:gap-4">
+          <span className="min-w-0 flex-1 whitespace-nowrap font-mono text-[9px] font-medium tracking-tight text-zinc-300 sm:text-xs">
             Daily Active Users &amp; Sessions
           </span>
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="inline-flex items-center gap-1.5 text-zinc-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Visitors
+
+          <div className="flex shrink-0 items-center gap-2 font-mono text-[8px] sm:gap-3 sm:text-xs">
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-zinc-400 sm:gap-1.5">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 sm:h-2 sm:w-2" />
+              Visitors
             </span>
-            <span className="inline-flex items-center gap-1.5 text-zinc-500">
-              <span className="h-2 w-2 rounded-full bg-zinc-600" /> Previous 30d
+
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-zinc-500 sm:gap-1.5">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600 sm:h-2 sm:w-2" />
+              Previous 30d
             </span>
           </div>
         </div>
 
         {/* Minimalist Line SVG */}
-        <div className="relative h-36 sm:h-44 w-full">
+        <div className="relative h-36 w-full sm:h-44">
           <svg
-            className="w-full h-full overflow-visible"
+            className="h-full w-full overflow-visible"
             viewBox="0 0 700 160"
             preserveAspectRatio="none"
           >
             {/* Horizontal Gridlines */}
-            <line x1="0" y1="20" x2="700" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-            <line x1="0" y1="70" x2="700" y2="70" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-            <line x1="0" y1="120" x2="700" y2="120" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+            <line
+              x1="0"
+              y1="20"
+              x2="700"
+              y2="20"
+              stroke="rgba(255,255,255,0.05)"
+              strokeDasharray="3 3"
+            />
+            <line
+              x1="0"
+              y1="70"
+              x2="700"
+              y2="70"
+              stroke="rgba(255,255,255,0.05)"
+              strokeDasharray="3 3"
+            />
+            <line
+              x1="0"
+              y1="120"
+              x2="700"
+              y2="120"
+              stroke="rgba(255,255,255,0.05)"
+              strokeDasharray="3 3"
+            />
 
             {/* Gradient fill for active trend */}
             <defs>
-              <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient
+                id="analyticsGradient"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
                 <stop offset="0%" stopColor="#34d399" stopOpacity="0.18" />
                 <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
               </linearGradient>
@@ -347,7 +375,7 @@ function AnalyticsMockView() {
         </div>
 
         {/* X Axis Labels */}
-        <div className="flex justify-between border-t border-white/5 pt-2 text-[10px] font-mono text-zinc-500">
+        <div className="flex justify-between border-t border-white/5 pt-2 font-mono text-[9px] text-zinc-500 sm:text-[10px]">
           <span>Day 1</span>
           <span>Day 8</span>
           <span>Day 15</span>
