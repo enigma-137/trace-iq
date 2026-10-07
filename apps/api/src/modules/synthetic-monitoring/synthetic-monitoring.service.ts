@@ -5,6 +5,7 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
 import { ObservabilityService } from '../observability/observability.service';
 import {
+  ReplaySyntheticDraft,
   SyntheticBrowser,
   SyntheticCiGroupDetail,
   SyntheticCiRunGroup,
@@ -22,6 +23,8 @@ import { SyntheticRunnerService } from './synthetic-runner.service';
 import { SyntheticSsrfValidator } from './synthetic-ssrf-validator';
 import { SyntheticCryptoService } from './synthetic-crypto.service';
 import { SyntheticArtifactService } from './synthetic-artifact.service';
+import { ReplaySyntheticExtractorService } from './replay-synthetic-extractor.service';
+import { ReplayService } from '../replay/replay.service';
 
 export interface CreateSyntheticMonitorDto {
   name: string;
@@ -34,11 +37,14 @@ export interface CreateSyntheticMonitorDto {
   timeoutMs?: number;
   steps: SyntheticStep[];
   environment?: string;
-  sourceType?: 'manual' | 'funnel' | 'template';
+  sourceType?: 'manual' | 'funnel' | 'template' | 'replay';
   sourceFunnelId?: string;
   sourceFunnelName?: string;
   sourceFunnelUpdatedAt?: string;
   sourceFunnelStepCount?: number;
+  sourceReplayId?: string;
+  sourceSessionId?: string;
+  sourceReplayStartedAt?: string;
   projectId?: string;
 }
 
@@ -82,7 +88,9 @@ export class SyntheticMonitoringService {
     private readonly runner: SyntheticRunnerService,
     private readonly observability: ObservabilityService,
     private readonly crypto: SyntheticCryptoService,
-    private readonly artifacts: SyntheticArtifactService
+    private readonly artifacts: SyntheticArtifactService,
+    private readonly replayExtractor: ReplaySyntheticExtractorService,
+    private readonly replayService: ReplayService
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -116,6 +124,9 @@ export class SyntheticMonitoringService {
         sm.source_funnel_name AS "sourceFunnelName",
         sm.source_funnel_updated_at AS "sourceFunnelUpdatedAt",
         sm.source_funnel_step_count AS "sourceFunnelStepCount",
+        sm.source_replay_id AS "sourceReplayId",
+        sm.source_session_id AS "sourceSessionId",
+        sm.source_replay_started_at AS "sourceReplayStartedAt",
         sm.created_by_user_id AS "createdByUserId",
         sm.created_at AS "createdAt",
         sm.updated_at AS "updatedAt"
@@ -196,6 +207,9 @@ export class SyntheticMonitoringService {
         source_funnel_name AS "sourceFunnelName",
         source_funnel_updated_at AS "sourceFunnelUpdatedAt",
         source_funnel_step_count AS "sourceFunnelStepCount",
+        source_replay_id AS "sourceReplayId",
+        source_session_id AS "sourceSessionId",
+        source_replay_started_at AS "sourceReplayStartedAt",
         created_by_user_id AS "createdByUserId",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
@@ -240,6 +254,9 @@ export class SyntheticMonitoringService {
         source_funnel_name AS "sourceFunnelName",
         source_funnel_updated_at AS "sourceFunnelUpdatedAt",
         source_funnel_step_count AS "sourceFunnelStepCount",
+        source_replay_id AS "sourceReplayId",
+        source_session_id AS "sourceSessionId",
+        source_replay_started_at AS "sourceReplayStartedAt",
         created_by_user_id AS "createdByUserId",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
@@ -250,6 +267,19 @@ export class SyntheticMonitoringService {
 
     const result = await this.database.query<SyntheticMonitor>(query, [funnelId, project.id]);
     return { monitors: result.rows };
+  }
+
+  async getReplayDraft(user: DashboardUser, replayId: string, projectId?: string): Promise<ReplaySyntheticDraft> {
+    const startTime = Date.now();
+    const { replay, events } = await this.replayService.getEventsForExtraction(user, replayId, projectId);
+    const draft = this.replayExtractor.extractDraft(replay, events);
+    const durationMs = Date.now() - startTime;
+
+    this.logger.log(
+      `replay_synthetic_draft_extracted replayId=${replay.id} rawEvents=${events.length} extractedSteps=${draft.initialSteps.length} durationMs=${durationMs}`
+    );
+
+    return draft;
   }
 
   async create(user: DashboardUser, dto: CreateSyntheticMonitorDto): Promise<SyntheticMonitor> {
@@ -283,6 +313,9 @@ export class SyntheticMonitoringService {
     const sourceFunnelName = dto.sourceFunnelName || null;
     const sourceFunnelUpdatedAt = dto.sourceFunnelUpdatedAt ? new Date(dto.sourceFunnelUpdatedAt) : null;
     const sourceFunnelStepCount = dto.sourceFunnelStepCount || null;
+    const sourceReplayId = dto.sourceReplayId || null;
+    const sourceSessionId = dto.sourceSessionId || null;
+    const sourceReplayStartedAt = dto.sourceReplayStartedAt ? new Date(dto.sourceReplayStartedAt) : null;
 
     const insertQuery = `
       INSERT INTO synthetic_monitors (
@@ -290,8 +323,9 @@ export class SyntheticMonitoringService {
         browser, viewport_width, viewport_height, timeout_ms, steps,
         environment, next_run_at, source_type, source_funnel_id,
         source_funnel_name, source_funnel_updated_at, source_funnel_step_count,
+        source_replay_id, source_session_id, source_replay_started_at,
         created_by_user_id, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW(), NOW())
       RETURNING
         id, project_id AS "projectId", name, description, base_url AS "baseUrl",
         status, schedule, browser, viewport_width AS "viewportWidth",
@@ -301,6 +335,8 @@ export class SyntheticMonitoringService {
         source_type AS "sourceType", source_funnel_id AS "sourceFunnelId",
         source_funnel_name AS "sourceFunnelName", source_funnel_updated_at AS "sourceFunnelUpdatedAt",
         source_funnel_step_count AS "sourceFunnelStepCount",
+        source_replay_id AS "sourceReplayId", source_session_id AS "sourceSessionId",
+        source_replay_started_at AS "sourceReplayStartedAt",
         created_by_user_id AS "createdByUserId", created_at AS "createdAt", updated_at AS "updatedAt"
     `;
 
@@ -323,6 +359,9 @@ export class SyntheticMonitoringService {
       sourceFunnelName,
       sourceFunnelUpdatedAt,
       sourceFunnelStepCount,
+      sourceReplayId,
+      sourceSessionId,
+      sourceReplayStartedAt,
       user.id
     ]);
 

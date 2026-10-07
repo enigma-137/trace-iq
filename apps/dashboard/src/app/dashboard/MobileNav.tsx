@@ -11,7 +11,15 @@ import { NavIcon } from './NavIcon';
 import { SignOutButton } from './SignOutButton';
 import { ThemeToggle } from './ThemeToggle';
 import { OrganizationSwitcher } from './OrganizationSwitcher';
-import { bottomNavItems, navItems, navLinkClass, withProjectId } from './nav';
+import {
+  topNavItems,
+  navGroups,
+  bottomNavItems,
+  navLinkClass,
+  childNavLinkClass,
+  findGroupForActiveItem,
+  withProjectId
+} from './nav';
 import { useMfaStatus } from '@/lib/mfa';
 import { DashboardPlanBadge } from './DashboardPlan';
 
@@ -27,8 +35,20 @@ export function MobileNav({
   organizationId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { enrolled } = useMfaStatus();
   const showMfaWarning = enrolled === false;
+
+  const activeGroup = findGroupForActiveItem(active);
+
+  // Initialize and keep active group expanded
+  useEffect(() => {
+    const initialGroups: Record<string, boolean> = {};
+    for (const group of navGroups) {
+      initialGroups[group.key] = group.key === activeGroup;
+    }
+    setOpenGroups(initialGroups);
+  }, [activeGroup]);
 
   // Lock the page behind the drawer and let Escape dismiss it.
   useEffect(() => {
@@ -46,6 +66,13 @@ export function MobileNav({
   }, [open]);
 
   const close = () => setOpen(false);
+
+  const toggleGroup = (groupKey: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
 
   return (
     <>
@@ -89,9 +116,10 @@ export function MobileNav({
                 </button>
               </div>
 
-              <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Dashboard navigation">
+              <nav className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar px-3 py-2 space-y-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" aria-label="Dashboard navigation">
+                {/* Top Standalone Items (Overview) */}
                 <div className="grid gap-0.5">
-                  {navItems.map((item) => (
+                  {topNavItems.map((item) => (
                     <Link
                       key={item.key}
                       className={navLinkClass(item.key === active)}
@@ -102,6 +130,68 @@ export function MobileNav({
                       {item.label}
                     </Link>
                   ))}
+                </div>
+
+                {/* Collapsible Groups */}
+                <div className="space-y-2 pt-1">
+                  {navGroups.map((group) => {
+                    const isOpen = openGroups[group.key] ?? false;
+                    const hasActiveChild = group.items.some((item) => item.key === active);
+
+                    return (
+                      <div key={group.key} className="space-y-0.5">
+                        {/* Group Header Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(group.key)}
+                          aria-expanded={isOpen}
+                          aria-controls={`mobile-group-${group.key}`}
+                          className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-semibold tracking-wide transition select-none ${
+                            hasActiveChild
+                              ? 'text-neutral-900 dark:text-slate-200 font-bold'
+                              : 'text-neutral-500 hover:bg-neutral-100/70 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          <span>{group.label}</span>
+                          <svg
+                            className={`size-3.5 text-neutral-400 transition-transform duration-150 ease-in-out dark:text-slate-500 ${
+                              isOpen ? 'rotate-90' : ''
+                            }`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.2}
+                            aria-hidden="true"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+
+                        {/* Child Items */}
+                        {isOpen && (
+                          <div
+                            id={`mobile-group-${group.key}`}
+                            className="ml-2.5 grid gap-0.5 border-l border-neutral-200/80 pl-2 my-0.5 dark:border-slate-800/80"
+                          >
+                            {group.items.map((item) => {
+                              const isActive = item.key === active;
+                              return (
+                                <Link
+                                  key={item.key}
+                                  className={childNavLinkClass(isActive)}
+                                  href={withProjectId(item.href, projectId)}
+                                  onClick={close}
+                                >
+                                  <NavIcon name={item.key} />
+                                  <span>{item.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </nav>
 

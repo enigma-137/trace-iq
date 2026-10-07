@@ -386,6 +386,59 @@ export class ReplayService {
       ...(runtime ? { runtime, platform } : {}), events, nextCursor: hasMore ? lastSequence : null, done: !hasMore };
   }
 
+  async getEventsForExtraction(user: DashboardUser, replayId: string, projectId?: string, maxChunks = 50) {
+    const project = await this.projects.requireActiveProject(user, projectId);
+    const result = await this.database.query(`
+      SELECT r.*,
+        COALESCE(e.context->'page'->>'url', e.context->'page'->>'path') AS "entryPage",
+        e.device_info AS "deviceInfo",
+        e.network_info AS "networkInfo"
+      FROM session_replays r
+      LEFT JOIN LATERAL (
+        SELECT context, device_info, network_info FROM events
+        WHERE project_id=r.project_id AND session_id=r.session_id ORDER BY occurred_at LIMIT 1
+      ) e ON true
+      WHERE r.id=$1 AND r.project_id=$2 AND r.deleted_at IS NULL LIMIT 1
+    `, [this.safeId(replayId, 'replayId'), project.id]);
+    const replay = result.rows[0];
+    if (!replay) throw new NotFoundException('Replay not found or inaccessible.');
+
+    const chunks = await this.database.query<ChunkRow>(`
+      SELECT id, sequence, storage_key, content_sha256, status, event_count, compressed_size_bytes, uncompressed_size_bytes
+      FROM replay_chunks WHERE replay_id=$1 AND status='ready' AND deleted_at IS NULL
+      ORDER BY sequence LIMIT $2
+    `, [replay.id, maxChunks]);
+
+    const events: any[] = [];
+    for (const chunk of chunks.rows) {
+      try {
+        const compressed = await this.storage.get(chunk.storage_key);
+        if (createHash('sha256').update(compressed).digest('hex') !== chunk.content_sha256) continue;
+        const json = gunzipSync(compressed, { maxOutputLength: REPLAY_LIMITS.maxUncompressedChunkBytes });
+        const parsed = JSON.parse(json.toString('utf8'));
+        if (Array.isArray(parsed)) {
+          events.push(...isolateReplayEventsForPlayback(parsed));
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to read chunk ${chunk.id} for extraction: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    return {
+      replay: {
+        id: replay.id as string,
+        sessionId: replay.session_id as string,
+        userId: (replay.user_id as string | null) || null,
+        anonymousId: (replay.anonymous_id as string | null) || null,
+        startedAt: replay.started_at as string,
+        durationSeconds: Math.round((Number(replay.duration_ms) || 0) / 1000),
+        entryPage: replay.entryPage as string | undefined,
+        deviceInfo: replay.deviceInfo as any
+      },
+      events
+    };
+  }
+
   async getSettings(user: DashboardUser, projectId?: string) {
     const project = await this.projects.requireActiveProject(user, projectId);
     const settings = await this.loadSettings(project.id);

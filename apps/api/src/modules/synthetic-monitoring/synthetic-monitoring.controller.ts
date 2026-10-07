@@ -31,6 +31,32 @@ export class SyntheticMonitoringController {
   ) {}
 
   // ---------------------------------------------------------------------------
+  // REPLAY DRAFTS
+  // ---------------------------------------------------------------------------
+
+  @Get('replays/:id/synthetic-draft')
+  async getReplayDraft(
+    @Param('id') id: string,
+    @Headers('authorization') authorization?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'synthetic_monitors:read');
+    return this.syntheticService.getReplayDraft(user, id, projectId);
+  }
+
+  @Get('synthetic-drafts/replay/:id')
+  async getReplayDraftAlias(
+    @Param('id') id: string,
+    @Headers('authorization') authorization?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'synthetic_monitors:read');
+    return this.syntheticService.getReplayDraft(user, id, projectId);
+  }
+
+  // ---------------------------------------------------------------------------
   // MONITORS
   // ---------------------------------------------------------------------------
 

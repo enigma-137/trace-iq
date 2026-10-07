@@ -130,11 +130,10 @@ export function SyntheticMonitorList({
                 key={filter}
                 type="button"
                 onClick={() => setStatusFilter(filter)}
-                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${
-                  statusFilter === filter
+                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${statusFilter === filter
                     ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
                     : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 {filter}
               </button>
@@ -154,11 +153,11 @@ export function SyntheticMonitorList({
       {/* Monitors List / Cards */}
       {filteredMonitors.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-950">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+          {/* <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-          </div>
+          </div> */}
           <h3 className="mt-4 text-base font-semibold text-neutral-900 dark:text-white">
             {search ? 'No matching synthetic monitors' : 'No synthetic monitors configured yet'}
           </h3>

@@ -45,11 +45,14 @@ export interface SyntheticMonitor {
   lastRunAt?: string | null;
   lastRunStatus?: SyntheticRunStatus | null;
   lastRunDurationMs?: number | null;
-  sourceType?: 'manual' | 'funnel' | 'template';
+  sourceType?: 'manual' | 'funnel' | 'template' | 'replay';
   sourceFunnelId?: string | null;
   sourceFunnelName?: string | null;
   sourceFunnelUpdatedAt?: string | null;
   sourceFunnelStepCount?: number | null;
+  sourceReplayId?: string | null;
+  sourceSessionId?: string | null;
+  sourceReplayStartedAt?: string | null;
   createdByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -81,6 +84,56 @@ export interface FunnelSyntheticDraft {
   };
   milestones: FunnelSyntheticDraftMilestone[];
   initialSteps: SyntheticStep[];
+}
+
+export type SelectorConfidence = 'high' | 'medium' | 'low';
+
+export interface ReplaySyntheticDraftStep extends SyntheticStep {
+  sourceTimestamp?: number;
+  relativeTimeMs?: number;
+  confidence?: SelectorConfidence;
+  selectorStrategy?: string;
+  needsReview?: boolean;
+  isMasked?: boolean;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+export interface ReplaySyntheticDraft {
+  source: {
+    type: 'replay';
+    replayId: string;
+    sessionId: string;
+    userId?: string | null;
+    anonymousId?: string | null;
+    startedAt: string;
+    durationSeconds: number;
+    initialUrl: string;
+    deviceInfo?: {
+      browser?: string;
+      os?: string;
+      deviceType?: string;
+      viewport?: { width: number; height: number };
+    };
+  };
+  monitor: {
+    name: string;
+    baseUrl: string;
+    schedule: SyntheticSchedule;
+    browser: SyntheticBrowser;
+    viewportWidth: number;
+    viewportHeight: number;
+  };
+  initialSteps: ReplaySyntheticDraftStep[];
+  stats: {
+    totalRawEvents: number;
+    extractedStepsCount: number;
+    highConfidenceCount: number;
+    lowConfidenceCount: number;
+    truncated: boolean;
+  };
+  warnings: string[];
+  [key: string]: unknown;
 }
 
 export interface SyntheticStepResult {

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   FunnelSyntheticDraft,
+  ReplaySyntheticDraft,
+  ReplaySyntheticDraftStep,
   SyntheticBrowser,
   SyntheticMonitor,
   SyntheticSchedule,
@@ -15,6 +17,7 @@ import Link from 'next/link';
 interface SyntheticMonitorFormProps {
   initialData?: SyntheticMonitor;
   initialDraft?: FunnelSyntheticDraft;
+  initialReplayDraft?: ReplaySyntheticDraft;
   projectId?: string;
   token: string | null;
 }
@@ -33,33 +36,66 @@ const STEP_TYPES: Array<{ type: SyntheticStepType; label: string; helper: string
 export function SyntheticMonitorForm({
   initialData,
   initialDraft,
+  initialReplayDraft,
   projectId,
   token
 }: SyntheticMonitorFormProps) {
   const router = useRouter();
 
-  const [name, setName] = useState(initialData?.name || initialDraft?.monitor.name || '');
+  const [name, setName] = useState(
+    initialData?.name ||
+      initialReplayDraft?.monitor.name ||
+      initialDraft?.monitor.name ||
+      ''
+  );
   const [description, setDescription] = useState(
     initialData?.description ||
-      (initialDraft
+      (initialReplayDraft
+        ? `Extracted from session ${initialReplayDraft.source.sessionId} (${initialReplayDraft.initialSteps.length} extracted interactions)`
+        : initialDraft
         ? `Continuous verification of ${initialDraft.source.name} funnel flow (${initialDraft.source.stepCount} milestones)`
         : '')
   );
-  const [baseUrl, setBaseUrl] = useState(initialData?.baseUrl || initialDraft?.monitor.baseUrl || 'https://');
+  const [baseUrl, setBaseUrl] = useState(
+    initialData?.baseUrl ||
+      initialReplayDraft?.monitor.baseUrl ||
+      initialDraft?.monitor.baseUrl ||
+      'https://'
+  );
   const [schedule, setSchedule] = useState<SyntheticSchedule>(
-    initialData?.schedule || initialDraft?.monitor.schedule || '15m'
+    initialData?.schedule ||
+      initialReplayDraft?.monitor.schedule ||
+      initialDraft?.monitor.schedule ||
+      '15m'
   );
   const [browser, setBrowser] = useState<SyntheticBrowser>(
-    initialData?.browser || initialDraft?.monitor.browser || 'chromium'
+    initialData?.browser ||
+      initialReplayDraft?.monitor.browser ||
+      initialDraft?.monitor.browser ||
+      'chromium'
   );
-  const [viewportPreset, setViewportPreset] = useState<'desktop' | 'fhd' | 'mobile' | 'tablet'>('desktop');
-  const [viewportWidth, setViewportWidth] = useState(initialData?.viewportWidth || 1280);
-  const [viewportHeight, setViewportHeight] = useState(initialData?.viewportHeight || 720);
+  const [viewportPreset, setViewportPreset] = useState<'desktop' | 'fhd' | 'mobile' | 'tablet'>(
+    initialReplayDraft?.monitor.viewportWidth === 390
+      ? 'mobile'
+      : initialReplayDraft?.monitor.viewportWidth === 1920
+      ? 'fhd'
+      : initialReplayDraft?.monitor.viewportWidth === 820
+      ? 'tablet'
+      : 'desktop'
+  );
+  const [viewportWidth, setViewportWidth] = useState(
+    initialData?.viewportWidth || initialReplayDraft?.monitor.viewportWidth || 1280
+  );
+  const [viewportHeight, setViewportHeight] = useState(
+    initialData?.viewportHeight || initialReplayDraft?.monitor.viewportHeight || 720
+  );
   const [timeoutMs, setTimeoutMs] = useState(initialData?.timeoutMs || 30000);
 
   const [steps, setSteps] = useState<SyntheticStep[]>(
     initialData?.steps && initialData.steps.length > 0
       ? initialData.steps
+      : initialReplayDraft?.initialSteps && initialReplayDraft.initialSteps.length > 0
+      ? initialReplayDraft.initialSteps
       : initialDraft?.initialSteps && initialDraft.initialSteps.length > 0
       ? initialDraft.initialSteps
       : [
@@ -177,11 +213,14 @@ export function SyntheticMonitorForm({
       viewportHeight,
       timeoutMs,
       steps,
-      sourceType: initialData?.sourceType || (initialDraft ? 'funnel' : 'manual'),
+      sourceType: initialData?.sourceType || (initialReplayDraft ? 'replay' : initialDraft ? 'funnel' : 'manual'),
       sourceFunnelId: initialData?.sourceFunnelId || initialDraft?.source.funnelId || undefined,
       sourceFunnelName: initialData?.sourceFunnelName || initialDraft?.source.name || undefined,
       sourceFunnelUpdatedAt: initialData?.sourceFunnelUpdatedAt || initialDraft?.source.updatedAt || undefined,
       sourceFunnelStepCount: initialData?.sourceFunnelStepCount || initialDraft?.source.stepCount || undefined,
+      sourceReplayId: (initialData as any)?.sourceReplayId || initialReplayDraft?.source.replayId || undefined,
+      sourceSessionId: (initialData as any)?.sourceSessionId || initialReplayDraft?.source.sessionId || undefined,
+      sourceReplayStartedAt: (initialData as any)?.sourceReplayStartedAt || initialReplayDraft?.source.startedAt || undefined,
       projectId
     };
 
@@ -215,11 +254,88 @@ export function SyntheticMonitorForm({
     }
   };
 
+  const formatRelativeTime = (ms?: number) => {
+    if (ms === undefined || ms === null) return '';
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const tenths = Math.floor((ms % 1000) / 100);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${tenths}`;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
+        </div>
+      )}
+
+      {/* Session Replay Extraction Provenance Banner */}
+      {initialReplayDraft && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-5 dark:border-indigo-900/50 dark:bg-indigo-950/30 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+                Session Replay Extraction
+              </span>
+              <span className="text-sm font-semibold text-neutral-900 dark:text-white">
+                Session: {initialReplayDraft.source.sessionId}
+              </span>
+            </div>
+
+            <Link
+              href={`/dashboard/replays/${initialReplayDraft.source.replayId}${projectId ? `?projectId=${projectId}` : ''}`}
+              className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              target="_blank"
+            >
+              View Session Replay ↗
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="rounded-lg border border-indigo-200/60 bg-white/70 p-2.5 dark:border-indigo-800/40 dark:bg-slate-900/70">
+              <span className="text-[11px] text-neutral-500 dark:text-slate-400">Recorded</span>
+              <p className="font-medium text-neutral-900 dark:text-white truncate">
+                {new Date(initialReplayDraft.source.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-200/60 bg-white/70 p-2.5 dark:border-indigo-800/40 dark:bg-slate-900/70">
+              <span className="text-[11px] text-neutral-500 dark:text-slate-400">Duration</span>
+              <p className="font-medium text-neutral-900 dark:text-white">
+                {Math.floor(initialReplayDraft.source.durationSeconds / 60)}m {Math.round(initialReplayDraft.source.durationSeconds % 60)}s
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-200/60 bg-white/70 p-2.5 dark:border-indigo-800/40 dark:bg-slate-900/70">
+              <span className="text-[11px] text-neutral-500 dark:text-slate-400">Browser</span>
+              <p className="font-medium text-neutral-900 dark:text-white truncate">
+                {initialReplayDraft.source.deviceInfo?.browser || 'Desktop Browser'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-200/60 bg-white/70 p-2.5 dark:border-indigo-800/40 dark:bg-slate-900/70">
+              <span className="text-[11px] text-neutral-500 dark:text-slate-400">Extracted Steps</span>
+              <p className="font-medium text-neutral-900 dark:text-white">
+                {initialReplayDraft.stats.extractedStepsCount} interactions ({initialReplayDraft.stats.highConfidenceCount} high conf.)
+              </p>
+            </div>
+          </div>
+
+          {initialReplayDraft.warnings && initialReplayDraft.warnings.length > 0 && (
+            <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="font-semibold flex items-center gap-1.5">
+                <span>⚠️ Journey Extraction Warnings:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                {initialReplayDraft.warnings.map((w, idx) => (
+                  <li key={idx}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="rounded-md bg-indigo-100/60 p-2.5 text-[11px] text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200">
+            🔒 <strong>Deterministic Privacy:</strong> Passwords, payment cards, and sensitive keystrokes were automatically replaced with secure placeholders (e.g. <code>&#123;&#123;TEST_PASSWORD&#125;&#125;</code>, <code>&#123;&#123;TEST_EMAIL&#125;&#125;</code>).
+          </div>
         </div>
       )}
 
@@ -457,6 +573,35 @@ export function SyntheticMonitorForm({
                     onChange={(e) => handleUpdateStep(idx, { description: e.target.value })}
                     className="hidden sm:block w-56 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs text-neutral-700 placeholder:text-neutral-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                   />
+
+                  {/* Replay source timestamp chip */}
+                  {(step as any).relativeTimeMs !== undefined && (
+                    <span className="inline-flex items-center rounded-xs bg-neutral-200/80 px-1.5 py-0.5 text-[10px] font-mono text-neutral-700 dark:bg-slate-800 dark:text-slate-300">
+                      ⏱️ {formatRelativeTime((step as any).relativeTimeMs)}
+                    </span>
+                  )}
+
+                  {/* Selector confidence badges */}
+                  {(step as any).confidence === 'high' && (
+                    <span className="inline-flex items-center rounded-xs bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                      High confidence
+                    </span>
+                  )}
+                  {(step as any).confidence === 'medium' && (
+                    <span className="inline-flex items-center rounded-xs bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-900/50 dark:text-sky-300">
+                      Medium
+                    </span>
+                  )}
+                  {((step as any).confidence === 'low' || (step as any).needsReview) && (
+                    <span className="inline-flex items-center rounded-xs bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                      Needs selector review
+                    </span>
+                  )}
+                  {(step as any).isMasked && (
+                    <span className="inline-flex items-center rounded-xs bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+                      🔒 Masked
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1 self-end sm:self-auto">

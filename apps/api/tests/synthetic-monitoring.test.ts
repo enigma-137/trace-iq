@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SyntheticMonitoringService } from '../src/modules/synthetic-monitoring/synthetic-monitoring.service';
 import { SyntheticSsrfValidator } from '../src/modules/synthetic-monitoring/synthetic-ssrf-validator';
 import { SyntheticCryptoService } from '../src/modules/synthetic-monitoring/synthetic-crypto.service';
+import { ReplaySyntheticExtractorService } from '../src/modules/synthetic-monitoring/replay-synthetic-extractor.service';
 import { mockDatabase, rows } from './helpers/mock-db';
 
 const PROJECT = {
@@ -62,6 +63,24 @@ function makeService(dbQueries?: (sql: string, params?: any[]) => any) {
     listRunArtifacts: vi.fn(),
     deleteRunArtifacts: vi.fn()
   };
+  const replayExtractor = new ReplaySyntheticExtractorService();
+  const replayService = {
+    getEventsForExtraction: vi.fn().mockResolvedValue({
+      replay: {
+        id: 'rpl_extracted_1',
+        sessionId: 'ses_ext_1',
+        userId: null,
+        anonymousId: 'anon_ext_1',
+        startedAt: new Date().toISOString(),
+        durationSeconds: 30,
+        deviceInfo: { browser: 'Chrome', viewport: { width: 1280, height: 720 } }
+      },
+      events: [
+        { type: 4, timestamp: 1000, data: { href: 'https://app.traceiq.dev/signup', width: 1280, height: 720 } },
+        { type: 2, timestamp: 1005, data: { node: { id: 1, tagName: 'html', childNodes: [{ id: 2, tagName: 'body' }] } } }
+      ]
+    })
+  };
 
   const service = new SyntheticMonitoringService(
     db as any,
@@ -69,10 +88,12 @@ function makeService(dbQueries?: (sql: string, params?: any[]) => any) {
     runner as any,
     observability as any,
     crypto as any,
-    artifacts as any
+    artifacts as any,
+    replayExtractor as any,
+    replayService as any
   );
 
-  return { service, db, projects, runner, observability, crypto, artifacts };
+  return { service, db, projects, runner, observability, crypto, artifacts, replayExtractor, replayService };
 }
 
 describe('SyntheticMonitoring - Hardened SSRF & Protocol Security', () => {
@@ -767,6 +788,58 @@ describe('SyntheticMonitoring - CI Run Groups & PR Preview Testing', () => {
       PROJECT.id
     );
     expect(writeKeyAuth.projectId).toBe(PROJECT.id);
+  });
+
+  describe('Session Replay → Synthetic Journey Extraction & Provenance', () => {
+    it('generates a draft from replay events and respects tenancy isolation', async () => {
+      const { service, replayService } = makeService();
+
+      const draft = await service.getReplayDraft(USER, 'rpl_extracted_1', PROJECT.id);
+
+      expect(draft.source.type).toBe('replay');
+      expect(draft.source.replayId).toBe('rpl_extracted_1');
+      expect(draft.source.sessionId).toBe('ses_ext_1');
+      expect(draft.monitor.baseUrl).toBe('https://app.traceiq.dev');
+      expect(draft.initialSteps.length).toBeGreaterThanOrEqual(1);
+      expect(draft.initialSteps[0].type).toBe('navigate');
+      expect(replayService.getEventsForExtraction).toHaveBeenCalledWith(USER, 'rpl_extracted_1', PROJECT.id);
+    });
+
+    it('creates monitor with replay provenance fields intact', async () => {
+      let insertedRow: any = null;
+      const { service } = makeService((sql, params) => {
+        if (sql.includes('INSERT INTO synthetic_monitors')) {
+          insertedRow = {
+            id: params?.[0],
+            projectId: params?.[1],
+            name: params?.[2],
+            baseUrl: params?.[4],
+            sourceType: params?.[13],
+            sourceReplayId: params?.[18],
+            sourceSessionId: params?.[19],
+            sourceReplayStartedAt: params?.[20]?.toISOString?.() || params?.[20]
+          };
+          return rows([insertedRow]);
+        }
+        return rows([]);
+      });
+
+      const startedAt = '2026-10-07T10:00:00.000Z';
+      const created = await service.create(USER, {
+        name: 'Extracted Replay Monitor',
+        baseUrl: 'https://app.traceiq.dev',
+        steps: [{ type: 'navigate', url: '/signup' }],
+        sourceType: 'replay',
+        sourceReplayId: 'rpl_extracted_1',
+        sourceSessionId: 'ses_ext_1',
+        sourceReplayStartedAt: startedAt,
+        projectId: PROJECT.id
+      });
+
+      expect(created.sourceType).toBe('replay');
+      expect(created.sourceReplayId).toBe('rpl_extracted_1');
+      expect(created.sourceSessionId).toBe('ses_ext_1');
+    });
   });
 });
 
