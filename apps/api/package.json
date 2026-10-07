@@ -7,7 +7,7 @@
     "dev": "nest start --watch",
     "prebuild": "node scripts/clean-dist.js",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "node -e \"const fs = require('fs'); const p = fs.existsSync('dist/apps/api/src/main.js') ? './dist/apps/api/src/main.js' : './dist/main.js'; require(p);\"",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
