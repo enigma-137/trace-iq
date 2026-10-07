@@ -40,11 +40,11 @@ const sampleEvents = [
 ];
 
 const draft = extractor.extractDraft(replayRecord, sampleEvents);
-console.log('Extracted steps count:', draft.steps.length);
-console.log('Initial URL:', draft.initialUrl);
-console.log('Provenance:', JSON.stringify(draft.provenance, null, 2));
+console.log('Extracted steps count:', draft.initialSteps.length);
+console.log('Base URL:', draft.monitor.baseUrl);
+console.log('Source:', JSON.stringify(draft.source, null, 2));
 
-if (draft.steps.length >= 1 && draft.provenance.sourceReplayId === 'rpl_smoke_1') {
+if (draft.initialSteps.length >= 1 && draft.source.replayId === 'rpl_smoke_1') {
   console.log('Extraction smoke test PASSED: draft and provenance structured correctly.');
 } else {
   console.error('Extraction smoke test FAILED!');
