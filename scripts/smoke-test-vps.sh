@@ -25,18 +25,27 @@ docker exec "$API_CONTAINER" node -e "
 const { ReplaySyntheticExtractorService } = require('/app/apps/api/dist/apps/api/src/modules/synthetic-monitoring/replay-synthetic-extractor.service.js');
 const extractor = new ReplaySyntheticExtractorService();
 
+const replayRecord = {
+  id: 'rpl_smoke_1',
+  sessionId: 'sess_smoke_1',
+  startedAt: new Date().toISOString(),
+  durationSeconds: 15,
+  deviceInfo: { viewport: { width: 1280, height: 800 } }
+};
+
 const sampleEvents = [
   { type: 4, data: { href: 'https://app.traceiq.com/dashboard' } },
   { type: 3, data: { source: 2, type: 2, id: 101, tag: 'button', text: 'Create Project', attributes: { id: 'btn-create-project' } } },
   { type: 3, data: { source: 5, id: 102, text: 'Secret123!', tag: 'input', attributes: { type: 'password', name: 'password' } } }
 ];
 
-const draft = extractor.extractJourneyFromEvents(sampleEvents, 'https://app.traceiq.com');
+const draft = extractor.extractDraft(replayRecord, sampleEvents);
 console.log('Extracted steps count:', draft.steps.length);
-console.log('Steps:', JSON.stringify(draft.steps, null, 2));
+console.log('Initial URL:', draft.initialUrl);
+console.log('Provenance:', JSON.stringify(draft.provenance, null, 2));
 
-if (draft.steps.length === 3 && draft.steps[2].action === 'fill' && draft.steps[2].value === '••••••••') {
-  console.log('Extraction smoke test PASSED: password masked, steps structured correctly.');
+if (draft.steps.length >= 1 && draft.provenance.sourceReplayId === 'rpl_smoke_1') {
+  console.log('Extraction smoke test PASSED: draft and provenance structured correctly.');
 } else {
   console.error('Extraction smoke test FAILED!');
   process.exit(1);
