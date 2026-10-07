@@ -13,6 +13,18 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: ${VPS_DATABASE_URL}
+      DATABASE_SSL: "false"
+    depends_on:
+      - postgres
+    command: ["npm", "run", "migrate", "--workspace=@traceiq/api"]
+    restart: "no"
+
   api:
     build:
       context: .
@@ -21,6 +33,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - migrate
     environment:
       NODE_ENV: production
       TRACEIQ_DEPLOYMENT_MODE: ${TRACEIQ_DEPLOYMENT_MODE:-self_hosted}
@@ -39,6 +52,9 @@ services:
       TRACEIQ_REPLAY_STORAGE_DIR: ${TRACEIQ_REPLAY_STORAGE_DIR:-/var/lib/traceiq/session-replays}
       REPLAY_UPLOAD_TOKEN_SECRET: ${REPLAY_UPLOAD_TOKEN_SECRET:-}
 
+      TRACEIQ_SECRET_ENCRYPTION_KEY: ${TRACEIQ_SECRET_ENCRYPTION_KEY:-}
+      TRACEIQ_SYNTHETIC_STORAGE_DIR: ${TRACEIQ_SYNTHETIC_STORAGE_DIR:-/var/lib/traceiq/synthetic-artifacts}
+
       CENCORI_API_KEY: ${CENCORI_API_KEY:-}
       TRACEIQ_AI_FAST_MODEL: ${TRACEIQ_AI_FAST_MODEL:-}
       TRACEIQ_AI_REASONING_MODEL: ${TRACEIQ_AI_REASONING_MODEL:-}
@@ -53,7 +69,6 @@ services:
       BACHS_PRO_MONTHLY_PRODUCT_ID: ${BACHS_PRO_MONTHLY_PRODUCT_ID:-}
       BACHS_PRO_YEARLY_PRODUCT_ID: ${BACHS_PRO_YEARLY_PRODUCT_ID:-}
 
-      
       CORS_ORIGINS: ${CORS_ORIGINS:-https://traceiq.run}
       DASHBOARD_URL: https://traceiq.run
       BILLING_DASHBOARD_RETURN_URL: ${BILLING_DASHBOARD_RETURN_URL:-}
@@ -63,7 +78,9 @@ services:
       - "127.0.0.1:4000:4000"
     volumes:
       - replay_data:/var/lib/traceiq/session-replays
+      - synthetic_data:/var/lib/traceiq/synthetic-artifacts
 
 volumes:
   postgres_data:
   replay_data:
+  synthetic_data:

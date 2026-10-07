@@ -385,3 +385,70 @@ describe('FunnelsService.update and remove', () => {
     expect(deletes[0].values).toEqual(['fnl_1', 'proj_1']);
   });
 });
+
+describe('FunnelsService.generateSyntheticDraft', () => {
+  it('generates a synthetic journey draft preserving milestones and deterministic heuristics', async () => {
+    const funnelSteps = [
+      { order: 0, eventName: 'page_view', label: 'Landing Page' },
+      { order: 1, eventName: 'sign_up_start', label: 'Signup Form' },
+      { order: 2, eventName: 'pricing_view', label: '/pricing' },
+      { order: 3, eventName: 'project_created', label: 'Create Project' }
+    ];
+
+    const db = mockDatabase((text) => {
+      if (text.includes('FROM funnels WHERE')) {
+        return rows([{ id: 'fnl_signup', name: 'User Signup Flow', created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-02T00:00:00.000Z' }]);
+      }
+      if (text.includes('FROM funnel_steps')) {
+        return rows(funnelSteps);
+      }
+      return rows([]);
+    });
+
+    const projects = {
+      requireActiveProject: vi.fn().mockResolvedValue(PROJECT),
+      requireWritableProject: vi.fn().mockResolvedValue(PROJECT)
+    };
+
+    const service = new FunnelsService(db as never, projects as never);
+    const draft = await service.generateSyntheticDraft(user, 'fnl_signup', 'proj_1');
+
+    expect(draft.source.funnelId).toBe('fnl_signup');
+    expect(draft.source.name).toBe('User Signup Flow');
+    expect(draft.source.stepCount).toBe(4);
+    expect(draft.monitor.name).toBe('User Signup Flow - Synthetic Journey');
+    expect(draft.milestones).toHaveLength(4);
+
+    // Step 0: page_view -> suggested navigate step
+    expect(draft.milestones[0].eventName).toBe('page_view');
+    expect(draft.milestones[0].suggestedSteps[0].type).toBe('navigate');
+    expect(draft.milestones[0].needsConfiguration).toBe(false);
+
+    // Step 1: sign_up -> template steps with secure variables
+    expect(draft.milestones[1].eventName).toBe('sign_up_start');
+    const step1Types = draft.milestones[1].suggestedSteps.map((s) => s.type);
+    expect(step1Types).toContain('fill');
+    expect(step1Types).toContain('click');
+    expect(draft.milestones[1].suggestedSteps.some((s) => s.value === '{{SYNTHETIC_EMAIL}}')).toBe(true);
+
+    // Step 2: pricing_view with /pricing label -> navigate to /pricing
+    expect(draft.milestones[2].eventName).toBe('pricing_view');
+    expect(draft.milestones[2].suggestedSteps[0].type).toBe('navigate');
+    expect(draft.milestones[2].suggestedSteps[0].url).toBe('/pricing');
+
+    // Step 3: custom event project_created -> marked as needsConfiguration
+    expect(draft.milestones[3].eventName).toBe('project_created');
+    expect(draft.milestones[3].needsConfiguration).toBe(true);
+  });
+
+  it('enforces project isolation and throws NotFoundException for missing funnel', async () => {
+    const db = mockDatabase(() => empty());
+    const projects = {
+      requireActiveProject: vi.fn().mockResolvedValue(PROJECT),
+      requireWritableProject: vi.fn().mockResolvedValue(PROJECT)
+    };
+    const service = new FunnelsService(db as never, projects as never);
+    await expect(service.generateSyntheticDraft(user, 'fnl_nonexistent', 'proj_1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+

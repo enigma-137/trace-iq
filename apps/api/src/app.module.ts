@@ -25,6 +25,7 @@ import { AchievementsModule } from './modules/achievements/achievements.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { ExperimentsModule } from './modules/experiments/experiments.module';
 import { SurveysModule } from './modules/surveys/surveys.module';
+import { SyntheticMonitoringModule } from './modules/synthetic-monitoring/synthetic-monitoring.module';
 import { SetupVerificationsModule } from './modules/setup-verifications/setup-verifications.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
@@ -53,6 +54,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     FlagsModule,
     ExperimentsModule,
     SurveysModule,
+    SyntheticMonitoringModule,
     WebhooksModule,
     ExportModule,
     ObservabilityModule,

@@ -279,18 +279,18 @@ function AnalyticsMockView() {
       {/* Clean SVG Trend Chart */}
       <div className="rounded-xl border border-white/5 bg-white/[0.015] p-3 sm:p-5">
         {/* Chart Header */}
-        <div className="mb-4 flex w-full items-center gap-2 sm:gap-4">
-          <span className="min-w-0 flex-1 whitespace-nowrap font-mono text-[9px] font-medium tracking-tight text-zinc-300 sm:text-xs">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <span className="font-mono text-xs font-medium tracking-tight text-zinc-300">
             Daily Active Users &amp; Sessions
           </span>
 
-          <div className="flex shrink-0 items-center gap-2 font-mono text-[8px] sm:gap-3 sm:text-xs">
-            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-zinc-400 sm:gap-1.5">
+          <div className="flex items-center gap-3 font-mono text-[10px] sm:text-xs">
+            <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-zinc-400">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 sm:h-2 sm:w-2" />
               Visitors
             </span>
 
-            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-zinc-500 sm:gap-1.5">
+            <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-zinc-500">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600 sm:h-2 sm:w-2" />
               Previous 30d
             </span>

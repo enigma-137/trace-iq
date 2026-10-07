@@ -108,9 +108,9 @@ export function LandingDevExperience() {
 
             {/* Control Bar */}
 
-            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-4 sm:gap-3">
+            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-3 sm:gap-3 sm:pb-4">
 
-              <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
 
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 whitespace-nowrap sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
 
@@ -128,7 +128,7 @@ export function LandingDevExperience() {
 
                   onChange={(e) => setSelectedEvent(e.target.value)}
 
-                  className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-black/40 px-2 py-1 text-[10px] font-mono text-zinc-300 outline-none transition-colors hover:border-white/20 sm:px-2.5 sm:text-xs"
+                  className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-[11px] font-mono text-zinc-300 outline-none transition-colors hover:border-white/20 sm:px-2.5 sm:text-xs cursor-pointer"
 
                 >
 
@@ -148,6 +148,8 @@ export function LandingDevExperience() {
 
 
 
+              {/* Desktop Send Event Button */}
+
               <button
 
                 type="button"
@@ -156,7 +158,7 @@ export function LandingDevExperience() {
 
                 disabled={isSending}
 
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-50 sm:gap-1.5 sm:px-3 sm:text-xs"
+                className="hidden sm:inline-flex shrink-0 items-center gap-1.5 rounded-md border border-white/20 bg-white px-3 py-1 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-50"
 
               >
 
@@ -197,6 +199,32 @@ export function LandingDevExperience() {
                 </div>
 
               ))}
+
+            </div>
+
+
+
+            {/* Mobile Send Event Button - positioned below requests on small screens */}
+
+            <div className="mt-4 pt-3 border-t border-white/5 sm:hidden">
+
+              <button
+
+                type="button"
+
+                onClick={sendTestEvent}
+
+                disabled={isSending}
+
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 active:scale-98 disabled:opacity-50 shadow-sm"
+
+              >
+
+                <span>{isSending ? 'Sending event...' : 'Send event'}</span>
+
+                <HugeiconsIcon icon={RocketIcon} size={14} className="text-zinc-950" />
+
+              </button>
 
             </div>
 

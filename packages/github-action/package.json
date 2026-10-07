@@ -1,0 +1,21 @@
+{
+  "name": "@traceiq/github-action",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TraceIQ Synthetic Check Action for Pull Request Preview Deployments",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.7"
+  }
+}

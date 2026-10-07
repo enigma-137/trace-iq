@@ -7,6 +7,7 @@ import { FunnelEventFlow } from '@/components/charts/FunnelEventFlow';
 import { FunnelAiSummary } from './FunnelAiSummary';
 import { FunnelDebugPanel, type FunnelDebugData } from './FunnelDebugPanel';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
+import type { SyntheticMonitor } from '@traceiq/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,16 @@ interface FunnelResultsResponse {
   funnel: { id: string; name: string };
   days: number;
   steps: FunnelStep[];
+}
+
+interface FunnelDetailResponse {
+  funnel: {
+    id: string;
+    name: string;
+    description: string | null;
+    projectId: string;
+    updatedAt?: string;
+  };
 }
 
 interface StepUsersResponse {
@@ -65,10 +76,25 @@ export default async function FunnelResultsPage({
   const stepParam = firstParam(searchParams.step);
   const statusParam = firstParam(searchParams.status) === 'dropped' ? 'dropped' : 'reached';
 
-  const { data, error } = await dashboardGet<FunnelResultsResponse>(
-    `/v1/dashboard/funnels/${params.id}/results?days=${encodeURIComponent(days)}`,
-    token
-  );
+  const [resultsRes, funnelRes, monitorsRes] = await Promise.all([
+    dashboardGet<FunnelResultsResponse>(
+      `/v1/dashboard/funnels/${params.id}/results?days=${encodeURIComponent(days)}`,
+      token
+    ),
+    dashboardGet<FunnelDetailResponse>(
+      `/v1/dashboard/funnels/${params.id}`,
+      token
+    ),
+    dashboardGet<{ monitors: SyntheticMonitor[] }>(
+      `/v1/dashboard/funnels/${params.id}/synthetic-monitors`,
+      token
+    )
+  ]);
+
+  const data = resultsRes.data;
+  const error = resultsRes.error;
+  const funnelDetails = funnelRes.data?.funnel;
+  const linkedMonitors = monitorsRes.data?.monitors ?? [];
 
   let debugData: FunnelDebugData | null = null;
   if (debugEnabled) {
@@ -97,12 +123,12 @@ export default async function FunnelResultsPage({
 
   return (
     <DashboardShell active="funnels" title={data?.funnel.name ?? 'Funnel'} userEmail={user.email}>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link href="/dashboard/funnels" className="text-sm font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white">
           ← All funnels
         </Link>
         {data ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/funnels/${params.id}?days=${days}&debug=${debugEnabled ? '' : '1'}`}
               className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-semibold transition ${
@@ -118,6 +144,12 @@ export default async function FunnelResultsPage({
               className="inline-flex h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Edit funnel
+            </Link>
+            <Link
+              href={`/dashboard/synthetic-monitors/new?funnelId=${params.id}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white transition hover:bg-blue-500 shadow-xs"
+            >
+              <span>⚡</span> Convert to Synthetic Monitor
             </Link>
             <AddCurrentViewToDashboardButton
               title={`${data.funnel.name} Funnel`}
@@ -139,6 +171,100 @@ export default async function FunnelResultsPage({
 
       {data ? (
         <>
+          {linkedMonitors.length > 0 && (
+            <section className="mb-6 rounded-md border border-purple-200/80 bg-purple-50/40 p-4 dark:border-purple-900/40 dark:bg-purple-950/20">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3 border-b border-purple-100 pb-2.5 dark:border-purple-900/30">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <h3 className="text-sm font-semibold text-purple-950 dark:text-purple-200">
+                    Linked Synthetic Monitors ({linkedMonitors.length})
+                  </h3>
+                  <span className="text-xs text-purple-700/80 dark:text-purple-400">
+                    Continuous automated browser journeys
+                  </span>
+                </div>
+                <Link
+                  href={`/dashboard/synthetic-monitors/new?funnelId=${params.id}`}
+                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 dark:text-purple-300 dark:hover:text-purple-100 underline decoration-purple-300 underline-offset-2"
+                >
+                  + Convert to another monitor
+                </Link>
+              </div>
+
+              <div className="space-y-2">
+                {linkedMonitors.map((m) => {
+                  const isOutdated =
+                    funnelDetails?.updatedAt &&
+                    m.sourceFunnelUpdatedAt &&
+                    new Date(funnelDetails.updatedAt).getTime() > new Date(m.sourceFunnelUpdatedAt).getTime() + 1000;
+
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border border-purple-100 bg-white/90 px-3.5 py-2.5 dark:border-purple-900/40 dark:bg-slate-900/80"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/dashboard/synthetic-monitors/${m.id}`}
+                            className="font-medium text-sm text-neutral-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400 truncate"
+                          >
+                            {m.name}
+                          </Link>
+                          {m.lastRunStatus === 'passed' ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Passing
+                            </span>
+                          ) : m.lastRunStatus === 'failed' || m.lastRunStatus === 'timed_out' ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                              Failing
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-slate-800 dark:text-slate-400">
+                              {m.status === 'paused' ? 'Paused' : 'Never run'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-slate-400 mt-0.5">
+                          <span>⏱ Every {m.schedule}</span>
+                          <span>•</span>
+                          <span className="font-mono">{m.baseUrl}</span>
+                          {m.lastRunDurationMs !== null && (
+                            <>
+                              <span>•</span>
+                              <span>{m.lastRunDurationMs}ms</span>
+                            </>
+                          )}
+                          {isOutdated && (
+                            <>
+                              <span>•</span>
+                              <span
+                                className="text-amber-700 dark:text-amber-300 font-medium"
+                                title="The source funnel definition was modified after this synthetic monitor was created."
+                              >
+                                ⚠️ Funnel modified since monitor created
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Link
+                          href={`/dashboard/synthetic-monitors/${m.id}`}
+                          className="rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          View Monitor →
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <section className="mb-6 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-start">
             <div className="max-w-xl">
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">

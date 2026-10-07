@@ -40,6 +40,7 @@ const ICONS: Record<string, IconSvgElement> = {
   flags: Flag02Icon,
   experiments: FlaskConicalIcon,
   surveys: Comment01Icon,
+  'synthetic-monitors': Activity01Icon,
   webhooks: WebhookIcon,
   achievements: ChampionIcon,
   export: Download04Icon,

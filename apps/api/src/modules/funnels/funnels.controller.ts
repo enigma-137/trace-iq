@@ -1,12 +1,14 @@
 import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { CreateFunnelRequest, FunnelsService } from './funnels.service';
+import { SyntheticMonitoringService } from '../synthetic-monitoring/synthetic-monitoring.service';
 
 @Controller('v1/dashboard/funnels')
 export class FunnelsController {
   constructor(
     private readonly authService: AuthService,
-    private readonly funnelsService: FunnelsService
+    private readonly funnelsService: FunnelsService,
+    private readonly syntheticService: SyntheticMonitoringService
   ) {}
 
   @Get()
@@ -32,6 +34,28 @@ export class FunnelsController {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'funnels:read');
     return this.funnelsService.getFunnel(user, id, projectId);
+  }
+
+  @Get(':id/synthetic-draft')
+  async getSyntheticDraft(
+    @Param('id') id: string,
+    @Headers('authorization') authorization?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'funnels:read');
+    return this.funnelsService.generateSyntheticDraft(user, id, projectId);
+  }
+
+  @Get(':id/synthetic-monitors')
+  async getSyntheticMonitors(
+    @Param('id') id: string,
+    @Headers('authorization') authorization?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'funnels:read');
+    return this.syntheticService.listByFunnel(user, id, projectId);
   }
 
   @Put(':id')

@@ -68,5 +68,5 @@ describe('assertDnsSafeUrl (DNS SSRF resolution)', () => {
     const url = 'https://example.com/webhook';
     const result = await assertDnsSafeUrl(url);
     expect(result).toBe(url);
-  });
+  }, 15000);
 });

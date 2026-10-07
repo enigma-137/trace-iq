@@ -16,6 +16,7 @@ export const navItems = [
   { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },
   { label: 'Experiments', href: '/dashboard/experiments', key: 'experiments' },
   { label: 'Surveys', href: '/dashboard/surveys', key: 'surveys' },
+  { label: 'Synthetic monitors', href: '/dashboard/synthetic-monitors', key: 'synthetic-monitors' },
   { label: 'Webhooks', href: '/dashboard/webhooks', key: 'webhooks' },
   { label: 'Achievements', href: '/dashboard/achievements', key: 'achievements' },
   { label: 'Export', href: '/dashboard/export', key: 'export' }

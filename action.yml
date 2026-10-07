@@ -1,0 +1,57 @@
+name: 'TraceIQ Synthetic Checks'
+description: 'Run deterministic TraceIQ Playwright synthetic monitors against pull-request preview deployments before code merge.'
+author: 'TraceIQ Team'
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  api-key:
+    description: 'TraceIQ Project API Key or Personal Access Token (tiq_pat_...)'
+    required: true
+  project-id:
+    description: 'Target TraceIQ Project ID (e.g. prj_123)'
+    required: true
+  preview-url:
+    description: 'Base URL of the pull-request preview deployment (e.g. from Vercel, Netlify, Cloudflare)'
+    required: true
+  monitors:
+    description: 'Comma-separated list of Synthetic Monitor IDs to execute (e.g. "sym_signup,sym_checkout")'
+    required: true
+  api-url:
+    description: 'TraceIQ API base URL (defaults to https://api.traceiq.ai)'
+    required: false
+    default: 'https://api.traceiq.ai'
+  app-url:
+    description: 'TraceIQ Dashboard URL for diagnostic links (defaults to https://app.traceiq.ai)'
+    required: false
+    default: 'https://app.traceiq.ai'
+  environment:
+    description: 'Target deployment environment tag (e.g. "preview", "staging")'
+    required: false
+    default: 'preview'
+  timeout-seconds:
+    description: 'Maximum time to wait for synthetic monitor runs to complete (in seconds)'
+    required: false
+    default: '600'
+  poll-interval-seconds:
+    description: 'Polling interval in seconds between status checks'
+    required: false
+    default: '5'
+  idempotency-key:
+    description: 'Optional custom idempotency key to prevent duplicate runs upon workflow retry'
+    required: false
+
+outputs:
+  status:
+    description: 'Aggregated synthetic check status (passed, failed, or timed_out)'
+  passed-count:
+    description: 'Number of passed synthetic monitors'
+  failed-count:
+    description: 'Number of failed synthetic monitors'
+  run-group-id:
+    description: 'TraceIQ Synthetic CI Run Group ID'
+
+runs:
+  using: 'node20'
+  main: 'packages/github-action/dist/index.js'

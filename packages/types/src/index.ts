@@ -46,6 +46,7 @@ export interface TimelineEvent {
 }
 
 export * from './mobile-replay';
+export * from './synthetic-monitoring';
 
 // Experiment Types
 export type ExperimentStatus = 'draft' | 'running' | 'paused' | 'completed' | 'archived';

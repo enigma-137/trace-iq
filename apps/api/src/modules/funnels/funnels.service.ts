@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
+import { FunnelSyntheticDraft, FunnelSyntheticDraftMilestone, SyntheticStep } from '@traceiq/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -215,6 +216,197 @@ export class FunnelsService {
       createdAt: funnel.created_at,
       stepCount: steps.length,
       steps
+    };
+  }
+
+  async generateSyntheticDraft(
+    user: DashboardUser,
+    funnelId: string,
+    projectId?: string
+  ): Promise<FunnelSyntheticDraft> {
+    const project = await this.projects.requireActiveProject(user, projectId);
+    const funnel = await this.loadFunnel(project.id, funnelId);
+    const steps = await this.loadSteps(funnelId);
+
+    if (steps.length === 0) {
+      throw new BadRequestException('Funnel has no steps to convert.');
+    }
+
+    const milestones: FunnelSyntheticDraftMilestone[] = [];
+    const allSuggestedSteps: SyntheticStep[] = [];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const ev = step.eventName.toLowerCase().trim();
+      const lbl = (step.label || '').toLowerCase().trim();
+
+      const suggestedSteps: SyntheticStep[] = [];
+      let needsConfiguration = false;
+      let notes: string | undefined;
+
+      // 1. Page view or navigation milestones
+      if (
+        ev === 'page_view' ||
+        ev === 'screen_view' ||
+        ev === '$pageview' ||
+        ev.includes('landing') ||
+        ev.includes('page') ||
+        lbl.startsWith('/')
+      ) {
+        let path = '/';
+        if (step.label && step.label.includes('/')) {
+          const match = step.label.match(/(\/[a-zA-Z0-9_\-\/]+)/);
+          if (match) path = match[1];
+        } else if (ev.includes('pricing')) {
+          path = '/pricing';
+        } else if (ev.includes('signup') || ev.includes('register')) {
+          path = '/signup';
+        } else if (ev.includes('login') || ev.includes('signin')) {
+          path = '/login';
+        } else if (ev.includes('checkout')) {
+          path = '/checkout';
+        }
+
+        suggestedSteps.push({
+          type: 'navigate',
+          url: path,
+          description: `Navigate to ${step.label || step.eventName}`
+        });
+        suggestedSteps.push({
+          type: 'assert_visible',
+          selector: 'body',
+          description: `Verify ${step.label || 'page'} loaded`
+        });
+        notes = 'Pre-filled navigation and visibility assertion for page view milestone';
+      }
+      // 2. Signup / Registration milestones
+      else if (
+        ev.includes('signup') ||
+        ev.includes('sign_up') ||
+        ev.includes('register') ||
+        lbl.includes('sign up') ||
+        lbl.includes('signup') ||
+        lbl.includes('register')
+      ) {
+        suggestedSteps.push({
+          type: 'navigate',
+          url: '/signup',
+          description: 'Open registration form'
+        });
+        suggestedSteps.push({
+          type: 'fill',
+          selector: 'input[type=email], input[name=email]',
+          value: '{{SYNTHETIC_EMAIL}}',
+          description: 'Fill user email'
+        });
+        suggestedSteps.push({
+          type: 'fill',
+          selector: 'input[type=password], input[name=password]',
+          value: '{{SYNTHETIC_PASSWORD}}',
+          description: 'Fill user password'
+        });
+        suggestedSteps.push({
+          type: 'click',
+          selector: 'button[type=submit], [data-testid=signup-submit]',
+          description: 'Click Submit Registration'
+        });
+        notes = 'Pre-filled registration form template using secure variables';
+      }
+      // 3. Login / Sign In milestones
+      else if (
+        ev.includes('login') ||
+        ev.includes('log_in') ||
+        ev.includes('signin') ||
+        ev.includes('sign_in') ||
+        ev.includes('auth') ||
+        lbl.includes('login') ||
+        lbl.includes('log in') ||
+        lbl.includes('sign in') ||
+        lbl.includes('signin')
+      ) {
+        suggestedSteps.push({
+          type: 'navigate',
+          url: '/login',
+          description: 'Open login page'
+        });
+        suggestedSteps.push({
+          type: 'fill',
+          selector: 'input[type=email], input[name=email]',
+          value: '{{SYNTHETIC_EMAIL}}',
+          description: 'Fill account email'
+        });
+        suggestedSteps.push({
+          type: 'fill',
+          selector: 'input[type=password], input[name=password]',
+          value: '{{SYNTHETIC_PASSWORD}}',
+          description: 'Fill account password'
+        });
+        suggestedSteps.push({
+          type: 'click',
+          selector: 'button[type=submit], [data-testid=login-submit]',
+          description: 'Click Log In'
+        });
+        notes = 'Pre-filled authentication template using secure variables';
+      }
+      // 4. Search milestones
+      else if (ev.includes('search') || lbl.includes('search')) {
+        suggestedSteps.push({
+          type: 'fill',
+          selector: 'input[type=search], input[name=q]',
+          value: 'TraceIQ',
+          description: 'Type search query'
+        });
+        suggestedSteps.push({
+          type: 'click',
+          selector: 'button[type=submit], [data-testid=search-submit]',
+          description: 'Submit search'
+        });
+        needsConfiguration = true;
+        notes = 'Review search input selectors and expected query';
+      }
+      // 5. Generic / Custom milestones
+      else {
+        const testId = step.eventName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
+        suggestedSteps.push({
+          type: 'click',
+          selector: `[data-testid="${testId}"], button#${testId}`,
+          description: `Trigger ${step.label || step.eventName}`
+        });
+        needsConfiguration = true;
+        notes = 'Specify the exact element selector and interaction required for this milestone';
+      }
+
+      milestones.push({
+        stepOrder: step.order,
+        eventName: step.eventName,
+        label: step.label,
+        suggestedSteps,
+        needsConfiguration,
+        notes
+      });
+
+      allSuggestedSteps.push(...suggestedSteps);
+    }
+
+    return {
+      source: {
+        type: 'funnel',
+        funnelId: funnel.id,
+        name: funnel.name,
+        updatedAt: funnel.updated_at || funnel.created_at,
+        stepCount: steps.length
+      },
+      monitor: {
+        name: `${funnel.name} - Synthetic Journey`,
+        baseUrl: 'https://',
+        schedule: '15m',
+        browser: 'chromium'
+      },
+      milestones,
+      initialSteps:
+        allSuggestedSteps.length > 0
+          ? allSuggestedSteps
+          : [{ type: 'navigate', url: '/', description: 'Open base URL' }]
     };
   }
 
@@ -495,8 +687,8 @@ export class FunnelsService {
   }
 
   private async loadFunnel(projectId: string, funnelId: string) {
-    const result = await this.database.query<{ id: string; name: string; created_at: string }>(
-      `SELECT id, name, created_at FROM funnels WHERE id = $1 AND project_id = $2 LIMIT 1`,
+    const result = await this.database.query<{ id: string; name: string; created_at: string; updated_at: string }>(
+      `SELECT id, name, created_at, updated_at FROM funnels WHERE id = $1 AND project_id = $2 LIMIT 1`,
       [funnelId, projectId]
     );
 
