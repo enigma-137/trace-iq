@@ -20,7 +20,7 @@ RUN npm ci --include=dev --legacy-peer-deps
 # Install Playwright Chromium browser and its shared system libraries
 RUN npx playwright install --with-deps chromium
 
-RUN npm run build --workspace=@traceiq/api
+RUN npm --prefix apps/api run build
 
 ENV NODE_ENV=production
 
