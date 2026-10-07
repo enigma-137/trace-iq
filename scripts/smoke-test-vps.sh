@@ -22,7 +22,7 @@ LIMIT 3;
 # 2. Check Extraction logic via internal API test
 echo "--- 2. Testing Extraction Service directly in Node API runtime ---"
 docker exec "$API_CONTAINER" node -e "
-const { ReplaySyntheticExtractorService } = require('./dist/apps/api/src/modules/synthetic-monitoring/replay-synthetic-extractor.service.js');
+const { ReplaySyntheticExtractorService } = require('/app/apps/api/dist/apps/api/src/modules/synthetic-monitoring/replay-synthetic-extractor.service.js');
 const extractor = new ReplaySyntheticExtractorService();
 
 const sampleEvents = [
