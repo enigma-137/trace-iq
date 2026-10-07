@@ -3,35 +3,31 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Play,
-  Clock,
-  Users,
-  Smartphone,
-  Monitor,
-  Search,
-  Calendar,
-  ChevronDown,
-  SlidersHorizontal,
-  X,
-  ExternalLink,
-  Copy,
-  Check,
-  MoreHorizontal,
-  Trash2,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Tablet,
-  Globe,
-  ArrowRight,
-  TrendingUp,
-  TrendingDown,
-  Info,
-  Shield,
-  Layers,
-  MousePointerClick
-} from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
+import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
+import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
+import SmartPhone01Icon from '@hugeicons/core-free-icons/SmartPhone01Icon';
+import ComputerIcon from '@hugeicons/core-free-icons/ComputerIcon';
+import Tablet01Icon from '@hugeicons/core-free-icons/Tablet01Icon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
+import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import ArrowLeft01Icon from '@hugeicons/core-free-icons/ArrowLeft01Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import FilterIcon from '@hugeicons/core-free-icons/FilterIcon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
+import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
+import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
+import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
+import Globe02Icon from '@hugeicons/core-free-icons/Globe02Icon';
+import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
+import AnalyticsUpIcon from '@hugeicons/core-free-icons/AnalyticsUpIcon';
+import AnalyticsDownIcon from '@hugeicons/core-free-icons/AnalyticsDownIcon';
+import Shield01Icon from '@hugeicons/core-free-icons/Shield01Icon';
+import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
 import type { ReplayListItem } from '@/features/replay/types';
 import { DashboardDialog } from '../DashboardDialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -291,7 +287,6 @@ export function ReplaysWorkspace({
 
   function handleRowClick(replay: ReplayListItem) {
     if (selectedReplayId === replay.id) {
-      // already selected, keep open or toggle
       return;
     }
     setSelectedReplayId(replay.id);
@@ -386,9 +381,6 @@ export function ReplaysWorkspace({
       <div className="flex flex-col justify-between gap-4 border-b border-neutral-200 pb-5 dark:border-slate-800 sm:flex-row sm:items-center">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              Session Replays
-            </h1>
             <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-[11px] font-medium text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Retention active</span>
@@ -404,92 +396,84 @@ export function ReplaysWorkspace({
             href={`/dashboard/settings/replay${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-2xs transition hover:bg-neutral-50 hover:text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
-            <Settings className="size-3.5 text-neutral-500 dark:text-slate-400" />
+            <HugeiconsIcon icon={Settings02Icon} size={14} strokeWidth={1.8} className="text-neutral-500 dark:text-slate-400" />
             <span>Replay settings</span>
           </Link>
         </div>
       </div>
 
-      {/* 2. Compact 4 Summary Cards */}
+      {/* 2. Compact 4 Summary Cards (Clean icons without colored background bubbles) */}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Total replays */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-            <Play className="size-4 fill-current ml-0.5" />
-          </div>
+        <div className="flex items-start justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">Total replays</p>
-            <div className="mt-0.5 flex items-baseline gap-2">
+            <div className="mt-1 flex items-baseline gap-2">
               <span className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
                 {stats.total.toLocaleString()}
               </span>
               <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="size-3" />
+                <HugeiconsIcon icon={AnalyticsUpIcon} size={12} strokeWidth={2} />
                 <span>12%</span>
               </span>
             </div>
             <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-slate-500">vs. previous 7 days</p>
           </div>
+          <HugeiconsIcon icon={PlayIcon} size={20} strokeWidth={1.8} className="text-neutral-400 dark:text-slate-500 shrink-0" />
         </div>
 
         {/* Card 2: Avg. duration */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-            <Clock className="size-4" />
-          </div>
+        <div className="flex items-start justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">Avg. duration</p>
-            <div className="mt-0.5 flex items-baseline gap-2">
+            <div className="mt-1 flex items-baseline gap-2">
               <span className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
                 {formatDuration(stats.avgDurationMs)}
               </span>
               <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="size-3" />
+                <HugeiconsIcon icon={AnalyticsUpIcon} size={12} strokeWidth={2} />
                 <span>8%</span>
               </span>
             </div>
             <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-slate-500">vs. previous 7 days</p>
           </div>
+          <HugeiconsIcon icon={Clock03Icon} size={20} strokeWidth={1.8} className="text-neutral-400 dark:text-slate-500 shrink-0" />
         </div>
 
         {/* Card 3: Drop-off sessions */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-            <Users className="size-4" />
-          </div>
+        <div className="flex items-start justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">Drop-off sessions</p>
-            <div className="mt-0.5 flex items-baseline gap-2">
+            <div className="mt-1 flex items-baseline gap-2">
               <span className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
                 {stats.dropOffRate}%
               </span>
               <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <TrendingDown className="size-3" />
+                <HugeiconsIcon icon={AnalyticsDownIcon} size={12} strokeWidth={2} />
                 <span>6%</span>
               </span>
             </div>
             <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-slate-500">vs. previous 7 days</p>
           </div>
+          <HugeiconsIcon icon={UserGroupIcon} size={20} strokeWidth={1.8} className="text-neutral-400 dark:text-slate-500 shrink-0" />
         </div>
 
         {/* Card 4: Mobile share */}
-        <div className="flex items-center gap-3.5 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-            <Smartphone className="size-4" />
-          </div>
+        <div className="flex items-start justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-950">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">Mobile share</p>
-            <div className="mt-0.5 flex items-baseline gap-2">
+            <div className="mt-1 flex items-baseline gap-2">
               <span className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
                 {stats.mobileShareRate}%
               </span>
               <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                <TrendingUp className="size-3" />
+                <HugeiconsIcon icon={AnalyticsUpIcon} size={12} strokeWidth={2} />
                 <span>3%</span>
               </span>
             </div>
             <p className="mt-0.5 text-[10px] text-neutral-400 dark:text-slate-500">vs. previous 7 days</p>
           </div>
+          <HugeiconsIcon icon={SmartPhone01Icon} size={20} strokeWidth={1.8} className="text-neutral-400 dark:text-slate-500 shrink-0" />
         </div>
       </div>
 
@@ -500,7 +484,7 @@ export function ReplaysWorkspace({
           <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
             {/* Search Box */}
             <div className="relative min-w-[240px] flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-neutral-400 dark:text-slate-500" />
+              <HugeiconsIcon icon={Search01Icon} size={14} strokeWidth={1.8} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500" />
               <input
                 type="text"
                 value={searchQuery}
@@ -513,8 +497,9 @@ export function ReplaysWorkspace({
                   type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:text-slate-500 dark:hover:text-slate-300"
+                  aria-label="Clear search"
                 >
-                  <X className="size-3" />
+                  <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
                 </button>
               ) : null}
             </div>
@@ -532,8 +517,8 @@ export function ReplaysWorkspace({
                 <option value="30d">Last 30 days</option>
                 <option value="all">All time</option>
               </select>
-              <Calendar className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-neutral-400 dark:text-slate-500" />
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-3 text-neutral-400 dark:text-slate-500" />
+              <HugeiconsIcon icon={Calendar03Icon} size={14} strokeWidth={1.8} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500" />
+              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500" />
             </div>
 
             {/* Device Dropdown */}
@@ -549,7 +534,7 @@ export function ReplaysWorkspace({
                 <option value="mobile">Mobile</option>
                 <option value="tablet">Tablet</option>
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-3 text-neutral-400 dark:text-slate-500" />
+              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500" />
             </div>
 
             {/* Location Dropdown */}
@@ -567,7 +552,7 @@ export function ReplaysWorkspace({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-3 text-neutral-400 dark:text-slate-500" />
+              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500" />
             </div>
 
             {/* Duration Dropdown */}
@@ -583,7 +568,7 @@ export function ReplaysWorkspace({
                 <option value="medium">1 - 5 mins</option>
                 <option value="long">&gt; 5 mins</option>
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-3 text-neutral-400 dark:text-slate-500" />
+              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500" />
             </div>
           </div>
 
@@ -594,33 +579,30 @@ export function ReplaysWorkspace({
               <button
                 type="button"
                 onClick={() => setPlatformFormat('all')}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  platformFormat === 'all'
-                    ? 'bg-blue-600 text-white shadow-2xs dark:bg-blue-600'
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${platformFormat === 'all'
+                    ? 'bg-neutral-900 text-white shadow-2xs dark:bg-white dark:text-neutral-900'
                     : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-slate-200'
-                }`}
+                  }`}
               >
                 All
               </button>
               <button
                 type="button"
                 onClick={() => setPlatformFormat('web')}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  platformFormat === 'web'
-                    ? 'bg-blue-600 text-white shadow-2xs dark:bg-blue-600'
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${platformFormat === 'web'
+                    ? 'bg-neutral-900 text-white shadow-2xs dark:bg-white dark:text-neutral-900'
                     : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-slate-200'
-                }`}
+                  }`}
               >
                 Web
               </button>
               <button
                 type="button"
                 onClick={() => setPlatformFormat('mobile')}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  platformFormat === 'mobile'
-                    ? 'bg-blue-600 text-white shadow-2xs dark:bg-blue-600'
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${platformFormat === 'mobile'
+                    ? 'bg-neutral-900 text-white shadow-2xs dark:bg-white dark:text-neutral-900'
                     : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-slate-200'
-                }`}
+                  }`}
               >
                 Mobile
               </button>
@@ -630,13 +612,12 @@ export function ReplaysWorkspace({
             <button
               type="button"
               onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                isFilterPanelOpen || hasActiveFilters
-                  ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300'
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${isFilterPanelOpen || hasActiveFilters
+                  ? 'border-neutral-400 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white'
                   : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-              }`}
+                }`}
             >
-              <SlidersHorizontal className="size-3.5" />
+              <HugeiconsIcon icon={FilterIcon} size={14} strokeWidth={1.8} />
               <span>Filters</span>
             </button>
 
@@ -645,7 +626,7 @@ export function ReplaysWorkspace({
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400 px-1"
+                className="text-xs font-medium text-neutral-600 hover:text-neutral-900 hover:underline dark:text-slate-400 dark:hover:text-slate-200 px-1"
               >
                 Clear all
               </button>
@@ -670,7 +651,7 @@ export function ReplaysWorkspace({
                         if (el) el.indeterminate = isSomeCurrentPageChecked;
                       }}
                       onChange={toggleSelectAllCurrentPage}
-                      className="size-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                      className="size-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900"
                     />
                   </th>
                   <th className="px-3 py-3">Visitor</th>
@@ -726,7 +707,7 @@ export function ReplaysWorkspace({
                           <button
                             type="button"
                             onClick={clearAllFilters}
-                            className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                            className="text-xs font-semibold text-neutral-900 hover:underline dark:text-slate-200"
                           >
                             Reset all filters
                           </button>
@@ -754,19 +735,18 @@ export function ReplaysWorkspace({
                       <tr
                         key={replay.id}
                         onClick={() => handleRowClick(replay)}
-                        className={`cursor-pointer transition ${
-                          isSelected
-                            ? 'border-l-2 border-l-blue-600 bg-blue-50/50 dark:border-l-blue-500 dark:bg-blue-950/25'
+                        className={`cursor-pointer transition ${isSelected
+                            ? 'border-l-2 border-l-neutral-900 bg-neutral-50/70 dark:border-l-white dark:bg-slate-900/60'
                             : 'hover:bg-neutral-50/70 dark:hover:bg-slate-900/50'
-                        }`}
+                          }`}
                       >
                         {/* Checkbox */}
                         <td className="w-10 px-3 py-3 text-center" onClick={(e) => toggleCheck(replay.id, e)}>
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => {}}
-                            className="size-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                            onChange={() => { }}
+                            className="size-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900"
                           />
                         </td>
 
@@ -801,10 +781,13 @@ export function ReplaysWorkspace({
                           )}
                         </td>
 
-                        {/* Entry Page */}
+                        {/* Entry Page - Clean formatted and truncated URL */}
                         <td className="px-3 py-3">
-                          <span className="max-w-40 truncate font-mono text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
-                            {replay.entryPage || '/'}
+                          <span
+                            className="block max-w-56 truncate font-mono text-xs font-medium text-neutral-700 dark:text-slate-300"
+                            title={replay.entryPage || undefined}
+                          >
+                            {formatDisplayUrl(replay.entryPage)}
                           </span>
                         </td>
 
@@ -829,9 +812,9 @@ export function ReplaysWorkspace({
                         <td className="px-3 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             {isMobile ? (
-                              <Smartphone className="size-4 shrink-0 text-neutral-500 dark:text-slate-400" />
+                              <HugeiconsIcon icon={SmartPhone01Icon} size={15} strokeWidth={1.8} className="shrink-0 text-neutral-500 dark:text-slate-400" />
                             ) : (
-                              <Monitor className="size-4 shrink-0 text-neutral-500 dark:text-slate-400" />
+                              <HugeiconsIcon icon={ComputerIcon} size={15} strokeWidth={1.8} className="shrink-0 text-neutral-500 dark:text-slate-400" />
                             )}
                             <div className="text-xs">
                               <p className="font-medium text-neutral-800 dark:text-slate-200">
@@ -857,13 +840,14 @@ export function ReplaysWorkspace({
                         {/* Actions */}
                         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Watch Replay Button: Grey border, transparent background, Play icon */}
                             <Link
-                              href={`/dashboard/replays/${encodeURIComponent(replay.id)}${
-                                projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
-                              }`}
-                              className="inline-flex items-center justify-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                              href={`/dashboard/replays/${encodeURIComponent(replay.id)}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
+                                }`}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-transparent px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900 dark:border-slate-800 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                             >
-                              Watch replay
+                              <HugeiconsIcon icon={PlayIcon} size={13} strokeWidth={2} className="text-neutral-500 dark:text-slate-400" />
+                              <span>Watch replay</span>
                             </Link>
 
                             {/* Overflow Menu */}
@@ -871,21 +855,20 @@ export function ReplaysWorkspace({
                               <button
                                 type="button"
                                 onClick={() => setActiveMenuId(activeMenuId === replay.id ? null : replay.id)}
-                                className="inline-flex size-7 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:bg-neutral-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                                className="inline-flex size-7 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 transition hover:bg-neutral-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
                                 aria-label="More actions"
                               >
-                                <MoreHorizontal className="size-3.5" />
+                                <HugeiconsIcon icon={MoreHorizontalIcon} size={14} strokeWidth={2} />
                               </button>
 
                               {activeMenuId === replay.id ? (
                                 <div className="absolute right-0 top-full z-30 mt-1 w-44 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                                   <Link
-                                    href={`/dashboard/replays/${encodeURIComponent(replay.id)}${
-                                      projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
-                                    }`}
+                                    href={`/dashboard/replays/${encodeURIComponent(replay.id)}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
+                                      }`}
                                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                   >
-                                    <Play className="size-3" />
+                                    <HugeiconsIcon icon={PlayIcon} size={13} strokeWidth={1.8} />
                                     <span>Watch replay</span>
                                   </Link>
                                   <button
@@ -896,7 +879,7 @@ export function ReplaysWorkspace({
                                     }}
                                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                   >
-                                    <Copy className="size-3" />
+                                    <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={1.8} />
                                     <span>Copy Session ID</span>
                                   </button>
                                   <button
@@ -910,7 +893,7 @@ export function ReplaysWorkspace({
                                     }}
                                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                   >
-                                    <ExternalLink className="size-3" />
+                                    <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} strokeWidth={1.8} />
                                     <span>Copy Replay link</span>
                                   </button>
                                   <div className="my-1 border-t border-neutral-100 dark:border-slate-800" />
@@ -922,7 +905,7 @@ export function ReplaysWorkspace({
                                     }}
                                     className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
                                   >
-                                    <Trash2 className="size-3" />
+                                    <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.8} />
                                     <span>Delete replay</span>
                                   </button>
                                 </div>
@@ -980,7 +963,7 @@ export function ReplaysWorkspace({
                   className="inline-flex size-7 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:bg-neutral-50 disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
                   aria-label="Previous page"
                 >
-                  <ChevronLeft className="size-3.5" />
+                  <HugeiconsIcon icon={ArrowLeft01Icon} size={14} strokeWidth={1.8} />
                 </button>
 
                 {generatePaginationItems(currentPage, totalPages).map((item, idx) => {
@@ -998,11 +981,10 @@ export function ReplaysWorkspace({
                       key={`page-${pageNum}`}
                       type="button"
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`inline-flex size-7 items-center justify-center rounded-md text-xs font-semibold transition ${
-                        isActive
-                          ? 'bg-blue-600 text-white shadow-2xs dark:bg-blue-600'
+                      className={`inline-flex size-7 items-center justify-center rounded-md text-xs font-semibold transition ${isActive
+                          ? 'bg-neutral-900 text-white shadow-2xs dark:bg-white dark:text-neutral-900'
                           : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-                      }`}
+                        }`}
                     >
                       {pageNum}
                     </button>
@@ -1016,7 +998,7 @@ export function ReplaysWorkspace({
                   className="inline-flex size-7 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 transition hover:bg-neutral-50 disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
                   aria-label="Next page"
                 >
-                  <ChevronRight className="size-3.5" />
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -1035,17 +1017,16 @@ export function ReplaysWorkspace({
                 className="inline-flex size-6 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
                 aria-label="Close session details"
               >
-                <X className="size-4" />
+                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.8} />
               </button>
             </div>
 
             <div className="p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
               {/* Mock Video Preview Player Thumbnail */}
               <Link
-                href={`/dashboard/replays/${encodeURIComponent(selectedReplay.id)}${
-                  projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
-                }`}
-                className="group relative block aspect-video w-full overflow-hidden rounded-lg border border-neutral-300/80 bg-neutral-900 transition hover:border-blue-500 dark:border-slate-800"
+                href={`/dashboard/replays/${encodeURIComponent(selectedReplay.id)}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
+                  }`}
+                className="group relative block aspect-video w-full overflow-hidden rounded-lg border border-neutral-300/80 bg-neutral-900 transition hover:border-neutral-500 dark:border-slate-800"
               >
                 {/* Mock player layout */}
                 <div className="absolute inset-0 flex flex-col justify-between p-2.5">
@@ -1057,14 +1038,14 @@ export function ReplaysWorkspace({
                       <span className="size-1.5 rounded-full bg-neutral-600" />
                     </div>
                     <div className="rounded bg-neutral-800/90 px-2 py-0.5 text-[9px] font-mono text-neutral-300 max-w-40 truncate">
-                      {selectedReplay.entryPage || '/dashboard'}
+                      {formatDisplayUrl(selectedReplay.entryPage)}
                     </div>
                   </div>
 
                   {/* Centered Play Button */}
                   <div className="flex items-center justify-center">
                     <div className="flex size-11 items-center justify-center rounded-full bg-white text-neutral-900 shadow-md transition group-hover:scale-110">
-                      <Play className="size-5 fill-current ml-0.5" />
+                      <HugeiconsIcon icon={PlayIcon} size={18} strokeWidth={2} className="ml-0.5 fill-current" />
                     </div>
                   </div>
 
@@ -1093,9 +1074,9 @@ export function ReplaysWorkspace({
                     title="Copy full session ID"
                   >
                     {copiedId === 'drawer-session-id' ? (
-                      <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} className="text-emerald-600 dark:text-emerald-400" />
                     ) : (
-                      <Copy className="size-3.5" />
+                      <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={1.8} />
                     )}
                   </button>
                 </div>
@@ -1110,7 +1091,7 @@ export function ReplaysWorkspace({
                   {selectedReplay.matchedFlows?.map((f) => (
                     <span
                       key={f.id}
-                      className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
+                      className="rounded border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
                     >
                       {f.name}
                     </span>
@@ -1123,18 +1104,21 @@ export function ReplaysWorkspace({
                 {/* Entry Page */}
                 <div className="flex items-start justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                    <Globe className="size-3.5" />
+                    <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.8} />
                     <span>Entry page</span>
                   </span>
-                  <span className="max-w-44 truncate font-mono text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
-                    {selectedReplay.entryPage || '/'}
+                  <span
+                    className="max-w-44 truncate font-mono text-xs font-semibold text-neutral-800 dark:text-slate-200"
+                    title={selectedReplay.entryPage || undefined}
+                  >
+                    {formatDisplayUrl(selectedReplay.entryPage)}
                   </span>
                 </div>
 
                 {/* Started */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                    <Calendar className="size-3.5" />
+                    <HugeiconsIcon icon={Calendar03Icon} size={14} strokeWidth={1.8} />
                     <span>Started</span>
                   </span>
                   <span className="font-medium text-neutral-800 dark:text-slate-200">
@@ -1145,7 +1129,7 @@ export function ReplaysWorkspace({
                 {/* Duration */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                    <Clock className="size-3.5" />
+                    <HugeiconsIcon icon={Clock03Icon} size={14} strokeWidth={1.8} />
                     <span>Duration</span>
                   </span>
                   <span className="font-mono font-medium text-neutral-800 dark:text-slate-200">
@@ -1156,7 +1140,7 @@ export function ReplaysWorkspace({
                 {/* Device & Browser */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                    <Monitor className="size-3.5" />
+                    <HugeiconsIcon icon={ComputerIcon} size={14} strokeWidth={1.8} />
                     <span>Device</span>
                   </span>
                   <span className="font-medium text-neutral-800 dark:text-slate-200">
@@ -1169,7 +1153,7 @@ export function ReplaysWorkspace({
                 {/* Location */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                    <Globe className="size-3.5" />
+                    <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.8} />
                     <span>Location</span>
                   </span>
                   <span className="font-medium text-neutral-800 dark:text-slate-200">
@@ -1180,7 +1164,7 @@ export function ReplaysWorkspace({
                 {/* Size */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                    <Layers className="size-3.5" />
+                    <HugeiconsIcon icon={Layers01Icon} size={14} strokeWidth={1.8} />
                     <span>Size</span>
                   </span>
                   <span className="font-mono font-medium text-neutral-800 dark:text-slate-200">
@@ -1192,7 +1176,7 @@ export function ReplaysWorkspace({
                 {selectedReplay.privacyMode ? (
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 text-neutral-500 dark:text-slate-400">
-                      <Shield className="size-3.5" />
+                      <HugeiconsIcon icon={Shield01Icon} size={14} strokeWidth={1.8} />
                       <span>Privacy</span>
                     </span>
                     <span className="font-medium capitalize text-neutral-800 dark:text-slate-200">
@@ -1238,12 +1222,11 @@ export function ReplaysWorkspace({
               {/* Bottom Actions in Drawer */}
               <div className="border-t border-neutral-200 pt-3 dark:border-slate-800 flex items-center gap-2">
                 <Link
-                  href={`/dashboard/replays/${encodeURIComponent(selectedReplay.id)}${
-                    projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
-                  }`}
+                  href={`/dashboard/replays/${encodeURIComponent(selectedReplay.id)}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
+                    }`}
                   className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-neutral-900 text-xs font-semibold text-white transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-slate-100"
                 >
-                  <Play className="size-3.5 fill-current" />
+                  <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} className="fill-current" />
                   <span>Watch replay</span>
                 </Link>
                 <button
@@ -1252,7 +1235,7 @@ export function ReplaysWorkspace({
                   className="inline-flex size-9 items-center justify-center rounded-lg border border-neutral-200 bg-white text-red-600 transition hover:bg-red-50 dark:border-slate-800 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
                   title="Delete this replay"
                 >
-                  <Trash2 className="size-4" />
+                  <HugeiconsIcon icon={Delete02Icon} size={15} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -1300,6 +1283,19 @@ export function ReplaysWorkspace({
 }
 
 // Helpers
+function formatDisplayUrl(rawUrl?: string | null): string {
+  if (!rawUrl) return '—';
+  try {
+    const isFullUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
+    const parsed = new URL(isFullUrl ? rawUrl : `https://${rawUrl}`);
+    const host = parsed.host || '';
+    const path = parsed.pathname === '/' ? '/' : parsed.pathname.replace(/\/$/, '');
+    return isFullUrl ? `${host}${path}` : `${rawUrl.split('?')[0]}`;
+  } catch {
+    return rawUrl.split('?')[0] || rawUrl;
+  }
+}
+
 function formatDuration(ms: number): string {
   if (!ms || ms <= 0) return '0:00';
   const mins = Math.floor(ms / 60_000);
