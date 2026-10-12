@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { clientFetch } from '@/lib/analytics-api';
 import {
   Users,
   UserCheck,
@@ -77,6 +78,7 @@ interface Props {
   offset: number;
   searchParam: string;
   userEmail?: string | null;
+  projectId?: string | null;
 }
 
 const AVATAR_COLORS = [
@@ -131,7 +133,8 @@ export function UsersClientView({
   limit,
   offset,
   searchParam,
-  userEmail
+  userEmail,
+  projectId
 }: Props) {
   const router = useRouter();
 
@@ -183,15 +186,13 @@ export function UsersClientView({
     let isMounted = true;
     setLoadingTimeline(true);
 
-    fetch(`/api/dashboard-proxy?path=/v1/dashboard/users/${encodeURIComponent(activePerson.id)}/timeline?limit=10`)
-      .then(async (res) => {
-        if (!res.ok) {
-          // Fallback if proxy route is standard API URL
-          return { items: [] };
-        }
-        return res.json();
-      })
-      .then((data) => {
+    const timelineQuery = new URLSearchParams({ limit: '10' });
+    if (projectId) timelineQuery.set('projectId', projectId);
+
+    clientFetch<{ items?: UserTimelineEvent[] }>(
+      `/v1/dashboard/users/${encodeURIComponent(activePerson.id)}/timeline?${timelineQuery.toString()}`
+    )
+      .then(({ data }) => {
         if (isMounted) {
           setTimelineEvents(data?.items ?? []);
           setLoadingTimeline(false);
@@ -206,7 +207,10 @@ export function UsersClientView({
     return () => {
       isMounted = false;
     };
-  }, [activePerson?.id]);
+  }, [activePerson?.id, projectId]);
+
+  const profileHref = (id: string) =>
+    `/dashboard/users/${encodeURIComponent(id)}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`;
 
   // Select all toggle
   const handleSelectAll = () => {
@@ -538,7 +542,7 @@ export function UsersClientView({
                       {/* Action Menu */}
                       <div className="flex justify-end">
                         <Link
-                          href={`/dashboard/users/${person.id}`}
+                          href={profileHref(person.id)}
                           onClick={(e) => e.stopPropagation()}
                           className="text-neutral-400 hover:text-neutral-700 dark:hover:text-slate-200"
                         >
@@ -736,7 +740,7 @@ export function UsersClientView({
                     <div className="flex items-center justify-between border-b border-neutral-200 pb-2 dark:border-slate-800">
                       <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Recent events</h4>
                       <Link
-                        href={`/dashboard/users/${activePerson.id}`}
+                        href={profileHref(activePerson.id)}
                         className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-400"
                       >
                         View all →
@@ -780,13 +784,13 @@ export function UsersClientView({
                   {/* Bottom Action CTAs */}
                   <div className="flex items-center gap-3 pt-2">
                     <Link
-                      href={`/dashboard/users/${activePerson.id}`}
+                      href={profileHref(activePerson.id)}
                       className="flex-1 rounded-md border border-neutral-300 bg-white py-2 text-center text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                     >
                       View full timeline
                     </Link>
                     <Link
-                      href={`/dashboard/users/${activePerson.id}`}
+                      href={profileHref(activePerson.id)}
                       className="flex-1 rounded-md bg-blue-600 py-2 text-center text-xs font-semibold text-white hover:bg-blue-700"
                     >
                       View user journey

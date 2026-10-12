@@ -26,13 +26,18 @@ export default async function UsersPage({
   const search = firstParam(searchParams.search) ?? '';
   const offset = Number(firstParam(searchParams.offset) ?? '0') || 0;
   const limit = Number(firstParam(searchParams.limit) ?? '20') || 20;
+  const requestedProjectId = firstParam(searchParams.projectId);
 
   const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   if (search) {
     query.set('search', search);
   }
+  if (requestedProjectId) {
+    query.set('projectId', requestedProjectId);
+  }
 
   const { data, error } = await dashboardGet<PersonsResponse>(`/v1/dashboard/users?${query.toString()}`, token);
+  const projectId = data?.project?.id ?? requestedProjectId ?? null;
   const persons = data?.persons ?? [];
   const totalCount = data?.totalCount ?? persons.length;
   const stats: UserStats = data?.stats ?? {
@@ -43,7 +48,7 @@ export default async function UsersPage({
   };
 
   return (
-    <DashboardShell active="users" title="Users" userEmail={user.email ?? undefined}>
+    <DashboardShell active="users" title="Users" userEmail={user.email ?? undefined} projectId={projectId}>
       {error ? (
         <section className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-400">
           {error}
@@ -51,6 +56,8 @@ export default async function UsersPage({
       ) : null}
 
       <UsersClientView
+        key={projectId ?? 'default'}
+        projectId={projectId}
         initialPersons={persons}
         totalCount={totalCount}
         stats={stats}
