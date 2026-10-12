@@ -1,4 +1,6 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { ACTIVE_PROJECT_COOKIE, ACTIVE_PROJECT_HEADER } from '@/lib/active-project';
 import { createSupabaseServerClient, hasSupabaseServerConfig } from '@/lib/supabase/server';
 
 export const apiBaseUrl = process.env.TRACEIQ_API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -50,10 +52,14 @@ export async function dashboardGet<T>(
     return { data: null, error: 'Your dashboard session expired. Sign in again.' };
   }
 
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  const activeProjectId = readActiveProjectCookie();
+  if (activeProjectId) headers[ACTIVE_PROJECT_HEADER] = activeProjectId;
+
   try {
     const response = await fetch(`${apiBaseUrl}${path}`, {
       cache: 'no-store',
-      headers: { Authorization: `Bearer ${token}` }
+      headers
     });
 
     if (!response.ok) {
@@ -63,6 +69,15 @@ export async function dashboardGet<T>(
     return { data: (await response.json()) as T, error: null };
   } catch (error) {
     return { data: null, error: error instanceof Error ? error.message : 'Request failed.' };
+  }
+}
+
+/** The project the user last switched to (set by the middleware), if any. */
+export function readActiveProjectCookie(): string | null {
+  try {
+    return cookies().get(ACTIVE_PROJECT_COOKIE)?.value || null;
+  } catch {
+    return null;
   }
 }
 

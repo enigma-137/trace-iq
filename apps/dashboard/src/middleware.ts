@@ -1,11 +1,31 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { ACTIVE_PROJECT_COOKIE } from '@/lib/active-project';
 
 const protectedPrefixes = ['/dashboard'];
 const authPrefixes = ['/auth'];
 
+function selectedProjectFromUrl(request: NextRequest): string | null {
+  if (!request.nextUrl.pathname.startsWith('/dashboard')) return null;
+  const projectId = request.nextUrl.searchParams.get('projectId')?.trim();
+  return projectId && projectId.length <= 200 ? projectId : null;
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Remember the project in the URL so every page (and API call) follows a
+  // project switch. Set on the request too, so this render already sees it.
+  const selectedProjectId = selectedProjectFromUrl(request);
+  if (selectedProjectId) {
+    request.cookies.set(ACTIVE_PROJECT_COOKIE, selectedProjectId);
+  }
+  const rememberProject = (res: NextResponse) => {
+    if (selectedProjectId) {
+      res.cookies.set(ACTIVE_PROJECT_COOKIE, selectedProjectId, { path: '/', maxAge: 31536000, sameSite: 'lax' });
+    }
+    return res;
+  };
 
   if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
     if (authPrefixes.some((prefix) => pathname.startsWith(prefix))) {
@@ -14,7 +34,7 @@ export async function middleware(request: NextRequest) {
       redirectUrl.search = '';
       return NextResponse.redirect(redirectUrl);
     }
-    return NextResponse.next();
+    return rememberProject(NextResponse.next({ request }));
   }
 
   if (process.env.NEXT_PUBLIC_WAITLIST_ONLY === 'true') {
@@ -94,7 +114,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return response;
+  return rememberProject(response);
 }
 
 export const config = {

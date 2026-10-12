@@ -8,6 +8,7 @@ import { AchievementsService } from '../achievements/achievements.service';
 import { UsageService } from '../billing/usage.service';
 import { EntitlementService } from '../billing/entitlement.service';
 import { sanitizeIngestedTraits } from '../users/users.service';
+import { getPreferredProjectId } from '../../common/active-project';
 import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
 
 type JsonObject = Record<string, unknown>;
@@ -498,10 +499,10 @@ export class EventsService {
         JOIN organizations o ON o.id = om.organization_id
         JOIN projects p ON p.organization_id = o.id
         WHERE om.user_id = $1
-        ORDER BY o.created_at ASC, p.created_at ASC
+        ORDER BY (p.id = $2) DESC NULLS LAST, o.created_at ASC, p.created_at ASC
         LIMIT 1
       `,
-      [user.id]
+      [user.id, getPreferredProjectId()]
     );
 
     const project = result.rows[0];

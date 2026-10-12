@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { json } from 'express';
 import { AppModule } from './app.module';
+import { activeProjectMiddleware } from './common/active-project';
 
 // Cap request bodies. Ingestion batches of 500 events are the largest legitimate
 // payloads; 1MB is generous for them and still bounds memory/disk abuse.
@@ -79,11 +80,12 @@ async function bootstrap() {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const corsMiddleware = isIngestPath(req.path)
       ? cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-traceiq-write-key', 'x-traceiq-replay-token', 'x-traceiq-environment'], maxAge: 86400 })
-      : cors({ origin: corsOrigins, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'x-traceiq-write-key', 'x-traceiq-environment'], maxAge: 86400 });
+      : cors({ origin: corsOrigins, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'x-traceiq-write-key', 'x-traceiq-environment', 'x-traceiq-project-id'], maxAge: 86400 });
     corsMiddleware(req, res, next);
   });
 
   app.use(setSecurityHeaders);
+  app.use(activeProjectMiddleware);
 
   await app.listen(process.env.API_PORT ? Number(process.env.API_PORT) : 4000, host);
 }

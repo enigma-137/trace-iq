@@ -5,6 +5,8 @@ import { DashboardPlanProvider } from './DashboardPlan';
 import { AskTraceIQProvider } from '@/components/ai/AskTraceIQContext';
 import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
 import { FeatureSpotlightCard } from '@/components/FeatureSpotlightCard';
+import { readActiveProjectCookie } from '@/lib/dashboard';
+import { ActiveProjectFetch } from './ActiveProjectFetch';
 
 export interface DashboardShellProps {
   active?: string;
@@ -26,19 +28,23 @@ export function DashboardShell({
   title,
   organizationName,
   projectName,
-  projectId,
+  projectId: projectIdProp,
   organizationId,
   alertsSummary,
   userEmail,
   headerActions,
   children
 }: DashboardShellProps) {
+  // Pages that don't resolve a project themselves still keep the sidebar links
+  // (and Ask TraceIQ) on the project the user switched to.
+  const projectId = projectIdProp ?? readActiveProjectCookie();
   const effectiveActive = activeNavKey || active || 'overview';
   const localMode = process.env.NEXT_PUBLIC_AUTH_MODE === 'local';
 
   return (
     <DashboardPlanProvider projectId={projectId}>
       <AskTraceIQProvider projectId={projectId}>
+        <ActiveProjectFetch />
         <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
           <div className="flex min-h-screen w-full">
             <Sidebar active={effectiveActive} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />

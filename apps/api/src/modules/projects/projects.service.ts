@@ -3,6 +3,7 @@ import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { EntitlementService } from '../billing/entitlement.service';
 import { AuditService } from '../organizations/audit.service';
+import { getPreferredProjectId } from '../../common/active-project';
 
 export type ResolvedProject = {
   id: string;
@@ -61,6 +62,8 @@ export class ProjectsService {
   ): Promise<ResolvedProject | null> {
     const requestedProjectId = this.optionalString(projectId);
     const requestedOrganizationId = this.optionalString(organizationId);
+    // Without an explicit project, prefer the one the dashboard last switched to.
+    const preferredProjectId = requestedProjectId ? null : getPreferredProjectId();
 
     const result = await this.database.query<ResolvedProject>(
       `
@@ -77,10 +80,10 @@ export class ProjectsService {
         WHERE om.user_id = $1
           AND ($2::text IS NULL OR p.id = $2)
           AND ($3::text IS NULL OR o.id = $3)
-        ORDER BY o.created_at ASC, p.created_at ASC
+        ORDER BY (p.id = $4) DESC NULLS LAST, o.created_at ASC, p.created_at ASC
         LIMIT 1
       `,
-      [user.id, requestedProjectId ?? null, requestedOrganizationId ?? null]
+      [user.id, requestedProjectId ?? null, requestedOrganizationId ?? null, preferredProjectId]
     );
 
     const project = result.rows[0] ?? null;
