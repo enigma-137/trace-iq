@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
@@ -100,6 +101,11 @@ const INGEST_METRIC_KEYS: readonly string[] = ['events.all_time', 'events.24h', 
 // historical backfill: they are never emailed as a "new" unlock.
 const UNLOCK_NOTIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// The ingest hook runs full-table COUNTs, so it is throttled per project: at most
+// one evaluation in flight and one per interval. Milestones still unlock, just up
+// to this much later than the event that crossed them.
+const INGEST_EVALUATION_INTERVAL_MS = 5 * 60 * 1000;
+
 // The instant a metric first crossed `threshold`, or null when it hasn't yet.
 // Unlocks are stamped with this timestamp instead of "the day the pipeline first
 // noticed", so a milestone reached months ago isn't backdated to today.
@@ -198,6 +204,9 @@ const CATALOGUE_SQL = `
 
 @Injectable()
 export class AchievementsService {
+  private readonly lastIngestEvaluation = new Map<string, number>();
+  private readonly ingestEvaluationsInFlight = new Set<string>();
+
   constructor(
     private readonly database: DatabaseService,
     private readonly projects: ProjectsService,
@@ -266,6 +275,12 @@ export class AchievementsService {
    * it must never block or fail ingestion, so every error is swallowed here.
    */
   async afterProjectIngest(projectId: string): Promise<void> {
+    const now = Date.now();
+    if (this.ingestEvaluationsInFlight.has(projectId)) return;
+    if (now - (this.lastIngestEvaluation.get(projectId) ?? 0) < INGEST_EVALUATION_INTERVAL_MS) return;
+    this.ingestEvaluationsInFlight.add(projectId);
+    this.lastIngestEvaluation.set(projectId, now);
+
     try {
       const result = await this.database.query<{ organization_id: string }>(
         `SELECT organization_id FROM projects WHERE id = $1 LIMIT 1`,
@@ -288,9 +303,15 @@ export class AchievementsService {
       const members = await this.orgMemberIds(org.organization_id);
       if (members.length === 0) return;
 
+      // Skip milestones every member already holds: the OFFSET scan in
+      // metricReachedAt is expensive on large projects and the award is a no-op.
+      const awarded = await this.fullyAwardedIds(qualified.map((row) => row.id), members);
+      const pending = qualified.filter((row) => !awarded.has(row.id));
+      if (pending.length === 0) return;
+
       const scope = { organizationId: org.organization_id, projectId };
       const toAward: Array<{ achievementId: string; unlockedAt: string }> = [];
-      for (const row of qualified) {
+      for (const row of pending) {
         const reachedAt = await metricReachedAt(this.database, row.metric, scope, row.threshold);
         toAward.push({ achievementId: row.id, unlockedAt: reachedAt ?? new Date().toISOString() });
       }
@@ -300,7 +321,21 @@ export class AchievementsService {
       await this.emailNewUnlocks(org.organization_id);
     } catch {
       // Ingestion must never break because of an achievements evaluation.
+    } finally {
+      this.ingestEvaluationsInFlight.delete(projectId);
     }
+  }
+
+  // Achievement ids from `achievementIds` that every one of `userIds` has unlocked.
+  private async fullyAwardedIds(achievementIds: string[], userIds: string[]): Promise<Set<string>> {
+    const result = await this.database.query<{ achievement_id: string }>(
+      `SELECT achievement_id FROM achievement_unlocks
+       WHERE achievement_id = ANY($1) AND user_id = ANY($2)
+       GROUP BY achievement_id
+       HAVING COUNT(DISTINCT user_id) = $3`,
+      [achievementIds, userIds, userIds.length]
+    );
+    return new Set(result.rows.map((row) => row.achievement_id));
   }
 
   private async loadCatalogue(): Promise<AchievementDefinition[]> {
@@ -310,7 +345,14 @@ export class AchievementsService {
 
   private async evaluateAll(catalogue: AchievementDefinition[], scope: MetricScope): Promise<Record<string, number>> {
     const progress: Record<string, number> = {};
+    // Several catalogue rows share a metric (one per threshold); compute each once.
+    const values = new Map<string, number>();
     for (const row of catalogue) {
+      const cached = values.get(row.metric);
+      if (cached !== undefined) {
+        progress[row.id] = cached;
+        continue;
+      }
       const evaluator = METRICS[row.metric];
       if (!evaluator) {
         // Unknown metric keys never unlock. Safe default so a typo'd catalogue
@@ -318,7 +360,9 @@ export class AchievementsService {
         progress[row.id] = 0;
         continue;
       }
-      progress[row.id] = await evaluator(this.database, scope);
+      const value = await evaluator(this.database, scope);
+      values.set(row.metric, value);
+      progress[row.id] = value;
     }
     return progress;
   }
@@ -381,10 +425,12 @@ export class AchievementsService {
     );
   }
 
-  // Finds unlocks that haven't been emailed yet, groups them per recipient, and
-  // sends one email per member. Successful sends are marked so they never repeat;
-  // failures are left unmarked and retried on the next read/ingest. Any error here
-  // is swallowed — email is best-effort and must never break a page or an ingest.
+  // Claims unlocks that haven't been emailed yet, groups them per recipient, and
+  // sends one email per member. Rows are claimed (email_sent_at stamped) in the same
+  // statement that selects them, so concurrent callers — every ingest and dashboard
+  // read can land here — never see the same unlock and never send duplicates. A
+  // failed send releases its claim so the next read/ingest retries it. Any error
+  // here is swallowed — email is best-effort and must never break a page or an ingest.
   private async emailNewUnlocks(organizationId: string): Promise<void> {
     try {
       const result = await this.database.query<{
@@ -396,14 +442,19 @@ export class AchievementsService {
         description: string;
         category: string;
       }>(
-        `SELECT om.user_id, om.email, u.achievement_id, a.slug, a.title, a.description, a.category
-         FROM achievement_unlocks u
-         JOIN achievements a ON a.id = u.achievement_id
-         JOIN organization_members om ON om.user_id = u.user_id
-         WHERE om.organization_id = $1
-           AND om.email IS NOT NULL
-           AND u.email_sent_at IS NULL
-         ORDER BY u.unlocked_at ASC`,
+        `WITH claimed AS (
+           UPDATE achievement_unlocks u SET email_sent_at = now()
+           FROM organization_members om
+           WHERE om.user_id = u.user_id
+             AND om.organization_id = $1
+             AND om.email IS NOT NULL
+             AND u.email_sent_at IS NULL
+           RETURNING u.user_id, u.achievement_id, u.unlocked_at, om.email
+         )
+         SELECT c.user_id, c.email, c.achievement_id, a.slug, a.title, a.description, a.category
+         FROM claimed c
+         JOIN achievements a ON a.id = c.achievement_id
+         ORDER BY c.unlocked_at ASC`,
         [organizationId]
       );
 
@@ -427,17 +478,19 @@ export class AchievementsService {
         const sent = await this.email.send({
           to: [recipient],
           subject: unlockSubject(unlocks),
-          html: buildUnlockEmail(unlocks)
-        });
-        if (!sent.ok) continue;
+          html: buildUnlockEmail(unlocks),
+          // Backstop against duplicates if a claim is ever released and re-sent.
+          idempotencyKey: `achievement-unlock/${createHash('sha256')
+            .update(unlocks.map((unlock) => `${unlock.userId}:${unlock.achievementId}`).sort().join(','))
+            .digest('hex')}`
+        }).catch(() => ({ ok: false }));
+        if (sent.ok) continue;
 
-        for (const unlock of unlocks) {
-          await this.database.query(
-            `UPDATE achievement_unlocks SET email_sent_at = now()
-             WHERE user_id = $1 AND achievement_id = $2`,
-            [unlock.userId, unlock.achievementId]
-          );
-        }
+        await this.database.query(
+          `UPDATE achievement_unlocks SET email_sent_at = NULL
+           WHERE (user_id, achievement_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))`,
+          [unlocks.map((unlock) => unlock.userId), unlocks.map((unlock) => unlock.achievementId)]
+        );
       }
     } catch {
       // Email must never break a page load or an ingest.
