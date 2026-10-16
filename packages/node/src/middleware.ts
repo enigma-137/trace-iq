@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { CaptureParams } from './client';
 
 // Minimal structural types so we don't depend on express (works with express,
@@ -9,14 +11,34 @@ export interface RequestLike {
   baseUrl?: string;
   path?: string;
   route?: { path?: unknown };
+  headers?: Record<string, string | string[] | undefined>;
+  query?: unknown;
+  body?: unknown;
 }
 
 export interface ResponseLike {
   statusCode?: number;
   on(event: 'finish', listener: () => void): void;
+  setHeader?(name: string, value: string): unknown;
+  getHeader?(name: string): unknown;
+  getHeaders?(): Record<string, unknown>;
+  headersSent?: boolean;
+  write?: (...args: any[]) => any;
+  end?: (...args: any[]) => any;
 }
 
 export type NextLike = (error?: unknown) => void;
+
+export interface PayloadCaptureOptions {
+  /** Send request/response headers (sensitive headers are always redacted). Default true. */
+  headers?: boolean;
+  /** Send request/response bodies (sensitive fields are always redacted). Default false. */
+  bodies?: boolean;
+  /** Bytes kept per body before truncation. Default 8192. */
+  maxBodyBytes?: number;
+  /** Return false to keep a request metadata-only (e.g. auth routes). */
+  shouldCapture?: (req: RequestLike) => boolean;
+}
 
 export interface MiddlewareOptions {
   /** Pull the identified user id off the request (e.g. (req) => req.user?.id). */
@@ -25,46 +47,269 @@ export interface MiddlewareOptions {
   path?: (req: RequestLike) => string;
   /** Return true to skip a request (health checks, static assets, …). */
   ignore?: (req: RequestLike) => boolean;
+  /** Logical service name shown in the Requests explorer (e.g. "billing-api"). */
+  service?: string;
+  /** Deployment environment (e.g. "production"). Defaults to NODE_ENV when set. */
+  environment?: string;
+  /** Incoming header that carries an upstream request id. Default "x-request-id". */
+  requestIdHeader?: string;
+  /** Echo the request id back on the response as `x-request-id`. Default true. */
+  echoRequestId?: boolean;
+  /**
+   * Opt-in payload capture. Off by default. Payloads are also gated server-side by
+   * the project's capture settings and redacted again before they are stored.
+   */
+  capturePayloads?: boolean | PayloadCaptureOptions;
+}
+
+/** The request currently being handled, available to code running inside it. */
+export interface RequestContext {
+  requestId: string;
+  traceId: string;
+  spanId: string;
+}
+
+const requestContext = new AsyncLocalStorage<RequestContext>();
+
+/** Correlation ids for the in-flight request, or undefined outside the middleware. */
+export function getRequestContext(): RequestContext | undefined {
+  return requestContext.getStore();
 }
 
 interface Capturer {
   capture(params: CaptureParams): void;
 }
 
+const ID_PATTERN = /^[A-Za-z0-9._:/+=-]{1,128}$/;
+const TRACEPARENT = /^[\da-f]{2}-([\da-f]{32})-([\da-f]{16})-[\da-f]{2}$/i;
+
+const SENSITIVE_HEADERS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'x-auth-token',
+  'x-access-token',
+  'x-csrf-token',
+  'x-xsrf-token',
+  'x-traceiq-write-key'
+]);
+const SENSITIVE_FIELD = /(pass(word|wd)?|secret|token|api[-_]?key|private[-_]?key|authorization|cookie|session|ssn|card[-_]?number|cvv|cvc)/i;
+
 /**
  * Express/connect-style middleware that times each request and emits a
- * `$api_request` event (method, path, status, durationMs) when the response
- * finishes. Timing and capture never throw into the request lifecycle.
+ * `$api_request` event when the response finishes: method, route, status and
+ * duration, plus request/trace ids, service, environment and sizes. Timing and
+ * capture never throw into the request lifecycle.
  */
 export function createRequestMiddleware(client: Capturer, options: MiddlewareOptions = {}) {
+  const idHeader = (options.requestIdHeader ?? 'x-request-id').toLowerCase();
+  const environment = options.environment ?? process.env.NODE_ENV ?? undefined;
+  const capture = resolveCapture(options.capturePayloads);
+
   return function traceiqRequestMiddleware(req: RequestLike, res: ResponseLike, next: NextLike): void {
     if (options.ignore?.(req)) {
       next();
       return;
     }
 
+    const startedAt = new Date();
     const start = process.hrtime.bigint();
+    const incomingId = header(req, idHeader);
+    const requestId = incomingId && ID_PATTERN.test(incomingId) ? incomingId : randomUUID();
+    const parent = TRACEPARENT.exec(header(req, 'traceparent') ?? '');
+    const context: RequestContext = {
+      requestId,
+      traceId: parent ? parent[1].toLowerCase() : randomBytes(16).toString('hex'),
+      spanId: randomBytes(8).toString('hex')
+    };
+
+    if (options.echoRequestId !== false) {
+      try {
+        if (!res.headersSent) res.setHeader?.('x-request-id', requestId);
+      } catch {
+        // Never let instrumentation break the request.
+      }
+    }
+
+    const captureThis = capture && (capture.shouldCapture?.(req) ?? true);
+    const responseBody = captureThis && capture.bodies ? tapResponseBody(res, capture.maxBodyBytes) : null;
+
     res.on('finish', () => {
       try {
         const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
         const status = res.statusCode ?? 0;
+        const rawUrl = req.originalUrl ?? req.url ?? '/';
+        const properties: Record<string, unknown> = {
+          method: (req.method ?? 'GET').toUpperCase(),
+          path: options.path ? options.path(req) : derivePath(req),
+          status,
+          durationMs: Math.round(durationMs * 100) / 100,
+          ok: status >= 200 && status < 400,
+          requestId: context.requestId,
+          traceId: context.traceId,
+          spanId: context.spanId,
+          url: rawUrl.split(/[?#]/)[0],
+          instrumentation: 'node'
+        };
+        if (parent) properties.parentSpanId = parent[2].toLowerCase();
+        if (options.service) properties.service = options.service;
+        if (environment) properties.environment = environment;
+        const host = header(req, 'host');
+        if (host) properties.host = host;
+        const requestSize = toSize(header(req, 'content-length'));
+        if (requestSize !== undefined) properties.requestSize = requestSize;
+        const responseSize = toSize(res.getHeader?.('content-length')) ?? responseBody?.size();
+        if (responseSize !== undefined) properties.responseSize = responseSize;
+
+        if (captureThis && capture) {
+          properties.payload = buildPayload(req, res, capture, responseBody);
+        }
+
         client.capture({
           event: '$api_request',
           userId: options.resolveUserId?.(req),
-          properties: {
-            method: (req.method ?? 'GET').toUpperCase(),
-            path: options.path ? options.path(req) : derivePath(req),
-            status,
-            durationMs: Math.round(durationMs),
-            ok: status >= 200 && status < 400
-          }
+          properties,
+          timestamp: startedAt
         });
       } catch {
         // Never let instrumentation break the request.
       }
     });
 
-    next();
+    requestContext.run(context, () => next());
+  };
+}
+
+interface ResolvedCapture {
+  headers: boolean;
+  bodies: boolean;
+  maxBodyBytes: number;
+  shouldCapture?: (req: RequestLike) => boolean;
+}
+
+function resolveCapture(option: MiddlewareOptions['capturePayloads']): ResolvedCapture | null {
+  if (!option) return null;
+  const config = option === true ? {} : option;
+  return {
+    headers: config.headers !== false,
+    bodies: config.bodies === true,
+    maxBodyBytes: Math.min(Math.max(config.maxBodyBytes ?? 8192, 0), 65_536),
+    shouldCapture: config.shouldCapture
+  };
+}
+
+function header(req: RequestLike, name: string): string | undefined {
+  const value = req.headers?.[name];
+  if (Array.isArray(value)) return value[0];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function toSize(value: unknown): number | undefined {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : undefined;
+}
+
+function redactHeaders(headers: Record<string, unknown> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    const key = name.toLowerCase();
+    if (value === undefined) continue;
+    out[key] =
+      SENSITIVE_HEADERS.has(key) || SENSITIVE_FIELD.test(key)
+        ? '[REDACTED]'
+        : Array.isArray(value)
+          ? value.map(String).join(', ')
+          : String(value);
+  }
+  return out;
+}
+
+function redactFields(value: unknown, depth = 0): unknown {
+  if (depth > 8 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.slice(0, 100).map((item) => redactFields(item, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = SENSITIVE_FIELD.test(key) ? '[REDACTED]' : redactFields(inner, depth + 1);
+  }
+  return out;
+}
+
+function bodyForTransport(body: unknown, maxBytes: number): unknown {
+  if (body === undefined || body === null) return undefined;
+  if (Buffer.isBuffer(body)) return body.subarray(0, maxBytes).toString('utf8');
+  if (typeof body === 'string') return body.length > maxBytes * 2 ? body.slice(0, maxBytes * 2) : body;
+  return redactFields(body);
+}
+
+function buildPayload(
+  req: RequestLike,
+  res: ResponseLike,
+  capture: ResolvedCapture,
+  responseBody: ReturnType<typeof tapResponseBody> | null
+) {
+  const requestType = header(req, 'content-type') ?? null;
+  const responseType = String(res.getHeader?.('content-type') ?? '') || null;
+  return {
+    request: {
+      headers: capture.headers ? redactHeaders(req.headers) : undefined,
+      query: req.query && typeof req.query === 'object' ? redactFields(req.query) : undefined,
+      contentType: requestType,
+      body: capture.bodies ? bodyForTransport(req.body, capture.maxBodyBytes) : undefined,
+      bodySize: toSize(header(req, 'content-length'))
+    },
+    response: {
+      headers: capture.headers ? redactHeaders(res.getHeaders?.()) : undefined,
+      contentType: responseType,
+      body: capture.bodies ? responseBody?.text() : undefined,
+      bodySize: responseBody?.size()
+    }
+  };
+}
+
+// Wraps res.write/res.end to keep the first `maxBytes` of the response body.
+function tapResponseBody(res: ResponseLike, maxBytes: number) {
+  const chunks: Buffer[] = [];
+  let kept = 0;
+  let total = 0;
+  const collect = (chunk: unknown, encoding?: unknown) => {
+    if (chunk === undefined || chunk === null || typeof chunk === 'function') return;
+    const buffer = Buffer.isBuffer(chunk)
+      ? chunk
+      : Buffer.from(String(chunk), typeof encoding === 'string' ? (encoding as BufferEncoding) : 'utf8');
+    total += buffer.length;
+    if (kept < maxBytes) {
+      const slice = buffer.subarray(0, maxBytes - kept);
+      chunks.push(slice);
+      kept += slice.length;
+    }
+  };
+  const originalWrite = res.write;
+  const originalEnd = res.end;
+  if (typeof originalWrite === 'function') {
+    res.write = function (this: unknown, chunk: unknown, ...rest: unknown[]) {
+      try {
+        collect(chunk, rest[0]);
+      } catch {
+        // ignore
+      }
+      return originalWrite.call(this, chunk, ...rest);
+    };
+  }
+  if (typeof originalEnd === 'function') {
+    res.end = function (this: unknown, chunk: unknown, ...rest: unknown[]) {
+      try {
+        collect(chunk, rest[0]);
+      } catch {
+        // ignore
+      }
+      return originalEnd.call(this, chunk, ...rest);
+    };
+  }
+  return {
+    text: () => (chunks.length ? Buffer.concat(chunks).toString('utf8') : undefined),
+    size: () => (total > 0 ? total : undefined)
   };
 }
 

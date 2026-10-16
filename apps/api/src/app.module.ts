@@ -14,6 +14,7 @@ import { FlagsModule } from './modules/flags/flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ExportModule } from './modules/export/export.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
+import { RequestsModule } from './modules/requests/requests.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ReplayModule } from './modules/replay/replay.module';
@@ -58,6 +59,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     WebhooksModule,
     ExportModule,
     ObservabilityModule,
+    RequestsModule,
     AnalyticsModule,
     UsersModule,
     ReplayModule,

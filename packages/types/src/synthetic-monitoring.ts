@@ -160,6 +160,8 @@ export interface SyntheticNetworkRequest {
   durationMs?: number;
   failed: boolean;
   failureText?: string;
+  /** The target's `x-request-id` response header, when it sent one (links to Requests). */
+  requestId?: string;
   [key: string]: unknown;
 }
 
@@ -168,6 +170,8 @@ export interface SyntheticHttpError {
   method: string;
   status: number;
   statusText?: string;
+  /** The target's `x-request-id` response header, when it sent one (links to Requests). */
+  requestId?: string;
   [key: string]: unknown;
 }
 

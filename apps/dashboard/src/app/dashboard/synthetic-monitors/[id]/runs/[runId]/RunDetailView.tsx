@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { SyntheticMonitor, SyntheticRun } from '@traceiq/types';
+import { requestsSearchHref } from '@/lib/requests';
 
 interface RunDetailViewProps {
   run: SyntheticRun;
@@ -348,6 +349,15 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
                       </td>
                       <td className="px-4 py-2 truncate max-w-lg text-neutral-600 dark:text-slate-400">
                         {req.url}
+                        {req.requestId ? (
+                          <Link
+                            href={requestsSearchHref(req.requestId, projectId)}
+                            className="ml-2 font-sans text-[11px] font-medium text-blue-700 hover:underline dark:text-blue-300"
+                            title={`Request ID ${req.requestId}`}
+                          >
+                            View request →
+                          </Link>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -373,6 +383,14 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
                   <span className="text-neutral-800 dark:text-slate-200">{err.url}</span>
                 </div>
                 {err.statusText && <span className="text-rose-700 dark:text-rose-300 shrink-0">{err.statusText}</span>}
+                {err.requestId ? (
+                  <Link
+                    href={requestsSearchHref(err.requestId, projectId)}
+                    className="shrink-0 font-sans text-[11px] font-medium text-blue-700 hover:underline dark:text-blue-300"
+                  >
+                    View request →
+                  </Link>
+                ) : null}
               </div>
             ))}
           </div>

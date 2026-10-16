@@ -54,6 +54,15 @@ export class SyntheticRunnerService {
     private readonly artifacts?: SyntheticArtifactService
   ) {}
 
+  private responseRequestId(res: any): string | null {
+    try {
+      const value = res.headers?.()?.['x-request-id'];
+      return typeof value === 'string' && /^[A-Za-z0-9._:/+=-]{1,128}$/.test(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
   async execute(options: ExecuteMonitorOptions): Promise<ExecutionResult> {
     const startedAt = new Date().toISOString();
     const startTime = Date.now();
@@ -193,13 +202,17 @@ export class SyntheticRunnerService {
         const statusCode = res.status();
         const rawUrl = req.url().slice(0, 500);
         const redactedUrl = this.crypto.redact(rawUrl, secretValues);
+        // Instrumented backends echo their request id; recording it lets a run link
+        // to the exact server-side request record. Read-only: nothing is injected.
+        const requestId = this.responseRequestId(res);
 
         if (networkRequests.length < 100) {
           networkRequests.push({
             url: redactedUrl,
             method: req.method(),
             status: statusCode,
-            failed: statusCode >= 400
+            failed: statusCode >= 400,
+            ...(requestId ? { requestId } : {})
           });
         }
 
@@ -208,7 +221,8 @@ export class SyntheticRunnerService {
             url: redactedUrl,
             method: req.method(),
             status: statusCode,
-            statusText: this.crypto.redact(res.statusText() || '', secretValues)
+            statusText: this.crypto.redact(res.statusText() || '', secretValues),
+            ...(requestId ? { requestId } : {})
           });
         }
       });

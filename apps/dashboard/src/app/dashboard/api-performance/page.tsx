@@ -4,6 +4,7 @@ import { DashboardShell } from '../DashboardShell';
 import { withProjectId } from '../nav';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { buildApiFlowGraph } from '@/lib/apiFlowGraph';
+import { requestsHrefForEndpoint, type RequestSort } from '@/lib/requests';
 import { StatTile } from '@/components/charts/StatTile';
 import { SvgNodeFlowGraph } from '@/components/charts/SvgNodeFlowGraph';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
@@ -84,7 +85,14 @@ export default async function ApiPerformancePage({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-sm text-neutral-500 dark:text-slate-400">
           Latency, errors, and traffic per endpoint — from <code className="font-mono text-xs">$api_request</code> events
-          sent by the SDK middleware or browser autocapture.
+          sent by the SDK middleware or browser autocapture. Click an endpoint to inspect its individual{' '}
+          <Link
+            className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white"
+            href={withProjectId('/dashboard/requests', canonicalProjectId)}
+          >
+            requests
+          </Link>
+          .
         </p>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-slate-800">
@@ -164,17 +172,30 @@ export default async function ApiPerformancePage({
           <div className="grid gap-6 lg:grid-cols-2">
             <EndpointPanel
               title="Highest latency"
-              subtitle="by p95 response time"
+              subtitle="by p95 response time · open to see the slowest requests"
               rows={data?.highestLatency ?? []}
               metric="p95"
+              link={{ days, projectId: canonicalProjectId, sort: 'duration' }}
             />
-            <ErrorPanel title="Highest error" subtitle="4xx / 5xx responses" rows={data?.highestError ?? []} />
-            <EndpointPanel title="Most requests" subtitle="by volume" rows={data?.mostRequests ?? []} metric="avg" />
+            <ErrorPanel
+              title="Highest error"
+              subtitle="4xx / 5xx responses · open to see the failing requests"
+              rows={data?.highestError ?? []}
+              link={{ days, projectId: canonicalProjectId }}
+            />
+            <EndpointPanel
+              title="Most requests"
+              subtitle="by volume"
+              rows={data?.mostRequests ?? []}
+              metric="avg"
+              link={{ days, projectId: canonicalProjectId }}
+            />
             <EndpointPanel
               title="Least requests"
               subtitle="quietest endpoints"
               rows={data?.leastRequests ?? []}
               metric="avg"
+              link={{ days, projectId: canonicalProjectId }}
             />
           </div>
         </>
@@ -183,21 +204,34 @@ export default async function ApiPerformancePage({
   );
 }
 
+interface RowLink {
+  days: string;
+  projectId?: string | null;
+  sort?: RequestSort;
+}
+
 function EndpointPanel({
   title,
   subtitle,
   rows,
-  metric
+  metric,
+  link
 }: {
   title: string;
   subtitle: string;
   rows: EndpointRow[];
   metric: 'p95' | 'avg';
+  link: RowLink;
 }) {
   return (
     <Panel title={title} subtitle={subtitle} headers={['Method', 'Endpoint', metric === 'p95' ? 'p95' : 'Avg']}>
       {rows.map((row) => (
-        <div key={`${row.method}\n${row.path}`} className="grid grid-cols-[64px_1fr_auto] items-center gap-3 px-5 py-2.5">
+        <Link
+          key={`${row.method}\n${row.path}`}
+          href={requestsHrefForEndpoint({ method: row.method, path: row.path, ...link })}
+          className="grid grid-cols-[64px_1fr_auto] items-center gap-3 px-5 py-2.5 hover:bg-neutral-50 dark:hover:bg-slate-900"
+          title={`Open ${row.method} ${row.path} in Requests`}
+        >
           <MethodPill method={row.method} />
           <span className="flex min-w-0 items-center gap-2">
             <StatusDot status={row.status} />
@@ -206,17 +240,27 @@ function EndpointPanel({
           <span className="text-right text-sm tabular-nums text-neutral-600 dark:text-slate-400">
             {formatMs(metric === 'p95' ? row.p95 : row.avg)}
           </span>
-        </div>
+        </Link>
       ))}
     </Panel>
   );
 }
 
-function ErrorPanel({ title, subtitle, rows }: { title: string; subtitle: string; rows: ErrorRow[] }) {
+function ErrorPanel({ title, subtitle, rows, link }: { title: string; subtitle: string; rows: ErrorRow[]; link: RowLink }) {
   return (
     <Panel title={title} subtitle={subtitle} headers={['Method', 'Endpoint', 'Count']}>
       {rows.map((row) => (
-        <div key={`${row.method}\n${row.path}\n${row.status}`} className="grid grid-cols-[64px_1fr_auto] items-center gap-3 px-5 py-2.5">
+        <Link
+          key={`${row.method}\n${row.path}\n${row.status}`}
+          href={requestsHrefForEndpoint({
+            method: row.method,
+            path: row.path,
+            status: row.status ? String(row.status) : undefined,
+            ...link
+          })}
+          className="grid grid-cols-[64px_1fr_auto] items-center gap-3 px-5 py-2.5 hover:bg-neutral-50 dark:hover:bg-slate-900"
+          title={`Open failing ${row.method} ${row.path} requests`}
+        >
           <MethodPill method={row.method} />
           <span className="flex min-w-0 items-center gap-2">
             <StatusDot status={row.status} />
@@ -225,7 +269,7 @@ function ErrorPanel({ title, subtitle, rows }: { title: string; subtitle: string
           <span className="text-right text-sm tabular-nums text-neutral-600 dark:text-slate-400">
             {row.count.toLocaleString()}
           </span>
-        </div>
+        </Link>
       ))}
     </Panel>
   );

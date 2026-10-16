@@ -33,8 +33,9 @@ export const navGroups: NavGroup[] = [
     key: 'observability',
     label: 'Observability',
     items: [
-      { label: 'Logs', href: '/dashboard/logs', key: 'logs' },
       { label: 'API performance', href: '/dashboard/api-performance', key: 'api-performance' },
+      { label: 'Requests', href: '/dashboard/requests', key: 'requests' },
+      { label: 'Logs', href: '/dashboard/logs', key: 'logs' },
       { label: 'Errors', href: '/dashboard/errors', key: 'errors' },
       { label: 'Alerts', href: '/dashboard/alerts', key: 'alerts' },
       { label: 'Replays', href: '/dashboard/replays', key: 'replays' },

@@ -10,6 +10,13 @@ import { EntitlementService } from '../billing/entitlement.service';
 import { sanitizeIngestedTraits } from '../users/users.service';
 import { getPreferredProjectId } from '../../common/active-project';
 import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
+import { RequestsService } from '../requests/requests.service';
+import {
+  API_REQUEST_EVENT,
+  ApiRequestRecord,
+  normalizeApiRequest,
+  stripApiRequestPayload
+} from '../requests/request-capture';
 
 type JsonObject = Record<string, unknown>;
 
@@ -75,6 +82,9 @@ interface PreparedEvent {
   externalId?: string;
   sessionId?: string;
   properties?: JsonObject;
+  // `$api_request` only: the properties as sent, payload included. Never stored on
+  // the event; only read to build the redacted `api_requests` row.
+  rawProperties?: JsonObject;
   deviceInfo?: JsonObject;
   networkInfo: JsonObject;
   context: JsonObject;
@@ -91,7 +101,8 @@ export class EventsService {
     private readonly webhooks: WebhooksService,
     private readonly achievements: AchievementsService,
     private readonly usage: UsageService = new UsageService(new EntitlementService(database)),
-    @Optional() private readonly setupVerifications?: SetupVerificationsService
+    @Optional() private readonly setupVerifications?: SetupVerificationsService,
+    @Optional() private readonly requests?: RequestsService
   ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
@@ -126,14 +137,16 @@ export class EventsService {
     const prepared: PreparedEvent[] = [];
     batch.forEach((item, index) => {
       try {
+        const eventName = this.requiredString(item.eventName, 'eventName');
         prepared.push({
           index,
-          eventName: this.requiredString(item.eventName, 'eventName'),
+          eventName,
           occurredAt: this.parseTimestamp(item.timestamp),
           anonymousId: this.optionalString(item.anonymousId),
           externalId: this.optionalString(item.userId),
           sessionId: this.optionalString(item.sessionId),
-          properties: item.properties,
+          properties: stripApiRequestPayload(eventName, item.properties),
+          rawProperties: eventName === API_REQUEST_EVENT ? item.properties : undefined,
           deviceInfo: item.deviceInfo,
           networkInfo: this.buildNetworkInfo(item.networkInfo, meta),
           context: item.context ?? {},
@@ -320,6 +333,47 @@ export class EventsService {
   }
 
   // Insert all prepared events in one multi-row statement; returns ids aligned to `prepared`.
+  // Normalizes `$api_request` events into request records (payloads gated by the
+  // project's capture policy and redacted). Malformed requests are skipped here
+  // but the event itself is still stored, exactly as before.
+  private async buildApiRequestRecords(
+    auth: WriteKeyRecord,
+    items: Array<{
+      eventId: string;
+      eventName: string;
+      occurredAt: Date;
+      sessionId?: string;
+      anonymousId?: string;
+      userId: string | null;
+      rawProperties?: JsonObject;
+      context: JsonObject;
+    }>
+  ): Promise<ApiRequestRecord[]> {
+    const candidates = items.filter((item) => item.eventName === API_REQUEST_EVENT);
+    if (!this.requests || candidates.length === 0) return [];
+    const hasPayload = candidates.some((item) => item.rawProperties?.payload);
+    const settings = hasPayload ? await this.requests.captureSettingsFor(auth.project_id) : null;
+
+    const records: ApiRequestRecord[] = [];
+    for (const item of candidates) {
+      const record = normalizeApiRequest({
+        id: `req_${randomUUID().replace(/-/g, '')}`,
+        eventId: item.eventId,
+        organizationId: auth.organization_id,
+        projectId: auth.project_id,
+        occurredAt: item.occurredAt,
+        properties: item.rawProperties,
+        context: item.context,
+        sessionId: item.sessionId ?? null,
+        userId: item.userId,
+        anonymousId: item.anonymousId ?? null,
+        settings
+      });
+      if (record) records.push(record);
+    }
+    return records;
+  }
+
   private async bulkInsertEvents(auth: WriteKeyRecord, prepared: PreparedEvent[]) {
     if (prepared.length === 0) return { eventIds: [] as string[], usageWarningPercentage: undefined };
 
@@ -349,6 +403,11 @@ export class EventsService {
       );
     });
 
+    const requestRecords = await this.buildApiRequestRecords(
+      auth,
+      prepared.map((p, i) => ({ ...p, eventId: ids[i] }))
+    );
+
     const consumption = await this.database.transaction(async (client) => {
       const usage = await this.usage.consumeProjectEvents(client, auth.organization_id, auth.project_id, prepared.length);
       await client.query(`
@@ -358,6 +417,7 @@ export class EventsService {
         )
         VALUES ${groups.join(', ')}
       `, values);
+      await this.requests?.insertRecords(client, requestRecords);
       return usage;
     });
     return { eventIds: ids, usageWarningPercentage: consumption.warningThreshold ?? undefined };
@@ -369,6 +429,9 @@ export class EventsService {
     meta: IngestMeta
   ): Promise<IngestEventResponse> {
     const eventName = this.requiredString(input.eventName, 'eventName');
+    const rawProperties = input.properties;
+    // Payload material on `$api_request` never reaches the events table or webhooks.
+    input = { ...input, properties: stripApiRequestPayload(eventName, input.properties) };
     const occurredAt = this.parseTimestamp(input.timestamp);
     const anonymousId = this.optionalString(input.anonymousId);
     const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId);
@@ -397,6 +460,21 @@ export class EventsService {
 
     const networkInfo = this.buildNetworkInfo(input.networkInfo, meta);
     const eventId = `evt_${randomUUID()}`;
+    const requestRecords =
+      eventName === API_REQUEST_EVENT
+        ? await this.buildApiRequestRecords(auth, [
+            {
+              eventId,
+              eventName,
+              occurredAt,
+              sessionId: sessionId ?? undefined,
+              anonymousId,
+              userId,
+              rawProperties,
+              context: input.context ?? {}
+            }
+          ])
+        : [];
 
     const consumption = await this.database.transaction(async (client) => {
       const usage = await this.usage.consumeProjectEvents(client, auth.organization_id, auth.project_id, 1);
@@ -430,6 +508,7 @@ export class EventsService {
         JSON.stringify(input.context ?? {}),
         occurredAt.toISOString()
       ]);
+      await this.requests?.insertRecords(client, requestRecords);
       return usage;
     });
 

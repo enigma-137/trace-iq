@@ -277,7 +277,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
       const start = self.nowMs();
       return originalFetch.call(window, input as RequestInfo, init).then(
         (response: Response) => {
-          self.recordRequest(method, url, response.status, self.nowMs() - start);
+          self.recordRequest(method, url, response.status, self.nowMs() - start, response);
           return response;
         },
         (error: unknown) => {
@@ -289,14 +289,31 @@ export class BrowserTraceIQClient implements TraceIQClient {
     };
   }
 
-  private recordRequest(method: string, url: string, status: number, durationMs: number): void {
-    this.track('$api_request', {
+  private recordRequest(method: string, url: string, status: number, durationMs: number, response?: Response): void {
+    const properties: Record<string, unknown> = {
       method,
       path: normalizeApiPath(url, this.getLocation()?.origin),
       status,
       durationMs: Math.round(durationMs),
       ok: status >= 200 && status < 400
-    });
+    };
+    // When an instrumented backend echoes its request id (and CORS exposes it), the
+    // browser-side record links to the server-side record of the same request.
+    const requestId = this.responseHeader(response, 'x-request-id');
+    if (requestId && /^[A-Za-z0-9._:/+=-]{1,128}$/.test(requestId)) properties.requestId = requestId;
+    const size = Number(this.responseHeader(response, 'content-length'));
+    if (Number.isFinite(size) && size >= 0 && this.responseHeader(response, 'content-length') !== null) {
+      properties.responseSize = size;
+    }
+    this.track('$api_request', properties);
+  }
+
+  private responseHeader(response: Response | undefined, name: string): string | null {
+    try {
+      return response?.headers?.get(name) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private requestUrl(input: RequestInfo | URL): string {

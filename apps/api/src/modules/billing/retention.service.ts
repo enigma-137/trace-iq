@@ -79,11 +79,27 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
           if (count < 1000) break;
         }
 
+        // Request records (and any captured payloads) follow the same window.
+        for (let batch = 0; batch < 20; batch += 1) {
+          const result = await client.query(`
+            DELETE FROM api_requests
+            WHERE id IN (
+              SELECT id FROM api_requests
+              WHERE project_id = $1 AND occurred_at < now() - ($2::int * interval '1 day')
+              ORDER BY occurred_at
+              LIMIT 1000
+            )
+          `, [project.id, retentionDays]);
+          const count = result?.rowCount ?? 0;
+          projectDeleted += count;
+          if (count < 1000) break;
+        }
+
         return projectDeleted;
       });
     }
 
-    if (deletedEvents > 0) this.logger.log(`Retention sweep deleted ${deletedEvents} expired records (events & logs).`);
+    if (deletedEvents > 0) this.logger.log(`Retention sweep deleted ${deletedEvents} expired records (events, logs & requests).`);
     return { projectsScanned: projects.rows.length, deletedEvents };
   }
 

@@ -1,4 +1,4 @@
-import { createRequestMiddleware, MiddlewareOptions } from './middleware';
+import { createRequestMiddleware, getRequestContext, MiddlewareOptions } from './middleware';
 
 export interface TraceIQNodeOptions {
   /** Your project ID (from Settings). */
@@ -126,11 +126,18 @@ export class TraceIQ {
       this.debug('capture() called without an event name; ignored.');
       return;
     }
+    // Inside traceiq.middleware(), stamp the in-flight request's ids so errors and
+    // events raised while handling it link back to that exact request record.
+    const request = getRequestContext();
+    const properties =
+      request && params.properties?.requestId === undefined
+        ? { ...params.properties, requestId: request.requestId, traceId: request.traceId }
+        : params.properties;
     this.enqueue({
       eventName: params.event,
       userId: params.userId,
       anonymousId: params.anonymousId,
-      properties: params.properties,
+      properties,
       context: params.context,
       timestamp: this.toIso(params.timestamp)
     });

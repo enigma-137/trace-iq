@@ -61,6 +61,35 @@ await traceiq.shutdown();
 | `debug` | `false` | Log warnings to the console. |
 | `fetchImpl` | global `fetch` | Inject a fetch (tests, or Node < 18 with a polyfill). |
 
+## Request telemetry (Requests explorer)
+
+`traceiq.middleware(options)` records every request as a `$api_request` event, which
+powers API Performance (aggregates) and the Requests explorer (individual requests).
+
+```ts
+app.use(traceiq.middleware({ service: 'billing-api', environment: 'production' }));
+```
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `service` | — | Service name shown and filterable in Requests. |
+| `environment` | `NODE_ENV` | Deployment environment. |
+| `requestIdHeader` | `x-request-id` | Incoming id to reuse; otherwise a UUID is generated. |
+| `echoRequestId` | `true` | Sets `x-request-id` on the response so browsers/monitors can link to the record. |
+| `capturePayloads` | off | `true` or `{ headers?, bodies?, maxBodyBytes?, shouldCapture? }`. |
+| `resolveUserId`, `path`, `ignore` | — | As before. |
+
+Each request carries a request id, a W3C trace id (continued from an incoming
+`traceparent`), and a span id. Any `capture()` call made while the request is being
+handled — e.g. an `$exception` event — is stamped with the same `requestId`/`traceId`,
+so Requests can link to it. Use `getRequestContext()` to read the ids yourself (for
+example to put them on structured logs sent to `POST /v1/logs`).
+
+Payload capture is opt-in twice: the middleware must send payloads, **and** the project
+must enable capture (Requests → Capture settings). Sensitive headers (authorization,
+cookies, API keys…) and fields (passwords, tokens, card numbers, emails…) are redacted
+in the SDK and again on the server before anything is stored; bodies are size-capped.
+
 ## How it maps to ingestion
 
 Under the hood the SDK POSTs to `POST /v1/events/batch` with your write key in the

@@ -7,6 +7,7 @@ import ChampionIcon from '@hugeicons/core-free-icons/ChampionIcon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
 import DashboardSpeed01Icon from '@hugeicons/core-free-icons/DashboardSpeed01Icon';
 import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01Icon';
+import ArrowDataTransferHorizontalIcon from '@hugeicons/core-free-icons/ArrowDataTransferHorizontalIcon';
 import Download04Icon from '@hugeicons/core-free-icons/Download04Icon';
 import Flag02Icon from '@hugeicons/core-free-icons/Flag02Icon';
 import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
@@ -35,6 +36,7 @@ const ICONS: Record<string, IconSvgElement> = {
   users: UserGroupIcon,
   replays: VideoReplayIcon,
   'api-performance': DashboardSpeed01Icon,
+  requests: ArrowDataTransferHorizontalIcon,
   errors: Alert02Icon,
   alerts: Notification02Icon,
   flags: Flag02Icon,
