@@ -695,6 +695,10 @@ export class FlagsService {
 
     const exposureId = `exp_${randomUUID()}`;
     const occurredAt = exposure.timestamp ? new Date(exposure.timestamp) : new Date();
+    // `userId` from the SDK is the app's external id; user_id/session_id columns
+    // reference TraceIQ's own rows. Resolve both within the project, and store null
+    // (keeping distinct_id) when they don't exist yet instead of failing the FK.
+    const { userId, sessionId } = await this.resolveExposureIdentity(auth.project_id, exposure.userId, exposure.sessionId);
 
     // Insert exposure record
     if (flag) {
@@ -714,9 +718,9 @@ export class FlagsService {
           env,
           flagRevision,
           distinctId,
-          exposure.userId ?? null,
+          userId,
           exposure.anonymousId ?? null,
-          exposure.sessionId ?? null,
+          sessionId,
           Boolean(exposure.enabled),
           exposure.evaluationReason ?? null,
           exposure.payloadHash ?? null,
@@ -739,9 +743,9 @@ export class FlagsService {
         eventId,
         auth.organization_id,
         auth.project_id,
-        exposure.userId ?? null,
+        userId,
         exposure.anonymousId ?? distinctId,
-        exposure.sessionId ?? null,
+        sessionId,
         JSON.stringify({
           flagKey,
           flagId,
@@ -759,6 +763,24 @@ export class FlagsService {
     );
 
     return { accepted: true, exposureId, eventId };
+  }
+
+  private async resolveExposureIdentity(
+    projectId: string,
+    rawUserId: string | undefined,
+    rawSessionId: string | undefined
+  ): Promise<{ userId: string | null; sessionId: string | null }> {
+    const userRef = typeof rawUserId === 'string' && rawUserId.trim() ? rawUserId.trim() : null;
+    const sessionRef = typeof rawSessionId === 'string' && rawSessionId.trim() ? rawSessionId.trim() : null;
+    if (!userRef && !sessionRef) return { userId: null, sessionId: null };
+
+    const result = await this.database.query<{ user_id: string | null; session_id: string | null }>(
+      `SELECT
+         (SELECT id FROM users WHERE project_id = $1 AND (external_id = $2 OR id = $2) ORDER BY (id = $2) DESC LIMIT 1) AS user_id,
+         (SELECT id FROM sessions WHERE project_id = $1 AND id = $3 LIMIT 1) AS session_id`,
+      [projectId, userRef, sessionRef]
+    );
+    return { userId: result.rows[0]?.user_id ?? null, sessionId: result.rows[0]?.session_id ?? null };
   }
 
   // -- Impact & Analytics --------------------------------------------------

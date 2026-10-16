@@ -66,6 +66,15 @@ export interface BatchIngestResponse {
 
 const MAX_BATCH_SIZE = 500;
 
+const SESSION_UPSERT_ATTEMPTS = 3;
+
+// unique_violation on the sessions keys, or a deadlock: both clear on retry.
+function isTransientSessionConflict(error: unknown): boolean {
+  const pg = error as { code?: string; constraint?: string };
+  if (pg?.code === '40P01') return true;
+  return pg?.code === '23505' && (pg.constraint === 'sessions_id_project_replay_fk_idx' || pg.constraint === 'sessions_pkey');
+}
+
 // Write keys change rarely, so caching the lookup removes a DB round-trip from the
 // ingest hot path. Kept short so a revoked key stops working within seconds.
 const WRITE_KEY_TTL_MS = 10 * 1000;
@@ -311,15 +320,26 @@ export class EventsService {
     const values: unknown[] = [];
     const groups: string[] = [];
     let idx = 0;
-    for (const [sessionId, s] of distinct) {
+    // Sorted so concurrent batches lock session rows in the same order (no deadlocks).
+    for (const [sessionId, s] of [...distinct].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
       const base = idx * 5;
       groups.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::jsonb)`);
       values.push(sessionId, projectId, s.userId, s.anonymousId ?? null, JSON.stringify(s.context ?? {}));
       idx += 1;
     }
 
-    await this.database.query(
-      `
+    await this.upsertSessions(groups, values);
+  }
+
+  /**
+   * Session upsert, retried on transient conflicts. `ON CONFLICT (id)` only absorbs
+   * conflicts on the primary key, so two requests creating the same new session at
+   * once can trip the (id, project_id) unique index instead, and the upsert can
+   * deadlock with identity stitching. The statement is idempotent, so a retry
+   * (which then takes the conflict path) is always safe.
+   */
+  private async upsertSessions(groups: string[], values: unknown[]): Promise<void> {
+    const sql = `
         INSERT INTO sessions (id, project_id, user_id, anonymous_id, context)
         VALUES ${groups.join(', ')}
         ON CONFLICT (id) DO UPDATE
@@ -327,9 +347,16 @@ export class EventsService {
             anonymous_id = COALESCE(EXCLUDED.anonymous_id, sessions.anonymous_id),
             last_seen_at = now(),
             context = sessions.context || EXCLUDED.context
-      `,
-      values
-    );
+      `;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await this.database.query(sql, values);
+        return;
+      } catch (error) {
+        if (attempt >= SESSION_UPSERT_ATTEMPTS || !isTransientSessionConflict(error)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 10 * attempt + Math.floor(Math.random() * 15)));
+      }
+    }
   }
 
   // Insert all prepared events in one multi-row statement; returns ids aligned to `prepared`.
@@ -703,16 +730,8 @@ export class EventsService {
       return null;
     }
 
-    await this.database.query(
-      `
-        INSERT INTO sessions (id, project_id, user_id, anonymous_id, context)
-        VALUES ($1, $2, $3, $4, $5::jsonb)
-        ON CONFLICT (id) DO UPDATE
-        SET user_id = COALESCE(EXCLUDED.user_id, sessions.user_id),
-            anonymous_id = COALESCE(EXCLUDED.anonymous_id, sessions.anonymous_id),
-            last_seen_at = now(),
-            context = sessions.context || EXCLUDED.context
-      `,
+    await this.upsertSessions(
+      ['($1, $2, $3, $4, $5::jsonb)'],
       [safeSessionId, projectId, userId ?? null, anonymousId ?? null, JSON.stringify(context)]
     );
 
