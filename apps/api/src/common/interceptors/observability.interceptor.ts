@@ -8,6 +8,18 @@ import { Observable, tap } from 'rxjs';
 import { randomUUID } from 'node:crypto';
 import { ObservabilityService } from '../../modules/observability/observability.service';
 
+// A project's Logs belong to the connected app, not to TraceIQ's own traffic. The
+// only TraceIQ-side requests worth surfacing there are SDK deliveries that failed
+// (rejected write key, rate limit, bad payload): the app's developers need to know
+// their data isn't arriving. Successful ingestion and all dashboard/setup/admin
+// traffic are never recorded.
+const SDK_PATH_PREFIXES = ['/v1/events', '/v1/flags', '/v1/experiments', '/v1/surveys', '/v1/replays'];
+
+export function shouldRecordRequest(path: string, statusCode: number): boolean {
+  if (statusCode < 400) return false;
+  return SDK_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 @Injectable()
 export class ObservabilityInterceptor implements NestInterceptor {
   constructor(private readonly observabilityService: ObservabilityService) {}
@@ -110,6 +122,8 @@ export class ObservabilityInterceptor implements NestInterceptor {
     requestId: string;
     error?: any;
   }) {
+    if (!shouldRecordRequest(params.path, params.statusCode)) return;
+
     // Fire and forget, don't let log recording ever break request flow
     Promise.resolve().then(async () => {
       try {
@@ -125,17 +139,16 @@ export class ObservabilityInterceptor implements NestInterceptor {
           return;
         }
 
-        const isError = params.statusCode >= 400;
-        const level = params.statusCode >= 500 ? 'error' : params.statusCode >= 400 ? 'warn' : 'info';
-        const status = isError ? 'error' : 'success';
+        const serverFault = params.statusCode >= 500;
+        const reason = typeof params.error?.message === 'string' ? `: ${params.error.message.slice(0, 200)}` : '';
 
         await this.observabilityService.recordLog({
           projectId,
-          level,
-          source: 'api',
-          service: 'traceiq-api',
-          message: `${params.method} ${params.path} -> ${params.statusCode}`,
-          status,
+          level: serverFault ? 'error' : 'warn',
+          source: 'sdk',
+          service: 'traceiq-ingest',
+          message: `SDK delivery failed — ${params.method} ${params.path} -> ${params.statusCode}${reason}`,
+          status: serverFault ? 'error' : 'warning',
           statusCode: params.statusCode,
           durationMs: params.durationMs,
           method: params.method,
