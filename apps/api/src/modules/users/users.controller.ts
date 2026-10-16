@@ -15,11 +15,12 @@ export class UsersController {
     @Query('search') search?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
-    @Query('projectId') projectId?: string
+    @Query('projectId') projectId?: string,
+    @Query('segment') segment?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'users:read');
-    return this.usersService.listPersons(user, { search, limit, offset, projectId });
+    return this.usersService.listPersons(user, { search, limit, offset, projectId, segment });
   }
 
   @Get('search')

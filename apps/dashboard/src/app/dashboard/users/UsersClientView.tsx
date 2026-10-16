@@ -77,6 +77,8 @@ interface Props {
   limit: number;
   offset: number;
   searchParam: string;
+  /** Active tab; filtered server-side across every user (?segment=). */
+  segment: 'all' | 'new' | 'returning' | 'inactive';
   userEmail?: string | null;
   projectId?: string | null;
 }
@@ -133,13 +135,22 @@ export function UsersClientView({
   limit,
   offset,
   searchParam,
+  segment,
   userEmail,
   projectId
 }: Props) {
   const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState(searchParam);
-  const [activeTab, setActiveTab] = useState<'all' | 'new' | 'returning' | 'inactive'>('all');
+  const activeTab = segment;
+  const setActiveTab = (next: Props['segment']) => {
+    if (next === activeTab) return;
+    const params = new URLSearchParams(window.location.search);
+    if (next === 'all') params.delete('segment');
+    else params.set('segment', next);
+    params.delete('offset');
+    router.push(`/dashboard/users?${params.toString()}`, { scroll: false });
+  };
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(initialPersons[0]?.id ?? null);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [detailTab, setDetailTab] = useState<'overview' | 'events' | 'sessions' | 'properties'>('overview');
@@ -164,19 +175,8 @@ export function UsersClientView({
     return () => clearTimeout(timer);
   }, [searchQuery, searchParam, router]);
 
-  // Filter the loaded page by the active tab.
-  const filteredPersons = useMemo(() => {
-    return initialPersons.filter((p) => {
-      // Tab filter
-      const status = getUserStatus(p.lastSeenAt);
-      const isNew = p.firstSeenAt && (Date.now() - new Date(p.firstSeenAt).getTime()) <= 14 * 24 * 60 * 60 * 1000;
-
-      if (activeTab === 'new') return isNew;
-      if (activeTab === 'returning') return status === 'Active' && !isNew;
-      if (activeTab === 'inactive') return status === 'Inactive';
-      return true;
-    });
-  }, [initialPersons, activeTab]);
+  // Tabs and search are applied by the API, so the loaded page is already filtered.
+  const filteredPersons = initialPersons;
 
   // Active selected person
   const activePerson = useMemo(() => {
@@ -463,7 +463,11 @@ export function UsersClientView({
             <div className="divide-y divide-neutral-200 dark:divide-slate-800">
               {filteredPersons.length === 0 ? (
                 <div className="p-8 text-center text-xs text-neutral-500 dark:text-slate-400">
-                  {searchQuery ? 'No users matching your search query.' : 'No identified users recorded yet.'}
+                  {searchParam
+                    ? 'No users match your search.'
+                    : segment !== 'all'
+                      ? `No ${segment} users in this project.`
+                      : 'No identified users recorded yet.'}
                 </div>
               ) : (
                 filteredPersons.map((person) => {
@@ -610,7 +614,7 @@ export function UsersClientView({
 
                 <span>
                   {initialPersons.length > 0 ? `${offset + 1}-${offset + initialPersons.length}` : '0'} of {totalCount.toLocaleString()}{' '}
-                  {searchParam ? 'matching ' : ''}users
+                  {searchParam || segment !== 'all' ? 'matching ' : ''}users
                 </span>
               </div>
             </div>

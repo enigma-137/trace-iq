@@ -27,6 +27,8 @@ export default async function UsersPage({
   const offset = Number(firstParam(searchParams.offset) ?? '0') || 0;
   const limit = Number(firstParam(searchParams.limit) ?? '20') || 20;
   const requestedProjectId = firstParam(searchParams.projectId);
+  const rawSegment = firstParam(searchParams.segment);
+  const segment = rawSegment === 'new' || rawSegment === 'returning' || rawSegment === 'inactive' ? rawSegment : 'all';
 
   const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   if (search) {
@@ -34,6 +36,9 @@ export default async function UsersPage({
   }
   if (requestedProjectId) {
     query.set('projectId', requestedProjectId);
+  }
+  if (segment !== 'all') {
+    query.set('segment', segment);
   }
 
   const { data, error } = await dashboardGet<PersonsResponse>(`/v1/dashboard/users?${query.toString()}`, token);
@@ -66,6 +71,7 @@ export default async function UsersPage({
         limit={limit}
         offset={offset}
         searchParam={search}
+        segment={segment}
         userEmail={user.email}
       />
     </DashboardShell>

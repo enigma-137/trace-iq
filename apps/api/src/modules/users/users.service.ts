@@ -274,6 +274,15 @@ export function sanitizeIngestedTraits(rawTraits: unknown): Record<string, unkno
 
 // Shared by the page query and its match count. $1 = project id, $2 = escaped search
 // (ILIKE pattern body) or NULL for no search.
+// Users-page tabs. Static SQL chosen from a whitelist (never interpolated input);
+// "new" and "returning" match the stat cards, so a tab's total equals its card.
+export const PERSON_SEGMENTS = {
+  new: `u.first_seen_at >= now() - interval '14 days'`,
+  returning: `u.first_seen_at < now() - interval '14 days' AND u.last_seen_at >= now() - interval '14 days'`,
+  inactive: `u.last_seen_at < now() - interval '30 days'`
+} as const;
+export type PersonSegment = keyof typeof PERSON_SEGMENTS;
+
 const PERSON_SEARCH_WHERE = `u.project_id = $1
           AND (
             $2::text IS NULL
@@ -298,7 +307,7 @@ export class UsersService {
 
   async listPersons(
     user: DashboardUser,
-    params: { search?: string; limit?: string; offset?: string; projectId?: string }
+    params: { search?: string; limit?: string; offset?: string; projectId?: string; segment?: string }
   ): Promise<{
     project: unknown;
     persons: PersonSummary[];
@@ -313,6 +322,12 @@ export class UsersService {
     const search = this.optionalString(params.search) ?? null;
     // Matched with ILIKE, so a literal % or _ in the query must not act as a wildcard.
     const searchPattern = search ? search.slice(0, 200).replace(/[\\%_]/g, (char) => `\\${char}`) : null;
+
+    const segment =
+      params.segment && Object.prototype.hasOwnProperty.call(PERSON_SEGMENTS, params.segment)
+        ? (params.segment as PersonSegment)
+        : null;
+    const personWhere = segment ? `${PERSON_SEARCH_WHERE} AND ${PERSON_SEGMENTS[segment]}` : PERSON_SEARCH_WHERE;
 
     if (!project) {
       return { project: null, persons: [], limit, offset };
@@ -347,7 +362,7 @@ export class UsersService {
           (SELECT e.network_info->>'country' FROM events e WHERE e.user_id = u.id AND NULLIF(e.network_info->>'country','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastCountry",
           (SELECT e.network_info->>'city' FROM events e WHERE e.user_id = u.id AND NULLIF(e.network_info->>'city','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastCity"
         FROM users u
-        WHERE ${PERSON_SEARCH_WHERE}
+        WHERE ${personWhere}
         ORDER BY u.last_seen_at DESC
         LIMIT $3 OFFSET $4
       `,
@@ -411,11 +426,11 @@ export class UsersService {
       returningUsers: 0
     };
 
-    // While searching, pagination counts the matches; the stat cards stay project-wide.
+    // While searching or on a tab, pagination counts the matches; the stat cards stay project-wide.
     let totalCount = stats.totalUsers;
-    if (searchPattern) {
+    if (searchPattern || segment) {
       const matches = await this.database.query<{ count: number }>(
-        `SELECT count(*)::int AS count FROM users u WHERE ${PERSON_SEARCH_WHERE}`,
+        `SELECT count(*)::int AS count FROM users u WHERE ${personWhere}`,
         [project.id, searchPattern]
       );
       totalCount = Number(matches.rows[0]?.count ?? 0);
