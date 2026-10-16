@@ -40,6 +40,7 @@ const SECTION_DESCRIPTIONS: Record<string, string> = {
   dashboards: 'Saved side-by-side insight views with custom date filters.',
   'public-sharing': 'Permission-scoped public dashboard links and revocation guidance.',
   'api-performance': 'Endpoint latency (p95), error rates, and traffic metrics.',
+  logs: 'Send structured logs from your app with traceiq.log().',
   webhooks: 'Real-time HTTP event forwarders with HMAC signature verification.',
   export: 'Download raw event payloads via CSV, JSON, or Export API.',
   events: 'Reserved event conventions ($page, $identify, $rageclick, etc.).',

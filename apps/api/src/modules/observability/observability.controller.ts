@@ -99,6 +99,16 @@ export class ObservabilityController {
     return this.observabilityService.getTrace(user, id, projectId);
   }
 
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
+  @Post('v1/logs/batch')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async ingestLogBatch(
+    @Body() body: { projectId?: string; writeKey?: string; logs?: unknown },
+    @Headers('x-traceiq-write-key') writeKey?: string
+  ) {
+    return this.observabilityService.ingestLogBatchFromSdk(body ?? {}, writeKey);
+  }
+
   @Throttle({ default: { limit: 1_000, ttl: 60_000 } })
   @Post('v1/logs')
   @HttpCode(HttpStatus.ACCEPTED)

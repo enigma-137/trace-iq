@@ -14,7 +14,8 @@ const MAX_BODY_BYTES = 1_048_576;
 // accept requests from any customer origin, so CORS stays open for them.
 const PUBLIC_INGEST_PATHS = [
   '/v1/events', '/v1/events/batch', '/v1/flags/evaluate', '/v1/flags/exposure',
-  '/v1/replays/config', '/v1/replays/authorize', '/v1/replays/chunks', '/v1/replays/complete'
+  '/v1/replays/config', '/v1/replays/authorize', '/v1/replays/chunks', '/v1/replays/complete',
+  '/v1/logs', '/v1/logs/batch'
 ];
 
 function setSecurityHeaders(_req: Request, res: Response, next: NextFunction) {

@@ -1,10 +1,21 @@
-import type { TraceIQClient, TraceIQFeatureFlags, TraceIQGroup, TraceIQIdentity, TraceIQInitOptions } from '../types';
+import type {
+  TraceIQClient,
+  TraceIQFeatureFlags,
+  TraceIQGroup,
+  TraceIQIdentity,
+  TraceIQInitOptions,
+  TraceIQLogLevel
+} from '../types';
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type MetricType } from 'web-vitals';
 import { ReplayRecorder } from './replay.js';
 
 const DEFAULT_ENDPOINT = 'http://localhost:4000';
 const ANONYMOUS_ID_STORAGE_KEY = 'traceiq.anonymousId';
 const SESSION_ID_STORAGE_KEY = 'traceiq.sessionId';
+const LOG_LEVELS: readonly TraceIQLogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
+const LOG_BATCH_SIZE = 20;
+const LOG_FLUSH_DELAY_MS = 2000;
+const MAX_BUFFERED_LOGS = 200;
 
 export class BrowserTraceIQClient implements TraceIQClient {
   private options?: TraceIQInitOptions;
@@ -17,6 +28,9 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private requestCaptureInstalled = false;
   private webVitalsInstalled = false;
   private recentClicks: Array<{ t: number; x: number; y: number }> = [];
+  private logBuffer: Array<Record<string, unknown>> = [];
+  private logFlushTimer?: ReturnType<typeof setTimeout>;
+  private logFlushOnHideInstalled = false;
   private lastRageAt = 0;
   private featureFlags: Record<string, boolean> = {};
   private featureFlagPayloads: Record<string, unknown> = {};
@@ -175,6 +189,75 @@ export class BrowserTraceIQClient implements TraceIQClient {
     onLCP(report);
     onFCP(report);
     onTTFB(report);
+  }
+
+  log(level: TraceIQLogLevel, message: string, attributes: Record<string, unknown> = {}): void {
+    if (!this.options) {
+      this.debug('TraceIQ has not been initialized.');
+      return;
+    }
+    if (typeof message !== 'string' || !message.trim()) return;
+
+    const { service, error, ...metadata } = attributes;
+    const normalizedError = error !== undefined ? this.normalizeError(error) : undefined;
+    const location = this.getLocation();
+    this.logBuffer.push({
+      level: LOG_LEVELS.includes(level) ? level : 'info',
+      message: message.slice(0, 4000),
+      timestamp: new Date().toISOString(),
+      service: typeof service === 'string' && service ? service : 'web-client',
+      environment: this.options.environment,
+      sessionId: this.sessionId,
+      distinctId: this.identity?.userId ?? this.anonymousId,
+      route: location?.pathname,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      errorDetails: normalizedError
+        ? { name: normalizedError.type, message: normalizedError.message, stack: normalizedError.stack }
+        : undefined
+    });
+    // Bounded so an offline page can't grow memory without limit; oldest go first.
+    if (this.logBuffer.length > MAX_BUFFERED_LOGS) this.logBuffer.splice(0, this.logBuffer.length - MAX_BUFFERED_LOGS);
+
+    this.installLogFlushOnHide();
+    if (this.logBuffer.length >= LOG_BATCH_SIZE) {
+      void this.flushLogs();
+    } else if (!this.logFlushTimer) {
+      this.logFlushTimer = setTimeout(() => void this.flushLogs(), LOG_FLUSH_DELAY_MS);
+    }
+  }
+
+  async flushLogs(): Promise<void> {
+    if (this.logFlushTimer) {
+      clearTimeout(this.logFlushTimer);
+      this.logFlushTimer = undefined;
+    }
+    const options = this.options;
+    if (!options || this.logBuffer.length === 0) return;
+
+    const batch = this.logBuffer.splice(0, LOG_BATCH_SIZE);
+    try {
+      const response = await fetch(`${(options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/logs/batch`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-traceiq-write-key': options.writeKey },
+        body: JSON.stringify({ projectId: options.projectId, logs: batch }),
+        keepalive: true
+      });
+      if (!response.ok) this.debug(`[TraceIQ] Logs rejected: HTTP ${response.status}`);
+    } catch {
+      this.debug('[TraceIQ] Logs could not be delivered.');
+    }
+    if (this.logBuffer.length > 0) void this.flushLogs();
+  }
+
+  private installLogFlushOnHide(): void {
+    if (this.logFlushOnHideInstalled || typeof document === 'undefined' || typeof window === 'undefined') return;
+    this.logFlushOnHideInstalled = true;
+    const flush = () => void this.flushLogs();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+    });
+    window.addEventListener('pagehide', flush);
   }
 
   captureException(error: unknown, properties: Record<string, unknown> = {}): void {

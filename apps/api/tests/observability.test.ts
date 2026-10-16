@@ -82,6 +82,49 @@ describe('ObservabilityService', () => {
     expect(result.logs[0].metadata?.safeField).toBe('normal-value');
   });
 
+  it('ingests SDK log batches with one write-key check and validated entries', async () => {
+    const db = mockDatabase((query) => {
+      if (query.includes('FROM project_write_keys')) return rows([{ project_id: 'proj_1' }]);
+      return rows([]);
+    });
+    const service = new ObservabilityService(db as never, {} as never);
+    const result = await service.ingestLogBatchFromSdk(
+      {
+        projectId: 'proj_1',
+        logs: [
+          { level: 'error', message: 'Level 3 assets failed', service: 'game-client', sessionId: 'sess_1', metadata: { level: 3 } },
+          { level: 'warning', message: 'slow frame' },
+          { level: 'nonsense', message: 'odd level', timestamp: '2999-01-01T00:00:00Z' },
+          { level: 'info' },
+          'not an object'
+        ]
+      },
+      'wk_test'
+    );
+
+    expect(result).toEqual({ ok: true, accepted: 3, rejected: 2 });
+    expect(db.queryCalls('FROM project_write_keys')).toHaveLength(1);
+    const inserts = db.queryCalls('INSERT INTO observability_logs');
+    expect(inserts).toHaveLength(3);
+    // id, project, timestamp, level, source, service, message, status
+    expect(inserts[0].values.slice(1, 8)).toEqual(['proj_1', expect.any(String), 'error', 'sdk', 'game-client', 'Level 3 assets failed', 'error']);
+    expect(inserts[1].values[3]).toBe('warn');
+    expect(inserts[1].values[7]).toBe('warning');
+    expect(inserts[2].values[3]).toBe('info');
+    expect(new Date(inserts[2].values[2] as string).getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('rejects empty, oversized or unauthenticated log batches', async () => {
+    const db = mockDatabase((query) => (query.includes('FROM project_write_keys') ? rows([]) : rows([])));
+    const service = new ObservabilityService(db as never, {} as never);
+    await expect(service.ingestLogBatchFromSdk({ logs: [] }, 'wk')).rejects.toThrow('non-empty');
+    await expect(
+      service.ingestLogBatchFromSdk({ logs: Array.from({ length: 101 }, () => ({ message: 'x' })) }, 'wk')
+    ).rejects.toThrow('limited to 100');
+    await expect(service.ingestLogBatchFromSdk({ logs: [{ message: 'x' }] }, undefined)).rejects.toThrow('Write key is required');
+    await expect(service.ingestLogBatchFromSdk({ projectId: 'proj_1', logs: [{ message: 'x' }] }, 'bad')).rejects.toThrow('Invalid');
+  });
+
   it('accepts a single status or a comma-separated status list', async () => {
     const db = mockDatabase(() => rows([]));
     const projectsMock = { resolveActiveProject: vi.fn().mockResolvedValue(mockProject) };

@@ -110,6 +110,82 @@ const SENSITIVE_KEYS = new Set([
   'private_key'
 ]);
 
+const MAX_LOG_BATCH = 100;
+const LOG_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
+const LOG_STATUSES: readonly LogStatus[] = ['success', 'warning', 'error', 'info', 'pending'];
+
+function cap(value: unknown, max: number): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * Normalizes an SDK-submitted log so it always satisfies the table's CHECK
+ * constraints (an unknown level used to surface as a 500) and stays bounded.
+ */
+export function normalizeSdkLog(
+  entry: Partial<ObservabilityLogEntry> & { message: string }
+): Partial<ObservabilityLogEntry> & { message: string } {
+  const rawLevel = typeof entry.level === 'string' ? entry.level.toLowerCase() : '';
+  const level: LogLevel = rawLevel === 'warning' ? 'warn' : (LOG_LEVELS as readonly string[]).includes(rawLevel) ? (rawLevel as LogLevel) : 'info';
+  const rawStatus = typeof entry.status === 'string' ? entry.status.toLowerCase() : '';
+  const status: LogStatus = (LOG_STATUSES as readonly string[]).includes(rawStatus)
+    ? (rawStatus as LogStatus)
+    : level === 'error' || level === 'fatal'
+      ? 'error'
+      : level === 'warn'
+        ? 'warning'
+        : 'info';
+  const timestamp = typeof entry.timestamp === 'string' && !Number.isNaN(Date.parse(entry.timestamp)) ? new Date(entry.timestamp) : new Date();
+  // Never accept timestamps from the future (clock skew would pin them to the top).
+  const safeTime = timestamp.getTime() > Date.now() + 60_000 ? new Date() : timestamp;
+  const statusCode = finiteNumber(entry.statusCode);
+  const durationMs = finiteNumber(entry.durationMs);
+
+  return {
+    timestamp: safeTime.toISOString(),
+    level,
+    status,
+    source: cap(entry.source, 32) ?? 'sdk',
+    service: cap(entry.service, 128) ?? 'app',
+    message: entry.message.slice(0, 4000),
+    statusCode: statusCode === undefined ? undefined : Math.trunc(statusCode),
+    durationMs: durationMs === undefined ? undefined : Math.max(0, Math.round(durationMs)),
+    method: cap(entry.method, 16)?.toUpperCase(),
+    route: cap(entry.route, 512),
+    clientIp: cap(entry.clientIp, 64),
+    userAgent: cap(entry.userAgent, 512),
+    traceId: cap(entry.traceId, 128),
+    requestId: cap(entry.requestId, 128),
+    sessionId: cap(entry.sessionId, 128),
+    distinctId: cap(entry.distinctId, 256),
+    actorUserId: cap(entry.actorUserId, 128),
+    provider: cap(entry.provider, 64),
+    model: cap(entry.model, 128),
+    inputTokens: finiteNumber(entry.inputTokens),
+    outputTokens: finiteNumber(entry.outputTokens),
+    costUsd: finiteNumber(entry.costUsd),
+    environment: cap(entry.environment, 64) ?? 'production',
+    metadata: boundedObject(entry.metadata),
+    errorDetails: boundedObject(entry.errorDetails)
+  };
+}
+
+const MAX_LOG_OBJECT_BYTES = 16_384;
+
+function boundedObject(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  try {
+    const size = JSON.stringify(value).length;
+    return size > MAX_LOG_OBJECT_BYTES ? { truncated: true, originalBytes: size } : (value as Record<string, unknown>);
+  } catch {
+    return undefined;
+  }
+}
+
 @Injectable()
 export class ObservabilityService {
   constructor(
@@ -617,13 +693,49 @@ export class ObservabilityService {
     entry: Partial<ObservabilityLogEntry> & { projectId?: string; writeKey?: string; message: string },
     writeKeyHeader?: string
   ) {
-    const key = writeKeyHeader ?? entry.writeKey;
+    const resolvedProjectId = await this.resolveWriteKeyProject(writeKeyHeader ?? entry.writeKey, entry.projectId);
+    return this.recordLog({
+      ...normalizeSdkLog(entry),
+      projectId: resolvedProjectId
+    });
+  }
+
+  /**
+   * Batched SDK logs (`traceiq.log()` in the browser/Node SDKs): one write-key check
+   * per batch; each entry is validated on its own so a bad entry drops only itself.
+   */
+  async ingestLogBatchFromSdk(
+    body: { projectId?: string; writeKey?: string; logs?: unknown },
+    writeKeyHeader?: string
+  ) {
+    if (!Array.isArray(body.logs) || body.logs.length === 0) {
+      throw new BadRequestException('logs must be a non-empty array.');
+    }
+    if (body.logs.length > MAX_LOG_BATCH) {
+      throw new BadRequestException(`logs is limited to ${MAX_LOG_BATCH} entries per request.`);
+    }
+    const projectId = await this.resolveWriteKeyProject(writeKeyHeader ?? body.writeKey, body.projectId);
+
+    let accepted = 0;
+    let rejected = 0;
+    for (const raw of body.logs) {
+      if (!raw || typeof raw !== 'object' || typeof (raw as { message?: unknown }).message !== 'string' || !(raw as { message: string }).message.trim()) {
+        rejected += 1;
+        continue;
+      }
+      await this.recordLog({ ...normalizeSdkLog(raw as Partial<ObservabilityLogEntry> & { message: string }), projectId });
+      accepted += 1;
+    }
+    return { ok: true, accepted, rejected };
+  }
+
+  private async resolveWriteKeyProject(key: string | undefined, projectId: string | undefined): Promise<string> {
     if (!key) {
       throw new BadRequestException('Write key is required to ingest logs.');
     }
 
     const keyHash = createHash('sha256').update(key).digest('hex');
-    let resolvedProjectId = entry.projectId;
+    let resolvedProjectId = projectId;
 
     if (resolvedProjectId) {
       const authRes = await this.database.query<{ project_id: string }>(
@@ -657,11 +769,7 @@ export class ObservabilityService {
       resolvedProjectId = authRes.rows[0].project_id;
     }
 
-    return this.recordLog({
-      ...entry,
-      projectId: resolvedProjectId,
-      source: entry.source ?? 'sdk'
-    });
+    return resolvedProjectId as string;
   }
 
   // `status` is a single value or a comma-separated list (e.g. "error,warning").

@@ -21,6 +21,7 @@ export const docsSections = [
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
   { id: 'public-sharing', label: 'Public sharing', category: 'Features' },
   { id: 'api-performance', label: 'API performance', category: 'Features' },
+  { id: 'logs', label: 'Logs', category: 'Features' },
   { id: 'webhooks', label: 'Webhooks', category: 'Features' },
   { id: 'export', label: 'Data export', category: 'Features' },
   { id: 'events', label: 'Reserved events', category: 'Features' },
@@ -1088,6 +1089,51 @@ app.use(traceiq.middleware({
         <P>
           Anything else (gRPC, background jobs) can report directly by sending an <Mono>$api_request</Mono> event
           with <Mono>method</Mono>, <Mono>path</Mono>, <Mono>status</Mono>, and <Mono>durationMs</Mono> properties.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'logs') {
+    return (
+      <Section id="logs" title="Logs">
+        <P>
+          Send structured log lines from your app to the{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/logs">
+            Logs
+          </a>{' '}
+          page. Logs show only what your app sends, plus a warning whenever TraceIQ rejects one of your SDK
+          deliveries (for example an invalid write key), so you know data isn&apos;t arriving.
+        </P>
+        <P>
+          <strong>Browser / games</strong>: entries are buffered, sent in batches, and tagged with the current session
+          (so they link to its replay) and user:
+        </P>
+        <Code lang="ts">{`traceiq.log('info', 'Level 3 started', { level: 3 });
+traceiq.log('error', 'Level 3 assets failed to load', {
+  service: 'game-client',   // optional, defaults to "web-client"
+  error,                    // optional Error: its stack is attached
+  level: 3,                 // anything else becomes searchable metadata
+});`}</Code>
+        <P>
+          <strong>Node</strong>: inside <Mono>traceiq.middleware()</Mono> each log carries the current request&apos;s
+          request and trace IDs, so it appears on that request in the Requests explorer:
+        </P>
+        <Code lang="ts">{`const traceiq = new TraceIQ({ projectId: '${projectId}', writeKey, serviceName: 'game-server' });
+
+traceiq.log('warn', 'Matchmaking queue is backing up', { queued: 412 });
+await traceiq.shutdown(); // flushes events and logs`}</Code>
+        <OptionsTable rows={[
+          ['level', 'Required', 'debug, info, warn, error or fatal.'],
+          ['message', 'Required', 'Up to 4,000 characters.'],
+          ['service', 'Optional', 'Groups and filters logs by component.'],
+          ['error', 'Optional', 'An Error whose name, message and stack are attached.'],
+          ['…other keys', 'Optional', 'Stored as metadata (up to 16 KB); keys like password or token are redacted.']
+        ]} />
+        <P>
+          Any other runtime can post directly to <Mono>POST {apiBaseUrl}/v1/logs/batch</Mono> with the{' '}
+          <Mono>x-traceiq-write-key</Mono> header and a body of <Mono>{'{ projectId, logs: [{ level, message, … }] }'}</Mono>{' '}
+          (up to 100 entries).
         </P>
       </Section>
     );

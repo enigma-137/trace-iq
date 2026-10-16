@@ -98,6 +98,8 @@ export interface TraceIQSurveysApi {
   submitResponse(surveyId: string, answers: Array<{ questionId: string; questionType: string; prompt: string; answerText?: string; selectedOptions?: string[]; rating?: number; score?: number }>): Promise<boolean>;
 }
 
+export type TraceIQLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
 export interface TraceIQClient {
   initialize(options: TraceIQInitOptions): void;
   identify(identity: TraceIQIdentity): void;
@@ -105,6 +107,16 @@ export interface TraceIQClient {
   page(name?: string, properties?: Record<string, unknown>): void;
   group(group: TraceIQGroup): void;
   captureException(error: unknown, properties?: Record<string, unknown>): void;
+  /**
+   * Sends a structured log line to TraceIQ Logs, tagged with this session and user.
+   * Logs are buffered and sent in small batches. Pass `service` in attributes to
+   * override the service name, and `error` (an Error) to attach its stack.
+   *
+   *   traceiq.log('error', 'Level 3 assets failed to load', { level: 3 });
+   */
+  log(level: TraceIQLogLevel, message: string, attributes?: Record<string, unknown>): void;
+  /** Sends any buffered logs now (also happens automatically when the page is hidden). */
+  flushLogs(): Promise<void>;
   /**
    * Fetches this user's flag evaluations from the server and caches them.
    * `properties` (the user's plan, country, plan tier, etc.) is merged over the

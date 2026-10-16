@@ -21,7 +21,14 @@ export interface TraceIQNodeOptions {
   onError?: (error: Error) => void;
   /** Inject a fetch implementation (tests, or Node < 18 with a polyfill). */
   fetchImpl?: typeof fetch;
+  /** Service name stamped on log() entries. Default "server". */
+  serviceName?: string;
+  /** Environment stamped on log() entries. Defaults to NODE_ENV, then "production". */
+  environment?: string;
 }
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+const LOG_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
 
 export interface CaptureParams {
   /** Event name, e.g. "payout_succeeded". */
@@ -81,6 +88,7 @@ export class TraceIQ {
   private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl'>> &
     Pick<TraceIQNodeOptions, 'onError' | 'fetchImpl'>;
   private queue: QueuedEvent[] = [];
+  private logQueue: Array<Record<string, unknown>> = [];
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: TraceIQNodeOptions) {
@@ -97,7 +105,9 @@ export class TraceIQ {
       timeoutMs: options.timeoutMs ?? DEFAULTS.timeoutMs,
       debug: options.debug ?? false,
       onError: options.onError,
-      fetchImpl: options.fetchImpl
+      fetchImpl: options.fetchImpl,
+      serviceName: options.serviceName ?? 'server',
+      environment: options.environment ?? process.env.NODE_ENV ?? 'production'
     };
 
     if (this.options.flushIntervalMs > 0) {
@@ -166,9 +176,42 @@ export class TraceIQ {
 
   /** Send everything queued right now. Safe to await. */
   async flush(): Promise<void> {
-    if (this.queue.length === 0) return;
-    const batch = this.queue.splice(0, this.queue.length);
-    await this.send(batch);
+    const events = this.queue.splice(0, this.queue.length);
+    const logs = this.logQueue.splice(0, this.logQueue.length);
+    if (events.length > 0) await this.send('/v1/events/batch', { batch: events });
+    // The logs endpoint takes at most 100 entries per request.
+    for (let i = 0; i < logs.length; i += 100) {
+      await this.send('/v1/logs/batch', { logs: logs.slice(i, i + 100) });
+    }
+  }
+
+  /**
+   * Send a structured log line to TraceIQ Logs. Inside traceiq.middleware() it is
+   * tagged with the in-flight request's requestId/traceId, so it shows up on that
+   * request in the Requests explorer. Pass `service` to override the service name
+   * (defaults to `serviceName`), `userId` for the user, and `error` to attach a stack.
+   *
+   *   traceiq.log('error', 'Payout provider timed out', { provider: 'stripe', error });
+   */
+  log(level: LogLevel, message: string, attributes: Record<string, unknown> = {}): void {
+    if (typeof message !== 'string' || !message.trim()) return;
+    const { service, userId, error, ...metadata } = attributes;
+    const request = getRequestContext();
+    const err = error instanceof Error ? error : undefined;
+    this.logQueue.push({
+      level: LOG_LEVELS.includes(level) ? level : 'info',
+      message: message.slice(0, 4000),
+      timestamp: new Date().toISOString(),
+      service: typeof service === 'string' && service ? service : this.options.serviceName,
+      environment: this.options.environment,
+      distinctId: typeof userId === 'string' ? userId : undefined,
+      requestId: request?.requestId,
+      traceId: request?.traceId,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      errorDetails: err ? { name: err.name, message: err.message, stack: err.stack } : undefined
+    });
+    if (this.logQueue.length > 1000) this.logQueue.splice(0, this.logQueue.length - 1000);
+    if (this.logQueue.length >= this.options.flushAt) void this.flush();
   }
 
   /** Flush and stop the timer. Call before the process exits. */
@@ -187,15 +230,15 @@ export class TraceIQ {
     }
   }
 
-  private async send(batch: QueuedEvent[]): Promise<void> {
+  private async send(path: string, payload: Record<string, unknown>): Promise<void> {
     const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
     if (typeof fetchImpl !== 'function') {
       this.handleError(new Error('No fetch implementation available. Use Node >= 18 or pass options.fetchImpl.'));
       return;
     }
 
-    const url = `${this.options.endpoint}/v1/events/batch`;
-    const body = JSON.stringify({ projectId: this.options.projectId, batch });
+    const url = `${this.options.endpoint}${path}`;
+    const body = JSON.stringify({ projectId: this.options.projectId, ...payload });
 
     for (let attempt = 1; ; attempt += 1) {
       const controller = new AbortController();
