@@ -31,7 +31,6 @@ import {
   KeyRound,
   Sparkles,
   ArrowUpRight,
-  TrendingUp,
   Tag
 } from 'lucide-react';
 
@@ -128,6 +127,49 @@ function formatDateTime(value?: string): string {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }).format(date);
 }
 
+const statTones = {
+  blue: { icon: 'border-blue-200 text-blue-600 dark:border-blue-900/60 dark:text-blue-400', bar: 'bg-blue-600 dark:bg-blue-500' },
+  violet: { icon: 'border-violet-200 text-violet-600 dark:border-violet-900/60 dark:text-violet-400', bar: 'bg-violet-600 dark:bg-violet-500' },
+  emerald: { icon: 'border-emerald-200 text-emerald-600 dark:border-emerald-900/60 dark:text-emerald-400', bar: 'bg-emerald-600 dark:bg-emerald-500' },
+  amber: { icon: 'border-amber-200 text-amber-600 dark:border-amber-900/60 dark:text-amber-400', bar: 'bg-amber-600 dark:bg-amber-500' }
+};
+
+function StatCard({
+  label,
+  value,
+  total,
+  hint,
+  icon,
+  tone
+}: {
+  label: string;
+  value: number;
+  total: number;
+  hint: string;
+  icon: React.ReactNode;
+  tone: keyof typeof statTones;
+}) {
+  const share = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/80">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{label}</span>
+        <div className={`flex h-7 w-7 items-center justify-center rounded-md border ${statTones[tone].icon}`}>{icon}</div>
+      </div>
+      <div className="mt-3 flex items-baseline justify-between">
+        <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{value.toLocaleString()}</span>
+        <span className="text-xs font-semibold tabular-nums text-neutral-500 dark:text-slate-400" title="Share of all users">
+          {share}%
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-neutral-400 dark:text-slate-500">{hint}</p>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
+        <div className={`h-full ${statTones[tone].bar}`} style={{ width: `${share}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function UsersClientView({
   initialPersons,
   totalCount,
@@ -156,7 +198,6 @@ export function UsersClientView({
   const [detailTab, setDetailTab] = useState<'overview' | 'events' | 'sessions' | 'properties'>('overview');
   const [timelineEvents, setTimelineEvents] = useState<UserTimelineEvent[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
-  const [timeRange, setTimeRange] = useState('14');
   const [rowsPerPage, setRowsPerPage] = useState(limit);
   const [copiedId, setCopiedId] = useState(false);
 
@@ -274,99 +315,40 @@ export function UsersClientView({
         </div>
       </div>
 
-      {/* Top 4 KPI Scorecard Cards (Solid Palette) */}
+      {/* Top 4 KPI cards: real counts from the API; each bar is the share of all users. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Users */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Total users</span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-blue-200 text-blue-600 dark:border-blue-900/60 dark:text-blue-400">
-              <Users className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              {(stats?.totalUsers || totalCount || initialPersons.length).toLocaleString()}
-            </span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +12%
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-400 dark:text-slate-500">vs previous {timeRange} days</p>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-blue-600 dark:bg-blue-500" style={{ width: '70%' }} />
-          </div>
-        </div>
-
-        {/* Active Users (14d) */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Active users ({timeRange}d)</span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-violet-200 text-violet-600 dark:border-violet-900/60 dark:text-violet-400">
-              <Activity className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              {(stats?.activeUsers14d || Math.round(initialPersons.length * 0.75)).toLocaleString()}
-            </span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +8%
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-400 dark:text-slate-500">Recent session activity</p>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-violet-600 dark:bg-violet-500" style={{ width: '55%' }} />
-          </div>
-        </div>
-
-        {/* New Users */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">New users ({timeRange}d)</span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 text-emerald-600 dark:border-emerald-900/60 dark:text-emerald-400">
-              <UserPlus className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              {(stats?.newUsers14d || Math.round(initialPersons.length * 0.2)).toLocaleString()}
-            </span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +22%
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-400 dark:text-slate-500">First time identified</p>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-emerald-600 dark:bg-emerald-500" style={{ width: '40%' }} />
-          </div>
-        </div>
-
-        {/* Returning Users */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Returning users</span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 text-amber-600 dark:border-amber-900/60 dark:text-amber-400">
-              <RefreshCw className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              {(stats?.returningUsers || Math.round(initialPersons.length * 0.6)).toLocaleString()}
-            </span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +6%
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-neutral-400 dark:text-slate-500">Recurring engagements</p>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-amber-600 dark:bg-amber-500" style={{ width: '60%' }} />
-          </div>
-        </div>
+        <StatCard
+          label="Total users"
+          value={stats.totalUsers}
+          total={stats.totalUsers}
+          hint="Identified in this project"
+          icon={<Users className="h-4 w-4" />}
+          tone="blue"
+        />
+        <StatCard
+          label="Active users (14d)"
+          value={stats.activeUsers14d}
+          total={stats.totalUsers}
+          hint="Seen in the last 14 days"
+          icon={<Activity className="h-4 w-4" />}
+          tone="violet"
+        />
+        <StatCard
+          label="New users (14d)"
+          value={stats.newUsers14d}
+          total={stats.totalUsers}
+          hint="First seen in the last 14 days"
+          icon={<UserPlus className="h-4 w-4" />}
+          tone="emerald"
+        />
+        <StatCard
+          label="Returning users"
+          value={stats.returningUsers}
+          total={stats.totalUsers}
+          hint="First seen 14d+ ago, active in the last 14d"
+          icon={<RefreshCw className="h-4 w-4" />}
+          tone="amber"
+        />
       </div>
 
       {/* Main Split Layout: Users Table (Left 7/8 Cols) + User Profile Panel (Right 4/5 Cols) */}

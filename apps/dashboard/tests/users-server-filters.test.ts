@@ -24,3 +24,15 @@ describe('Users page filters run on the server', () => {
     expect(page).not.toMatch(/totalCount \* 0\./);
   });
 });
+
+describe('Users stat cards', () => {
+  const view = readFileSync(new URL('../src/app/dashboard/users/UsersClientView.tsx', import.meta.url), 'utf8');
+
+  it('shows real API values with no invented fallbacks, deltas or bar widths', () => {
+    expect(view).not.toMatch(/initialPersons\.length \* 0\./);
+    expect(view).not.toMatch(/\+(12|8|22|6)%/);
+    expect(view).not.toMatch(/width: '\d+%'/);
+    expect(view).toContain('value={stats.returningUsers}');
+    expect(view).toContain('Math.round((value / total) * 100)');
+  });
+});
