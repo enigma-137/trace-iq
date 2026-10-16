@@ -40,11 +40,13 @@ export default async function UsersPage({
   const projectId = data?.project?.id ?? requestedProjectId ?? null;
   const persons = data?.persons ?? [];
   const totalCount = data?.totalCount ?? persons.length;
+  // Only reached when the API returned no stats (error / no project): show zeros
+  // rather than numbers invented from the page size.
   const stats: UserStats = data?.stats ?? {
     totalUsers: totalCount,
-    activeUsers14d: Math.round(totalCount * 0.75),
-    newUsers14d: Math.round(totalCount * 0.2),
-    returningUsers: Math.round(totalCount * 0.6)
+    activeUsers14d: 0,
+    newUsers14d: 0,
+    returningUsers: 0
   };
 
   return (

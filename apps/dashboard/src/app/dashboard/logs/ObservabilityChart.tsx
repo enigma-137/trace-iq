@@ -19,9 +19,12 @@ export function ObservabilityChart({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const maxTotal = Math.max(...buckets.map((b) => b.total), 1);
-  const successRate = summary.total > 0
-    ? ((summary.success / summary.total) * 100).toFixed(1)
-    : '100.0';
+  // App logs are info/warn/error rather than HTTP success, so "healthy" means
+  // anything that is not a warning or an error.
+  const healthy = Math.max(0, summary.total - summary.error - summary.warning);
+  const healthyRate = summary.total > 0 ? ((healthy / summary.total) * 100).toFixed(1) : null;
+  // 0 means no entry carried a duration (most app logs don't); show a dash instead of "0 ms".
+  const formatLatency = (value: number) => (value > 0 ? `${value}` : null);
 
   const formatTime = (ts: string) => {
     try {
@@ -53,26 +56,26 @@ export function ObservabilityChart({
         </div>
 
         <div className="rounded-md border border-neutral-100 bg-neutral-50/50 p-2.5 dark:border-slate-800/80 dark:bg-slate-900/40">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500">Success Rate</div>
+          <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500" title="Entries that are not warnings or errors">Healthy</div>
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
-              {successRate}%
+              {healthyRate === null ? '—' : `${healthyRate}%`}
             </span>
             <span className="text-[11px] text-neutral-400 dark:text-slate-500">
-              ({summary.success.toLocaleString()})
+              ({healthy.toLocaleString()})
             </span>
           </div>
         </div>
 
         <div className="rounded-md border border-neutral-100 bg-neutral-50/50 p-2.5 dark:border-slate-800/80 dark:bg-slate-900/40">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500">Errors (5xx)</div>
+          <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500" title="Error and fatal logs, including HTTP 5xx">Errors</div>
           <div className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
             {summary.error.toLocaleString()}
           </div>
         </div>
 
         <div className="rounded-md border border-neutral-100 bg-neutral-50/50 p-2.5 dark:border-slate-800/80 dark:bg-slate-900/40">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500">Warnings (4xx)</div>
+          <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500" title="Warning logs, including HTTP 4xx">Warnings</div>
           <div className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">
             {summary.warning.toLocaleString()}
           </div>
@@ -81,14 +84,16 @@ export function ObservabilityChart({
         <div className="rounded-md border border-neutral-100 bg-neutral-50/50 p-2.5 dark:border-slate-800/80 dark:bg-slate-900/40">
           <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500">Avg Latency</div>
           <div className="mt-1 text-lg font-semibold text-neutral-900 dark:text-white">
-            {summary.avgDuration} <span className="text-xs font-normal text-neutral-500">ms</span>
+            {formatLatency(summary.avgDuration) ?? '—'}{' '}
+            {formatLatency(summary.avgDuration) ? <span className="text-xs font-normal text-neutral-500">ms</span> : null}
           </div>
         </div>
 
         <div className="rounded-md border border-neutral-100 bg-neutral-50/50 p-2.5 dark:border-slate-800/80 dark:bg-slate-900/40">
           <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-400 dark:text-slate-500">p95 Latency</div>
           <div className="mt-1 text-lg font-semibold text-neutral-900 dark:text-white">
-            {summary.p95Duration} <span className="text-xs font-normal text-neutral-500">ms</span>
+            {formatLatency(summary.p95Duration) ?? '—'}{' '}
+            {formatLatency(summary.p95Duration) ? <span className="text-xs font-normal text-neutral-500">ms</span> : null}
           </div>
         </div>
       </div>

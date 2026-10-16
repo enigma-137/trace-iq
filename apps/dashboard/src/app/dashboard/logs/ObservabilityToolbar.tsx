@@ -49,9 +49,9 @@ const LEVELS: { id: LogLevel | ''; label: string; color: string }[] = [
 
 const STATUSES: { id: LogStatus | ''; label: string; color: string }[] = [
   { id: '', label: 'All status', color: 'bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-slate-300' },
-  { id: 'success', label: 'Success (2xx)', color: ' text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60' },
-  { id: 'warning', label: 'Warning (4xx)', color: ' text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' },
-  { id: 'error', label: 'Error (5xx)', color: ' text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' }
+  { id: 'success', label: 'Success', color: ' text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60' },
+  { id: 'warning', label: 'Warning', color: ' text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' },
+  { id: 'error', label: 'Error', color: ' text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' }
 ];
 
 export function ObservabilityToolbar({

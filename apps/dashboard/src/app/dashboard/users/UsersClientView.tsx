@@ -149,21 +149,24 @@ export function UsersClientView({
   const [rowsPerPage, setRowsPerPage] = useState(limit);
   const [copiedId, setCopiedId] = useState(false);
 
-  // Filter persons based on active tab and search
+  // Search runs on the server across every user in the project (not just this
+  // page): typing updates ?search= after a short pause and restarts at page 1.
+  useEffect(() => {
+    const next = searchQuery.trim();
+    if (next === searchParam.trim()) return;
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (next) params.set('search', next);
+      else params.delete('search');
+      params.delete('offset');
+      router.replace(`/dashboard/users?${params.toString()}`, { scroll: false });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchParam, router]);
+
+  // Filter the loaded page by the active tab.
   const filteredPersons = useMemo(() => {
     return initialPersons.filter((p) => {
-      // Search filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const name = (p.displayName || '').toLowerCase();
-        const email = (p.email || p.emailMasked || '').toLowerCase();
-        const ext = (p.externalId || '').toLowerCase();
-        const anon = (p.anonymousId || '').toLowerCase();
-        if (!name.includes(q) && !email.includes(q) && !ext.includes(q) && !anon.includes(q)) {
-          return false;
-        }
-      }
-
       // Tab filter
       const status = getUserStatus(p.lastSeenAt);
       const isNew = p.firstSeenAt && (Date.now() - new Date(p.firstSeenAt).getTime()) <= 14 * 24 * 60 * 60 * 1000;
@@ -173,7 +176,7 @@ export function UsersClientView({
       if (activeTab === 'inactive') return status === 'Inactive';
       return true;
     });
-  }, [initialPersons, searchQuery, activeTab]);
+  }, [initialPersons, activeTab]);
 
   // Active selected person
   const activePerson = useMemo(() => {
@@ -420,7 +423,7 @@ export function UsersClientView({
                   <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
                   <input
                     type="text"
-                    placeholder="Search by user ID, email..."
+                    placeholder="Search all users by ID, name, email..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full rounded-md border border-neutral-300 bg-white py-1.5 pl-8 pr-3 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
@@ -573,7 +576,7 @@ export function UsersClientView({
                   {Math.floor(offset / limit) + 1}
                 </span>
                 <button
-                  disabled={filteredPersons.length < limit}
+                  disabled={offset + initialPersons.length >= totalCount || initialPersons.length < limit}
                   onClick={() => {
                     const params = new URLSearchParams(window.location.search);
                     params.set('offset', String(offset + limit));
@@ -606,7 +609,8 @@ export function UsersClientView({
                 </div>
 
                 <span>
-                  {filteredPersons.length > 0 ? `${offset + 1}-${offset + filteredPersons.length}` : '0'} of {totalCount || filteredPersons.length} users
+                  {initialPersons.length > 0 ? `${offset + 1}-${offset + initialPersons.length}` : '0'} of {totalCount.toLocaleString()}{' '}
+                  {searchParam ? 'matching ' : ''}users
                 </span>
               </div>
             </div>

@@ -45,9 +45,12 @@ describe('Logs & Observability UI', () => {
     );
 
     expect(source).toContain('Total Activity');
-    expect(source).toContain('Success Rate');
-    expect(source).toContain('Errors (5xx)');
-    expect(source).toContain('Warnings (4xx)');
+    expect(source).toContain('>Healthy<');
+    expect(source).toContain('>Errors<');
+    expect(source).toContain('>Warnings<');
+    // App logs are info/warn/error, so health is "not a warning or an error".
+    expect(source).toContain('summary.total - summary.error - summary.warning');
+    expect(source).not.toContain('(5xx)');
     expect(source).toContain('Avg Latency');
     expect(source).toContain('p95 Latency');
     expect(source).toContain('onSelectBucket');

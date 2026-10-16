@@ -272,6 +272,23 @@ export function sanitizeIngestedTraits(rawTraits: unknown): Record<string, unkno
   return sanitized;
 }
 
+// Shared by the page query and its match count. $1 = project id, $2 = escaped search
+// (ILIKE pattern body) or NULL for no search.
+const PERSON_SEARCH_WHERE = `u.project_id = $1
+          AND (
+            $2::text IS NULL
+            OR u.external_id ILIKE '%' || $2 || '%'
+            OR u.anonymous_id ILIKE '%' || $2 || '%'
+            OR u.id ILIKE '%' || $2 || '%'
+            OR u.traits->>'name' ILIKE '%' || $2 || '%'
+            OR u.traits->>'full_name' ILIKE '%' || $2 || '%'
+            OR u.traits->>'displayName' ILIKE '%' || $2 || '%'
+            OR u.traits->>'first_name' ILIKE '%' || $2 || '%'
+            OR u.traits->>'last_name' ILIKE '%' || $2 || '%'
+            OR u.traits->>'email' ILIKE '%' || $2 || '%'
+            OR u.traits->>'username' ILIKE '%' || $2 || '%'
+          )`;
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -294,6 +311,8 @@ export class UsersService {
     const limit = this.clamp(params.limit, 25, 1, 100);
     const offset = this.clamp(params.offset, 0, 0, 100000);
     const search = this.optionalString(params.search) ?? null;
+    // Matched with ILIKE, so a literal % or _ in the query must not act as a wildcard.
+    const searchPattern = search ? search.slice(0, 200).replace(/[\\%_]/g, (char) => `\\${char}`) : null;
 
     if (!project) {
       return { project: null, persons: [], limit, offset };
@@ -328,24 +347,11 @@ export class UsersService {
           (SELECT e.network_info->>'country' FROM events e WHERE e.user_id = u.id AND NULLIF(e.network_info->>'country','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastCountry",
           (SELECT e.network_info->>'city' FROM events e WHERE e.user_id = u.id AND NULLIF(e.network_info->>'city','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastCity"
         FROM users u
-        WHERE u.project_id = $1
-          AND (
-            $2::text IS NULL
-            OR u.external_id ILIKE '%' || $2 || '%'
-            OR u.anonymous_id ILIKE '%' || $2 || '%'
-            OR u.id ILIKE '%' || $2 || '%'
-            OR u.traits->>'name' ILIKE '%' || $2 || '%'
-            OR u.traits->>'full_name' ILIKE '%' || $2 || '%'
-            OR u.traits->>'displayName' ILIKE '%' || $2 || '%'
-            OR u.traits->>'first_name' ILIKE '%' || $2 || '%'
-            OR u.traits->>'last_name' ILIKE '%' || $2 || '%'
-            OR u.traits->>'email' ILIKE '%' || $2 || '%'
-            OR u.traits->>'username' ILIKE '%' || $2 || '%'
-          )
+        WHERE ${PERSON_SEARCH_WHERE}
         ORDER BY u.last_seen_at DESC
         LIMIT $3 OFFSET $4
       `,
-      [project.id, search, limit, offset]
+      [project.id, searchPattern, limit, offset]
     );
 
     const persons: PersonSummary[] = result.rows.map((row) => {
@@ -405,12 +411,22 @@ export class UsersService {
       returningUsers: 0
     };
 
+    // While searching, pagination counts the matches; the stat cards stay project-wide.
+    let totalCount = stats.totalUsers;
+    if (searchPattern) {
+      const matches = await this.database.query<{ count: number }>(
+        `SELECT count(*)::int AS count FROM users u WHERE ${PERSON_SEARCH_WHERE}`,
+        [project.id, searchPattern]
+      );
+      totalCount = Number(matches.rows[0]?.count ?? 0);
+    }
+
     return {
       project,
       persons,
       limit,
       offset,
-      totalCount: stats.totalUsers,
+      totalCount,
       stats
     };
   }
