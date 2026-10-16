@@ -82,6 +82,24 @@ describe('ObservabilityService', () => {
     expect(result.logs[0].metadata?.safeField).toBe('normal-value');
   });
 
+  it('accepts a single status or a comma-separated status list', async () => {
+    const db = mockDatabase(() => rows([]));
+    const projectsMock = { resolveActiveProject: vi.fn().mockResolvedValue(mockProject) };
+    const service = new ObservabilityService(db as never, projectsMock as never);
+
+    await service.getLogs(dummyUser, { projectId: 'proj_1', status: 'error' });
+    await service.getLogs(dummyUser, { projectId: 'proj_1', status: 'Error, warning,error' });
+    await service.getHistogram(dummyUser, { projectId: 'proj_1', status: 'error,warning' });
+
+    const [single, list] = db.queryCalls(/FROM observability_logs/);
+    expect(single.text).toContain('status = $4');
+    expect(single.values).toContain('error');
+    expect(list.text).toContain('status = ANY($4::text[])');
+    expect(list.values).toContainEqual(['error', 'warning']);
+    const histogram = db.queryCalls(/count\(\*\) FILTER/)[0];
+    expect(histogram.text).toContain('status = ANY($4::text[])');
+  });
+
   it('aggregates time-series histogram with summary metrics', async () => {
     const bucketRows = [
       {

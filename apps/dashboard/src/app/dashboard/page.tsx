@@ -23,6 +23,7 @@ import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
 import { TodayStoryCard } from './TodayStoryCard';
 import { NowActivityPanel } from './NowActivityPanel';
+import { RecentLogsPanel } from './RecentLogsPanel';
 import { alpha2ToName } from '@/lib/country-codes';
 import { OverviewGeographyGlobe } from './OverviewGeographyGlobe';
 import { PageBanner } from '@/components/PageBanner';
@@ -299,7 +300,10 @@ export default async function DashboardPage({
 
         {/* Row 1: Observability Tabbed Trends Chart & Allocation */}
         <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.65fr_1fr]">
-          <OverviewTabbedChart data={tabbedPoints} />
+          <div className="flex min-w-0 flex-col gap-4">
+            <OverviewTabbedChart data={tabbedPoints} />
+            <RecentLogsPanel projectId={canonicalProjectId} />
+          </div>
 
           <div className="flex flex-col gap-4">
             <NowActivityPanel projectId={canonicalProjectId} />

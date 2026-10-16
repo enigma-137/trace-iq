@@ -137,10 +137,7 @@ export class ObservabilityService {
       filters.push(`level = $${params.length}`);
     }
 
-    if (query.status) {
-      params.push(query.status.toLowerCase());
-      filters.push(`status = $${params.length}`);
-    }
+    this.applyStatusFilter(query.status, params, filters);
 
     if (query.method) {
       params.push(query.method.toUpperCase());
@@ -292,10 +289,7 @@ export class ObservabilityService {
       filters.push(`level = $${params.length}`);
     }
 
-    if (query.status) {
-      params.push(query.status.toLowerCase());
-      filters.push(`status = $${params.length}`);
-    }
+    this.applyStatusFilter(query.status, params, filters);
 
     if (query.search && query.search.trim()) {
       params.push(`%${query.search.trim().toLowerCase()}%`);
@@ -668,6 +662,20 @@ export class ObservabilityService {
       projectId: resolvedProjectId,
       source: entry.source ?? 'sdk'
     });
+  }
+
+  // `status` is a single value or a comma-separated list (e.g. "error,warning").
+  private applyStatusFilter(status: string | undefined, params: unknown[], filters: string[]) {
+    if (!status) return;
+    const values = [...new Set(status.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean))];
+    if (values.length === 0) return;
+    if (values.length === 1) {
+      params.push(values[0]);
+      filters.push(`status = $${params.length}`);
+      return;
+    }
+    params.push(values.slice(0, 5));
+    filters.push(`status = ANY($${params.length}::text[])`);
   }
 
   private parseTimeRange(query: LogsQuery) {

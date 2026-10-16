@@ -31,6 +31,10 @@ export default async function DashboardLogsPage({
   const level = firstParam(searchParams.level) ?? '';
   const status = firstParam(searchParams.status) ?? '';
   const search = firstParam(searchParams.search) ?? '';
+  // A custom window (e.g. ±1h around a request opened from Requests) when both ends are valid.
+  const from = firstParam(searchParams.from) ?? '';
+  const to = firstParam(searchParams.to) ?? '';
+  const hasWindow = !Number.isNaN(Date.parse(from)) && !Number.isNaN(Date.parse(to)) && !!from && !!to;
 
   const queryParams = new URLSearchParams();
   if (projectId) queryParams.set('projectId', projectId);
@@ -38,11 +42,22 @@ export default async function DashboardLogsPage({
   if (level) queryParams.set('level', level);
   if (status) queryParams.set('status', status);
   if (search) queryParams.set('search', search);
+  if (hasWindow) {
+    queryParams.set('from', from);
+    queryParams.set('to', to);
+  }
   queryParams.set('limit', '50');
 
-  const [logsResult, histogramResult] = await Promise.all([
+  // `?logId=` opens that entry's detail drawer (same endpoint the drawer uses).
+  const logId = firstParam(searchParams.logId);
+  const logDetailPath = logId
+    ? `/v1/dashboard/logs/${encodeURIComponent(logId)}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`
+    : null;
+
+  const [logsResult, histogramResult, logDetailResult] = await Promise.all([
     dashboardGet<LogsApiResponse>(`/v1/dashboard/logs?${queryParams.toString()}`, token),
-    dashboardGet<HistogramResponse>(`/v1/dashboard/logs/histogram?${queryParams.toString()}`, token)
+    dashboardGet<HistogramResponse>(`/v1/dashboard/logs/histogram?${queryParams.toString()}`, token),
+    logDetailPath ? dashboardGet<{ log: ObservabilityLog }>(logDetailPath, token) : Promise.resolve({ data: null })
   ]);
 
   const project = logsResult.data?.project ?? null;
@@ -76,9 +91,6 @@ export default async function DashboardLogsPage({
               Unified
             </span>
           </div>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-            Logs &amp; Observability
-          </h2>
           <p className="mt-1.5 max-w-3xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
             Real-time operational activity across API requests, webhooks, AI models, background jobs, alerts, and SDK telemetry with distributed trace correlation and automated credential redaction.
           </p>
@@ -101,6 +113,11 @@ export default async function DashboardLogsPage({
         initialHasMore={initialHasMore}
         projectId={projectId}
         project={project}
+        initialSelectedLog={logDetailResult.data?.log ?? null}
+        initialFilters={{
+          search,
+          ...(hasWindow ? { timeRange: 'custom' as const, from, to } : {})
+        }}
       />
     </DashboardShell>
   );

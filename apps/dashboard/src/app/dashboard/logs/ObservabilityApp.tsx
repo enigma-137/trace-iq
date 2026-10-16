@@ -21,6 +21,10 @@ interface ObservabilityAppProps {
   initialHasMore: boolean;
   projectId?: string | null;
   project?: { id: string; name: string } | null;
+  /** Filters from the URL (e.g. a deep link from Requests) applied on first load. */
+  initialFilters?: Partial<ObservabilityFilterState>;
+  /** Log opened via `?logId=` (e.g. from the Overview's Recent logs panel). */
+  initialSelectedLog?: ObservabilityLog | null;
 }
 
 export function ObservabilityApp({
@@ -28,7 +32,9 @@ export function ObservabilityApp({
   initialHistogram,
   initialHasMore,
   projectId,
-  project
+  project,
+  initialFilters,
+  initialSelectedLog
 }: ObservabilityAppProps) {
   const supabase = createSupabaseBrowserClient();
 
@@ -37,13 +43,14 @@ export function ObservabilityApp({
     source: 'all',
     level: '',
     status: '',
-    search: ''
+    search: '',
+    ...initialFilters
   });
 
   const [logs, setLogs] = useState<ObservabilityLog[]>(initialLogs);
   const [histogram, setHistogram] = useState<HistogramResponse>(initialHistogram);
   const [hasMore, setHasMore] = useState<boolean>(initialHasMore);
-  const [selectedLog, setSelectedLog] = useState<ObservabilityLog | null>(null);
+  const [selectedLog, setSelectedLog] = useState<ObservabilityLog | null>(initialSelectedLog ?? null);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [offset, setOffset] = useState<number>(0);
