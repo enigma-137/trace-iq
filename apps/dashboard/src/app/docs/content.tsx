@@ -27,6 +27,7 @@ export const docsSections = [
   { id: 'events', label: 'Reserved events', category: 'Features' },
   { id: 'features', label: 'Feature guide', category: 'Features' },
   { id: 'ingestion', label: 'Server-side ingestion', category: 'Reference' },
+  { id: 'cli', label: 'CLI', category: 'Reference' },
   { id: 'mcp', label: 'MCP server', category: 'Reference' }
 ];
 
@@ -351,6 +352,14 @@ curl http://127.0.0.1:4000/health`}</Code>
             Settings
           </a>
           .
+        </P>
+        <P>
+          Prefer a guided setup? <Mono>npx traceiq-cli</Mono> detects your framework, installs the SDK, writes the env
+          vars and confirms the first event arrives. See the{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=cli">
+            CLI
+          </Link>{' '}
+          guide.
         </P>
       </Section>
     );
@@ -944,6 +953,121 @@ payload = data.get("payloads", {}).get("nuwell-new-add-meal")`}</Code>
     );
   }
 
+  if (id === 'cli') {
+    return (
+      <Section id="cli" title="CLI">
+        <P>
+          <Mono>traceiq-cli</Mono> sets up TraceIQ in your app and lets you work with your projects from the terminal:
+          switch projects, write env files, and read logs, events and errors. Run it with <Mono>npx</Mono>, or install it
+          globally to get the shorter <Mono>traceiq</Mono> command.
+        </P>
+        <Code lang="bash">{`npx traceiq-cli            # setup wizard
+npx traceiq-cli help       # every command
+
+npm install -g traceiq-cli
+traceiq help logs          # flags for one command`}</Code>
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">Setup wizard</h3>
+        <P>
+          With no command, the CLI detects your framework (Next.js, Vite + React, Node), installs the SDK, writes your
+          project ID and write key to the env file, and waits until the first real event reaches TraceIQ.
+        </P>
+        <Bullets
+          items={[
+            ['traceiq', 'Install and verify. Flags: --project-id, --write-key, --api-url, --dry-run, --skip-verify.'],
+            ['traceiq audit', 'Check the instrumentation already in this project (alias: doctor).'],
+            ['traceiq verify', 'Wait for a live event using the credentials in your .env file.']
+          ]}
+        />
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">Log in</h3>
+        <P>
+          Every other command uses a personal access token. Create one in{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/settings">
+            Settings
+          </a>{' '}
+          under <Mono>Personal access tokens</Mono> with <Mono>projects:read</Mono>, <Mono>analytics:read</Mono> and{' '}
+          <Mono>errors:read</Mono>, then log in. The token is saved to <Mono>~/.traceiq/config.json</Mono>, readable only
+          by you.
+        </P>
+        <Code lang="bash">{`traceiq login                       # prompts for the token (input hidden)
+traceiq login --token tiq_pat_...   # non-interactive
+traceiq login --api-url ${apiBaseUrl}   # a self-hosted or local API
+traceiq whoami
+traceiq logout`}</Code>
+        <P>
+          In CI, set <Mono>TRACEIQ_TOKEN</Mono> instead of logging in. <Mono>logout</Mono> only forgets the token
+          locally; revoke it in Settings to disable it.
+        </P>
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">Projects and env files</h3>
+        <Code lang="bash">{`traceiq projects list
+traceiq projects use              # pick from a list
+traceiq projects use my-app       # by id, slug or name
+
+traceiq env pull                  # writes .env.local (or your existing .env file)
+traceiq env pull --print          # print instead of writing
+traceiq env pull --write-key trq_...`}</Code>
+        <P>
+          Logs, events, errors, status and <Mono>env pull</Mono> use the active project; pass{' '}
+          <Mono>--project &lt;id&gt;</Mono> to use another one for a single run. <Mono>env pull</Mono> writes{' '}
+          <Mono>TRACEIQ_PROJECT_ID</Mono>, <Mono>TRACEIQ_API_URL</Mono> and <Mono>TRACEIQ_WRITE_KEY</Mono> with the
+          prefix your framework needs (<Mono>NEXT_PUBLIC_</Mono>, <Mono>VITE_</Mono>, or none for Node) and keeps the
+          rest of the file. Write keys are stored hashed, so the CLI keeps the key already in your env file for that
+          project, or uses <Mono>--write-key</Mono>.
+        </P>
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">Logs, events and errors</h3>
+        <Code lang="bash">{`traceiq logs                              # last hour, oldest first
+traceiq logs --level error --since 24h
+traceiq logs -s checkout --follow         # stream new logs until Ctrl+C
+traceiq logs --trace 4bf92f35... --json   # one JSON object per line
+
+traceiq events --follow
+traceiq events --name signup_completed -n 50
+
+traceiq errors --days 30`}</Code>
+        <OptionsTable
+          rows={[
+            ['-l, --level', 'all', 'debug, info, warn or error.'],
+            ['-s, --search', '—', 'Matches message, route, service, trace or request ID, and user ID.'],
+            ['--source', 'all', 'api, sdk, ai, webhook, job, …'],
+            ['--status', 'all', 'success, warning or error (comma-separated for several).'],
+            ['--trace', '—', 'Only logs for one trace.'],
+            ['--since', '1h', 'A window such as 15m, 2h, 7d, or an ISO date.'],
+            ['-n, --limit', '50', 'How many to show first (max 200; events max 100).'],
+            ['-f, --follow', 'off', 'Keep polling for new entries. --interval sets the seconds between polls (default 2).'],
+            ['--json', 'off', 'Newline-delimited JSON, for piping into jq or a file.']
+          ]}
+        />
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">Status and the dashboard</h3>
+        <Code lang="bash">{`traceiq status             # API health, last event, last log, event counts
+traceiq open logs          # also: events, errors, users, web, api, flags, replays, alerts, settings
+traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
+        <P>
+          <Mono>status</Mono> exits with code 1 when the API can&apos;t be reached, so it also works as a CI check.
+        </P>
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">Configuration</h3>
+        <OptionsTable
+          rows={[
+            ['--api-url / TRACEIQ_API_URL', "'https://api.traceiq.run'", 'API to talk to. login --api-url saves it.'],
+            ['--token / TRACEIQ_TOKEN', 'saved by login', 'Personal access token (tiq_pat_...).'],
+            ['-p, --project', 'saved by projects use', 'Project for this run.'],
+            ['--dashboard-url / TRACEIQ_DASHBOARD_URL', 'from the API URL', 'Where open sends you. A localhost API maps to http://localhost:3000.'],
+            ['TRACEIQ_CONFIG_DIR', '~/.traceiq', 'Where the token and active project are stored.']
+          ]}
+        />
+        <P>
+          Flags win over environment variables, which win over the saved config. Creating, renaming or deleting
+          projects and showing or rotating write keys need a signed-in dashboard session, so they stay in Settings;
+          the CLI points you there if you try them.
+        </P>
+      </Section>
+    );
+  }
+
   if (id === 'mcp') {
     return (
       <Section id="mcp" title="MCP server">
@@ -1135,6 +1259,15 @@ await traceiq.shutdown(); // flushes events and logs`}</Code>
           <Mono>x-traceiq-write-key</Mono> header and a body of <Mono>{'{ projectId, logs: [{ level, message, … }] }'}</Mono>{' '}
           (up to 100 entries).
         </P>
+        <P>
+          To read logs from the terminal, use the{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=cli">
+            CLI
+          </Link>
+          :
+        </P>
+        <Code lang="bash">{`traceiq logs --level error --since 24h
+traceiq logs --search checkout --follow`}</Code>
       </Section>
     );
   }

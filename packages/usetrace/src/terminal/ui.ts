@@ -1,4 +1,5 @@
 import readline from 'node:readline';
+import { Writable } from 'node:stream';
 
 // Color & formatting helpers
 const hasColors = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -229,6 +230,35 @@ export async function textPrompt(message: string, defaultValue = ''): Promise<st
       const val = answer.trim() || defaultValue;
       resolve(val);
     });
+  });
+}
+
+/**
+ * Hidden Text Input Prompt (for tokens). Typed characters are not echoed.
+ */
+export async function secretPrompt(message: string): Promise<string> {
+  let muted = false;
+  const output = new Writable({
+    write(chunk, _encoding, callback) {
+      if (!muted) process.stdout.write(chunk);
+      callback();
+    }
+  });
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output,
+    terminal: Boolean(process.stdin.isTTY)
+  });
+
+  return new Promise<string>((resolve) => {
+    rl.question(`  ${colors.bold(message)}: `, (answer) => {
+      muted = false;
+      rl.close();
+      if (process.stdin.isTTY) process.stdout.write('\n');
+      resolve(answer.trim());
+    });
+    muted = true;
   });
 }
 

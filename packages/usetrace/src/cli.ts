@@ -25,11 +25,32 @@ import {
 import { TraceIQInstaller } from './installer/installer.js';
 import { TraceIQVerifier } from './verifier/verifier.js';
 import { CliOptions, TRACEIQ_PRODUCTS, TraceIQProduct } from './types.js';
+import { MANAGE_COMMANDS, runManageCommand } from './manage/commands.js';
+import { MAIN_HELP } from './manage/help.js';
+
+const WIZARD_COMMANDS = new Set(['setup', 'init', 'audit', 'doctor', 'verify']);
 
 export async function runCli(args: string[] = []): Promise<void> {
   const cwd = process.cwd();
   const options = parseCliArgs(args);
   const command = getSubcommand(args);
+
+  if (command && MANAGE_COMMANDS.has(command)) {
+    await runManageCommand(command, args.slice(1));
+    return;
+  }
+
+  if (!command && (args.includes('--help') || args.includes('-h'))) {
+    console.log(MAIN_HELP);
+    return;
+  }
+
+  if (command && !WIZARD_COMMANDS.has(command)) {
+    logError(`Unknown command "${command}".`);
+    console.log(MAIN_HELP);
+    process.exitCode = 1;
+    return;
+  }
 
   printBanner();
 

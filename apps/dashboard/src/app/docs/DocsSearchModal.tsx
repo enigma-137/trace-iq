@@ -46,6 +46,7 @@ const SECTION_DESCRIPTIONS: Record<string, string> = {
   events: 'Reserved event conventions ($page, $identify, $rageclick, etc.).',
   features: 'Complete feature breakdown and capability guide.',
   ingestion: 'Raw HTTP POST ingestion endpoint specification.',
+  cli: 'traceiq-cli: setup wizard, projects, env pull, and tailing logs and events from the terminal.',
   mcp: 'Model Context Protocol (MCP) server for Claude Desktop & Cursor.'
 };
 

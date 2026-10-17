@@ -124,6 +124,12 @@ See the [JavaScript SDK README](packages/sdk-js/README.md),
 [Flutter SDK README](packages/sdk-flutter/README.md), and the other
 package-specific READMEs for installation details.
 
+## CLI
+
+`npx traceiq-cli` runs the setup wizard. The same CLI also lists and switches
+projects, writes env files, and tails logs and events from the terminal. See the
+[CLI README](packages/usetrace/README.md).
+
 ## Repository layout
 
 ```text

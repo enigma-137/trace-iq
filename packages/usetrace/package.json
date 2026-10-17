@@ -5,7 +5,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Developer-first interactive setup wizard and instrumentation tool for TraceIQ.",
+  "description": "TraceIQ setup wizard and project CLI: install the SDK, switch projects, pull env vars, and tail logs and events.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
