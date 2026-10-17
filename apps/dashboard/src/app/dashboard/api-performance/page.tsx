@@ -5,7 +5,7 @@ import { withProjectId } from '../nav';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { buildApiFlowGraph } from '@/lib/apiFlowGraph';
 import { requestsHrefForEndpoint, type RequestSort } from '@/lib/requests';
-import { StatTile } from '@/components/charts/StatTile';
+import { DashCard, KpiStrip, RangeTabs } from '@/components/dashboard/DashCard';
 import { SvgNodeFlowGraph } from '@/components/charts/SvgNodeFlowGraph';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 
@@ -82,124 +82,107 @@ export default async function ApiPerformancePage({
       userEmail={user.email}
       projectId={canonicalProjectId}
     >
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-xl text-sm text-neutral-500 dark:text-slate-400">
-          Latency, errors, and traffic per endpoint — from <code className="font-mono text-xs">$api_request</code> events
-          sent by the SDK middleware or browser autocapture. Click an endpoint to inspect its individual{' '}
-          <Link
-            className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white"
-            href={withProjectId('/dashboard/requests', canonicalProjectId)}
-          >
-            requests
-          </Link>
-          .
-        </p>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border border-neutral-200 p-1 dark:border-slate-800">
-            {RANGES.map((range) => (
-              <Link
-                key={range.value}
-                href={withProjectId(`/dashboard/api-performance?days=${range.value}`, canonicalProjectId)}
-                className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
-                  days === range.value
-                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
-                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-slate-400 dark:hover:bg-neutral-900'
-                }`}
-              >
-                {range.label}
-              </Link>
-            ))}
-          </div>
-
-          <AddCurrentViewToDashboardButton
-            title="API Requests & Latency"
-            type="api_performance"
-            chartType="line"
-            query={{ event: '$api_request', days, interval: days === '1' ? 'hour' : 'day' }}
-            dateConfig={{ days }}
-            projectId={canonicalProjectId}
-          />
-        </div>
-      </div>
-
-      {error ? (
-        <section className="mb-4 rounded-md border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-          {error}
-        </section>
-      ) : null}
-
-      {!hasData ? (
-        <section className="rounded-md border border-neutral-200 bg-white p-6 text-sm text-neutral-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-          No API requests captured yet. Add <code className="font-mono">traceiq.middleware()</code> to your server, or
-          enable <code className="font-mono">autoCaptureRequests</code> in the browser SDK. See{' '}
-          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=api-performance">
-            the docs
-          </Link>
-          .
-        </section>
-      ) : (
-        <>
-          <p className="mb-4 text-sm text-neutral-600 dark:text-slate-300">
-            Over the last {data?.days}d, <strong>{summary?.totalRequests.toLocaleString()}</strong> requests ·{' '}
-            <strong>{summary?.errorRate}%</strong> errored · slowest is{' '}
-            <strong>
-              {slowest ? `${slowest.method} ${slowest.path}` : '—'}
-            </strong>{' '}
-            at <strong>{formatMs(slowest?.p95 ?? 0)}</strong> p95.
+      <div className="grid gap-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-xl text-sm text-neutral-500 dark:text-slate-400">
+            Latency, errors, and traffic per endpoint. Click an endpoint to open its{' '}
+            <Link
+              className="font-medium text-neutral-900 underline underline-offset-2 dark:text-white"
+              href={withProjectId('/dashboard/requests', canonicalProjectId)}
+            >
+              requests
+            </Link>
+            .
           </p>
-
-          <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile label="Requests" value={summary?.totalRequests ?? 0} hint={`last ${data?.days}d`} />
-            <StatTile
-              label="Error rate"
-              value={`${summary?.errorRate ?? 0}%`}
-              hint={`${(summary?.errorCount ?? 0).toLocaleString()} of ${(summary?.totalRequests ?? 0).toLocaleString()} 4xx/5xx`}
+          <div className="flex items-center gap-2">
+            <RangeTabs
+              ranges={RANGES}
+              active={days}
+              hrefFor={(value) => withProjectId(`/dashboard/api-performance?days=${value}`, canonicalProjectId)}
             />
-            <StatTile label="p95 latency" value={formatMs(summary?.p95 ?? 0)} hint="95% of requests are faster" />
-            <StatTile label="Avg latency" value={formatMs(summary?.avg ?? 0)} hint="mean response time" />
-          </section>
+            <AddCurrentViewToDashboardButton
+              title="API Requests & Latency"
+              type="api_performance"
+              chartType="line"
+              query={{ event: '$api_request', days, interval: days === '1' ? 'hour' : 'day' }}
+              dateConfig={{ days }}
+              projectId={canonicalProjectId}
+            />
+          </div>
+        </div>
 
-          {/* Pure SVG Endpoint & Service Pipeline Flow Architecture */}
-          <section className="mb-8">
+        {error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+            {error}
+          </div>
+        ) : null}
+
+        {!hasData ? (
+          <DashCard title="No API requests yet">
+            <p className="text-sm text-neutral-500 dark:text-slate-400">
+              Add <code className="font-mono text-xs">traceiq.middleware()</code> to your server, or enable{' '}
+              <code className="font-mono text-xs">autoCaptureRequests</code> in the browser SDK. Requests are recorded as{' '}
+              <code className="font-mono text-xs">$api_request</code> events.{' '}
+              <Link className="font-medium text-neutral-900 underline underline-offset-2 dark:text-white" href="/docs?page=api-performance">
+                Read the docs
+              </Link>
+            </p>
+          </DashCard>
+        ) : (
+          <>
+            <KpiStrip
+              items={[
+                { label: 'Requests', value: (summary?.totalRequests ?? 0).toLocaleString(), hint: `Last ${rangeLabel(days)}` },
+                {
+                  label: 'Error rate',
+                  value: `${summary?.errorRate ?? 0}%`,
+                  hint: `${(summary?.errorCount ?? 0).toLocaleString()} 4xx/5xx responses`
+                },
+                { label: 'p95 latency', value: formatMs(summary?.p95 ?? 0), hint: '95% of requests are faster' },
+                { label: 'Avg latency', value: formatMs(summary?.avg ?? 0), hint: slowest ? `Slowest: ${slowest.method} ${slowest.path}` : 'Mean response time' }
+              ]}
+            />
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <EndpointPanel
+                title="Slowest endpoints"
+                subtitle="By p95 response time"
+                rows={data?.highestLatency ?? []}
+                metric="p95"
+                link={{ days, projectId: canonicalProjectId, sort: 'duration' }}
+              />
+              <ErrorPanel
+                title="Most errors"
+                subtitle="4xx and 5xx responses"
+                rows={data?.highestError ?? []}
+                link={{ days, projectId: canonicalProjectId }}
+              />
+              <EndpointPanel
+                title="Busiest endpoints"
+                subtitle="By request volume"
+                rows={data?.mostRequests ?? []}
+                metric="avg"
+                link={{ days, projectId: canonicalProjectId }}
+              />
+              <EndpointPanel
+                title="Quietest endpoints"
+                subtitle="Fewest requests"
+                rows={data?.leastRequests ?? []}
+                metric="avg"
+                link={{ days, projectId: canonicalProjectId }}
+              />
+            </div>
+
             <SvgNodeFlowGraph
-              title="API Pipeline & Endpoint Flow Architecture"
-              subtitle={`Live topology flow across ${columns.length} architecture layers and ${connections.length} request pathways`}
+              compact
+              title="Request flow"
+              subtitle={`How requests move through ${columns.length} layers across ${connections.length} paths`}
               columns={columns}
               connections={connections}
             />
-          </section>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <EndpointPanel
-              title="Highest latency"
-              subtitle="by p95 response time · open to see the slowest requests"
-              rows={data?.highestLatency ?? []}
-              metric="p95"
-              link={{ days, projectId: canonicalProjectId, sort: 'duration' }}
-            />
-            <ErrorPanel
-              title="Highest error"
-              subtitle="4xx / 5xx responses · open to see the failing requests"
-              rows={data?.highestError ?? []}
-              link={{ days, projectId: canonicalProjectId }}
-            />
-            <EndpointPanel
-              title="Most requests"
-              subtitle="by volume"
-              rows={data?.mostRequests ?? []}
-              metric="avg"
-              link={{ days, projectId: canonicalProjectId }}
-            />
-            <EndpointPanel
-              title="Least requests"
-              subtitle="quietest endpoints"
-              rows={data?.leastRequests ?? []}
-              metric="avg"
-              link={{ days, projectId: canonicalProjectId }}
-            />
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </DashboardShell>
   );
 }
@@ -224,20 +207,20 @@ function EndpointPanel({
   link: RowLink;
 }) {
   return (
-    <Panel title={title} subtitle={subtitle} headers={['Method', 'Endpoint', metric === 'p95' ? 'p95' : 'Avg']}>
+    <Panel title={title} subtitle={subtitle} valueHeader={metric === 'p95' ? 'p95' : 'Avg'} empty={rows.length === 0}>
       {rows.map((row) => (
         <Link
           key={`${row.method}\n${row.path}`}
           href={requestsHrefForEndpoint({ method: row.method, path: row.path, ...link })}
-          className="grid grid-cols-[64px_1fr_auto] items-center gap-3 px-5 py-2.5 hover:bg-neutral-50 dark:hover:bg-slate-900"
+          className={rowClass}
           title={`Open ${row.method} ${row.path} in Requests`}
         >
           <MethodPill method={row.method} />
           <span className="flex min-w-0 items-center gap-2">
+            <code className="truncate font-mono text-xs text-neutral-800 dark:text-slate-200">{row.path}</code>
             <StatusDot status={row.status} />
-            <code className="truncate font-mono text-xs text-neutral-700 dark:text-slate-300">{row.path}</code>
           </span>
-          <span className="text-right text-sm tabular-nums text-neutral-600 dark:text-slate-400">
+          <span className="text-right text-xs tabular-nums text-neutral-600 dark:text-slate-400">
             {formatMs(metric === 'p95' ? row.p95 : row.avg)}
           </span>
         </Link>
@@ -248,7 +231,7 @@ function EndpointPanel({
 
 function ErrorPanel({ title, subtitle, rows, link }: { title: string; subtitle: string; rows: ErrorRow[]; link: RowLink }) {
   return (
-    <Panel title={title} subtitle={subtitle} headers={['Method', 'Endpoint', 'Count']}>
+    <Panel title={title} subtitle={subtitle} valueHeader="Count" empty={rows.length === 0}>
       {rows.map((row) => (
         <Link
           key={`${row.method}\n${row.path}\n${row.status}`}
@@ -258,58 +241,51 @@ function ErrorPanel({ title, subtitle, rows, link }: { title: string; subtitle: 
             status: row.status ? String(row.status) : undefined,
             ...link
           })}
-          className="grid grid-cols-[64px_1fr_auto] items-center gap-3 px-5 py-2.5 hover:bg-neutral-50 dark:hover:bg-slate-900"
+          className={rowClass}
           title={`Open failing ${row.method} ${row.path} requests`}
         >
           <MethodPill method={row.method} />
           <span className="flex min-w-0 items-center gap-2">
+            <code className="truncate font-mono text-xs text-neutral-800 dark:text-slate-200">{row.path}</code>
             <StatusDot status={row.status} />
-            <code className="truncate font-mono text-xs text-neutral-700 dark:text-slate-300">{row.path}</code>
           </span>
-          <span className="text-right text-sm tabular-nums text-neutral-600 dark:text-slate-400">
-            {row.count.toLocaleString()}
-          </span>
+          <span className="text-right text-xs tabular-nums text-neutral-600 dark:text-slate-400">{row.count.toLocaleString()}</span>
         </Link>
       ))}
     </Panel>
   );
 }
 
+const rowClass =
+  'grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2 transition hover:bg-neutral-50 dark:hover:bg-slate-900/60';
+
 function Panel({
   title,
   subtitle,
-  headers,
+  valueHeader,
+  empty,
   children
 }: {
   title: string;
   subtitle: string;
-  headers: string[];
+  valueHeader: string;
+  empty: boolean;
   children: React.ReactNode;
 }) {
-  const empty = !Array.isArray(children) || children.length === 0;
   return (
-    <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <div className="border-b border-neutral-200 px-5 py-3 dark:border-slate-800">
-        <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</h2>
-        <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{subtitle}</p>
-      </div>
-      <div className="grid grid-cols-[64px_1fr_auto] gap-3 border-b border-neutral-200 bg-neutral-50 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-neutral-900/60 dark:text-neutral-500">
-        <span>{headers[0]}</span>
-        <span>{headers[1]}</span>
-        <span className="text-right">{headers[2]}</span>
-      </div>
+    <DashCard title={title} description={subtitle} actions={<span className="text-xs text-neutral-400 dark:text-slate-500">{valueHeader}</span>} padded={false}>
       {empty ? (
-        <p className="px-5 py-4 text-sm text-neutral-500 dark:text-slate-500">Nothing here for this range.</p>
+        <p className="px-4 py-6 text-center text-sm text-neutral-500 dark:text-slate-500">Nothing in this range.</p>
       ) : (
-        <div className="divide-y divide-neutral-200 dark:divide-slate-800">{children}</div>
+        <div className="divide-y divide-neutral-100 dark:divide-slate-800">{children}</div>
       )}
-    </section>
+    </DashCard>
   );
 }
 
 function MethodPill({ method }: { method: string }) {
   return (
-    <span className="inline-flex justify-center rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+    <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-slate-400">
       {method}
     </span>
   );
@@ -325,11 +301,15 @@ function StatusDot({ status }: { status: number }) {
         ? 'bg-emerald-500'
         : 'bg-neutral-400 dark:bg-slate-600';
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 text-xs tabular-nums text-neutral-500 dark:text-slate-400">
+    <span className="inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-neutral-400 dark:text-slate-500">
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${color}`} aria-hidden />
       {status || '—'}
     </span>
   );
+}
+
+function rangeLabel(days: string): string {
+  return RANGES.find((range) => range.value === days)?.label ?? `${days}d`;
 }
 
 function formatMs(value: number): string {

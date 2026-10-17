@@ -7,13 +7,11 @@ import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { RankedList } from '@/components/charts/RankedList';
 import { ActiveHoursHeatmap } from '@/components/charts/ActiveHoursHeatmap';
-import { Sparkline } from '@/components/charts/Sparkline';
-import { MiniBars } from '@/components/charts/MiniBars';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
 import { TopLocationsCard } from '@/components/charts/TopLocationsCard';
 import { TrafficTimingCard } from '@/components/charts/TrafficTimingCard';
-import { getCountryFlag } from '@/lib/country-codes';
-import { WebAnalyticsControls } from './WebAnalyticsControls';
+import { DashCard, KpiStrip, RangeTabs, percentChange, secondaryButtonSm } from '@/components/dashboard/DashCard';
+import { WebFilterBar, WebGoals } from './WebAnalyticsControls';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,21 +66,8 @@ const RANGES = [
   { value: '30', label: '30d' }
 ];
 
-const cardClass =
-  'relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
-const tableClass =
-  'mb-5 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
-
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
 function formatCompact(val: number): string {
@@ -160,382 +145,215 @@ export default async function WebAnalyticsPage({
   const cur = data?.current;
   const prev = data?.previous;
   const trend = data?.visitorsTrend ?? [];
-  const trendValues = trend.map((p) => p.total);
   const sessionGraph = data?.journey ? buildSessionTransitionGraph(data.journey) : { columns: [], connections: [] };
+
+  const rangeText = RANGES.find((range) => range.value === days)?.label ?? `${days}d`;
+  const vitals = data?.webVitals.metrics ?? [];
+  const vitalPages = data?.webVitals.pages ?? [];
+  const campaigns = data?.campaigns ?? [];
+  const topPaths = data?.topPaths ?? [];
 
   return (
     <DashboardShell active="web" title="Web analytics" userEmail={user.email} projectId={canonicalProjectId}>
-      {/* Header Bar with Title, Subtitle, Range Buttons and Refresh */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 pb-4 dark:border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
-              {data?.project ? data.project.name : 'Active Project'}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400 sm:text-sm">
-            Requests, visitors, bandwidth, latency, routes, and response activity.
+      <div className="grid gap-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-neutral-500 dark:text-slate-400">
+            Visitors, pages, and traffic sources{data?.project ? <> for <span className="font-medium text-neutral-900 dark:text-white">{data.project.name}</span></> : null}.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Time Range Pills */}
-          <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white p-1 shadow-xs dark:border-slate-800 dark:bg-slate-950">
-            {RANGES.map((range) => (
-              <Link
-                key={range.value}
-                href={withProjectId(`/dashboard/web?days=${range.value}`, canonicalProjectId)}
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition sm:px-3 sm:py-1.5 sm:text-sm ${
-                  days === range.value
-                    ? 'bg-blue-600 text-white shadow-xs dark:bg-blue-600 dark:text-white'
-                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {range.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Refresh Link/Button */}
-          <Link
-            href={withProjectId(`/dashboard/web?days=${days}`, canonicalProjectId)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-xs transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:text-sm"
-          >
-            <HugeiconsIcon icon={RefreshIcon} size={14} className="text-blue-600 dark:text-blue-400" />
-            <span>Refresh</span>
-          </Link>
-        </div>
-      </div>
-
-      {error ? (
-        <section className="mb-4 rounded-md border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-100">
-          {error}
-        </section>
-      ) : null}
-
-      {/* Top 5 Headline KPI Cards */}
-      <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Web metrics headline">
-        {/* Card 1: Visitors */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Visitors
-          </p>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
-              {formatCompact(cur?.visitors ?? 0)}
-            </p>
-            <span className="rounded-full border border-blue-500/15 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
-              {cur?.pageviews?.toLocaleString()} views
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            Unique visitors in the last {days === '1' ? '24h' : `${days}d`}
-          </p>
-          <div className="mt-3">
-            <Sparkline points={trendValues.map((total) => ({ total }))} tone="blue" filled className="h-9 w-full" />
+          <div className="flex items-center gap-2">
+            <RangeTabs ranges={RANGES} active={days} hrefFor={(value) => withProjectId(`/dashboard/web?days=${value}`, canonicalProjectId)} />
+            <Link href={withProjectId(`/dashboard/web?days=${days}`, canonicalProjectId)} className={secondaryButtonSm} aria-label="Refresh">
+              <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.8} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Link>
           </div>
         </div>
 
-        {/* Card 2: Online now */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-              Online now
-            </p>
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            </span>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
-              {cur?.onlineNow ?? 0}
-            </p>
-            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-              Live
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            Unique sessions in the last 5 minutes
-          </p>
-          <div className="mt-3">
-            <MiniBars values={trendValues.slice(-10)} tone="green" />
-          </div>
-        </div>
+        {error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{error}</div>
+        ) : null}
 
-        {/* Card 3: Bandwidth */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Bandwidth
-          </p>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-white">
-              {formatBytes(cur?.bandwidthBytes ?? 0)}
-            </p>
-            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
-              Payloads
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            Estimated bytes sent and received
-          </p>
-          <div className="mt-3">
-            <MiniBars values={trendValues.slice(-10)} tone="blue" />
-          </div>
-        </div>
+        <WebFilterBar token={token ?? ''} projectId={canonicalProjectId} days={days} initialFilters={data?.filters ?? []} />
 
-        {/* Card 4: Top Country */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Top Country
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-2xl leading-none">
-              {data?.topCountry ? getCountryFlag(data.topCountry.name) : '🌐'}
-            </span>
-            <p className="truncate text-xl font-bold capitalize tracking-tight text-neutral-900 dark:text-white">
-              {data?.topCountry?.name ?? 'Global'}
-            </p>
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            {data?.topCountry ? `${data.topCountry.percentage.toFixed(1)}% of located traffic` : 'Location data analyzing'}
-          </p>
-          <div className="mt-3">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-              <div
-                className="h-full rounded-full bg-blue-600 dark:bg-blue-500"
-                style={{ width: `${Math.max(10, data?.topCountry?.percentage ?? 10)}%` }}
-              />
-            </div>
-          </div>
-        </div>
+        <KpiStrip
+          items={[
+            { label: 'Visitors', value: formatCompact(cur?.visitors ?? 0), delta: percentChange(cur?.visitors, prev?.visitors), hint: `vs. previous ${rangeText}` },
+            { label: 'Page views', value: formatCompact(cur?.pageviews ?? 0), delta: percentChange(cur?.pageviews, prev?.pageviews) },
+            { label: 'Sessions', value: formatCompact(cur?.sessions ?? 0), delta: percentChange(cur?.sessions, prev?.sessions) },
+            {
+              label: 'Bounce rate',
+              value: `${Math.round((cur?.bounceRate ?? 0) * 100)}%`,
+              delta: percentChange(cur?.bounceRate, prev?.bounceRate),
+              invertDelta: true,
+              hint: 'Single-page sessions'
+            },
+            { label: 'Avg. session', value: formatDuration(cur?.avgSessionDuration ?? 0), delta: percentChange(cur?.avgSessionDuration, prev?.avgSessionDuration) }
+          ]}
+        />
 
-        {/* Card 5: Peak Time */}
-        <div className="relative overflow-hidden rounded-md border border-neutral-200 bg-white p-4 shadow-sm dark:border-slate-800/90 dark:bg-slate-900">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-            Peak Time
-          </p>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <p className="font-mono text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              {data?.peakTime?.window ?? '11:00—12:00'}
-            </p>
-            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
-              UTC
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-            Busiest activity window ({data?.peakTime?.total ?? 0} events)
-          </p>
-          <div className="mt-3">
-            <Sparkline points={trendValues.map((total) => ({ total }))} tone="blue" filled className="h-9 w-full" />
-          </div>
-        </div>
-      </section>
-
-      {/* Top Locations & Traffic Timing side-by-side section */}
-      <section className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <TopLocationsCard countries={data?.countries ?? []} cities={data?.cities ?? []} />
-        <TrafficTimingCard timing={data?.trafficTiming ?? []} />
-      </section>
-
-      <WebAnalyticsControls
-        token={token ?? ''}
-        projectId={canonicalProjectId}
-        days={days}
-        initialFilters={data?.filters ?? []}
-        goals={data?.goals ?? []}
-      />
-
-      {/* Unique visitors trend card */}
-      <section className={`${cardClass} mb-5`}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_76%_16%,rgba(59,130,246,0.08),transparent_36%)] dark:bg-[radial-gradient(circle_at_76%_16%,rgba(59,130,246,0.16),transparent_36%)]" />
-        <div className="relative mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Unique visitors trend</h3>
-            <p className="text-xs text-neutral-500 dark:text-slate-400">Daily unique visitors over selected window</p>
-          </div>
-          <span className="rounded-full border border-blue-500/10 bg-blue-500/5 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
-            Last {days === '1' ? '24h' : `${days}d`}
-          </span>
-        </div>
-        <div className="relative">
+        <DashCard title="Unique visitors" description={`Per ${days === '1' || days === '2' || days === '3' ? 'hour' : 'day'}, last ${rangeText}`}>
           <TrendChart
             buckets={trend.map((p) => p.bucket)}
             series={[{ key: 'Visitors', points: trend.map((p) => ({ bucket: p.bucket, total: p.total, value: p.total })) }]}
             interval="day"
           />
+        </DashCard>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          <DashCard title="Top pages" description="By page views" padded={false} actions={<ColumnLabels labels={['Visitors', 'Views']} />}>
+            {topPaths.length === 0 ? (
+              <EmptyRow>No page views captured yet.</EmptyRow>
+            ) : (
+              <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
+                {topPaths.slice(0, 10).map((p) => (
+                  <li key={p.path} className="grid grid-cols-[minmax(0,1fr)_64px_64px] items-center gap-3 px-4 py-2">
+                    <span className="truncate font-mono text-xs text-neutral-800 dark:text-slate-200" title={p.path}>{p.path}</span>
+                    <span className="text-right text-xs tabular-nums text-neutral-500 dark:text-slate-400">{p.visitors.toLocaleString()}</span>
+                    <span className="text-right text-xs tabular-nums text-neutral-900 dark:text-white">{p.views.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DashCard>
+
+          <DashCard
+            title="Referrers"
+            description="Ranked by page views; no referrer counts as Direct"
+          >
+            <RankedList items={(data?.referrers ?? []).map((r) => ({ label: r.domain, total: r.views }))} emptyLabel="No referrers yet." />
+          </DashCard>
         </div>
-      </section>
 
-      {/* Top paths table */}
-      <section className={tableClass}>
-        <div className="border-b border-neutral-200 px-5 py-3 dark:border-slate-800">
-          <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Top paths</h3>
-          <p className="text-xs text-neutral-500 dark:text-slate-400">Most visited routes by pageviews and visitors</p>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <TopLocationsCard countries={data?.countries ?? []} cities={data?.cities ?? []} />
+          <DashCard title="Channels" description="Where visitors came from">
+            <RankedList items={(data?.sources ?? []).map((s) => ({ label: s.channel, total: s.visitors }))} emptyLabel="No sources yet." />
+          </DashCard>
         </div>
-        {(data?.topPaths ?? []).length === 0 ? (
-          <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No page views captured yet.</p>
-        ) : (
-          <div className="divide-y divide-neutral-200 dark:divide-slate-800">
-            <div className="hidden grid-cols-[1fr_100px_100px] gap-4 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-500 sm:grid">
-              <span>Path</span>
-              <span className="text-right">Visitors</span>
-              <span className="text-right">Views</span>
-            </div>
-            {(data?.topPaths ?? []).map((p) => (
-              <div key={p.path} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_100px_100px] sm:gap-4">
-                <span className="truncate font-mono text-sm text-neutral-900 dark:text-slate-100">{p.path}</span>
-                <span className="text-sm tabular-nums text-neutral-500 dark:text-slate-400 sm:text-right">{p.visitors.toLocaleString()}</span>
-                <span className="text-sm tabular-nums text-neutral-500 dark:text-slate-400 sm:text-right">{p.views.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
-      {/* Breakdown cards */}
-      <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <Card title="Sources by channel">
-          <RankedList items={(data?.sources ?? []).map((s) => ({ label: s.channel, total: s.visitors }))} emptyLabel="No sources yet." />
-        </Card>
-        <Card title="Top referrers">
-          <RankedList items={(data?.referrers ?? []).map((r) => ({ label: r.domain, total: r.views }))} emptyLabel="No referrers yet." />
-          {(data?.referrers ?? []).length > 0 ? (
-            <p className="mt-3 border-t border-neutral-200 pt-3 text-[11px] text-neutral-500 dark:border-slate-800 dark:text-slate-500">
-              Ranked by page views. Missing referrers are shown as Direct.
-            </p>
-          ) : null}
-        </Card>
-        <Card title="Devices">
-          <RankedList items={(data?.devices ?? []).map((d) => ({ label: d.name, total: d.total }))} emptyLabel="No device data yet." />
-        </Card>
-        <Card title="Browsers">
-          <RankedList items={(data?.browsers ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No browser data yet." />
-        </Card>
-        <Card title="Operating systems">
-          <RankedList items={(data?.operatingSystems ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No OS data yet." />
-        </Card>
-        <Card title="Frustrating pages">
-          <RankedList
-            items={(data?.frustratingPages ?? []).map((item) => ({ label: item.path, total: item.errors + item.rageClicks }))}
-            emptyLabel="No frustration signals yet."
-          />
-        </Card>
-      </section>
+        <div className="grid gap-5 md:grid-cols-3">
+          <DashCard title="Devices">
+            <RankedList items={(data?.devices ?? []).map((d) => ({ label: d.name, total: d.total }))} emptyLabel="No device data yet." />
+          </DashCard>
+          <DashCard title="Browsers">
+            <RankedList items={(data?.browsers ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No browser data yet." />
+          </DashCard>
+          <DashCard title="Operating systems">
+            <RankedList items={(data?.operatingSystems ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No OS data yet." />
+          </DashCard>
+        </div>
 
-      {/* Session Flow Transition Graph */}
-      {sessionGraph.connections.length > 0 ? (
-        <section className="mb-6">
+        <WebGoals token={token ?? ''} projectId={canonicalProjectId} goals={data?.goals ?? []} />
+
+        <DashCard title="Web Vitals" description="75th percentile from real visits" padded={false}>
+          {vitals.length === 0 ? (
+            <EmptyRow>No Web Vitals yet. They appear after visitors load a page with the updated browser SDK.</EmptyRow>
+          ) : (
+            <>
+              <dl className="grid grid-cols-2 border-b border-neutral-100 sm:grid-cols-3 lg:grid-cols-5 dark:border-slate-800">
+                {vitals.map((vital) => {
+                  const rating = vitalRating(vital.metric, vital.p75);
+                  return (
+                    <div key={vital.metric} className="border-neutral-100 px-4 py-3 dark:border-slate-800 [&:not(:first-child)]:border-l">
+                      <dt className="flex items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-slate-400">
+                        <span className={`h-1.5 w-1.5 rounded-full ${RATING_DOT[rating]}`} aria-hidden="true" />
+                        {vital.metric}
+                      </dt>
+                      <dd className="mt-1 text-lg font-semibold tabular-nums text-neutral-900 dark:text-white">{formatVital(vital.metric, vital.p75)}</dd>
+                      <dd className="text-xs text-neutral-500 dark:text-slate-500">
+                        {RATING_LABEL[rating]} · {vital.count.toLocaleString()} samples
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              {vitalPages.length > 0 ? (
+                <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
+                  {vitalPages.map((page) => (
+                    <li key={`${page.path}:${page.metric}`} className="grid grid-cols-[minmax(0,1fr)_56px_88px_64px] items-center gap-3 px-4 py-2 text-xs">
+                      <span className="truncate font-mono text-neutral-800 dark:text-slate-200">{page.path}</span>
+                      <span className="font-medium text-neutral-500 dark:text-slate-400">{page.metric}</span>
+                      <span className="text-right tabular-nums text-neutral-900 dark:text-white">{formatVital(page.metric, page.p75)}</span>
+                      <span className={`text-right tabular-nums ${page.poor > 0 ? 'text-red-600 dark:text-red-400' : 'text-neutral-400 dark:text-slate-500'}`}>{page.poor} poor</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          )}
+        </DashCard>
+
+        {sessionGraph.connections.length > 0 ? (
           <SvgNodeFlowGraph
-            title="Session navigation paths"
-            subtitle={`${(data?.journey.sessions ?? 0).toLocaleString()} sessions · consecutive page views · last ${days === '1' ? '24 hours' : `${days} days`}`}
+            compact
+            title="Navigation paths"
+            subtitle={`${(data?.journey.sessions ?? 0).toLocaleString()} sessions · consecutive page views · last ${rangeText}`}
             columns={sessionGraph.columns}
             connections={sessionGraph.connections}
             legends={[{ label: 'Observed transition', status: 'info', color: '#3b82f6', description: 'Consecutive page views recorded in the same session' }]}
           />
-        </section>
-      ) : null}
+        ) : null}
 
-      {/* Web Vitals Section */}
-      <section className="mb-5">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400">Web Vitals</p>
-            <p className="mt-1 text-sm text-neutral-500">75th percentile field measurements from real visits.</p>
-          </div>
-        </div>
-        {(data?.webVitals.metrics ?? []).length === 0 ? (
-          <div className={cardClass}>
-            <p className="text-sm text-neutral-500">
-              No Web Vitals captured yet. Measurements appear after visitors load a page with the updated browser SDK.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {data?.webVitals.metrics.map((vital) => {
-                const rating = vitalRating(vital.metric, vital.p75);
-                const tone =
-                  rating === 'good'
-                    ? 'text-emerald-600 dark:text-emerald-300'
-                    : rating === 'poor'
-                      ? 'text-red-600 dark:text-red-300'
-                      : 'text-amber-600 dark:text-amber-300';
-                return (
-                  <div key={vital.metric} className={cardClass}>
-                    <div className="flex items-center justify-between">
-                      <p className="font-mono text-xs font-semibold">{vital.metric}</p>
-                      <span className={`text-[10px] font-semibold uppercase ${tone}`}>{rating.replace('-', ' ')}</span>
-                    </div>
-                    <p className={`mt-3 text-2xl font-semibold tabular-nums ${tone}`}>{formatVital(vital.metric, vital.p75)}</p>
-                    <p className="mt-1 text-xs text-neutral-500">p75 · {vital.count.toLocaleString()} samples</p>
-                    <div className="mt-3 flex gap-2 text-[10px] tabular-nums">
-                      <span className="text-emerald-600">{vital.good} good</span>
-                      <span className="text-amber-600">{vital.needsImprovement} improve</span>
-                      <span className="text-red-600">{vital.poor} poor</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className={`${tableClass} mt-3`}>
-              <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">
-                Vitals by page
-              </p>
-              <div className="divide-y divide-neutral-200 dark:divide-slate-800">
-                {data?.webVitals.pages.map((page) => (
-                  <div key={`${page.path}:${page.metric}`} className="grid gap-1 px-5 py-2.5 sm:grid-cols-[1fr_90px_120px_100px]">
-                    <span className="truncate font-mono text-sm">{page.path}</span>
-                    <span className="text-sm font-semibold">{page.metric}</span>
-                    <span className="text-right text-sm tabular-nums">{formatVital(page.metric, page.p75)}</span>
-                    <span className="text-right text-sm text-red-600">{page.poor} poor</span>
-                  </div>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <DashCard title="UTM campaigns" padded={false} actions={<ColumnLabels labels={['Visitors', 'Views']} />}>
+            {campaigns.length === 0 ? (
+              <EmptyRow>No tagged campaigns yet.</EmptyRow>
+            ) : (
+              <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
+                {campaigns.map((campaign) => (
+                  <li key={`${campaign.campaign}:${campaign.source}:${campaign.medium}`} className="grid grid-cols-[minmax(0,1fr)_64px_64px] items-center gap-3 px-4 py-2">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm text-neutral-900 dark:text-white">{campaign.campaign}</span>
+                      <span className="block truncate text-xs text-neutral-500 dark:text-slate-400">{campaign.source} / {campaign.medium}</span>
+                    </span>
+                    <span className="text-right text-xs tabular-nums text-neutral-500 dark:text-slate-400">{campaign.visitors.toLocaleString()}</span>
+                    <span className="text-right text-xs tabular-nums text-neutral-900 dark:text-white">{campaign.views.toLocaleString()}</span>
+                  </li>
                 ))}
-              </div>
-            </div>
-          </>
-        )}
-      </section>
+              </ul>
+            )}
+          </DashCard>
+          <DashCard title="Frustrating pages" description="Errors plus rage clicks">
+            <RankedList
+              items={(data?.frustratingPages ?? []).map((item) => ({ label: item.path, total: item.errors + item.rageClicks }))}
+              emptyLabel="No frustration signals yet."
+              mono
+            />
+          </DashCard>
+        </div>
 
-      {/* UTM Campaigns Table */}
-      <section className={tableClass}>
-        <p className="border-b border-neutral-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:border-slate-800">
-          UTM campaigns
-        </p>
-        {(data?.campaigns ?? []).length === 0 ? (
-          <p className="p-5 text-sm text-neutral-500">No tagged campaigns captured yet.</p>
-        ) : (
-          <div className="divide-y divide-neutral-200 dark:divide-slate-800">
-            {data?.campaigns.map((campaign) => (
-              <div key={`${campaign.campaign}:${campaign.source}:${campaign.medium}`} className="grid gap-1 px-5 py-3 sm:grid-cols-[1fr_1fr_100px_100px]">
-                <span className="font-semibold">{campaign.campaign}</span>
-                <span className="text-sm text-neutral-500">{campaign.source} / {campaign.medium}</span>
-                <span className="text-right text-sm tabular-nums">{campaign.visitors} visitors</span>
-                <span className="text-right text-sm tabular-nums">{campaign.views} views</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Active hours heatmap */}
-      <section className={`${cardClass} mb-5`}>
-        <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-          Active hours (unique visitors, UTC)
-        </p>
-        <ActiveHoursHeatmap matrix={data?.activeHours ?? Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))} />
-      </section>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <TrafficTimingCard timing={data?.trafficTiming ?? []} />
+          <DashCard title="Active hours" description="Unique visitors by weekday and hour (UTC)">
+            <ActiveHoursHeatmap matrix={data?.activeHours ?? Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))} />
+          </DashCard>
+        </div>
+      </div>
     </DashboardShell>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+const RATING_DOT = { good: 'bg-emerald-500', 'needs-improvement': 'bg-amber-500', poor: 'bg-red-500' } as const;
+const RATING_LABEL = { good: 'Good', 'needs-improvement': 'Needs work', poor: 'Poor' } as const;
+
+function ColumnLabels({ labels }: { labels: string[] }) {
   return (
-    <div className={cardClass}>
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">{title}</p>
-      {children}
-    </div>
+    <span className="flex gap-3 text-xs text-neutral-400 dark:text-slate-500">
+      {labels.map((label) => <span key={label} className="w-16 text-right">{label}</span>)}
+    </span>
   );
+}
+
+function EmptyRow({ children }: { children: React.ReactNode }) {
+  return <p className="px-4 py-6 text-center text-sm text-neutral-500 dark:text-slate-500">{children}</p>;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.round(seconds % 60);
+  if (minutes < 60) return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 function withProjectId(href: string, projectId?: string | null): string {

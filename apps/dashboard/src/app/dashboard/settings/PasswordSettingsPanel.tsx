@@ -4,6 +4,8 @@ import { FormEvent, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import LockPasswordIcon from '@hugeicons/core-free-icons/LockPasswordIcon';
+import { Notice, SettingsCard, fieldLabelClass, inputClass, primaryButton, secondaryButton } from './SettingsUI';
 
 interface PasswordSettingsPanelProps {
   userEmail?: string | null;
@@ -25,18 +27,9 @@ export function PasswordSettingsPanel({ userEmail }: PasswordSettingsPanelProps)
     }
   }, []);
 
+  // Local mode has no accounts; the 2FA card already explains that auth is off.
   if (process.env.NEXT_PUBLIC_AUTH_MODE === 'local') {
-    return (
-      <section className="mt-8 border-t border-neutral-200 pt-8 dark:border-slate-800" aria-labelledby="password-settings-title">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Security</p>
-        <h2 id="password-settings-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          Password & Authentication
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-          Password management is disabled in single-user local mode.
-        </p>
-      </section>
-    );
+    return null;
   }
 
   async function handlePasswordUpdate(e: FormEvent<HTMLFormElement>) {
@@ -130,66 +123,47 @@ export function PasswordSettingsPanel({ userEmail }: PasswordSettingsPanelProps)
     }
   }
 
-  const inputClass =
-    'h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-950 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-neutral-500 dark:focus:border-white dark:focus:ring-white/10';
-
   return (
-    <section className="mt-8 grid gap-5 border-t border-neutral-200 pt-8 dark:border-slate-800" aria-labelledby="password-settings-title">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Security</p>
-        <h2 id="password-settings-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          Reset password
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-          Change your account password or send a recovery link to your registered email address.
-        </p>
-      </div>
-
-      <div className="rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Account credentials</h3>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              {userEmail ? (
-                <span>Signed in as <span className="font-medium text-neutral-800 dark:text-neutral-200">{userEmail}</span></span>
-              ) : (
-                'Manage password and authentication credentials.'
-              )}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+    <SettingsCard
+      icon={LockPasswordIcon}
+      title="Password"
+      description={
+        userEmail ? (
+          <>
+            Signed in as <span className="font-medium text-neutral-800 dark:text-slate-200">{userEmail}</span>. Change your password or email yourself a reset link.
+          </>
+        ) : (
+          'Change your password or email yourself a reset link.'
+        )
+      }
+      actions={
+        isOpen ? null : (
+          <>
             {userEmail ? (
-              <button
-                type="button"
-                onClick={handleSendResetEmail}
-                disabled={isSendingReset || isUpdating}
-                className="h-9 shrink-0 rounded-md border border-neutral-300 bg-white px-3 py-2 text-center text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
+              <button type="button" onClick={handleSendResetEmail} disabled={isSendingReset || isUpdating} className={secondaryButton}>
                 {isSendingReset ? 'Sending link…' : 'Send reset email'}
               </button>
             ) : null}
-
             <button
               type="button"
               onClick={() => {
-                setIsOpen(!isOpen);
+                setIsOpen(true);
                 setStatus(null);
               }}
-              className="h-9 shrink-0 rounded-md bg-neutral-900 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+              className={primaryButton}
             >
-              {isOpen ? 'Cancel' : 'Change password'}
+              Change password
             </button>
-          </div>
-        </div>
-
-        {isOpen ? (
-          <form className="mt-6 border-t border-neutral-200 pt-5 dark:border-slate-800" onSubmit={handlePasswordUpdate}>
-            <div className="grid max-w-md gap-4">
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="settings-new-password">
-                  New password
-                </label>
+          </>
+        )
+      }
+    >
+      {isOpen || status ? (
+        <div className="grid gap-4 p-5">
+          {isOpen ? (
+            <form className="grid max-w-md gap-4" onSubmit={handlePasswordUpdate}>
+              <label className={fieldLabelClass} htmlFor="settings-new-password">
+                New password
                 <input
                   className={inputClass}
                   id="settings-new-password"
@@ -202,13 +176,11 @@ export function PasswordSettingsPanel({ userEmail }: PasswordSettingsPanelProps)
                   required
                   autoFocus
                 />
-                <p className="text-xs text-neutral-400 dark:text-neutral-500">At least 6 characters.</p>
-              </div>
+                <span className="text-xs font-normal text-neutral-500 dark:text-slate-500">At least 6 characters.</span>
+              </label>
 
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="settings-confirm-password">
-                  Confirm new password
-                </label>
+              <label className={fieldLabelClass} htmlFor="settings-confirm-password">
+                Confirm new password
                 <input
                   className={inputClass}
                   id="settings-confirm-password"
@@ -220,40 +192,22 @@ export function PasswordSettingsPanel({ userEmail }: PasswordSettingsPanelProps)
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                 />
-              </div>
+              </label>
 
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="h-9 rounded-md bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                >
+              <div className="flex items-center gap-2 pt-1">
+                <button type="submit" disabled={isUpdating} className={primaryButton}>
                   {isUpdating ? 'Saving…' : 'Save new password'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="h-9 rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
+                <button type="button" onClick={() => setIsOpen(false)} className={secondaryButton}>
                   Cancel
                 </button>
               </div>
-            </div>
-          </form>
-        ) : null}
+            </form>
+          ) : null}
 
-        {status ? (
-          <p
-            className={`mt-4 rounded-md border px-3 py-2 text-sm ${
-              status.tone === 'error'
-                ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-                : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
-            }`}
-          >
-            {status.message}
-          </p>
-        ) : null}
-      </div>
-    </section>
+          {status ? <Notice tone={status.tone}>{status.message}</Notice> : null}
+        </div>
+      ) : null}
+    </SettingsCard>
   );
 }

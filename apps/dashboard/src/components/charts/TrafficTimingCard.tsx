@@ -42,45 +42,45 @@ export function TrafficTimingCard({ timing = [], className = '' }: TrafficTiming
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900 ${className}`}
+      className={`overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-slate-800 dark:bg-slate-900/40 dark:shadow-none ${className}`}
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3 dark:border-slate-800">
         <div>
-          <h3 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
-            Traffic timing
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+            Busiest hours
           </h3>
           <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
-            Hourly UTC activity distribution and peak visitation windows.
+            Top hourly windows (UTC)
           </p>
         </div>
         {peakItem && peakItem.total > 0 && (
-          <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-400">
+          <span className="text-xs text-neutral-500 dark:text-slate-400">
             Peak: {peakItem.window}
           </span>
         )}
       </div>
 
       {timing.length === 0 || totalEvents === 0 ? (
-        <div className="flex min-h-48 items-center justify-center text-xs text-neutral-400 dark:text-slate-600">
+        <div className="flex min-h-48 items-center justify-center px-4 text-sm text-neutral-500 dark:text-slate-500">
           No traffic timing data recorded yet for this period.
         </div>
       ) : (
-        <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-12">
+        <div className="grid grid-cols-1 items-center gap-6 p-4 lg:grid-cols-12">
           {/* Donut Chart Visual */}
           <div className="flex justify-center lg:col-span-5">
             <DonutChart
               items={donutItems}
-              size={150}
-              thickness={22}
+              size={128}
+              thickness={16}
               centerValue={formatCount(totalEvents)}
-              centerLabel="TRAFFIC"
+              centerLabel="events"
               className="flex-col sm:flex-col"
             />
           </div>
 
           {/* Ranked Peak Windows List (2 columns on wide screens) */}
           <div className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2 lg:col-span-7">
-            {timing.slice(0, 10).map((item) => {
+            {timing.slice(0, 6).map((item) => {
               const padRank = item.rank.toString().padStart(2, '0');
               const maxVal = timing[0]?.total || 1;
               const relativeBar = Math.max(6, Math.min(100, (item.total / maxVal) * 100));

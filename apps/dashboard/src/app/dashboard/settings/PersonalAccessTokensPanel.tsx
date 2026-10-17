@@ -7,6 +7,23 @@ import { Checkbox } from '@traceiq/ui';
 import { DatePicker } from '@traceiq/ui';
 import { DashboardDialog } from '../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
+import { HugeiconsIcon } from '@hugeicons/react';
+import BookOpen01Icon from '@hugeicons/core-free-icons/BookOpen01Icon';
+import Key01Icon from '@hugeicons/core-free-icons/Key01Icon';
+import PlusSignIcon from '@hugeicons/core-free-icons/PlusSignIcon';
+import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
+import {
+  CopyButton,
+  Notice,
+  SettingsCard,
+  SettingsSection,
+  StatusPill,
+  dangerButton,
+  fieldLabelClass,
+  inputClass,
+  primaryButton,
+  secondaryButton
+} from './SettingsUI';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -202,189 +219,176 @@ export function PersonalAccessTokensPanel() {
   }
 
   return (
-    <section className="mt-8 grid gap-5 border-t border-neutral-200 pt-8 dark:border-slate-800" aria-labelledby="pat-title">
-      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">AI access</p>
-          <h2 id="pat-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-            Personal access tokens
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-            Create tokens for MCP clients such as Claude Desktop or Cursor. Full token values are shown once.
-          </p>
-        </div>
-        <Link
-          className="h-9 rounded-md border border-neutral-300 bg-white px-3 py-2 text-center text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          href="/docs?page=mcp"
-        >
+    <SettingsSection
+      id="api-access"
+      title="API access"
+      description="Personal access tokens for MCP clients such as Claude Desktop or Cursor, and for direct API calls."
+      actions={
+        <Link className={secondaryButton} href="/docs?page=mcp">
+          <HugeiconsIcon icon={BookOpen01Icon} size={15} strokeWidth={1.8} />
           MCP docs
         </Link>
-      </div>
+      }
+    >
+      {status ? <Notice tone={status.tone}>{status.message}</Notice> : null}
 
-      {status ? (
-        <p
-          className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
-              ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-              : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-            }`}
-        >
-          {status.message}
-        </p>
-      ) : null}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        <SettingsCard icon={PlusSignIcon} title="Create token" description="Grant only what the client needs. Tokens are rejected outside their scopes.">
+          <form className="grid gap-5 p-5" onSubmit={handleCreate}>
+            <label className={fieldLabelClass} htmlFor="patName">
+              Token name
+              <input id="patName" className={inputClass} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
+            </label>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,420px)_1fr]">
-        <form className="grid h-fit gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950" onSubmit={handleCreate}>
-          <div>
-            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Create token</h3>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">
-              Grant only what the client needs. A token is rejected by every endpoint outside its scopes.
-            </p>
-          </div>
+            <fieldset className="grid gap-2.5">
+              <legend className="mb-2.5 text-sm font-medium text-neutral-700 dark:text-slate-300">Scopes</legend>
 
-          <label className={fieldClass} htmlFor="patName">
-            Token name
-            <input id="patName" className={inputClass} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
-          </label>
-
-          <fieldset className="grid gap-2">
-            <legend className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">Scopes</legend>
-
-            <div className="flex flex-wrap gap-1.5">
-              {presets.map((preset) => {
-                const isActive = sameScopeSet(scopes, preset.scopes);
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setScopes(preset.scopes)}
-                    aria-pressed={isActive}
-                    className={`h-7 rounded-full border px-3 text-xs font-semibold transition ${isActive
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                        : 'border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+              <div className="flex flex-wrap gap-1.5">
+                {presets.map((preset) => {
+                  const isActive = sameScopeSet(scopes, preset.scopes);
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setScopes(preset.scopes)}
+                      aria-pressed={isActive}
+                      className={`h-7 rounded-full border px-3 text-xs font-medium transition ${
+                        isActive
+                          ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                          : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white'
                       }`}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs font-normal normal-case leading-5 text-neutral-500 dark:text-slate-400">
-              {presets.find((preset) => sameScopeSet(scopes, preset.scopes))?.hint ?? 'Custom selection.'}
-            </p>
-
-            <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
-              <div className="grid grid-cols-[1fr_3rem_3rem] items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
-                <span>Resource</span>
-                <span className="text-center">Read</span>
-                <span className="text-center">Write</span>
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
               </div>
-              {SCOPE_GROUPS.map((group) => (
-                <div
-                  key={group.key}
-                  className="grid grid-cols-[1fr_3rem_3rem] items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-b-0 dark:border-slate-800/60"
-                >
-                  <span className="text-sm font-normal normal-case text-neutral-700 dark:text-slate-300">
-                    {group.label}
-                    {!group.mcp ? (
-                      <span
-                        className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-slate-600"
-                        title="Enforced by the API, but no MCP tool uses this scope yet."
-                      >
-                        API only
-                      </span>
-                    ) : null}
-                  </span>
-                  {(['read', 'write'] as const).map((access) => {
-                    const scope = group[access];
-                    return (
-                      <div key={access} className="flex justify-center">
-                        {scope ? (
-                          <Checkbox
-                            checked={scopes.includes(scope)}
-                            onCheckedChange={() => toggleScope(scope)}
-                            aria-label={`${group.label} ${access}`}
-                          />
-                        ) : (
-                          <span className="text-neutral-300 dark:text-slate-700" aria-hidden="true">
-                            &mdash;
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+              <p className="text-xs leading-5 text-neutral-500 dark:text-slate-400">
+                {presets.find((preset) => sameScopeSet(scopes, preset.scopes))?.hint ?? 'Custom selection.'}
+              </p>
+
+              <div className="overflow-hidden rounded-lg border border-neutral-200 dark:border-slate-800">
+                <div className="grid grid-cols-[1fr_3rem_3rem] items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                  <span>Resource</span>
+                  <span className="text-center">Read</span>
+                  <span className="text-center">Write</span>
                 </div>
-              ))}
-            </div>
+                {SCOPE_GROUPS.map((group) => (
+                  <div
+                    key={group.key}
+                    className="grid grid-cols-[1fr_3rem_3rem] items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-b-0 dark:border-slate-800/60"
+                  >
+                    <span className="text-sm text-neutral-700 dark:text-slate-300">
+                      {group.label}
+                      {!group.mcp ? (
+                        <span
+                          className="ml-1.5 text-[10px] font-medium uppercase tracking-wide text-neutral-400 dark:text-slate-500"
+                          title="Enforced by the API, but no MCP tool uses this scope yet."
+                        >
+                          API only
+                        </span>
+                      ) : null}
+                    </span>
+                    {(['read', 'write'] as const).map((access) => {
+                      const scope = group[access];
+                      return (
+                        <div key={access} className="flex justify-center">
+                          {scope ? (
+                            <Checkbox
+                              checked={scopes.includes(scope)}
+                              onCheckedChange={() => toggleScope(scope)}
+                              aria-label={`${group.label} ${access}`}
+                            />
+                          ) : (
+                            <span className="text-neutral-300 dark:text-slate-700" aria-hidden="true">
+                              &mdash;
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
 
-            <p className="text-xs font-normal normal-case text-neutral-500 dark:text-slate-400">
-              {scopes.length} of {ALL_SCOPES.length} scopes selected
-            </p>
-          </fieldset>
+              <p className="text-xs text-neutral-500 dark:text-slate-400">
+                {scopes.length} of {ALL_SCOPES.length} scopes selected
+              </p>
+            </fieldset>
 
-          <label className={fieldClass} htmlFor="patExpires">
-            Expiry date (optional)
-            <DatePicker
-              value={expiresAt || undefined}
-              onChange={(value) => setExpiresAt(value)}
-              placeholder="No expiry"
-              id="patExpires"
-            />
-          </label>
+            <label className={fieldLabelClass} htmlFor="patExpires">
+              <span>
+                Expiry date <span className="font-normal text-neutral-400 dark:text-slate-500">(optional)</span>
+              </span>
+              <DatePicker value={expiresAt || undefined} onChange={(value) => setExpiresAt(value)} placeholder="No expiry" id="patExpires" />
+            </label>
 
-          <button
-            className="h-10 rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Creating...' : 'Create token'}
-          </button>
-        </form>
+            <button className={`${primaryButton} w-full`} type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating…' : 'Create token'}
+            </button>
+          </form>
+        </SettingsCard>
 
-        <section className="rounded-md border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-3 dark:border-slate-800">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">Tokens</p>
-            <button className={secondaryButtonClass} type="button" onClick={() => void loadTokens()} disabled={isLoading}>
+        <SettingsCard
+          icon={Key01Icon}
+          title="Your tokens"
+          description={isLoading ? 'Loading…' : `${tokens.filter((token) => !token.revokedAt && !isExpired(token.expiresAt)).length} active of ${tokens.length}`}
+          actions={
+            <button className={secondaryButton} type="button" onClick={() => void loadTokens()} disabled={isLoading}>
+              <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.8} />
               Refresh
             </button>
-          </div>
-
+          }
+        >
           {createdToken ? <CreatedTokenCard token={createdToken} /> : null}
 
           {isLoading ? (
             <div className="grid gap-3 p-5">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
             </div>
           ) : tokens.length === 0 ? (
-            <p className="p-5 text-sm text-neutral-500 dark:text-slate-500">No personal access tokens yet.</p>
+            <div className="grid place-items-center gap-2 px-5 py-12 text-center">
+              <HugeiconsIcon icon={Key01Icon} size={22} strokeWidth={1.6} className="text-neutral-400 dark:text-slate-500" />
+              <p className="text-sm font-medium text-neutral-900 dark:text-white">No tokens yet</p>
+              <p className="max-w-xs text-sm text-neutral-500 dark:text-slate-400">Create one to connect an MCP client to this workspace.</p>
+            </div>
           ) : (
-            <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
+            <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
               {tokens.map((token) => (
-                <li key={token.id} className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
+                <li key={token.id} className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-neutral-900 dark:text-white">{token.name}</p>
-                      <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-600 dark:bg-slate-900 dark:text-slate-400">{token.tokenPrefix}...</code>
-                      {token.revokedAt ? <Badge tone="muted">Revoked</Badge> : isExpired(token.expiresAt) ? <Badge tone="error">Expired</Badge> : <Badge tone="active">Active</Badge>}
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white">{token.name}</p>
+                      <code className="rounded-md border border-neutral-200 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:border-slate-700 dark:text-slate-400">
+                        {token.tokenPrefix}…
+                      </code>
+                      {token.revokedAt ? (
+                        <StatusPill tone="neutral">Revoked</StatusPill>
+                      ) : isExpired(token.expiresAt) ? (
+                        <StatusPill tone="danger">Expired</StatusPill>
+                      ) : (
+                        <StatusPill tone="success">Active</StatusPill>
+                      )}
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-slate-500">
-                      {token.scopes.join(', ')} · Created {formatDate(token.createdAt)} · Last used {formatDate(token.lastUsedAt)}
+                    <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-slate-400">
+                      Created {formatDate(token.createdAt)} · Last used {formatDate(token.lastUsedAt)}
                       {token.expiresAt ? ` · Expires ${formatDate(token.expiresAt)}` : ''}
                     </p>
+                    <p className="mt-0.5 truncate text-xs text-neutral-400 dark:text-slate-500" title={token.scopes.join(', ')}>
+                      {token.scopes.join(', ')}
+                    </p>
                   </div>
-                  <button
-                    className={dangerButtonClass}
-                    type="button"
-                    disabled={Boolean(token.revokedAt) || isRevoking}
-                    onClick={() => setTokenToRevoke(token)}
-                  >
-                    Revoke
-                  </button>
+                  {token.revokedAt ? null : (
+                    <button className={dangerButton} type="button" disabled={isRevoking} onClick={() => setTokenToRevoke(token)}>
+                      Revoke
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </SettingsCard>
       </div>
 
       <DashboardDialog
@@ -396,16 +400,16 @@ export function PersonalAccessTokensPanel() {
         }}
         footer={
           <>
-            <button className={secondaryButtonClass} type="button" disabled={isRevoking} onClick={() => setTokenToRevoke(null)}>
+            <button className={secondaryButton} type="button" disabled={isRevoking} onClick={() => setTokenToRevoke(null)}>
               Cancel
             </button>
-            <button className={dangerButtonClass} type="button" disabled={isRevoking} onClick={handleRevoke}>
-              {isRevoking ? 'Revoking...' : 'Revoke token'}
+            <button className={dangerButton} type="button" disabled={isRevoking} onClick={handleRevoke}>
+              {isRevoking ? 'Revoking…' : 'Revoke token'}
             </button>
           </>
         }
       />
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -428,56 +432,33 @@ function CreatedTokenCard({ token }: { token: CreateTokenResponse }) {
   );
 
   return (
-    <div className="grid gap-3 border-b border-neutral-200 bg-neutral-50 p-5 dark:border-slate-800 dark:bg-slate-900/40">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Copy this token now</h3>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">TraceIQ will not show the full value again.</p>
+    <div className="grid gap-4 border-b border-neutral-100 p-5 dark:border-slate-800">
+      <div className="grid gap-2">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Copy this token now</h4>
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-slate-400">TraceIQ will not show the full value again.</p>
+          </div>
+          <CopyButton value={token.token} label="Copy token" />
         </div>
-        <CopyButton value={token.token} label="Copy token" />
+        <pre className="overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-6 text-neutral-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+          <code>{token.token}</code>
+        </pre>
       </div>
-      <pre className="overflow-x-auto rounded-md border border-neutral-200 bg-white p-3 font-mono text-xs leading-6 text-neutral-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
-        <code>{token.token}</code>
-      </pre>
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Claude Desktop config</h3>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-slate-400">Paste this into your MCP client config.</p>
+      <div className="grid gap-2">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Claude Desktop config</h4>
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-slate-400">Paste this into your MCP client config.</p>
+          </div>
+          <CopyButton value={claudeConfig} label="Copy config" />
         </div>
-        <CopyButton value={claudeConfig} label="Copy config" />
+        <pre className="overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-6 text-neutral-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+          <code>{claudeConfig}</code>
+        </pre>
       </div>
-      <pre className="overflow-x-auto rounded-md border border-neutral-200 bg-white p-3 font-mono text-xs leading-6 text-neutral-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
-        <code>{claudeConfig}</code>
-      </pre>
     </div>
   );
-}
-
-function CopyButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  }
-
-  return (
-    <button className={secondaryButtonClass} type="button" onClick={handleCopy}>
-      {copied ? 'Copied' : label}
-    </button>
-  );
-}
-
-function Badge({ children, tone }: { children: string; tone: 'active' | 'error' | 'muted' }) {
-  const className =
-    tone === 'active'
-      ? 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
-      : tone === 'error'
-        ? 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-red-950/30 dark:text-red-300 dark:ring-red-900'
-        : 'border border-neutral-200 text-neutral-400 dark:border-slate-800 dark:text-slate-500';
-
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${className}`}>{children}</span>;
 }
 
 function isExpired(value: string | null) {
@@ -497,14 +478,3 @@ async function readError(response: Response) {
     return `Request failed with ${response.status}`;
   }
 }
-
-const fieldClass = 'grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400';
-
-const inputClass =
-  'min-h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';
-
-const secondaryButtonClass =
-  'inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
-
-const dangerButtonClass =
-  'inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-red-300 bg-red-50 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50';

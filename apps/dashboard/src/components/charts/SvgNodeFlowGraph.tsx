@@ -42,6 +42,8 @@ export interface SvgNodeFlowGraphProps {
   connections: ConnectionFlow[];
   legends?: LegendItem[];
   className?: string;
+  /** Smaller, quieter dashboard style: no pulsing, glow, or stat chips. */
+  compact?: boolean;
 }
 
 interface PathCoords {
@@ -102,7 +104,8 @@ export function SvgNodeFlowGraph({
     { label: 'INFO', status: 'info', color: '#3b82f6', description: 'Standard traffic flow' },
     { label: 'HEALTHY', status: 'healthy', color: '#10b981', description: 'Optimal pipeline execution' }
   ],
-  className = ''
+  className = '',
+  compact = false
 }: SvgNodeFlowGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -188,9 +191,23 @@ export function SvgNodeFlowGraph({
   const maxVolume = Math.max(...paths.map((path) => path.volume ?? 0), 1);
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm dark:border-white/[0.08] dark:bg-[#000000] dark:text-zinc-100 ${className}`}>
+    <div
+      className={
+        compact
+          ? `relative overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-100 dark:shadow-none ${className}`
+          : `relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm dark:border-white/[0.08] dark:bg-[#000000] dark:text-zinc-100 ${className}`
+      }
+    >
+      {/* Compact header */}
+      {compact && (title || subtitle) && (
+        <div className="border-b border-neutral-100 px-4 py-3 dark:border-slate-800">
+          {title && <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</h3>}
+          {subtitle && <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">{subtitle}</p>}
+        </div>
+      )}
+
       {/* Header */}
-      {(title || subtitle) && (
+      {!compact && (title || subtitle) && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-4 dark:border-white/[0.08]">
           <div>
             {title && (
@@ -221,7 +238,7 @@ export function SvgNodeFlowGraph({
       )}
 
       {/* Main Flow Container */}
-      <div ref={containerRef} className="relative min-h-[460px] w-full py-4">
+      <div ref={containerRef} className={compact ? 'relative w-full p-4' : 'relative min-h-[460px] w-full py-4'}>
         {/* SVG Bezier Flow Layer - Only shown on large horizontal desktop view to prevent crossing lines on mobile */}
         <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible z-10 hidden lg:block">
           <defs>
@@ -278,7 +295,7 @@ export function SvgNodeFlowGraph({
               : true;
             const isFilteredOut = activeFilterStatus && p.status !== activeFilterStatus;
 
-            let opacity = 0.55;
+            let opacity = compact ? 0.35 : 0.55;
             let strokeWidth = p.volume ? 1.5 + 4 * Math.sqrt(p.volume / maxVolume) : 2;
 
             if (hoveredNodeId) {
@@ -306,7 +323,7 @@ export function SvgNodeFlowGraph({
                 />
 
                 {/* Animated dash flow overlay */}
-                {isConnectedToHover && !isFilteredOut && (
+                {isConnectedToHover && !isFilteredOut && (!compact || hoveredNodeId) && (
                   <path
                     d={p.d}
                     fill="none"
@@ -315,7 +332,7 @@ export function SvgNodeFlowGraph({
                     strokeDasharray="6 10"
                     opacity={hoveredNodeId ? 0.95 : 0.75}
                     className="animate-dash-flow transition-all duration-300"
-                    filter={`url(#glow-${filterId})`}
+                    filter={compact ? undefined : `url(#glow-${filterId})`}
                   />
                 )}
               </g>
@@ -324,11 +341,11 @@ export function SvgNodeFlowGraph({
         </svg>
 
         {/* Card Columns Layout - Stretched Responsive Grid */}
-        <div className="svg-node-flow-columns relative z-20 grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 xl:gap-10">
+        <div className={`svg-node-flow-columns relative z-20 grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${compact ? 'gap-4 lg:gap-10' : 'gap-6 lg:gap-8 xl:gap-10'}`}>
           {columns.map((col, colIdx) => (
-            <div key={col.id} className="flex flex-col gap-3 min-w-0">
+            <div key={col.id} className={`flex min-w-0 flex-col ${compact ? 'gap-2' : 'gap-3'}`}>
               {/* Mobile Stage Connector Divider */}
-              {colIdx > 0 && (
+              {colIdx > 0 && !compact && (
                 <div className="flex lg:hidden items-center justify-center my-1">
                   <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-3 py-0.5 text-[11px] font-mono text-neutral-500 dark:border-white/10 dark:bg-zinc-900/90 dark:text-zinc-400 shadow-xs">
                     <span className="text-emerald-500">↓</span>
@@ -338,17 +355,23 @@ export function SvgNodeFlowGraph({
               )}
 
               {/* Column Header */}
-              <div className="mb-1 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
-                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-zinc-400">
+              <div className={compact ? 'mb-0.5' : 'mb-1 border-b border-neutral-200 pb-2 dark:border-white/[0.08]'}>
+                <span
+                  className={
+                    compact
+                      ? 'text-xs font-medium text-neutral-500 dark:text-slate-400'
+                      : 'font-mono text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-zinc-400'
+                  }
+                >
                   {col.title}
                 </span>
-                {col.subtitle && (
+                {col.subtitle && !compact && (
                   <p className="text-[11px] font-mono text-neutral-400 dark:text-zinc-500 truncate">{col.subtitle}</p>
                 )}
               </div>
 
               {/* Node Cards */}
-              <div className="flex flex-col gap-3">
+              <div className={`flex flex-col ${compact ? 'gap-2' : 'gap-3'}`}>
                 {col.nodes.map((node) => {
                   const nodeStatus = node.status || 'neutral';
                   const theme = STATUS_COLORS[nodeStatus];
@@ -365,8 +388,14 @@ export function SvgNodeFlowGraph({
                       }}
                       onMouseEnter={() => setHoveredNodeId(node.id)}
                       onMouseLeave={() => setHoveredNodeId(null)}
-                      className={`group relative flex flex-col justify-between rounded-lg border p-3.5 transition-all duration-200 cursor-pointer ${
-                        isHovered
+                      className={`group relative flex flex-col justify-between rounded-lg border transition-all duration-200 cursor-pointer ${compact ? 'px-3 py-2' : 'p-3.5'} ${
+                        compact
+                          ? isHovered
+                            ? 'z-30 border-neutral-400 bg-white dark:border-slate-500 dark:bg-slate-900'
+                            : isDimmed || isFiltered
+                              ? 'border-neutral-200 bg-white opacity-30 dark:border-slate-800 dark:bg-slate-950'
+                              : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
+                          : isHovered
                           ? 'border-emerald-500 bg-white shadow-lg shadow-emerald-500/10 scale-[1.02] z-30 dark:border-white/30 dark:bg-zinc-900 dark:shadow-2xl'
                           : isDimmed || isFiltered
                           ? 'border-neutral-200/40 bg-neutral-50/40 opacity-25 dark:border-white/[0.04] dark:bg-zinc-950/40'
@@ -374,29 +403,35 @@ export function SvgNodeFlowGraph({
                       }`}
                     >
                       {/* Top bar: Status dot & Count badge */}
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className={`flex items-center justify-between gap-2 ${compact ? '' : 'mb-1.5'}`}>
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`h-2 w-2 rounded-full ${theme.dot} ${isHovered ? 'animate-ping' : ''}`} />
+                          <span className={`shrink-0 rounded-full ${compact ? 'h-1.5 w-1.5' : 'h-2 w-2'} ${theme.dot} ${isHovered && !compact ? 'animate-ping' : ''}`} />
                           <span className="truncate font-mono text-xs font-semibold text-neutral-800 group-hover:text-neutral-900 dark:text-zinc-200 dark:group-hover:text-white">
                             {node.title}
                           </span>
                         </div>
                         {node.countBadge !== undefined && (
-                          <span className="shrink-0 rounded bg-neutral-200/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-neutral-700 border border-neutral-300/60 dark:bg-zinc-800/90 dark:text-zinc-300 dark:border-white/[0.08]">
+                          <span
+                            className={
+                              compact
+                                ? 'shrink-0 text-[11px] tabular-nums text-neutral-500 dark:text-slate-400'
+                                : 'shrink-0 rounded bg-neutral-200/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-neutral-700 border border-neutral-300/60 dark:bg-zinc-800/90 dark:text-zinc-300 dark:border-white/[0.08]'
+                            }
+                          >
                             {node.countBadge}
                           </span>
                         )}
                       </div>
 
                       {/* Description / Meta */}
-                      {node.description && (
+                      {node.description && !compact && (
                         <p className="text-[11px] text-neutral-500 dark:text-zinc-400 line-clamp-2 mb-1 font-sans">
                           {node.description}
                         </p>
                       )}
 
                       {/* Footer tags / status pill */}
-                      {(node.tags || node.meta) && (
+                      {(node.tags || node.meta) && !compact && (
                         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-neutral-400 dark:text-zinc-500">
                           {node.tags && (
                             <div className="flex flex-wrap gap-1">
@@ -420,7 +455,30 @@ export function SvgNodeFlowGraph({
       </div>
 
       {/* Legend & Filter Footer */}
-      {legends && legends.length > 0 && (
+      {compact && legends && legends.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-neutral-100 px-4 py-2.5 text-xs text-neutral-500 dark:border-slate-800 dark:text-slate-400">
+          {legends.map((item) => {
+            const theme = STATUS_COLORS[item.status] || STATUS_COLORS.neutral;
+            const isActive = activeFilterStatus === item.status;
+            return (
+              <button
+                key={item.status}
+                type="button"
+                onClick={() => setActiveFilterStatus(isActive ? null : item.status)}
+                aria-pressed={isActive}
+                className={`flex items-center gap-1.5 transition ${isActive ? 'font-medium text-neutral-900 dark:text-white' : 'hover:text-neutral-900 dark:hover:text-white'}`}
+                title={item.description}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} />
+                {item.label.charAt(0) + item.label.slice(1).toLowerCase()}
+              </button>
+            );
+          })}
+          <span className="ml-auto hidden text-neutral-400 sm:inline dark:text-slate-500">Hover a node to trace its paths</span>
+        </div>
+      )}
+
+      {!compact && legends && legends.length > 0 && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-4 text-xs font-mono text-neutral-600 dark:border-white/[0.08] dark:text-zinc-400">
           <div className="flex flex-wrap items-center gap-4">
             <span className="font-semibold uppercase tracking-wider text-[11px] text-neutral-500 dark:text-zinc-500">Legend:</span>

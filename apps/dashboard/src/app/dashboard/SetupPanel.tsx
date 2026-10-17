@@ -6,12 +6,36 @@ import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
 import PlusSignIcon from '@hugeicons/core-free-icons/PlusSignIcon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import Building03Icon from '@hugeicons/core-free-icons/Building03Icon';
+import CodeIcon from '@hugeicons/core-free-icons/CodeIcon';
+import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
+import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
+import Key01Icon from '@hugeicons/core-free-icons/Key01Icon';
+import MagicWand01Icon from '@hugeicons/core-free-icons/MagicWand01Icon';
+import PencilEdit02Icon from '@hugeicons/core-free-icons/PencilEdit02Icon';
+import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
+import SecurityLockIcon from '@hugeicons/core-free-icons/SecurityLockIcon';
+import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from './DashboardDialog';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { Skeleton } from '@/components/Skeleton';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import {
+  CopyButton,
+  Notice,
+  SettingsCard,
+  SettingsRow,
+  SettingsSection,
+  StatusPill,
+  dangerButton,
+  fieldLabelClass,
+  inputClass,
+  primaryButton,
+  secondaryButton
+} from './settings/SettingsUI';
 
 interface SetupResponse {
   hasSetup: boolean;
@@ -425,439 +449,239 @@ export function SetupPanel({
     deleteConfirmName.trim() === (setup?.project?.name ?? '') &&
     deleteConfirmPhrase.trim().toLowerCase() === 'delete my project';
 
+  const projectQuery = setup?.project?.id ? `?projectId=${encodeURIComponent(setup.project.id)}` : '';
+
   return (
-    <section className="grid gap-6" aria-labelledby="overview-title">
-      {status ? (
-        <p
-          className={`rounded-md border px-3.5 py-2.5 text-sm ${status.tone === 'success'
-            ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-            : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-            }`}
-        >
-          {status.message}
-        </p>
-      ) : null}
+    <div className={hasProject && !isLoading ? 'mt-8 grid gap-8 xl:grid-cols-[180px_minmax(0,1fr)] xl:gap-12' : 'mt-8'}>
+      {hasProject && !isLoading ? <SettingsNav /> : null}
 
-      {/* Fresh Write Key Banner (Shown upon regeneration or project creation) */}
-      {revealedWriteKey ? (
-        <div className="rounded-lg border border-amber-300 bg-amber-50/80 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
-                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                  New Write Key Generated — Copy Now
-                </h3>
-              </div>
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                For security, this token is revealed once. It will be masked when you leave or refresh this page.
-              </p>
-              <div className="mt-2.5 inline-flex max-w-full items-center gap-2 rounded border border-amber-200 bg-white/90 px-2.5 py-1.5 font-mono text-xs font-semibold text-neutral-900 shadow-sm dark:border-amber-900/40 dark:bg-slate-900 dark:text-amber-100">
-                <span className="truncate">{revealedWriteKey}</span>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <CopyButton value={revealedWriteKey} label="Copy key" />
-              <button
-                type="button"
-                className="h-8 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
-                onClick={() => setRevealedWriteKey(null)}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <div className="grid min-w-0 max-w-5xl gap-12">
+        {status || revealedWriteKey ? (
+          <div className="grid gap-3">
+            {status ? <Notice tone={status.tone}>{status.message}</Notice> : null}
 
-      {isLoading ? (
-        <SetupSkeleton />
-      ) : !hasProject ? (
-        organizationRole === 'member' ? (
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-            This organization has no projects yet. Ask an owner or admin to set up the first project.
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            <div className="pt-2">
-              <h2 id="overview-title" className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                Create your tracking workspace
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                Create an organization, a project, and the initial write key for event ingestion.
-              </p>
-            </div>
-            <form
-              className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-              onSubmit={handleBootstrapSubmit}
-            >
-              <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
-                Organization name
-                <input
-                  className={inputClass}
-                  value={bootstrapOrgName}
-                  onChange={(e) => setBootstrapOrgName(e.target.value)}
-                  required
-                />
-              </label>
-              <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-neutral-400">
-                Project name
-                <input
-                  className={inputClass}
-                  value={bootstrapProjectName}
-                  onChange={(e) => setBootstrapProjectName(e.target.value)}
-                  required
-                />
-              </label>
-              <div className="flex items-end">
-                <button
-                  className="h-10 w-full rounded-md bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200 sm:w-auto"
-                  type="submit"
-                  disabled={isBootstrapping}
-                >
-                  {isBootstrapping ? 'Creating…' : 'Create workspace'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )
-      ) : (
-        <>
-          {/* SECTION 1: ORGANIZATION SETTINGS (At the very top) */}
-          <div className="grid gap-3 pt-2" aria-labelledby="org-overview-title">
-            <div>
-              <p className="text-[11px] mt-4 font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Organization</p>
-              {/* <h2 id="org-overview-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                Organization Settings
-              </h2> */}
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                Overall account and team workspace managing all projects, members, and billing.
-              </p>
-            </div>
-
-            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Organization Name</span>
-                    {organizationRole ? (
-                      <span className="rounded px-1.5 py-0.5 text-[10px] font-medium capitalize text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                        {organizationRole}
-                      </span>
-                    ) : null}
-                    {setup?.organization?.slug ? (
-                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
-                        {setup.organization.slug}
-                      </span>
-                    ) : null}
-                  </div>
-                  {isEditingOrgName ? (
-                    <form className="mt-2 flex max-w-md items-center gap-2" onSubmit={handleSaveOrgName}>
-                      <input
-                        className="h-8 flex-1 rounded-md border border-neutral-300 bg-white px-2.5 text-xs text-neutral-900 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        value={orgNameDraft}
-                        onChange={(e) => setOrgNameDraft(e.target.value)}
-                        placeholder="Organization name"
-                        maxLength={80}
-                        required
-                        autoFocus
-                      />
-                      <button
-                        type="submit"
-                        disabled={isSavingOrgName || !orgNameDraft.trim()}
-                        className="h-8 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                      >
-                        {isSavingOrgName ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOrgNameDraft(setup?.organization?.name ?? '');
-                          setIsEditingOrgName(false);
-                        }}
-                        className="h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                      >
-                        Cancel
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="mt-1 text-sm font-semibold text-neutral-900 dark:text-white">
-                      {setup?.organization?.name ?? '—'}
-                    </p>
-                  )}
-                </div>
-                {!isEditingOrgName && isOwnerOrAdmin ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOrgNameDraft(setup?.organization?.name ?? '');
-                      setIsEditingOrgName(true);
-                    }}
-                    className="h-8 shrink-0 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    Rename
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 2: PROJECT CONFIGURATION & DETAILS */}
-          <div className="grid gap-3 border-t border-neutral-200 pt-6 dark:border-slate-800" aria-labelledby="project-overview-title">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-neutral-500">Project</p>
-                <h2 id="project-overview-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                  Project Configuration
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                  Workspace credentials, project identifiers, and client telemetry configuration.
-                </p>
-              </div>
-
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
-                {isOwnerOrAdmin ? (
-                  <button
-                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
-                    type="button"
-                    onClick={() => {
-                      setNewProjectOpen(true);
-                      setCreatedProject(null);
-                      setStatus(null);
-                    }}
-                  >
-                    <HugeiconsIcon icon={PlusSignIcon} size={15} />
-                    New project
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Project Details Card */}
-            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="divide-y divide-neutral-200 text-sm dark:divide-slate-800">
-                {/* Row 1: Project Name */}
-                <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Project Name</span>
-                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-mono text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
-                        {setup?.project?.slug ?? '—'}
-                      </span>
-                    </div>
-                    {isEditingProjectName ? (
-                      <form className="mt-2 flex max-w-md items-center gap-2" onSubmit={handleSaveProjectName}>
-                        <input
-                          className="h-8 flex-1 rounded-md border border-neutral-300 bg-white px-2.5 text-xs text-neutral-900 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                          value={projectNameDraft}
-                          onChange={(e) => setProjectNameDraft(e.target.value)}
-                          placeholder="Project name"
-                          maxLength={80}
-                          required
-                          autoFocus
-                        />
-                        <button
-                          type="submit"
-                          disabled={isSavingProjectName || !projectNameDraft.trim()}
-                          className="h-8 rounded-md bg-neutral-900 px-3 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                        >
-                          {isSavingProjectName ? 'Saving…' : 'Save'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProjectNameDraft(setup?.project?.name ?? '');
-                            setIsEditingProjectName(false);
-                          }}
-                          className="h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                        >
-                          Cancel
-                        </button>
-                      </form>
-                    ) : (
-                      <p className="mt-1 text-sm font-semibold text-neutral-900 dark:text-white">
-                        {setup?.project?.name ?? '—'}
+            {/* Fresh write key (shown once after regeneration or bootstrap) */}
+            {revealedWriteKey ? (
+              <div className="rounded-xl border border-amber-300 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-amber-900/70 dark:bg-slate-900/40">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <HugeiconsIcon icon={Key01Icon} size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Copy your new write key now</h3>
+                      <p className="mt-0.5 text-sm text-neutral-500 dark:text-slate-400">
+                        It is shown once and will be masked after you leave or refresh this page.
                       </p>
-                    )}
-                  </div>
-                  {!isEditingProjectName && isOwnerOrAdmin ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProjectNameDraft(setup?.project?.name ?? '');
-                        setIsEditingProjectName(true);
-                      }}
-                      className="h-8 shrink-0 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Rename
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Row 2: Project ID */}
-                <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                  <div className="min-w-0">
-                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Project ID</span>
-                    <p className="mt-1 font-mono text-xs font-semibold text-neutral-900 dark:text-slate-200">
-                      {setup?.project?.id ?? '—'}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
-                      Immutable identifier for API requests and SDK initialization.
-                    </p>
-                  </div>
-                  {setup?.project?.id ? (
-                    <CopyButton value={setup.project.id} label="Copy ID" compact />
-                  ) : null}
-                </div>
-
-                {/* Row 3: Write Key */}
-                <div className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Write Key</span>
-                      <span className="rounded bg-neutral-100 px-1.5 py-0.2 text-[10px] font-medium text-neutral-500 dark:bg-slate-800 dark:text-slate-400">
-                        Client Token
-                      </span>
+                      <code className="mt-2.5 block truncate rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 font-mono text-xs text-neutral-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+                        {revealedWriteKey}
+                      </code>
                     </div>
-                    <p className="mt-1 font-mono text-xs text-neutral-600 dark:text-slate-400">
-                      {setup?.writeKey?.value
-                        ? setup.writeKey.value
-                        : setup?.writeKey?.prefix
-                          ? `${setup.writeKey.prefix}••••••••••••••••`
-                          : 'trq_live_••••••••••••••••••••'}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-slate-500">
-                      Secret token used to authenticate event telemetry. Masked for security.
-                    </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {setup?.writeKey?.value ? (
-                      <CopyButton value={setup.writeKey.value} label="Copy key" compact />
-                    ) : null}
+                    <CopyButton value={revealedWriteKey} label="Copy key" />
+                    <button type="button" className={secondaryButton} onClick={() => setRevealedWriteKey(null)}>
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <SetupSkeleton />
+        ) : !hasProject ? (
+          organizationRole === 'member' ? (
+            <SettingsCard
+              icon={Folder01Icon}
+              title="No projects yet"
+              description="This organization has no projects yet. Ask an owner or admin to set up the first project."
+            />
+          ) : (
+            <SettingsSection
+              id="workspace"
+              title="Create your tracking workspace"
+              description="Create an organization, a project, and the initial write key for event ingestion."
+            >
+              <SettingsCard>
+                <form
+                  className="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+                  onSubmit={handleBootstrapSubmit}
+                >
+                  <label className={fieldLabelClass}>
+                    Organization name
+                    <input className={inputClass} value={bootstrapOrgName} onChange={(e) => setBootstrapOrgName(e.target.value)} required />
+                  </label>
+                  <label className={fieldLabelClass}>
+                    Project name
+                    <input className={inputClass} value={bootstrapProjectName} onChange={(e) => setBootstrapProjectName(e.target.value)} required />
+                  </label>
+                  <button className={primaryButton} type="submit" disabled={isBootstrapping}>
+                    {isBootstrapping ? 'Creating…' : 'Create workspace'}
+                  </button>
+                </form>
+              </SettingsCard>
+            </SettingsSection>
+          )
+        ) : (
+          <>
+            {/* GENERAL: organization + project */}
+            <SettingsSection
+              id="general"
+              title="General"
+              description="Your organization and the project you are currently viewing."
+            >
+              <SettingsCard
+                icon={Building03Icon}
+                title="Organization"
+                description="Owns every project, member, and the billing subscription."
+                actions={organizationRole ? <StatusPill tone="neutral">{capitalize(organizationRole)}</StatusPill> : null}
+              >
+                <SettingsRow
+                  label="Name"
+                  hint="Shown to everyone in your team."
+                  actions={
+                    !isEditingOrgName && isOwnerOrAdmin ? (
+                      <button
+                        type="button"
+                        className={secondaryButton}
+                        onClick={() => {
+                          setOrgNameDraft(setup?.organization?.name ?? '');
+                          setIsEditingOrgName(true);
+                        }}
+                      >
+                        <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.8} />
+                        Rename
+                      </button>
+                    ) : null
+                  }
+                >
+                  {isEditingOrgName ? (
+                    <InlineRenameForm
+                      value={orgNameDraft}
+                      onChange={setOrgNameDraft}
+                      onSubmit={handleSaveOrgName}
+                      onCancel={() => {
+                        setOrgNameDraft(setup?.organization?.name ?? '');
+                        setIsEditingOrgName(false);
+                      }}
+                      isSaving={isSavingOrgName}
+                      placeholder="Organization name"
+                    />
+                  ) : (
+                    <span className="font-medium text-neutral-900 dark:text-white">{setup?.organization?.name ?? '—'}</span>
+                  )}
+                </SettingsRow>
+                {setup?.organization?.slug ? (
+                  <SettingsRow label="Slug" hint="URL-safe identifier.">
+                    <code className="font-mono text-xs text-neutral-700 dark:text-slate-300">{setup.organization.slug}</code>
+                  </SettingsRow>
+                ) : null}
+              </SettingsCard>
+
+              <SettingsCard
+                icon={Folder01Icon}
+                title="Project"
+                description="Credentials and identifiers for sending events to this project."
+                actions={
+                  <>
+                    <ProjectSwitcher projectId={projectId} organizationId={organizationId} />
                     {isOwnerOrAdmin ? (
                       <button
+                        className={primaryButton}
                         type="button"
-                        onClick={() => setIsRegenerateDialogOpen(true)}
-                        className="h-8 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setNewProjectOpen(true);
+                          setCreatedProject(null);
+                          setStatus(null);
+                        }}
                       >
-                        Regenerate
+                        <HugeiconsIcon icon={PlusSignIcon} size={15} strokeWidth={1.8} />
+                        New project
                       </button>
                     ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 2.5: INTERACTIVE SETUP WIZARD CALLOUT */}
-          <div className="overflow-hidden rounded-xl border border-blue-500/20 bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/50 p-5 shadow-sm dark:border-blue-500/20 dark:from-blue-950/30 dark:via-slate-900 dark:to-indigo-950/20">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
-                  Guided Integration Wizard
-                </div>
-                <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
-                  Connect your project with useTrace
-                </h3>
-                <p className="max-w-xl text-xs text-neutral-600 dark:text-neutral-400">
-                  Use our interactive CLI or guided web wizard to inspect your framework, select products, generate configuration, and verify live event telemetry via SSE.
-                </p>
-                <div className="pt-2 flex items-center gap-2">
-                  <code className="rounded bg-neutral-900 px-2.5 py-1 font-mono text-xs font-medium text-emerald-400 dark:bg-slate-950">
-                    npx traceiq-cli
-                  </code>
-                  <CopyButton value="npx traceiq-cli" label="Copy CLI command" compact />
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <Link
-                  href={`/dashboard/setup${setup?.project?.id ? `?projectId=${encodeURIComponent(setup.project.id)}` : ''}`}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                  </>
+                }
+              >
+                <SettingsRow
+                  label="Name"
+                  hint={setup?.project?.slug ? <span className="font-mono">{setup.project.slug}</span> : undefined}
+                  actions={
+                    !isEditingProjectName && isOwnerOrAdmin ? (
+                      <button
+                        type="button"
+                        className={secondaryButton}
+                        onClick={() => {
+                          setProjectNameDraft(setup?.project?.name ?? '');
+                          setIsEditingProjectName(true);
+                        }}
+                      >
+                        <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.8} />
+                        Rename
+                      </button>
+                    ) : null
+                  }
                 >
-                  Launch Web Wizard
-                  <span aria-hidden="true">&rarr;</span>
-                </Link>
-              </div>
-            </div>
-          </div>
+                  {isEditingProjectName ? (
+                    <InlineRenameForm
+                      value={projectNameDraft}
+                      onChange={setProjectNameDraft}
+                      onSubmit={handleSaveProjectName}
+                      onCancel={() => {
+                        setProjectNameDraft(setup?.project?.name ?? '');
+                        setIsEditingProjectName(false);
+                      }}
+                      isSaving={isSavingProjectName}
+                      placeholder="Project name"
+                    />
+                  ) : (
+                    <span className="font-medium text-neutral-900 dark:text-white">{setup?.project?.name ?? '—'}</span>
+                  )}
+                </SettingsRow>
 
-          {/* SECTION 3: INTEGRATION SNIPPET */}
-          {setup?.sdkSnippet ? (
-            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3.5 dark:border-slate-800">
-                <div>
-                  <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Integration Snippet</h3>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Include this snippet in your client application to begin tracking events.
-                  </p>
-                </div>
-                <CopyButton value={setup.sdkSnippet} label="Copy snippet" compact />
-              </div>
-              <pre className="overflow-x-auto bg-neutral-900 p-4 font-mono text-xs leading-6 text-neutral-100 dark:bg-slate-900">
-                <code>{setup.sdkSnippet}</code>
-              </pre>
-            </div>
-          ) : null}
+                <SettingsRow
+                  label="Project ID"
+                  hint="Used for API requests and SDK initialization."
+                  actions={setup?.project?.id ? <CopyButton value={setup.project.id} label="Copy" /> : null}
+                >
+                  <code className="break-all font-mono text-xs text-neutral-700 dark:text-slate-300">{setup?.project?.id ?? '—'}</code>
+                </SettingsRow>
 
-          {/* New Project Creation Panel / Result (if opened) */}
-          {isOwnerOrAdmin && (createdProject?.project || newProjectOpen) ? (
-            <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-              {createdProject?.project ? (
-                <div className="grid gap-4">
-                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                        Project created ✓
-                      </div>
-                      <h3 className="mt-2 text-sm font-semibold text-neutral-900 dark:text-white">
-                        Your project is ready — {createdProject.project.name}
-                      </h3>
-                      <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                        Connect your application to start receiving events.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        className="h-8 rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                        type="button"
-                        onClick={() => router.push(`/dashboard?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
-                      >
-                        I'll do this later
-                      </button>
-                      <button
-                        className="h-8 rounded-md bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
-                        type="button"
-                        onClick={() => router.push(`/dashboard/setup?projectId=${encodeURIComponent(createdProject.project!.id)}`)}
-                      >
-                        Set up tracking →
-                      </button>
-                    </div>
-                  </div>
-                  {createdProject.writeKey?.value ? (
-                    <div className="flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-                      <div>
-                        <span className="text-[11px] font-semibold uppercase text-neutral-400">Write Key</span>
-                        <p className="font-mono text-xs font-bold text-neutral-900 dark:text-white">
-                          {createdProject.writeKey.value}
-                        </p>
-                      </div>
-                      <CopyButton value={createdProject.writeKey.value} label="Copy key" compact />
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Create Another Project</h3>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      Add a separate project inside {setup?.organization?.name ?? 'this organization'}. Each project maintains its own events, write keys, and flags.
-                    </p>
-                  </div>
-                  <form className="mt-2 flex max-w-lg items-center gap-2" onSubmit={handleCreateProject}>
+                <SettingsRow
+                  label="Write key"
+                  hint="Client token that authenticates ingested events."
+                  actions={
+                    <>
+                      {setup?.writeKey?.value ? <CopyButton value={setup.writeKey.value} label="Copy" /> : null}
+                      {isOwnerOrAdmin ? (
+                        <button type="button" className={secondaryButton} onClick={() => setIsRegenerateDialogOpen(true)}>
+                          <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.8} />
+                          Regenerate
+                        </button>
+                      ) : null}
+                    </>
+                  }
+                >
+                  <code className="break-all font-mono text-xs text-neutral-700 dark:text-slate-300">
+                    {setup?.writeKey?.value
+                      ? setup.writeKey.value
+                      : setup?.writeKey?.prefix
+                        ? `${setup.writeKey.prefix}••••••••••••••••`
+                        : 'trq_live_••••••••••••••••••••'}
+                  </code>
+                </SettingsRow>
+              </SettingsCard>
+
+              {/* New project form (opened from the Project card) */}
+              {isOwnerOrAdmin && newProjectOpen && !createdProject?.project ? (
+                <SettingsCard
+                  icon={PlusSignIcon}
+                  title="Create another project"
+                  description={`Each project inside ${setup?.organization?.name ?? 'this organization'} keeps its own events, write keys, and flags.`}
+                >
+                  <form className="flex flex-col gap-2 p-5 sm:flex-row sm:items-center" onSubmit={handleCreateProject}>
                     <input
-                      className="h-9 flex-1 rounded-md border border-neutral-300 bg-white px-3 text-xs text-neutral-900 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      className={`${inputClass} sm:max-w-sm`}
                       value={newProjectName}
                       onChange={(e) => setNewProjectName(e.target.value)}
                       placeholder="Project name (e.g. Mobile App)"
@@ -865,106 +689,118 @@ export function SetupPanel({
                       required
                       autoFocus
                     />
-                    <button
-                      type="submit"
-                      disabled={isCreatingProject || !newProjectName.trim()}
-                      className="h-9 rounded-md bg-neutral-900 px-3.5 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-                    >
-                      {isCreatingProject ? 'Creating…' : 'Create'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewProjectOpen(false)}
-                      className="h-9 rounded-md border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                    >
-                      Cancel
-                    </button>
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={isCreatingProject || !newProjectName.trim()} className={primaryButton}>
+                        {isCreatingProject ? 'Creating…' : 'Create project'}
+                      </button>
+                      <button type="button" onClick={() => setNewProjectOpen(false)} className={secondaryButton}>
+                        Cancel
+                      </button>
+                    </div>
                   </form>
-                </div>
-              )}
-            </div>
-          ) : null}
+                </SettingsCard>
+              ) : null}
+            </SettingsSection>
 
-          {/* SECTION 4 & 5: CHILDREN (Security 2FA & AI Access / Personal Access Tokens) */}
-          {children}
-
-          {/* SECTION 6: DANGER ZONE (Delete this project - Rendered at the VERY END) */}
-          <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50/20 shadow-sm dark:border-red-950/60 dark:bg-red-950/10">
-            <div className="border-b border-red-200/80 px-5 py-3.5 dark:border-red-950/60">
-              <div className="flex items-center gap-2">
-                <HugeiconsIcon icon={Alert02Icon} size={16} className="text-red-600 dark:text-red-400" />
-                <h3 className="text-sm font-semibold text-red-900 dark:text-red-200">Danger Zone</h3>
-              </div>
-              <p className="text-xs text-red-700/80 dark:text-red-400/80">
-                Irreversible and destructive actions for this project.
-              </p>
-            </div>
-
-            <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-              <div>
-                <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">Delete this project</h4>
-                <p className="mt-1 max-w-xl text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-                  Permanently delete <strong className="text-neutral-700 dark:text-neutral-200">{setup?.project?.name}</strong> and all associated data, including events, sessions, funnels, feature flags, webhooks, dashboards, and write keys. Organization and subscription settings will not be affected.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={!isOwnerOrAdmin}
-                onClick={() => {
-                  setDeleteConfirmName('');
-                  setDeleteConfirmPhrase('');
-                  setIsDeleteDialogOpen(true);
-                }}
-                className="h-9 shrink-0 rounded-md border border-red-300 bg-white px-3.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/80 dark:bg-slate-950 dark:text-red-400 dark:hover:bg-red-950/30"
+            {/* INTEGRATION: wizard + snippet */}
+            <SettingsSection
+              id="integration"
+              title="Integration"
+              description="Connect your app and start sending events."
+            >
+              <SettingsCard
+                icon={MagicWand01Icon}
+                title="Guided setup"
+                description="Detect your framework, pick products, generate config, and verify live events."
+                actions={
+                  <Link href={`/dashboard/setup${projectQuery}`} className={primaryButton}>
+                    Launch web wizard
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={15} strokeWidth={1.8} />
+                  </Link>
+                }
               >
-                Delete project
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+                <SettingsRow label="CLI" hint="Run in your project root." actions={<CopyButton value="npx traceiq-cli" label="Copy" />}>
+                  <code className="font-mono text-xs text-neutral-900 dark:text-slate-100">npx traceiq-cli</code>
+                </SettingsRow>
+              </SettingsCard>
+
+              {setup?.sdkSnippet ? (
+                <SettingsCard
+                  icon={CodeIcon}
+                  title="SDK snippet"
+                  description="Add this to your client application to begin tracking events."
+                  actions={<CopyButton value={setup.sdkSnippet} label="Copy snippet" />}
+                >
+                  <pre className="overflow-x-auto bg-neutral-950 p-5 font-mono text-xs leading-6 text-neutral-100 dark:bg-slate-950">
+                    <code>{setup.sdkSnippet}</code>
+                  </pre>
+                </SettingsCard>
+              ) : null}
+            </SettingsSection>
+
+            {/* SECURITY + API ACCESS (rendered by the page) */}
+            {children}
+
+            {/* DANGER ZONE */}
+            <SettingsSection id="danger" title="Danger zone" description="Irreversible actions for this project.">
+              <SettingsCard tone="danger">
+                <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <HugeiconsIcon icon={Delete02Icon} size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Delete this project</h3>
+                      <p className="mt-0.5 max-w-xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
+                        Permanently delete <strong className="font-medium text-neutral-800 dark:text-slate-200">{setup?.project?.name}</strong>{' '}
+                        and all its events, sessions, funnels, flags, webhooks, dashboards, and write keys. Organization and billing are not affected.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!isOwnerOrAdmin}
+                    onClick={() => {
+                      setDeleteConfirmName('');
+                      setDeleteConfirmPhrase('');
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    className={dangerButton}
+                  >
+                    Delete project
+                  </button>
+                </div>
+              </SettingsCard>
+            </SettingsSection>
+          </>
+        )}
+      </div>
 
       {/* Write Key Regeneration Dialog */}
       <DashboardDialog
         open={isRegenerateDialogOpen}
-        title="Regenerate Write Key"
+        title="Regenerate write key"
         description="Are you sure you want to rotate the write key for this project?"
         onClose={() => {
           if (!isRegenerating) setIsRegenerateDialogOpen(false);
         }}
         footer={
           <>
-            <button
-              className="h-9 rounded-md border border-neutral-300 bg-white px-3.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              type="button"
-              disabled={isRegenerating}
-              onClick={() => setIsRegenerateDialogOpen(false)}
-            >
+            <button className={secondaryButton} type="button" disabled={isRegenerating} onClick={() => setIsRegenerateDialogOpen(false)}>
               Cancel
             </button>
-            <button
-              className="h-9 rounded-md bg-neutral-900 px-3.5 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
-              type="button"
-              disabled={isRegenerating}
-              onClick={handleRegenerateWriteKey}
-            >
+            <button className={primaryButton} type="button" disabled={isRegenerating} onClick={handleRegenerateWriteKey}>
               {isRegenerating ? 'Regenerating…' : 'Rotate write key'}
             </button>
           </>
         }
       >
-        <div className="space-y-3 text-xs text-neutral-600 dark:text-neutral-300">
-          <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
-            <p className="font-semibold text-amber-900 dark:text-amber-200">
-              Immediate Token Invalidation
-            </p>
-            <p className="mt-1 leading-5 text-amber-800 dark:text-amber-300">
-              Rotating the write key revokes the active key immediately. Any websites, backend services, or SDK clients sending events with the previous key will be rejected with 401 Unauthorized until updated.
+        <div className="space-y-3 text-sm text-neutral-600 dark:text-slate-300">
+          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <p className="font-semibold text-amber-900 dark:text-amber-200">The current key stops working immediately</p>
+            <p className="mt-1 leading-6 text-amber-800 dark:text-amber-300">
+              Any website, backend service, or SDK client still sending events with the previous key will be rejected with 401 Unauthorized until updated.
             </p>
           </div>
-          <p className="leading-5">
-            The new key will be revealed on your screen once. Ensure you copy and distribute it to your engineering team immediately.
-          </p>
+          <p className="leading-6">The new key is revealed once. Copy it and share it with your team right away.</p>
         </div>
       </DashboardDialog>
 
@@ -978,16 +814,11 @@ export function SetupPanel({
         }}
         footer={
           <>
-            <button
-              className="h-9 rounded-md border border-neutral-300 bg-white px-3.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              type="button"
-              disabled={isDeletingProject}
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
+            <button className={secondaryButton} type="button" disabled={isDeletingProject} onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </button>
             <button
-              className="h-9 rounded-md bg-red-600 px-4 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-9 items-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
               type="button"
               disabled={!isDeleteConfirmed || isDeletingProject}
               onClick={handleDeleteProject}
@@ -997,9 +828,11 @@ export function SetupPanel({
           </>
         }
       >
-        <div className="space-y-4 text-xs">
-          <div className="rounded-md border border-red-200 bg-red-50/80 p-3.5 text-red-900 dark:border-red-950/80 dark:bg-red-950/30 dark:text-red-200">
-            <p className="font-semibold">You are about to delete {setup?.project?.name} ({setup?.project?.id}).</p>
+        <div className="space-y-4 text-sm">
+          <div className="rounded-lg border border-red-200 bg-red-50/80 p-3.5 text-red-900 dark:border-red-950/80 dark:bg-red-950/30 dark:text-red-200">
+            <p className="font-semibold">
+              You are about to delete {setup?.project?.name} ({setup?.project?.id}).
+            </p>
             <ul className="mt-2 list-inside list-disc space-y-1 text-red-800 dark:text-red-300">
               <li>All events, sessions, cohorts, and funnels will be erased.</li>
               <li>Feature flags, targeting rules, and exposures will be permanently deleted.</li>
@@ -1010,11 +843,11 @@ export function SetupPanel({
 
           <div className="space-y-3 pt-1">
             <label className="block">
-              <span className="font-semibold text-neutral-700 dark:text-neutral-300">
-                1. Type project name <span className="font-mono font-bold text-neutral-900 dark:text-white">"{setup?.project?.name}"</span> to confirm:
+              <span className="font-medium text-neutral-700 dark:text-slate-300">
+                Type the project name <span className="font-mono font-semibold text-neutral-900 dark:text-white">{setup?.project?.name}</span> to confirm
               </span>
               <input
-                className="mt-1.5 h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs text-neutral-900 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className={`${inputClass} mt-1.5 focus:border-red-500 focus:ring-red-500/20`}
                 value={deleteConfirmName}
                 onChange={(e) => setDeleteConfirmName(e.target.value)}
                 placeholder={setup?.project?.name ?? ''}
@@ -1023,11 +856,11 @@ export function SetupPanel({
             </label>
 
             <label className="block">
-              <span className="font-semibold text-neutral-700 dark:text-neutral-300">
-                2. Type <span className="font-mono font-bold text-neutral-900 dark:text-white">delete my project</span> to confirm:
+              <span className="font-medium text-neutral-700 dark:text-slate-300">
+                Type <span className="font-mono font-semibold text-neutral-900 dark:text-white">delete my project</span> to confirm
               </span>
               <input
-                className="mt-1.5 h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs text-neutral-900 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className={`${inputClass} mt-1.5 focus:border-red-500 focus:ring-red-500/20`}
                 value={deleteConfirmPhrase}
                 onChange={(e) => setDeleteConfirmPhrase(e.target.value)}
                 placeholder="delete my project"
@@ -1037,10 +870,10 @@ export function SetupPanel({
         </div>
       </DashboardDialog>
 
-      {/* Contextual Project Created Success Modal */}
+      {/* Project Created Modal */}
       <DashboardDialog
         open={Boolean(createdProject?.project)}
-        title="Project created ✓"
+        title="Project created"
         description="Your project is ready."
         onClose={() => {
           if (createdProject?.project?.id) {
@@ -1051,7 +884,7 @@ export function SetupPanel({
         footer={
           <div className="flex w-full items-center justify-end gap-2">
             <button
-              className="h-9 rounded-md border border-neutral-300 bg-white px-3.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className={secondaryButton}
               type="button"
               onClick={() => {
                 if (createdProject?.project?.id) {
@@ -1063,7 +896,7 @@ export function SetupPanel({
               I'll do this later
             </button>
             <button
-              className="h-9 rounded-md bg-blue-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+              className={primaryButton}
               type="button"
               onClick={() => {
                 if (createdProject?.project?.id) {
@@ -1072,80 +905,150 @@ export function SetupPanel({
                 setCreatedProject(null);
               }}
             >
-              Set up tracking →
+              Set up tracking
+              <HugeiconsIcon icon={ArrowRight01Icon} size={15} strokeWidth={1.8} />
             </button>
           </div>
         }
       >
         <div className="space-y-3.5">
-          <p className="text-xs text-neutral-600 dark:text-slate-300">
-            Connect your application to start receiving events for <strong className="font-semibold text-neutral-900 dark:text-white">{createdProject?.project?.name}</strong>.
+          <p className="text-sm text-neutral-600 dark:text-slate-300">
+            Connect your application to start receiving events for{' '}
+            <strong className="font-semibold text-neutral-900 dark:text-white">{createdProject?.project?.name}</strong>.
           </p>
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-neutral-500 dark:text-neutral-400">Project ID:</span>
-              <span className="font-mono font-semibold text-neutral-900 dark:text-white">
-                {createdProject?.project?.id}
-              </span>
+          <div className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-50 text-xs dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-3 p-3">
+              <span className="text-neutral-500 dark:text-slate-400">Project ID</span>
+              <span className="truncate font-mono font-semibold text-neutral-900 dark:text-white">{createdProject?.project?.id}</span>
             </div>
             {createdProject?.writeKey?.value ? (
-              <div className="mt-2 pt-2 border-t border-neutral-200 dark:border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-neutral-500 dark:text-neutral-400">Write Key:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-semibold text-neutral-900 dark:text-white">
-                    {createdProject.writeKey.value}
-                  </span>
-                  <CopyButton value={createdProject.writeKey.value} label="Copy key" compact />
+              <div className="flex items-center justify-between gap-3 p-3">
+                <span className="text-neutral-500 dark:text-slate-400">Write key</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-mono font-semibold text-neutral-900 dark:text-white">{createdProject.writeKey.value}</span>
+                  <CopyButton value={createdProject.writeKey.value} label="Copy" />
                 </div>
               </div>
             ) : null}
           </div>
         </div>
       </DashboardDialog>
-    </section>
+    </div>
+  );
+}
+
+const NAV_ITEMS = [
+  { id: 'general', label: 'General', icon: Settings02Icon },
+  { id: 'integration', label: 'Integration', icon: CodeIcon },
+  { id: 'security', label: 'Security', icon: SecurityLockIcon },
+  { id: 'api-access', label: 'API access', icon: Key01Icon },
+  { id: 'danger', label: 'Danger zone', icon: Alert02Icon }
+];
+
+/** Sticky in-page navigation that highlights the section currently in view. */
+function SettingsNav() {
+  const [activeId, setActiveId] = useState(NAV_ITEMS[0].id);
+
+  useEffect(() => {
+    const sections = NAV_ITEMS.map((item) => document.getElementById(item.id)).filter(Boolean) as HTMLElement[];
+    if (sections.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActiveId(visible[0].target.id);
+      },
+      { rootMargin: '-80px 0px -60% 0px' }
+    );
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <nav aria-label="On this page" className="hidden xl:block">
+      <ul className="sticky top-24 grid gap-0.5">
+        {NAV_ITEMS.map((item) => {
+          const active = activeId === item.id;
+          return (
+            <li key={item.id}>
+              <a
+                href={`#${item.id}`}
+                aria-current={active ? 'true' : undefined}
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition ${
+                  active
+                    ? 'font-medium text-neutral-900 dark:text-white'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <HugeiconsIcon icon={item.icon} size={16} strokeWidth={1.8} />
+                {item.label}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+function InlineRenameForm({
+  value,
+  onChange,
+  onSubmit,
+  onCancel,
+  isSaving,
+  placeholder
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  placeholder: string;
+}) {
+  return (
+    <form className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-center" onSubmit={onSubmit}>
+      <input
+        className={inputClass}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={80}
+        required
+        autoFocus
+      />
+      <div className="flex gap-2">
+        <button type="submit" disabled={isSaving || !value.trim()} className={primaryButton}>
+          {isSaving ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" onClick={onCancel} className={secondaryButton}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
 function SetupSkeleton() {
   return (
     <div className="grid gap-4">
-      <div className="rounded-lg border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <Skeleton className="h-4 w-36" />
-        <Skeleton className="mt-2 h-3 w-64" />
-        <div className="mt-6 space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
+      {[0, 1].map((key) => (
+        <div
+          key={key}
+          className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-slate-800 dark:bg-slate-900/40"
+        >
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="mt-2 h-3 w-64" />
+          <div className="mt-6 space-y-4">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-function CopyButton({ value, label, compact = false }: { value: string; label: string; compact?: boolean }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  return (
-    <button
-      className={`rounded-md border border-neutral-200 bg-white font-semibold text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white ${compact ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-xs'
-        }`}
-      type="button"
-      onClick={handleCopy}
-    >
-      {copied ? 'Copied' : label}
-    </button>
-  );
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
-
-const inputClass =
-  'min-h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal normal-case text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';

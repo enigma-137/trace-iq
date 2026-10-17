@@ -2,6 +2,7 @@ import { DashboardShell } from '../DashboardShell';
 import { SetupPanel } from '../SetupPanel';
 import { PasswordSettingsPanel } from './PasswordSettingsPanel';
 import { PersonalAccessTokensPanel } from './PersonalAccessTokensPanel';
+import { SettingsSection } from './SettingsUI';
 import { SettingsTabs } from './SettingsTabs';
 import { TwoFactorPanel } from './TwoFactorPanel';
 import { requireDashboardSession } from '@/lib/dashboard';
@@ -28,8 +29,10 @@ export default async function SettingsPage({
     >
       <SettingsTabs />
       <SetupPanel organizationId={organizationId} projectId={projectId} newProject={newProject}>
-        <TwoFactorPanel />
-        <PasswordSettingsPanel userEmail={user.email} />
+        <SettingsSection id="security" title="Security" description="Protect how you sign in to TraceIQ.">
+          <TwoFactorPanel />
+          <PasswordSettingsPanel userEmail={user.email} />
+        </SettingsSection>
         <PersonalAccessTokensPanel />
       </SetupPanel>
     </DashboardShell>

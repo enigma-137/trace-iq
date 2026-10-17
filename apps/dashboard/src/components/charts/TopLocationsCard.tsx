@@ -31,15 +31,15 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md border border-neutral-200 bg-white p-5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}
+      className={`overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-slate-800 dark:bg-slate-900/40 dark:shadow-none ${className}`}
     >
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3 dark:border-slate-800">
         <div>
-          <h3 className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
-            Top locations
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+            Locations
           </h3>
           <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
-            Geographic distribution of visitors across countries and cities.
+            Visitors by country and city
           </p>
         </div>
 
@@ -66,16 +66,16 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
         {/* Countries Column */}
         <div className={`${activeTab === 'cities' ? 'hidden sm:block' : 'block'}`}>
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+          <p className="mb-3 text-xs font-medium text-neutral-500 dark:text-slate-400">
             Countries
           </p>
           {countries.length === 0 ? (
             <p className="py-6 text-center text-xs text-neutral-400 dark:text-slate-600">No country location data yet</p>
           ) : (
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {countries.slice(0, 6).map((item) => {
                 const flag = getCountryFlag(item.name);
                 const relativePct = Math.max(8, Math.min(100, (item.total / maxCountry) * 100));
@@ -106,13 +106,13 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
 
         {/* Cities Column */}
         <div className={`${activeTab === 'countries' ? 'hidden sm:block' : 'block'}`}>
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
+          <p className="mb-3 text-xs font-medium text-neutral-500 dark:text-slate-400">
             Cities
           </p>
           {cities.length === 0 ? (
             <p className="py-6 text-center text-xs text-neutral-400 dark:text-slate-600">No city location data yet</p>
           ) : (
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {cities.slice(0, 6).map((item) => {
                 const relativePct = Math.max(8, Math.min(100, (item.total / maxCity) * 100));
                 return (
@@ -128,7 +128,7 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
                     {/* Visual Progress Bar */}
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
                       <div
-                        className="h-full rounded-full bg-sky-500 dark:bg-sky-400 transition-all duration-500 ease-out"
+                        className="h-full rounded-full bg-blue-500/70 dark:bg-blue-400/70 transition-all duration-500 ease-out"
                         style={{ width: `${relativePct}%` }}
                       />
                     </div>
