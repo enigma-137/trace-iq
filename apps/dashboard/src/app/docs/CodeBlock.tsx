@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
-import { codeToHtml } from 'shiki';
 
 export function CodeBlock({
   codeText,
@@ -18,11 +17,16 @@ export function CodeBlock({
 
   useEffect(() => {
     let active = true;
-    codeToHtml(codeText, {
-      lang,
-      themes: { light: 'github-light', dark: 'github-dark' },
-      defaultColor: false
-    })
+    // Loaded lazily: a static import makes this module (and every page that
+    // imports it) an async module, which breaks server rendering of /docs.
+    import('shiki')
+      .then(({ codeToHtml }) =>
+        codeToHtml(codeText, {
+          lang,
+          themes: { light: 'github-light', dark: 'github-dark' },
+          defaultColor: false
+        })
+      )
       .then((res) => {
         if (active) setHtml(res);
       })
