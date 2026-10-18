@@ -49,7 +49,15 @@ export class SyntheticSchedulerService implements OnModuleInit, OnModuleDestroy 
       for (const monitor of claimedMonitors) {
         const runId = `srun_${randomUUID().replace(/-/g, '')}`;
 
-        // Insert queued run and dispatch pipeline
+        // The pipeline only updates an existing run row, so insert it first;
+        // otherwise the run executes and its results are written nowhere.
+        try {
+          await this.syntheticService.createQueuedRun(monitor, runId, 'scheduled');
+        } catch (err: any) {
+          this.logger.error(`Could not queue scheduled run for ${monitor.id}: ${err.message}`);
+          continue;
+        }
+
         setImmediate(() => {
           this.syntheticService.executeRunPipeline(monitor, runId, 'scheduled').catch((err) => {
             this.logger.error(`Scheduled run pipeline failed for ${monitor.id}: ${err.message}`, err.stack);

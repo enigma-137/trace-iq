@@ -647,6 +647,35 @@ export class SyntheticMonitoringService {
   }
 
   /**
+   * Inserts the `queued` run row that {@link executeRunPipeline} updates as the
+   * run progresses. Every trigger must call this first: the pipeline only
+   * updates an existing row, so without it a run executes but records nothing.
+   */
+  async createQueuedRun(
+    monitor: SyntheticMonitor,
+    runId: string,
+    trigger: 'scheduled' | 'manual' | 'api' | 'ci'
+  ): Promise<void> {
+    await this.database.query(
+      `
+        INSERT INTO synthetic_runs (
+          id, project_id, monitor_id, status, trigger, target_url, browser,
+          viewport, created_at
+        ) VALUES ($1, $2, $3, 'queued', $4, $5, $6, $7, NOW())
+      `,
+      [
+        runId,
+        monitor.projectId,
+        monitor.id,
+        trigger,
+        monitor.baseUrl,
+        monitor.browser,
+        JSON.stringify({ width: monitor.viewportWidth, height: monitor.viewportHeight })
+      ]
+    );
+  }
+
+  /**
    * Triggers a manual run asynchronously: creates queued run and dispatches worker in background.
    * Returns immediately without blocking the HTTP request.
    */
@@ -659,23 +688,7 @@ export class SyntheticMonitoringService {
     const monitor = await this.get(user, monitorId, project.id);
 
     const runId = `srun_${randomUUID().replace(/-/g, '')}`;
-
-    const insertRunQuery = `
-      INSERT INTO synthetic_runs (
-        id, project_id, monitor_id, status, trigger, target_url, browser,
-        viewport, created_at
-      ) VALUES ($1, $2, $3, 'queued', 'manual', $4, $5, $6, NOW())
-      RETURNING id
-    `;
-
-    await this.database.query(insertRunQuery, [
-      runId,
-      monitor.projectId,
-      monitor.id,
-      monitor.baseUrl,
-      monitor.browser,
-      JSON.stringify({ width: monitor.viewportWidth, height: monitor.viewportHeight })
-    ]);
+    await this.createQueuedRun(monitor, runId, 'manual');
 
     // Dispatch asynchronous execution without blocking HTTP lifecycle
     setImmediate(() => {
