@@ -32,9 +32,20 @@ import {
   ListFilter
 } from 'lucide-react';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { readApiError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 import { EmptyState } from '@/components/EmptyState';
 
+export type IssueStatus = 'open' | 'regressed' | 'resolved' | 'ignored';
+export type IssueStatusFilter = 'open' | 'resolved' | 'ignored' | 'all';
+export type IssueCounts = Record<IssueStatus | 'all', number>;
+
 export interface ErrorIssueItem {
+  id: string;
+  status: IssueStatus;
+  assigneeUserId: string | null;
+  resolvedAt: string | null;
   type: string;
   message: string;
   occurrences: number;
@@ -60,7 +71,7 @@ export interface ErrorSampleItem {
 }
 
 export interface IssueDetailData {
-  issue: { type: string; message: string };
+  issue: { id: string | null; type: string; message: string; status: IssueStatus; assigneeUserId: string | null; resolvedAt: string | null };
   totals: { occurrences: number; sessions: number; users: number; firstSeen: string; lastSeen: string };
   samples: ErrorSampleItem[];
   timeline?: Array<{ day: string; count: number }>;
@@ -73,10 +84,36 @@ export interface IssueDetailData {
 interface Props {
   initialIssues: ErrorIssueItem[];
   initialDetail: IssueDetailData | null;
-  selectedType?: string;
-  selectedMessage?: string;
+  selectedId?: string;
+  statusFilter: IssueStatusFilter;
+  counts: IssueCounts;
   days: string;
   userEmail?: string | null;
+  currentUserId?: string | null;
+}
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+const STATUS_TABS: Array<{ value: IssueStatusFilter; label: string }> = [
+  { value: 'open', label: 'Open' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'ignored', label: 'Ignored' },
+  { value: 'all', label: 'All' }
+];
+
+function StatusBadge({ status }: { status: IssueStatus }) {
+  if (status === 'open') return null;
+  const styles: Record<Exclude<IssueStatus, 'open'>, string> = {
+    regressed: 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
+    resolved: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
+    ignored: 'border-neutral-300 bg-neutral-100 text-neutral-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+  };
+  const labels = { regressed: 'Regressed', resolved: 'Resolved', ignored: 'Ignored' };
+  return (
+    <span className={`inline-flex shrink-0 items-center rounded border px-1.5 py-0.5 text-[10px] font-bold ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
 }
 
 function getSeverity(type: string, occurrences: number): 'High' | 'Medium' | 'Low' {
@@ -129,12 +166,15 @@ function formatDateTime(value?: string) {
 export function ErrorTrackingClientView({
   initialIssues,
   initialDetail,
-  selectedType,
-  selectedMessage,
+  selectedId,
+  statusFilter,
+  counts,
   days,
-  userEmail
+  userEmail,
+  currentUserId
 }: Props) {
   const router = useRouter();
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
@@ -145,13 +185,13 @@ export function ErrorTrackingClientView({
   const [copied, setCopied] = useState(false);
 
   // Derive top KPIs
-  const totalIssuesCount = initialIssues.length;
+  const totalIssuesCount = counts.all || initialIssues.length;
   const totalOccurrences = initialIssues.reduce((acc, i) => acc + i.occurrences, 0);
   const totalUsersAffected = initialIssues.reduce((acc, i) => acc + i.users, 0);
   const totalSessionsImpacted = initialIssues.reduce((acc, i) => acc + i.sessions, 0);
 
-  // High severity / regression alerts count
-  const regressionAlertsCount = initialIssues.filter((i) => getSeverity(i.type, i.occurrences) === 'High').length;
+  // Resolved issues that happened again.
+  const regressionAlertsCount = counts.regressed;
 
   // New issues today (first seen within last 24h)
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
@@ -178,19 +218,63 @@ export function ErrorTrackingClientView({
 
   // Current active issue
   const activeIssue = useMemo(() => {
-    if (selectedType && selectedMessage) {
-      const found = initialIssues.find((i) => i.type === selectedType && i.message === selectedMessage);
+    if (selectedId) {
+      const found = initialIssues.find((i) => i.id === selectedId);
       if (found) return found;
     }
     return filteredIssues[0] ?? initialIssues[0] ?? null;
-  }, [initialIssues, filteredIssues, selectedType, selectedMessage]);
+  }, [initialIssues, filteredIssues, selectedId]);
 
   const activeDetail = initialDetail;
+  const detailMatches = Boolean(activeIssue && activeDetail?.issue.id === activeIssue.id);
+  const activeStatus: IssueStatus = (detailMatches ? activeDetail?.issue.status : activeIssue?.status) ?? 'open';
+  const activeAssignee = (detailMatches ? activeDetail?.issue.assigneeUserId : activeIssue?.assigneeUserId) ?? null;
 
-  const handleSelectIssue = (type: string, message: string) => {
-    const q = new URLSearchParams({ type, message, days });
-    router.push(`/dashboard/errors?${q.toString()}`);
+  const navigate = (changes: Record<string, string | null>) => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('type');
+    params.delete('message');
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) params.delete(key);
+      else params.set(key, value);
+    }
+    router.push(`/dashboard/errors?${params.toString()}`);
   };
+
+  const handleSelectIssue = (id: string) => navigate({ issue: id, days });
+
+  async function updateIssue(
+    id: string,
+    body: { status?: 'open' | 'resolved' | 'ignored'; assigneeUserId?: string | null },
+    success: string
+  ) {
+    setPendingAction(JSON.stringify(body));
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error('Your session expired. Sign in again.');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/errors/issues/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        toast.error(await readApiError(response, 'Could not update the issue.'));
+        return;
+      }
+      toast.success(success);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update the issue.');
+    } finally {
+      setPendingAction(null);
+    }
+  }
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -258,7 +342,7 @@ export function ErrorTrackingClientView({
           {/* System Operational Indicator */}
           <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400">
             <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
-            {regressionAlertsCount > 0 ? `${regressionAlertsCount} High Priority` : 'All systems operational'}
+            {regressionAlertsCount > 0 ? `${regressionAlertsCount} regressed` : 'No regressions'}
           </div>
 
           <AddCurrentViewToDashboardButton
@@ -283,13 +367,10 @@ export function ErrorTrackingClientView({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{totalIssuesCount}</span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +12%
-            </span>
+            <span className="text-xs font-semibold text-neutral-500 dark:text-slate-400">{counts.open} open</span>
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-rose-600 dark:bg-rose-500" style={{ width: '65%' }} />
+            <div className="h-full bg-rose-600 dark:bg-rose-500" style={{ width: `${counts.all ? Math.round((counts.open / counts.all) * 100) : 0}%` }} />
           </div>
         </div>
 
@@ -323,13 +404,7 @@ export function ErrorTrackingClientView({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{totalUsersAffected.toLocaleString()}</span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +18%
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-violet-600 dark:bg-violet-500" style={{ width: '48%' }} />
+            <span className="text-xs font-semibold text-neutral-500 dark:text-slate-400">last {days}d</span>
           </div>
         </div>
 
@@ -343,20 +418,14 @@ export function ErrorTrackingClientView({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{totalSessionsImpacted.toLocaleString()}</span>
-            <span className="inline-flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              +22%
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-emerald-600 dark:bg-emerald-500" style={{ width: '56%' }} />
+            <span className="text-xs font-semibold text-neutral-500 dark:text-slate-400">last {days}d</span>
           </div>
         </div>
 
         {/* Regression Alerts */}
         <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Regression Alerts</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Regressed</span>
             <div className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900/60 dark:text-amber-400">
               <AlertCircle className="h-4 w-4" />
             </div>
@@ -365,16 +434,16 @@ export function ErrorTrackingClientView({
             <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{regressionAlertsCount}</span>
             <span className="inline-flex items-center text-xs font-semibold text-amber-600 dark:text-amber-400">
               <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-              {regressionAlertsCount > 0 ? 'Review' : '0 new'}
+              {regressionAlertsCount > 0 ? 'Review' : 'None'}
             </span>
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-            <div className="h-full bg-amber-600 dark:bg-amber-500" style={{ width: regressionAlertsCount > 0 ? '75%' : '0%' }} />
+            <div className="h-full bg-amber-600 dark:bg-amber-500" style={{ width: `${counts.open ? Math.round((regressionAlertsCount / counts.open) * 100) : 0}%` }} />
           </div>
         </div>
       </div>
 
-      {initialIssues.length === 0 ? (
+      {counts.all === 0 && initialIssues.length === 0 ? (
         <div className="rounded-lg border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           <EmptyState
             illustrationSrc="/dashboards/no-errors.png"
@@ -400,11 +469,30 @@ export function ErrorTrackingClientView({
             <div className="rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               {/* Table Filter Controls */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-5 py-3.5 dark:border-slate-800">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <h2 className="text-base font-bold text-neutral-900 dark:text-white">Issues</h2>
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600 dark:bg-slate-800 dark:text-slate-300">
-                    {filteredIssues.length} issues
-                  </span>
+                  <div role="tablist" aria-label="Issue status" className="flex items-center gap-1 rounded-md bg-neutral-100 p-0.5 dark:bg-slate-800/70">
+                    {STATUS_TABS.map((tab) => {
+                      const selected = statusFilter === tab.value;
+                      return (
+                        <button
+                          key={tab.value}
+                          type="button"
+                          role="tab"
+                          aria-selected={selected}
+                          onClick={() => navigate({ status: tab.value === 'all' ? 'all' : tab.value, issue: null })}
+                          className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold transition ${
+                            selected
+                              ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-950 dark:text-white'
+                              : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                          }`}
+                        >
+                          {tab.label}
+                          <span className="tabular-nums text-[10px] text-neutral-400 dark:text-slate-500">{counts[tab.value]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -437,16 +525,19 @@ export function ErrorTrackingClientView({
 
               {/* Table Rows */}
               <div className="divide-y divide-neutral-200 dark:divide-slate-800">
+                {filteredIssues.length === 0 ? (
+                  <p className="px-5 py-8 text-center text-xs text-neutral-500 dark:text-slate-400">
+                    {searchQuery.trim() || severityFilter !== 'All' ? 'No issues match these filters.' : `No ${statusFilter === 'all' ? '' : `${statusFilter} `}issues in the last ${days} days.`}
+                  </p>
+                ) : null}
                 {filteredIssues.map((issue) => {
-                  const isSelected =
-                    (selectedType === issue.type && selectedMessage === issue.message) ||
-                    (!selectedType && activeIssue?.type === issue.type && activeIssue?.message === issue.message);
+                  const isSelected = activeIssue?.id === issue.id;
                   const sev = getSeverity(issue.type, issue.occurrences);
 
                   return (
                     <div
-                      key={`${issue.type}-${issue.message}`}
-                      onClick={() => handleSelectIssue(issue.type, issue.message)}
+                      key={issue.id}
+                      onClick={() => handleSelectIssue(issue.id)}
                       className={`grid cursor-pointer gap-2 px-4 py-3 transition-colors md:grid-cols-[1.5fr_90px_90px_70px_70px_80px_90px] md:items-center ${isSelected
                         ? 'border-l-4 border-l-blue-600 bg-blue-50/60 dark:border-l-blue-500 dark:bg-blue-950/20'
                         : 'hover:bg-neutral-50 dark:hover:bg-slate-800/40'
@@ -456,6 +547,7 @@ export function ErrorTrackingClientView({
                       <div className="min-w-0 pr-2">
                         <div className="flex items-center gap-1.5">
                           <p className="truncate text-xs font-bold text-neutral-900 dark:text-white">{issue.type}</p>
+                          <StatusBadge status={issue.status} />
                         </div>
                         <p className="truncate font-mono text-[11px] text-neutral-500 dark:text-slate-400">{issue.message}</p>
                       </div>
@@ -468,7 +560,7 @@ export function ErrorTrackingClientView({
                           </span>
                         )}
                         {sev === 'Medium' && (
-                          <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900/60 dark:text-amber-400">
+                          <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400">
                             Medium
                           </span>
                         )}
@@ -525,7 +617,61 @@ export function ErrorTrackingClientView({
                       <p className="mt-1 font-mono text-xs text-neutral-600 dark:text-slate-300">{activeIssue.message}</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={activeStatus} />
+                      {activeStatus === 'open' || activeStatus === 'regressed' ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={pendingAction !== null}
+                            onClick={() => void updateIssue(activeIssue.id, { status: 'resolved' }, 'Issue resolved. It reopens if it happens again.')}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Resolve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pendingAction !== null}
+                            onClick={() => void updateIssue(activeIssue.id, { status: 'ignored' }, 'Issue ignored.')}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                          >
+                            Ignore
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={pendingAction !== null}
+                          onClick={() => void updateIssue(activeIssue.id, { status: 'open' }, 'Issue reopened.')}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          Reopen
+                        </button>
+                      )}
+                      {activeAssignee && activeAssignee === currentUserId ? (
+                        <button
+                          type="button"
+                          disabled={pendingAction !== null}
+                          onClick={() => void updateIssue(activeIssue.id, { assigneeUserId: null }, 'Unassigned.')}
+                          title="Assigned to you. Click to unassign."
+                          className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          Assigned to you
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={pendingAction !== null}
+                          onClick={() => void updateIssue(activeIssue.id, { assigneeUserId: 'me' }, 'Assigned to you.')}
+                          title={activeAssignee ? 'Assigned to a teammate. Click to take it.' : undefined}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          {activeAssignee ? 'Assigned · take it' : 'Assign to me'}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleCopy(`${activeIssue.type}: ${activeIssue.message}`)}
                         className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"

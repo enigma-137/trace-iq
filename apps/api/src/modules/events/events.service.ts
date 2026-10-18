@@ -11,6 +11,7 @@ import { sanitizeIngestedTraits } from '../users/users.service';
 import { getPreferredProjectId } from '../../common/active-project';
 import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
 import { RequestsService } from '../requests/requests.service';
+import { withExceptionFingerprint } from '../errors/fingerprint';
 import {
   API_REQUEST_EVENT,
   ApiRequestRecord,
@@ -154,7 +155,7 @@ export class EventsService {
           anonymousId: this.optionalString(item.anonymousId),
           externalId: this.optionalString(item.userId),
           sessionId: this.optionalString(item.sessionId),
-          properties: stripApiRequestPayload(eventName, item.properties),
+          properties: withExceptionFingerprint(eventName, stripApiRequestPayload(eventName, item.properties)),
           rawProperties: eventName === API_REQUEST_EVENT ? item.properties : undefined,
           deviceInfo: item.deviceInfo,
           networkInfo: this.buildNetworkInfo(item.networkInfo, meta),
@@ -458,7 +459,7 @@ export class EventsService {
     const eventName = this.requiredString(input.eventName, 'eventName');
     const rawProperties = input.properties;
     // Payload material on `$api_request` never reaches the events table or webhooks.
-    input = { ...input, properties: stripApiRequestPayload(eventName, input.properties) };
+    input = { ...input, properties: withExceptionFingerprint(eventName, stripApiRequestPayload(eventName, input.properties)) };
     const occurredAt = this.parseTimestamp(input.timestamp);
     const anonymousId = this.optionalString(input.anonymousId);
     const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId);

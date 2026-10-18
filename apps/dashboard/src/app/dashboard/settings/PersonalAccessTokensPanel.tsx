@@ -65,7 +65,7 @@ const SCOPE_GROUPS: ScopeGroup[] = [
   { key: 'insights', label: 'Insights', read: 'insights:read', mcp: true },
   { key: 'funnels', label: 'Funnels', read: 'funnels:read', write: 'funnels:write', mcp: true },
   { key: 'users', label: 'Users', read: 'users:read', mcp: true },
-  { key: 'errors', label: 'Errors', read: 'errors:read', mcp: true },
+  { key: 'errors', label: 'Errors', read: 'errors:read', write: 'errors:write', mcp: true },
   { key: 'flags', label: 'Feature flags', read: 'flags:read', write: 'flags:write', mcp: true },
   { key: 'alerts', label: 'Alerts', read: 'alerts:read', write: 'alerts:write', mcp: true },
   { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: false },

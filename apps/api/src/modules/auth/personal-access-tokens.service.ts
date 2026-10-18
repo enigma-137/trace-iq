@@ -19,6 +19,7 @@ const ALLOWED_SCOPES = new Set([
   'dashboards:read',
   'dashboards:write',
   'errors:read',
+  'errors:write',
   'alerts:read',
   'alerts:write',
   'webhooks:read',
