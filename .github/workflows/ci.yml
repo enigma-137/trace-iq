@@ -29,8 +29,39 @@ jobs:
         run: npm run typecheck
       - name: Test API
         run: npm test --workspace=@traceiq/api
+      - name: Test dashboard
+        run: npm test --workspace=@traceiq/dashboard
+      - name: Test CLI
+        run: npm test --workspace=traceiq-cli
       - name: Build
         run: npm run build
+
+  dashboard-e2e:
+    name: Dashboard browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/dashboard
+      - name: Build dashboard
+        run: npm run build --workspace=@traceiq/dashboard
+      - name: Run smoke tests
+        run: npm run test:e2e --workspace=@traceiq/dashboard
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: apps/dashboard/test-results
+          retention-days: 7
 
   php:
     name: PHP SDK checks

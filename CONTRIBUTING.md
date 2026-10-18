@@ -37,8 +37,22 @@ Run the checks relevant to your change:
 ```bash
 npm run typecheck
 npm test --workspace=@traceiq/api
+npm test --workspace=@traceiq/dashboard
+npm test --workspace=traceiq-cli
 npm run build
 ```
+
+For dashboard UI changes, also run the browser smoke tests. They check that
+public pages render on the server without errors and that dark mode styles
+exist. The first run needs `npx playwright install chromium` in
+`apps/dashboard`. Against a dev server you already have running:
+
+```bash
+cd apps/dashboard
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+Without `PLAYWRIGHT_BASE_URL`, the tests build the dashboard and serve it on port 3100.
 
 For PHP SDK changes:
 

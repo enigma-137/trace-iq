@@ -103,7 +103,7 @@ describe('API Performance → Requests navigation', () => {
     expect(source).toContain('requestsHrefForEndpoint');
     expect(source.match(/link=\{\{ days, projectId: canonicalProjectId/g)?.length).toBe(4);
     // The flow-architecture overview stays.
-    expect(source).toContain('API Pipeline & Endpoint Flow Architecture');
+    expect(source).toContain('<SvgNodeFlowGraph');
   });
 
   it('registers Requests under Observability next to API performance', () => {
