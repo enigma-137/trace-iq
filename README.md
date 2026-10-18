@@ -32,12 +32,19 @@
   https://github.com/user-attachments/assets/... link, which plays inline in the
   README. Put that link on its own line here, in place of the banner below
   (or keep the banner and add the video under it).
--->
+
 <p align="center">
   <a href="https://traceiq.run">
     <img alt="TraceIQ: data that drives real growth" src="apps/dashboard/public/og.png" width="800">
   </a>
 </p>
+-->
+
+
+https://github.com/user-attachments/assets/8a11590c-b2b8-49b6-9081-e1de44a17a95
+
+## Every signal about your product, in one place
+
 
 ## Every signal about your product, in one place
 
