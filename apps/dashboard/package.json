@@ -43,7 +43,7 @@
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.2",
+    "@playwright/test": "^1.63.0",
     "@types/earcut": "^3.0.0",
     "@types/node": "^20.14.12",
     "@types/react": "^18.3.3",
