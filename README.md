@@ -43,7 +43,8 @@
 
 https://github.com/user-attachments/assets/8a11590c-b2b8-49b6-9081-e1de44a17a95
 
-## Every signal about your product, in one place
+
+
 
 
 ## Every signal about your product, in one place
