@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { OrganizationsService } from '../src/modules/organizations/organizations.service';
 import { mockDatabase, rows, affected, type MockDb } from './helpers/mock-db';
+import { activeProjectMiddleware } from '../src/common/active-project';
 
 type SetupRow = {
   organization_id: string;
@@ -214,5 +215,61 @@ describe('OrganizationsService.listOrganizations', () => {
 
     expect(result.organizations[0].projects).toEqual([]);
     expect(result.organizations[0].project).toBeNull();
+  });
+});
+describe('OrganizationsService.getSetup', () => {
+  const setupRow = {
+    id: 'org_1',
+    name: 'Acme',
+    slug: 'acme',
+    role: 'owner',
+    member_count: 1,
+    project_id: 'proj_2',
+    project_name: 'Second',
+    project_slug: 'second'
+  };
+
+  function withActiveProject<T>(projectId: string, run: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      activeProjectMiddleware(
+        { headers: { 'x-traceiq-project-id': projectId } } as never,
+        {} as never,
+        () => {
+          run().then(resolve, reject);
+        }
+      );
+    });
+  }
+
+  it('prefers the active project when no projectId is given', async () => {
+    const db = mockDatabase(() => rows([setupRow]));
+    const service = new OrganizationsService(db as never);
+
+    const result = await withActiveProject('proj_2', () => service.getSetup(user));
+
+    expect(result.project).toMatchObject({ id: 'proj_2', name: 'Second' });
+    const [call] = db.queryCalls(/FROM organization_members om/);
+    expect(call.text).toContain('ORDER BY (p.id = $4) DESC NULLS LAST');
+    expect(call.values).toEqual(['user_1', null, null, 'proj_2']);
+  });
+
+  it('lets an explicit projectId win over the active project', async () => {
+    const db = mockDatabase(() => rows([{ ...setupRow, project_id: 'proj_1' }]));
+    const service = new OrganizationsService(db as never);
+
+    await withActiveProject('proj_2', () => service.getSetup(user, undefined, 'proj_1'));
+
+    const [call] = db.queryCalls(/FROM organization_members om/);
+    expect(call.values).toEqual(['user_1', null, 'proj_1', null]);
+  });
+
+  it('uses no preference outside a dashboard request', async () => {
+    const db = mockDatabase(() => rows([setupRow]));
+    const service = new OrganizationsService(db as never);
+
+    await service.getSetup(user);
+
+    const [call] = db.queryCalls(/FROM organization_members om/);
+    expect(call.values[3]).toBeNull();
   });
 });

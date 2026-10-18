@@ -13,6 +13,7 @@ import { AuditService } from './audit.service';
 import { EmailService, toUniqueEmails } from '../emails/email.service';
 import { EntitlementService } from '../billing/entitlement.service';
 import { appConfig } from '../../config/app.config';
+import { getPreferredProjectId } from '../../common/active-project';
 
 export interface BootstrapSetupRequest {
   organizationName?: string;
@@ -89,10 +90,12 @@ export class OrganizationsService {
         WHERE om.user_id = $1
           AND ($2::text IS NULL OR o.id = $2)
           AND ($3::text IS NULL OR p.id = $3)
-        ORDER BY o.created_at ASC, p.created_at ASC
+        ORDER BY (p.id = $4) DESC NULLS LAST, o.created_at ASC, p.created_at ASC
         LIMIT 1;
       `,
-      [user.id, orgId ?? null, projId ?? null]
+      // Without an explicit project, prefer the one the dashboard last switched
+      // to (a soft preference: an inaccessible id just falls back to the default).
+      [user.id, orgId ?? null, projId ?? null, projId ? null : getPreferredProjectId()]
     );
 
     const row = result.rows[0];

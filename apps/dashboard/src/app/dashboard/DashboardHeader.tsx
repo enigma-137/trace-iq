@@ -153,7 +153,7 @@ export function DashboardHeader({
         <DashboardDialog
           open={isProjectModalOpen}
           title="Project Details & Identifier"
-          description="Use this project identifier to authenticate and send telemetry from your application."
+          description="Your SDKs send this ID with a write key. Write keys are created and rotated in Settings."
           onClose={() => setIsProjectModalOpen(false)}
           footer={
             <div className="flex w-full items-center justify-between gap-3">
@@ -191,7 +191,7 @@ export function DashboardHeader({
             {/* Project ID copy field */}
             <div>
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">
-                Project ID (Write Key)
+                Project ID
               </label>
               <div className="flex gap-2">
                 <input
