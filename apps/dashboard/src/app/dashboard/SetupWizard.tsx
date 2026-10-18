@@ -6,10 +6,13 @@ import Image from 'next/image';
 import { toast } from '@/lib/toast';
 import { readApiError } from '@/lib/api-error';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { ProjectSwitcher } from './ProjectSwitcher';
 
 export interface SetupWizardProps {
   projectId: string;
   projectName: string;
+  /** Enables the project dropdown in the wizard header. */
+  organizationId?: string | null;
   writeKey?: string;
   apiUrl?: string;
   userEmail?: string | null;
@@ -113,6 +116,7 @@ function maskKey(key: string | undefined): string {
 export function SetupWizard({
   projectId,
   projectName,
+  organizationId,
   writeKey: initialWriteKey,
   apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000',
   userEmail,
@@ -321,7 +325,13 @@ export function SetupWizard({
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
               <span className="text-neutral-500">Project:</span>
-              <span className="font-semibold text-neutral-900 dark:text-white">{projectName}</span>
+              <ProjectSwitcher
+                variant="inline"
+                target="current"
+                projectId={projectId}
+                organizationId={organizationId}
+                fallbackName={projectName}
+              />
               <span className="rounded border border-neutral-200 bg-neutral-100 px-2 py-0.5 font-mono text-xs text-neutral-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 {projectId}
               </span>

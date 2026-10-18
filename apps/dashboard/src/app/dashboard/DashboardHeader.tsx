@@ -7,7 +7,9 @@ import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
 import Notification02Icon from '@hugeicons/core-free-icons/Notification02Icon';
 import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
 import { MobileNav } from './MobileNav';
+import { ProjectSwitcher } from './ProjectSwitcher';
 import { DashboardDialog } from './DashboardDialog';
 import { toast } from '@/lib/toast';
 
@@ -69,21 +71,25 @@ export function DashboardHeader({
           <div className="flex min-w-0 items-center gap-3">
             <img className="h-7 w-auto dark:hidden lg:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
 
-            <div className="flex flex-wrap items-center gap-2 min-w-0 text-xs sm:text-sm">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs sm:text-sm">
               {displayOrg && displayProject ? (
                 <>
-                  <span className="truncate font-semibold text-neutral-500 dark:text-slate-400">
-                    {displayOrg}  &gt;
-                  </span>
-                  <span className="text-neutral-300 dark:text-slate-700 text-sm font-medium">&rsaquo;</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsProjectModalOpen(true)}
-                    title="Click to view & copy Project ID"
-                    className="group flex items-center gap-1.5 rounded-lg px-2 py-1 text-neutral-900 transition hover:bg-neutral-100 hover:text-blue-600 dark:text-white dark:hover:bg-slate-900 dark:hover:text-blue-400"
-                  >
-                    <span className="truncate">{displayProject}</span>
-                  </button>
+                  <span className="truncate font-semibold text-neutral-500 dark:text-slate-400">{displayOrg}</span>
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    size={14}
+                    strokeWidth={2}
+                    className="shrink-0 text-neutral-300 dark:text-slate-600"
+                    aria-hidden="true"
+                  />
+                  <ProjectSwitcher
+                    variant="inline"
+                    target="current"
+                    projectId={projectId}
+                    organizationId={organizationId}
+                    fallbackName={displayProject}
+                    onShowDetails={projectId ? () => setIsProjectModalOpen(true) : undefined}
+                  />
                 </>
               ) : (
                 <h1 id="dashboard-title" className="truncate text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-white">

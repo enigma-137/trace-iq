@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { SetupWizard } from '../SetupWizard';
 import { EmptyState } from '@/components/EmptyState';
-import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
+import { dashboardGet, readActiveProjectCookie, requireDashboardSession } from '@/lib/dashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +22,16 @@ export default async function SetupPage({
   const projectId = Array.isArray(searchParams.projectId) ? searchParams.projectId[0] : searchParams.projectId;
   const organizationId = Array.isArray(searchParams.organizationId) ? searchParams.organizationId[0] : searchParams.organizationId;
 
-  const { data } = await dashboardGet<SetupResponse>(
-    `/v1/setup${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
-    token
-  );
+  // /v1/setup ignores the active-project header and returns the organization's
+  // first project, so pass the project the user last switched to explicitly.
+  // A stale cookie (deleted or inaccessible project) falls back to the default.
+  const preferredProjectId = projectId ?? readActiveProjectCookie() ?? undefined;
+  const setupPath = (id?: string) => `/v1/setup${id ? `?projectId=${encodeURIComponent(id)}` : ''}`;
+
+  let { data } = await dashboardGet<SetupResponse>(setupPath(preferredProjectId), token);
+  if (!data?.project && preferredProjectId && !projectId) {
+    ({ data } = await dashboardGet<SetupResponse>(setupPath(), token));
+  }
 
   const activeProject = data?.project;
   const activeOrg = data?.organization;
@@ -41,8 +47,10 @@ export default async function SetupPage({
       <div className="mx-auto max-w-5xl py-4">
         {activeProject ? (
           <SetupWizard
+            key={activeProject.id}
             projectId={activeProject.id}
             projectName={activeProject.name}
+            organizationId={activeOrg?.id ?? organizationId}
             writeKey={data?.writeKey?.value ?? undefined}
             userEmail={user.email}
           />
