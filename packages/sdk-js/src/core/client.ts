@@ -365,7 +365,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
       const url = self.requestUrl(input);
       const method = self.requestMethod(input, init);
 
-      if (self.isInternalUrl(url)) {
+      if (!self.shouldCaptureRequest(url, (name) => self.requestHeader(input, init, name))) {
         return originalFetch.call(window, input as RequestInfo, init);
       }
 
@@ -405,7 +405,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
     Xhr.prototype.send = function (this: Tracked, body?: Document | XMLHttpRequestBodyInit | null) {
       const tracked = this.__traceiq;
-      if (tracked && !self.isInternalUrl(tracked.url)) {
+      if (tracked && self.shouldCaptureRequest(tracked.url)) {
         const start = self.nowMs();
         let recorded = false;
         const finish = () => {
@@ -470,6 +470,11 @@ export class BrowserTraceIQClient implements TraceIQClient {
     response?: Response,
     getHeader: (name: string) => string | null = (name) => this.responseHeader(response, name)
   ): void {
+    // A response that is an HTML document is a page load (Remix/Turbo/htmx-style
+    // navigation, a prefetch, an SPA fallback), not an API call.
+    if (!this.requestCaptureConfig().includePageRequests && /^text\/html\b/i.test(safeHeader(getHeader, 'content-type') ?? '')) {
+      return;
+    }
     const properties: Record<string, unknown> = {
       method,
       path: normalizeApiPath(url, this.getLocation()?.origin),
@@ -512,6 +517,34 @@ export class BrowserTraceIQClient implements TraceIQClient {
     const fromInit = init?.method;
     const fromRequest = typeof input !== 'string' && !(input instanceof URL) ? input.method : undefined;
     return (fromInit ?? fromRequest ?? 'GET').toUpperCase();
+  }
+
+  private requestCaptureConfig(): RequestCaptureConfig {
+    const option = this.options?.autoCaptureRequests;
+    return typeof option === 'object' && option !== null ? option : {};
+  }
+
+  // Decides before the request is sent whether it is an API call worth recording.
+  // Framework navigation (Next.js RSC payloads and prefetches), dev-server/HMR
+  // traffic and static assets are page loads, not API calls, and are skipped.
+  private shouldCaptureRequest(url: string, header?: (name: string) => string | null): boolean {
+    if (this.isInternalUrl(url)) return false;
+    const config = this.requestCaptureConfig();
+    if (config.exclude?.some((pattern) => matchesUrl(pattern, url))) return false;
+    if (config.include && config.include.length > 0) return config.include.some((pattern) => matchesUrl(pattern, url));
+    if (config.includePageRequests) return true;
+    if (header && (header('rsc') !== null || header('next-router-prefetch') !== null)) return false;
+    return !isFrameworkOrAssetUrl(url, this.getLocation()?.origin);
+  }
+
+  private requestHeader(input: RequestInfo | URL, init: RequestInit | undefined, name: string): string | null {
+    try {
+      const fromInit = init?.headers ? new Headers(init.headers).get(name) : null;
+      if (fromInit !== null) return fromInit;
+      return typeof input !== 'string' && !(input instanceof URL) ? input.headers?.get(name) ?? null : null;
+    } catch {
+      return null;
+    }
   }
 
   private isInternalUrl(url: string): boolean {
@@ -1216,6 +1249,26 @@ export class BrowserTraceIQClient implements TraceIQClient {
         console.log(message);
       }
     }
+  }
+}
+
+type RequestCaptureConfig = Exclude<NonNullable<TraceIQInitOptions['autoCaptureRequests']>, boolean>;
+
+function matchesUrl(pattern: string | RegExp, url: string): boolean {
+  return typeof pattern === 'string' ? url.includes(pattern) : pattern.test(url);
+}
+
+const FRAMEWORK_PATH = /^\/(_next|__nextjs|_nuxt|__vite_ping|@vite|@fs|@id|@react-refresh|__webpack_hmr|sockjs-node|_app\/immutable)\b|\.hot-update\./;
+const ASSET_EXTENSION =
+  /\.(m?js|cjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp3|mp4|webm|ogg|wav|wasm|txt|webmanifest)$/i;
+
+function isFrameworkOrAssetUrl(rawUrl: string, base?: string): boolean {
+  try {
+    const parsed = new URL(rawUrl, base ?? 'http://localhost');
+    if (parsed.searchParams.has('_rsc')) return true;
+    return FRAMEWORK_PATH.test(parsed.pathname) || ASSET_EXTENSION.test(parsed.pathname);
+  } catch {
+    return false;
   }
 }
 

@@ -46,8 +46,14 @@ export interface MiddlewareOptions {
   resolveUserId?: (req: RequestLike) => string | undefined;
   /** Override how the route/path is derived. Defaults to the Express route template. */
   path?: (req: RequestLike) => string;
-  /** Return true to skip a request (health checks, static assets, …). */
+  /** Return true to skip a request (health checks, …). */
   ignore?: (req: RequestLike) => boolean;
+  /**
+   * Also record page loads: HTML responses (server-rendered pages, SPA fallback),
+   * static assets and framework/dev-server paths. Off by default, so the Requests
+   * explorer and API performance show API calls only.
+   */
+  includePageRequests?: boolean;
   /** Logical service name shown in the Requests explorer (e.g. "billing-api"). */
   service?: string;
   /** Deployment environment (e.g. "production"). Defaults to NODE_ENV when set. */
@@ -83,6 +89,18 @@ interface Capturer {
 
 const ID_PATTERN = /^[A-Za-z0-9._:/+=-]{1,128}$/;
 const TRACEPARENT = /^[\da-f]{2}-([\da-f]{32})-([\da-f]{16})-[\da-f]{2}$/i;
+
+const FRAMEWORK_PATH = /^\/(_next|__nextjs|_nuxt|__vite_ping|@vite|@fs|@id|@react-refresh|__webpack_hmr|sockjs-node|_app\/immutable)\b|\.hot-update\./;
+const ASSET_EXTENSION =
+  /\.(m?js|cjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp3|mp4|webm|ogg|wav|wasm|txt|webmanifest)$/i;
+
+// Page loads, assets and framework traffic rather than API calls.
+function isPageRequest(req: RequestLike, res: ResponseLike): boolean {
+  const pathname = (req.originalUrl ?? req.url ?? '/').split(/[?#]/)[0];
+  if (FRAMEWORK_PATH.test(pathname) || ASSET_EXTENSION.test(pathname)) return true;
+  const contentType = String(res.getHeader?.('content-type') ?? '');
+  return /^text\/html\b/i.test(contentType);
+}
 
 const SENSITIVE_HEADERS = new Set([
   'authorization',
@@ -145,6 +163,7 @@ export function createRequestMiddleware(client: Capturer, options: MiddlewareOpt
       if (recorded) return;
       recorded = true;
       try {
+        if (!options.includePageRequests && isPageRequest(req, res)) return;
         const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
         const status = aborted ? 499 : res.statusCode ?? 0;
         const rawUrl = req.originalUrl ?? req.url ?? '/';

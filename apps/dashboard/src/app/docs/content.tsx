@@ -1209,7 +1209,14 @@ app.use(traceiq.middleware({
   writeKey: 'YOUR_WRITE_KEY',
   endpoint: '${apiBaseUrl}',
   autoCaptureRequests: true, // capture outgoing fetch() and XHR as $api_request
+  // Or narrow it to your backend:
+  // autoCaptureRequests: { include: ['https://api.example.com'], exclude: [/\/health$/] },
 });`}</Code>
+        <P>
+          Only API calls are recorded. Page loads are skipped on both sides: Next.js navigations and prefetches (RSC
+          requests), dev-server/HMR traffic, static assets, and any response that is an HTML page. Pass{' '}
+          <Mono>includePageRequests: true</Mono> (browser option object, or the middleware option) to record them too.
+        </P>
         <P>
           <strong>Server vs browser timings.</strong> The middleware measures how long your handler took, which is the
           number your host (Railway, Render, Fly…) reports. A browser timing is the full round trip from the

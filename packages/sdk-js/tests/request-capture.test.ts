@@ -145,3 +145,59 @@ describe('browser console capture', () => {
     }
   });
 });
+
+describe('browser request capture filtering', () => {
+  function capturing(option: unknown = true) {
+    const client = new BrowserTraceIQClient();
+    (client as unknown as { options: Record<string, unknown> }).options = {
+      projectId: 'p',
+      writeKey: 'w',
+      endpoint: 'https://ingest.traceiq.test',
+      autoCaptureRequests: option
+    };
+    const track = vi.spyOn(client, 'track').mockImplementation(() => undefined);
+    const internals = client as unknown as {
+      shouldCaptureRequest(url: string, header?: (name: string) => string | null): boolean;
+      recordRequest(method: string, url: string, status: number, ms: number, r?: Response, h?: (n: string) => string | null): void;
+    };
+    return { client, track, internals };
+  }
+
+  it('skips Next.js navigation, prefetches, HMR and static assets but keeps API calls', () => {
+    const { internals } = capturing();
+    const noHeaders = () => null;
+    expect(internals.shouldCaptureRequest('https://app.test/dashboard?_rsc=1x2y', noHeaders)).toBe(false);
+    expect(internals.shouldCaptureRequest('https://app.test/meals', (n) => (n === 'rsc' ? '1' : null))).toBe(false);
+    expect(internals.shouldCaptureRequest('https://app.test/meals', (n) => (n === 'next-router-prefetch' ? '1' : null))).toBe(false);
+    expect(internals.shouldCaptureRequest('https://app.test/_next/static/chunks/main.js')).toBe(false);
+    expect(internals.shouldCaptureRequest('https://app.test/logo.svg')).toBe(false);
+    expect(internals.shouldCaptureRequest('https://app.test/main.abc.hot-update.json')).toBe(false);
+    expect(internals.shouldCaptureRequest('https://ingest.traceiq.test/v1/events')).toBe(false);
+    expect(internals.shouldCaptureRequest('https://api.app.test/v1/meals', noHeaders)).toBe(true);
+    expect(internals.shouldCaptureRequest('https://api.app.test/build-status')).toBe(true);
+  });
+
+  it('drops responses that are HTML documents (page loads)', () => {
+    const { track, internals } = capturing();
+    internals.recordRequest('GET', 'https://app.test/about', 200, 80, undefined, (n) =>
+      n === 'content-type' ? 'text/html; charset=utf-8' : null
+    );
+    internals.recordRequest('GET', 'https://api.app.test/meals', 200, 80, undefined, (n) =>
+      n === 'content-type' ? 'application/json' : null
+    );
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track.mock.calls[0][1]).toMatchObject({ path: '/meals' });
+  });
+
+  it('honours include / exclude lists and the page-request opt-in', () => {
+    const scoped = capturing({ include: ['https://api.app.test'], exclude: [/\/health$/] }).internals;
+    expect(scoped.shouldCaptureRequest('https://api.app.test/v1/meals')).toBe(true);
+    expect(scoped.shouldCaptureRequest('https://api.app.test/health')).toBe(false);
+    expect(scoped.shouldCaptureRequest('https://maps.googleapis.com/geocode')).toBe(false);
+
+    const everything = capturing({ includePageRequests: true });
+    expect(everything.internals.shouldCaptureRequest('https://app.test/dashboard?_rsc=1')).toBe(true);
+    everything.internals.recordRequest('GET', 'https://app.test/about', 200, 80, undefined, () => 'text/html');
+    expect(everything.track).toHaveBeenCalledTimes(1);
+  });
+});

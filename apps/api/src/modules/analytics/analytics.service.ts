@@ -289,9 +289,9 @@ export class AnalyticsService {
         SELECT
           to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
           count(*)::int AS total,
-          count(*) FILTER (
-            WHERE event_name = '$api_request' OR properties->>'durationMs' IS NOT NULL
-          )::int AS api_calls,
+          -- Only real request telemetry: a custom event that happens to carry a
+          -- durationMs (time on page, a video watched) is not an API call.
+          count(*) FILTER (WHERE event_name = '$api_request')::int AS api_calls,
           count(*) FILTER (
             WHERE event_name = '$exception' OR event_name = '$error'
           )::int AS errors

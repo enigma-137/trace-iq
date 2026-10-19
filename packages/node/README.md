@@ -77,6 +77,7 @@ app.use(traceiq.middleware({ service: 'billing-api', environment: 'production' }
 | `environment` | `NODE_ENV` | Deployment environment. |
 | `requestIdHeader` | `x-request-id` | Incoming id to reuse; otherwise a UUID is generated. |
 | `echoRequestId` | `true` | Sets `x-request-id` on the response so browsers/monitors can link to the record. |
+| `includePageRequests` | `false` | Also record HTML page responses, static assets and framework/dev-server paths. Off, so only API calls are recorded. |
 | `capturePayloads` | off | `true` or `{ headers?, bodies?, maxBodyBytes?, shouldCapture? }`. |
 | `resolveUserId`, `path`, `ignore` | — | As before. |
 

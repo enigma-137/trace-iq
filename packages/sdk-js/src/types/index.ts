@@ -13,10 +13,23 @@ export interface TraceIQInitOptions {
   /**
    * Auto-capture outgoing fetch() and XMLHttpRequest (axios, jQuery, …) calls as
    * `$api_request` events (method, path, status, durationMs). Off by default —
-   * enabling it records every non-TraceIQ request the page makes. Browser timings
+   * enabling it records every non-TraceIQ API call the page makes. Browser timings
    * are full round trips, so API performance reports them apart from server timings.
+   *
+   * Page loads are skipped: Next.js navigations/prefetches (RSC), dev-server and
+   * HMR traffic, static assets, and any response that is an HTML document. Pass an
+   * object to narrow or widen that, e.g. `{ include: ['https://api.example.com'] }`.
    */
-  autoCaptureRequests?: boolean;
+  autoCaptureRequests?:
+    | boolean
+    | {
+        /** Only record URLs containing one of these strings / matching these patterns. */
+        include?: Array<string | RegExp>;
+        /** Never record URLs containing one of these strings / matching these patterns. */
+        exclude?: Array<string | RegExp>;
+        /** Also record page loads, framework navigation and assets. Default false. */
+        includePageRequests?: boolean;
+      };
   /**
    * Forward console output to TraceIQ Logs (service "web-console"). `true` captures
    * log/info/warn/error; pass `{ levels }` to choose. Off by default.
