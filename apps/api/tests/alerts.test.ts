@@ -171,6 +171,9 @@ describe('AlertsService.evaluateAlert (persist + notify)', () => {
     const body = JSON.parse(init.body);
     expect(body.alertId).toBe('alt_1');
     expect(body.value).toBe(150);
+    // Slack (text) and Discord (content) incoming webhooks accept the payload as-is.
+    expect(body.text).toMatch(/^TraceIQ alert: /);
+    expect(body.content).toBe(body.text);
     const webhookDeliveries = db.queryCalls(/INSERT INTO alert_deliveries/).filter((c) => c.values[3] === 'webhook');
     expect(webhookDeliveries).toHaveLength(1);
     expect(webhookDeliveries[0].values[5]).toBe('sent');
@@ -261,10 +264,27 @@ describe('AlertsService Cloud feature gates', () => {
     );
 
     await expect(service.create({ id: 'usr_1' } as never, {
-      projectId: 'proj_1', name: 'Signups', eventName: 'signup', measure: 'count', condition: 'above', threshold: 10
+      projectId: 'proj_1', name: 'Signups', eventName: 'signup', measure: 'count', condition: 'above', threshold: 10,
+      emailRecipients: ['ops@b.co']
     })).resolves.toMatchObject({ name: 'Signups' });
     expect(entitlements.assertAlertsAvailable).toHaveBeenCalledWith('org_1');
     expect(db.queryCalls(/INSERT INTO alerts/)).toHaveLength(1);
+  });
+
+  it('accepts a webhook-only alert and rejects an alert with no channel', async () => {
+    const makeCreateService = () =>
+      new AlertsService(
+        mockDatabase(() => affected(1)) as never,
+        { requireWritableProject: vi.fn().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1' }) } as never,
+        { resolveMembers: vi.fn().mockResolvedValue([]) } as never,
+        { send: vi.fn() } as never,
+        { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) } as never
+      );
+    const base = { projectId: 'proj_1', name: 'Signups', eventName: 'signup', measure: 'count', condition: 'above', threshold: 10 };
+
+    await expect(makeCreateService().create({ id: 'usr_1' } as never, { ...base, webhookUrl: 'https://hooks.example.com/alert' }))
+      .resolves.toMatchObject({ name: 'Signups' });
+    await expect(makeCreateService().create({ id: 'usr_1' } as never, base)).rejects.toThrow(/at least one notification channel/);
   });
 
   it('blocks creating and enabling alerts without Pro while still allowing disable', async () => {

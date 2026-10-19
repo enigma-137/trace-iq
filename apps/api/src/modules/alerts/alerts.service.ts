@@ -221,7 +221,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
       ? toUniqueGroupIds(body.notificationGroupIds)
       : [];
 
-    if (webhookUrl && emailRecipients.length === 0 && notificationGroupIds.length === 0) {
+    if (!webhookUrl && emailRecipients.length === 0 && notificationGroupIds.length === 0) {
       throw new BadRequestException('Pick at least one notification channel (webhook and/or email recipients/groups).');
     }
 
@@ -485,6 +485,9 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          // Chat apps read a single text field: Slack uses `text`, Discord `content`.
+          text: `TraceIQ alert: ${message}`,
+          content: `TraceIQ alert: ${message}`,
           alertId: alert.id,
           name: alert.name,
           event: alert.event_name,

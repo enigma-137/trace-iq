@@ -349,7 +349,7 @@ export function CreateAlertModal({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-1">
-                Webhook URL (Slack, Discord, PagerDuty)
+                Webhook URL (Slack, Discord, or any HTTPS endpoint)
               </label>
               <input
                 className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600"

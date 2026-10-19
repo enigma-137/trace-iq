@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -10,6 +10,22 @@ import { toast } from '@/lib/toast';
 import type { FilterCondition } from '@/components/SegmentFilters';
 import { CreateAlertModal, AlertFormData } from './CreateAlertModal';
 import { NotificationGroupModal } from './NotificationGroupModal';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
+import Clock01Icon from '@hugeicons/core-free-icons/Clock01Icon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
+import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
+import Notification02Icon from '@hugeicons/core-free-icons/Notification02Icon';
+import PauseIcon from '@hugeicons/core-free-icons/PauseIcon';
+import PencilEdit02Icon from '@hugeicons/core-free-icons/PencilEdit02Icon';
+import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
+import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
+import WebhookIcon from '@hugeicons/core-free-icons/WebhookIcon';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -106,7 +122,7 @@ function humanReadableCondition(alert: Alert): string {
         ? `unique users for "${alert.eventName}"`
         : `average ${alert.property ? `"${alert.property}"` : 'property'} for "${alert.eventName}"`;
 
-  const windowStr = alert.windowHours === 168 ? '7 days' : `${alert.windowHours} hours`;
+  const windowStr = alert.windowHours === 168 ? '7 days' : alert.windowHours === 1 ? '1 hour' : `${alert.windowHours} hours`;
 
   switch (alert.condition) {
     case 'drops_by':
@@ -127,6 +143,145 @@ function formatDate(value: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+type AlertFilter = 'all' | 'firing' | 'active' | 'paused';
+
+const FILTERS: Array<{ value: AlertFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'firing', label: 'Firing' },
+  { value: 'active', label: 'Active' },
+  { value: 'paused', label: 'Paused' }
+];
+
+/** Firing first, then active, then paused. */
+function statusRank(alert: Alert): number {
+  if (alert.enabled && alert.lastStatus === 'triggered') return 0;
+  return alert.enabled ? 1 : 2;
+}
+
+function alertStatus(alert: Alert, alertsAvailable: boolean) {
+  if (!alertsAvailable) {
+    return { key: 'locked', label: 'Pro required', badge: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300', dot: 'bg-amber-500' };
+  }
+  if (!alert.enabled) {
+    return { key: 'paused', label: 'Paused', badge: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300', dot: 'bg-neutral-400' };
+  }
+  if (alert.lastStatus === 'triggered') {
+    return { key: 'firing', label: 'Firing', badge: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300', dot: 'bg-red-500 animate-pulse' };
+  }
+  return { key: 'active', label: 'Active', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', dot: 'bg-emerald-500' };
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function thresholdLabel(alert: Alert): string {
+  switch (alert.condition) {
+    case 'above':
+      return `above ${formatNumber(alert.threshold)}`;
+    case 'below':
+      return `below ${formatNumber(alert.threshold)}`;
+    case 'drops_by':
+      return `drop of ${alert.threshold}%`;
+    case 'spikes_by':
+      return `spike of ${alert.threshold}%`;
+    default:
+      return `${alert.condition} ${formatNumber(alert.threshold)}`;
+  }
+}
+
+function formatRelative(value: string | null): string {
+  if (!value) return 'never';
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return value;
+  const seconds = Math.round((Date.now() - then) / 1000);
+  if (seconds < 45) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return days < 30 ? `${days} d ago` : formatDate(value);
+}
+
+/** The deliveries from the most recent firing (they share a send time within a minute). */
+function latestDeliveries(deliveries: AlertDelivery[]): AlertDelivery[] {
+  if (deliveries.length === 0) return [];
+  const sorted = [...deliveries].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+  const newest = new Date(sorted[0].sentAt).getTime();
+  return sorted.filter((d) => newest - new Date(d.sentAt).getTime() < 60_000).slice(0, 5);
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function StatTile({ label, value, hint, tone }: { label: string; value: number; hint: string; tone?: 'critical' | 'good' }) {
+  const valueColor =
+    tone === 'critical' ? 'text-red-600 dark:text-red-400' : tone === 'good' ? 'text-emerald-600 dark:text-emerald-400' : 'text-neutral-900 dark:text-white';
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 dark:text-slate-400">{label}</p>
+      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueColor}`}>{value}</p>
+      <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-slate-400">{hint}</p>
+    </div>
+  );
+}
+
+function IconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  danger,
+  showLabel
+}: {
+  label: string;
+  icon: IconSvgElement;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  showLabel?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 dark:border-slate-800 ${
+        danger
+          ? 'text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-400'
+          : 'text-neutral-700 hover:bg-neutral-50 dark:text-slate-200 dark:hover:bg-slate-900'
+      }`}
+    >
+      <HugeiconsIcon icon={icon} size={14} strokeWidth={1.9} />
+      {showLabel ? <span>{label}</span> : null}
+    </button>
+  );
+}
+
+function Chip({ icon, title, children }: { icon: IconSvgElement; title?: string; children: ReactNode }) {
+  return (
+    <span
+      title={title}
+      className="inline-flex max-w-full items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+    >
+      <HugeiconsIcon icon={icon} size={12} className="shrink-0 text-neutral-400 dark:text-slate-500" />
+      <span className="truncate">{children}</span>
+    </span>
+  );
 }
 
 export function AlertManager({
@@ -162,6 +317,8 @@ export function AlertManager({
   const [groupToDelete, setGroupToDelete] = useState<NotificationGroup | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { message: string; triggered: boolean }>>({});
+  const [filter, setFilter] = useState<AlertFilter>('all');
+  const [search, setSearch] = useState('');
 
   async function getToken(): Promise<string | null> {
     const {
@@ -356,542 +513,370 @@ export function AlertManager({
     }
   }
 
-  // Metrics summary
+  // Summary
+  const firingAlerts = alerts.filter((a) => a.enabled && a.lastStatus === 'triggered');
   const activeAlertsCount = alerts.filter((a) => a.enabled).length;
-  const triggeredCount = alerts.filter((a) => a.lastStatus === 'triggered').length;
-  const totalDestinationsCount =
-    alerts.reduce((sum, a) => {
-      let count = 0;
-      if (a.webhookUrl) count++;
-      if (a.emailRecipients.length > 0) count += a.emailRecipients.length;
-      if (a.notificationGroupIds.length > 0) count += a.notificationGroupIds.length;
-      return sum + count;
-    }, 0) + notificationGroups.length;
+  const pausedCount = alerts.length - activeAlertsCount;
+  const counts: Record<AlertFilter, number> = {
+    all: alerts.length,
+    firing: firingAlerts.length,
+    active: activeAlertsCount,
+    paused: pausedCount
+  };
+
+  const visibleAlerts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return alerts
+      .filter((a) => {
+        if (filter === 'firing' && !(a.enabled && a.lastStatus === 'triggered')) return false;
+        if (filter === 'active' && !a.enabled) return false;
+        if (filter === 'paused' && a.enabled) return false;
+        if (q && !`${a.name} ${a.eventName}`.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => statusRank(a) - statusRank(b) || a.name.localeCompare(b.name));
+  }, [alerts, filter, search]);
+
+  const createDisabled = !alertsAvailable;
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-sm leading-6 text-neutral-500 dark:text-slate-400">
+            Watch any event count, unique users or property average over a rolling window, and get an email or webhook the
+            moment it crosses a threshold, drops, or spikes.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => handleOpenCreateAlert()}
+          disabled={createDisabled}
+          className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-blue-500 disabled:opacity-50 sm:self-auto"
+        >
+          <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+          New alert
+        </button>
+      </div>
+
       {/* Plan Entitlement Warning */}
       {!alertsAvailable ? (
-        <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <strong className="font-semibold">Automated Alerts require Pro:</strong> Alert rules remain saved, but background evaluation and incident notifications are paused.
-            </div>
-            <Link
-              href="/dashboard/settings/billing"
-              className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition"
-            >
-              Upgrade to Pro →
-            </Link>
-          </div>
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <strong className="font-semibold">Alerts need the Pro plan.</strong> Your rules stay saved, but they are not
+            checked and no notifications go out.
+          </p>
+          <Link
+            href="/dashboard/settings/billing"
+            className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700"
+          >
+            Upgrade to Pro
+          </Link>
         </div>
       ) : null}
 
-      {/* Summary Metric Cards: Solid Blue Cards with White Text */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Solid Blue Card 1: Active Monitors */}
-        <div className="relative overflow-hidden rounded-xl border border-blue-500 bg-blue-600 p-5 text-white shadow-sm dark:border-blue-600 dark:bg-blue-600">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-100">
-              Active Monitors
-            </span>
-            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
-              {alerts.length} Total
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">
-              {activeAlertsCount}
-            </span>
-            <span className="text-xs text-blue-100 font-medium">
-              monitors enabled
-            </span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-blue-50/90">
-            {activeAlertsCount > 0
-              ? 'Continuously evaluating rolling telemetry in the background.'
-              : 'No active monitors enabled. Create or enable an alert below.'}
-          </p>
-        </div>
-
-        {/* Solid Blue Card 2: Recent Firings */}
-        <div className="relative overflow-hidden rounded-xl border border-blue-500 bg-blue-600 p-5 text-white shadow-sm dark:border-blue-600 dark:bg-blue-600">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-100">
-              Recent Firings
-            </span>
-            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
-              {triggeredCount > 0 ? 'Attention' : 'Healthy'}
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">
-              {recentEvents.length}
-            </span>
-            <span className="text-xs text-blue-100 font-medium">
-              incident events
-            </span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-blue-50/90">
-            {recentEvents.length > 0
-              ? `${recentEvents.length} threshold alerts recorded across recent evaluation windows.`
-              : 'All monitored metrics are currently within normal baseline thresholds.'}
-          </p>
-        </div>
-
-        {/* Neutral Card 3: Notification Destinations */}
-        <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 lg:col-span-1">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-                Notification Channels
-              </span>
-              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600 dark:bg-slate-900 dark:text-slate-300">
-                {notificationGroups.length} Groups
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-bold tracking-tight text-neutral-900 tabular-nums dark:text-white">
-                {totalDestinationsCount}
-              </span>
-              <span className="text-xs text-neutral-500 dark:text-slate-400 font-medium">
-                destinations configured
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
-              Webhooks, team notification groups, and direct email recipients ready to dispatch alerts.
-            </p>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-slate-800/80">
-            <button
-              type="button"
-              onClick={() => handleOpenCreateAlert()}
-              disabled={!alertsAvailable}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span>Create New Alert</span>
-            </button>
-          </div>
-        </div>
+      {/* Summary */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Alert summary">
+        <StatTile
+          label="Firing now"
+          value={firingAlerts.length}
+          tone={firingAlerts.length > 0 ? 'critical' : 'good'}
+          hint={firingAlerts.length > 0 ? 'Needs attention' : 'Everything within limits'}
+        />
+        <StatTile label="Active" value={activeAlertsCount} hint={`${alerts.length} alert${alerts.length === 1 ? '' : 's'} in total`} />
+        <StatTile label="Paused" value={pausedCount} hint={pausedCount > 0 ? 'Not being checked' : 'None paused'} />
+        <StatTile
+          label="Recent firings"
+          value={recentEvents.length}
+          hint={recentEvents[0] ? `Last ${formatRelative(recentEvents[0].triggeredAt)}` : 'No firings yet'}
+        />
       </section>
 
-      {/* Main Alerts Section & Recent Firings Layout */}
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        {/* Left Column: Primary Alerts List */}
-        <div className="space-y-6">
-          <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 shadow-xs">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-neutral-200/80 dark:border-slate-800/80">
-              <div>
-                <h3 className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
-                  Monitored Alerts
-                </h3>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
-                  Automated metric monitors running in the background.
-                </p>
-              </div>
+      {/* Firing banner */}
+      {firingAlerts.length > 0 ? (
+        <div className="flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+          <HugeiconsIcon icon={Alert02Icon} size={18} strokeWidth={2} className="mt-0.5 shrink-0" />
+          <p>
+            <strong className="font-semibold">
+              {firingAlerts.length === 1 ? `"${firingAlerts[0].name}" is firing.` : `${firingAlerts.length} alerts are firing.`}
+            </strong>{' '}
+            {firingAlerts.length === 1 && firingAlerts[0].lastValue !== null
+              ? `Last value ${formatNumber(firingAlerts[0].lastValue)}, threshold ${thresholdLabel(firingAlerts[0])}.`
+              : 'They are listed first below.'}
+          </p>
+        </div>
+      ) : null}
 
-              {alerts.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => handleOpenCreateAlert()}
-                  disabled={!alertsAvailable}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-500 self-start sm:self-auto"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  <span>Create alert</span>
-                </button>
-              ) : null}
-            </div>
-
-            {/* Alerts List or Rich Empty State */}
-            {alerts.length === 0 ? (
-              <div className="py-8 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 mb-4 shadow-inner">
-                  <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  </svg>
-                </div>
-                <h4 className="text-base font-bold text-neutral-900 dark:text-white">
-                  No automated alerts created yet
-                </h4>
-                <p className="mx-auto mt-1.5 max-w-lg text-sm text-neutral-500 dark:text-slate-400">
-                  Alerts proactively monitor your telemetry so you know immediately if key metrics drop, error rates spike, or usage hits abnormal levels without watching dashboards.
-                </p>
-
-                <div className="mt-6 flex justify-center">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        {/* Alerts list */}
+        <section className="min-w-0 overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex flex-col gap-3 border-b border-neutral-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+            <div role="tablist" aria-label="Filter alerts" className="flex flex-wrap gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-slate-900">
+              {FILTERS.map((f) => {
+                const selected = filter === f.value;
+                return (
                   <button
+                    key={f.value}
                     type="button"
-                    onClick={() => handleOpenCreateAlert()}
-                    disabled={!alertsAvailable}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-500"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setFilter(f.value)}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                      selected
+                        ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    <span>Create your first alert</span>
-                  </button>
-                </div>
-
-                {/* Recommended Alert Templates */}
-                <div className="mt-10 pt-8 border-t border-neutral-100 dark:border-slate-800/80">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500 mb-4">
-                    Or start with a common template:
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-3 max-w-3xl mx-auto text-left">
-                    {TEMPLATE_ALERTS.map((tmpl) => (
-                      <button
-                        key={tmpl.name}
-                        type="button"
-                        onClick={() => handleOpenCreateAlert(tmpl.data)}
-                        className="group rounded-xl border border-neutral-200 p-4 transition-all hover:border-blue-500 hover:bg-blue-50/30 hover:shadow-xs dark:border-slate-800 dark:hover:border-blue-500/50 dark:hover:bg-blue-950/20"
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-sm font-semibold text-neutral-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400 transition">
-                            {tmpl.name}
-                          </span>
-                          <span className="text-neutral-400 group-hover:text-blue-600 dark:text-slate-500 dark:group-hover:text-blue-400">
-                            →
-                          </span>
-                        </div>
-                        <p className="mt-1.5 text-xs text-neutral-500 dark:text-slate-400 leading-relaxed">
-                          {tmpl.description}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="divide-y divide-neutral-200/70 dark:divide-slate-800/70">
-                {alerts.map((alert) => {
-                  const testResult = testResults[alert.id];
-                  return (
-                    <div
-                      key={alert.id}
-                      className="py-5 first:pt-4 last:pb-0 flex flex-col gap-4"
+                    {f.label}
+                    <span
+                      className={`tabular-nums ${
+                        f.value === 'firing' && counts.firing > 0 ? 'text-red-600 dark:text-red-400' : 'text-neutral-400 dark:text-slate-500'
+                      }`}
                     >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-1.5 min-w-0">
-                          {/* Alert Title & Status Badge */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${!alertsAvailable
-                                  ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
-                                  : alert.enabled
-                                    ? alert.lastStatus === 'triggered'
-                                      ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-                                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                    : 'bg-neutral-100 text-neutral-500 dark:bg-slate-900 dark:text-slate-400'
-                                }`}
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${!alertsAvailable
-                                    ? 'bg-amber-500'
-                                    : alert.enabled
-                                      ? alert.lastStatus === 'triggered'
-                                        ? 'bg-red-500 animate-pulse'
-                                        : 'bg-emerald-500'
-                                      : 'bg-neutral-400'
-                                  }`}
-                              />
-                              {!alertsAvailable
-                                ? 'Pro required'
-                                : alert.enabled
-                                  ? alert.lastStatus === 'triggered'
-                                    ? 'Firing'
-                                    : 'Active'
-                                  : 'Paused'}
-                            </span>
+                      {counts[f.value]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <label className="relative block sm:w-60">
+              <span className="sr-only">Search alerts</span>
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-slate-500"
+              />
+              <input
+                id="alert-search"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or event"
+                className="w-full rounded-lg border border-neutral-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+              />
+            </label>
+          </div>
 
-                            <h4 className="text-base font-bold text-neutral-900 dark:text-white">
-                              {alert.name}
-                            </h4>
-
-                            <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                              {alert.eventName} · {alert.measure}
-                            </span>
-                          </div>
-
-                          {/* Human Readable Condition */}
-                          <p className="text-sm font-medium text-neutral-700 dark:text-slate-200">
-                            {humanReadableCondition(alert)}
-                          </p>
-
-                          {/* Last Evaluated Info */}
-                          <p className="text-xs text-neutral-400 dark:text-slate-500">
-                            {!alertsAvailable
-                              ? 'Evaluations paused while on Free tier'
-                              : alert.lastValue !== null
-                                ? `Last measured value: ${Math.round(alert.lastValue).toLocaleString()} • Checked ${formatDate(alert.lastEvaluatedAt)}`
-                                : 'Awaiting initial background evaluation cycle…'}
-                          </p>
+          {alerts.length === 0 ? (
+            <div className="px-6 py-10 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                <HugeiconsIcon icon={Notification02Icon} size={22} strokeWidth={1.8} />
+              </div>
+              <h3 className="text-base font-semibold text-neutral-900 dark:text-white">No alerts yet</h3>
+              <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-neutral-500 dark:text-slate-400">
+                Pick a starting point below or build your own. You can test any alert against live data before it goes out.
+              </p>
+              <div className="mx-auto mt-6 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+                {TEMPLATE_ALERTS.map((tmpl) => (
+                  <button
+                    key={tmpl.name}
+                    type="button"
+                    onClick={() => handleOpenCreateAlert(tmpl.data)}
+                    disabled={createDisabled}
+                    className="group rounded-xl border border-neutral-200 p-4 transition hover:border-blue-500 hover:bg-blue-50/40 disabled:opacity-50 dark:border-slate-800 dark:hover:border-blue-500/60 dark:hover:bg-blue-500/5"
+                  >
+                    <span className="flex items-center justify-between gap-2 text-sm font-semibold text-neutral-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+                      {tmpl.name}
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={14} className="shrink-0 text-neutral-400 group-hover:text-blue-500" />
+                    </span>
+                    <span className="mt-1.5 block text-xs leading-5 text-neutral-500 dark:text-slate-400">{tmpl.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : visibleAlerts.length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-neutral-500 dark:text-slate-400">
+              {search.trim() ? 'No alerts match your search.' : `No ${filter} alerts.`}
+            </p>
+          ) : (
+            <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
+              {visibleAlerts.map((alert) => {
+                const status = alertStatus(alert, alertsAvailable);
+                const testResult = testResults[alert.id];
+                const deliveries = latestDeliveries(alert.deliveries);
+                const busy = busyId === alert.id;
+                return (
+                  <li key={alert.id} className={`p-4 sm:p-5 ${status.key === 'firing' ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.badge}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                            {status.label}
+                          </span>
+                          <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{alert.name}</h3>
                         </div>
-
-                        {/* Actions Toolbar */}
-                        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleTest(alert)}
-                            disabled={!alertsAvailable || busyId === alert.id}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition"
-                            title="Run dry-run evaluation check"
-                          >
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polygon points="5 3 19 12 5 21 5 3" />
-                            </svg>
-                            <span>{busyId === alert.id ? 'Testing…' : 'Test'}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(alert)}
-                            disabled={!alertsAvailable || busyId === alert.id}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${alert.enabled
-                                ? 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
-                                : 'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-slate-200'
-                              }`}
-                          >
-                            {alert.enabled ? 'Pause' : 'Enable'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDuplicateAlert(alert)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition"
-                            title="Duplicate alert configuration"
-                          >
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                            </svg>
-                            <span>Duplicate</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setAlertToDelete(alert)}
-                            className="inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
-                            aria-label={`Delete ${alert.name}`}
-                            title="Delete alert"
-                          >
-                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            </svg>
-                          </button>
-                        </div>
+                        <p className="text-sm text-neutral-600 dark:text-slate-300">{humanReadableCondition(alert)}</p>
+                        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
+                          <span className="font-mono text-neutral-600 dark:text-slate-300">{alert.eventName}</span>
+                          {!alertsAvailable ? (
+                            <span>Not checked on the Free plan</span>
+                          ) : alert.lastValue !== null ? (
+                            <>
+                              <span>
+                                Last value <strong className="font-semibold text-neutral-800 tabular-nums dark:text-slate-100">{formatNumber(alert.lastValue)}</strong>{' '}
+                                · threshold {thresholdLabel(alert)}
+                              </span>
+                              <span className="inline-flex items-center gap-1" title={formatDate(alert.lastEvaluatedAt)}>
+                                <HugeiconsIcon icon={Clock01Icon} size={12} />
+                                Checked {formatRelative(alert.lastEvaluatedAt)}
+                              </span>
+                            </>
+                          ) : (
+                            <span>Waiting for the first check (runs every few minutes)</span>
+                          )}
+                        </p>
                       </div>
 
-                      {/* Notification Destination Chips */}
-                      {(alert.webhookUrl || alert.emailRecipients.length > 0 || alert.notificationGroupIds.length > 0) ? (
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500 mr-1">
-                            Dispatches to:
-                          </span>
-                          {alert.webhookUrl ? (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                              <svg className="h-3 w-3 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                              <span>Webhook</span>
-                            </span>
-                          ) : null}
-                          {alert.emailRecipients.map((email) => (
-                            <span key={email} className="inline-flex items-center gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-2 py-0.5 text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
-                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
-                              <span>{email}</span>
-                            </span>
-                          ))}
-                          {alert.notificationGroupIds.map((groupId) => {
-                            const groupName = notificationGroups.find((g) => g.id === groupId)?.name ?? 'Group';
-                            return (
-                              <span key={groupId} className="inline-flex items-center gap-1 rounded-md border border-blue-200/70 bg-blue-50/70 px-2 py-0.5 text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
-                                <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                                <span>Group · {groupName}</span>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-
-                      {/* Inline Test Result Banner */}
-                      {testResult ? (
-                        <div
-                          className={`rounded-lg p-3 text-xs font-medium border ${testResult.triggered
-                              ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
-                              : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
-                            }`}
-                        >
-                          <strong className="font-semibold">
-                            {testResult.triggered ? '⚠️ Threshold Triggered: ' : '✅ Threshold Passed: '}
-                          </strong>
-                          {testResult.message}
-                        </div>
-                      ) : null}
+                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                        <IconButton
+                          label={busy ? 'Testing…' : 'Test now'}
+                          icon={PlayIcon}
+                          onClick={() => handleTest(alert)}
+                          disabled={!alertsAvailable || busy}
+                          showLabel
+                        />
+                        <IconButton
+                          label={alert.enabled ? 'Pause' : 'Resume'}
+                          icon={alert.enabled ? PauseIcon : PlayIcon}
+                          onClick={() => handleToggle(alert)}
+                          disabled={!alertsAvailable || busy}
+                          showLabel
+                        />
+                        <IconButton label="Duplicate" icon={Copy01Icon} onClick={() => handleOpenDuplicateAlert(alert)} disabled={createDisabled} />
+                        <IconButton label={`Delete ${alert.name}`} icon={Delete02Icon} onClick={() => setAlertToDelete(alert)} danger />
+                      </div>
                     </div>
-                  );
-                })}
+
+                    {/* Destinations and delivery results */}
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+                      {alert.webhookUrl ? (
+                        <Chip icon={WebhookIcon} title={alert.webhookUrl}>
+                          Webhook · {hostOf(alert.webhookUrl)}
+                        </Chip>
+                      ) : null}
+                      {alert.emailRecipients.map((email) => (
+                        <Chip key={email} icon={Mail01Icon}>
+                          {email}
+                        </Chip>
+                      ))}
+                      {alert.notificationGroupIds.map((groupId) => (
+                        <Chip key={groupId} icon={UserGroupIcon}>
+                          {notificationGroups.find((g) => g.id === groupId)?.name ?? 'Deleted group'}
+                        </Chip>
+                      ))}
+                    </div>
+
+                    {deliveries.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
+                        <span>Last notified {formatRelative(deliveries[0].sentAt)}:</span>
+                        {deliveries.map((d, i) => (
+                          <span
+                            key={`${d.channel}-${d.recipient ?? i}`}
+                            className={d.status === 'sent' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}
+                            title={d.error ?? undefined}
+                          >
+                            {d.channel === 'webhook' ? 'Webhook' : d.recipient ?? 'Email'} {d.status === 'sent' ? 'sent' : `failed${d.error ? ` (${truncate(d.error, 60)})` : ''}`}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {testResult ? (
+                      <div
+                        className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
+                          testResult.triggered
+                            ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
+                            : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+                        }`}
+                      >
+                        <HugeiconsIcon icon={testResult.triggered ? Alert02Icon : CheckmarkCircle02Icon} size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
+                        <span>
+                          <strong className="font-semibold">{testResult.triggered ? 'Would fire now. ' : 'Within limits. '}</strong>
+                          {testResult.message} No notification was sent.
+                        </span>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* Side column */}
+        <div className="min-w-0 space-y-6">
+          <section className="rounded-xl border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-slate-800">
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Recent firings</h3>
+              <span className="text-xs text-neutral-400 tabular-nums dark:text-slate-500">{recentEvents.length}</span>
+            </div>
+            {recentEvents.length === 0 ? (
+              <div className="flex items-center gap-3 px-4 py-6 text-sm text-neutral-500 dark:text-slate-400">
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                No alert has fired yet.
               </div>
+            ) : (
+              <ol className="max-h-[420px] overflow-y-auto px-4 py-2">
+                {recentEvents.map((event) => (
+                  <li key={event.id} className="relative border-l border-neutral-200 py-2.5 pl-4 dark:border-slate-800">
+                    <span className="absolute -left-[4.5px] top-4 h-2 w-2 rounded-full bg-red-500" />
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-neutral-900 dark:text-white">{event.alertName}</p>
+                      <time className="shrink-0 text-[11px] text-neutral-400 dark:text-slate-500" dateTime={event.triggeredAt} title={formatDate(event.triggeredAt)}>
+                        {formatRelative(event.triggeredAt)}
+                      </time>
+                    </div>
+                    <p className="mt-0.5 text-xs leading-5 text-neutral-500 dark:text-slate-400">{event.message}</p>
+                  </li>
+                ))}
+              </ol>
             )}
           </section>
 
-          {/* Notification Groups Management Section */}
-          <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 shadow-xs">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-neutral-200/80 dark:border-slate-800/80">
+          <section className="rounded-xl border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3 dark:border-slate-800">
               <div>
-                <h3 className="text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
-                  Notification Groups
-                </h3>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
-                  Reusable team and on-call recipient bundles for one-click alert routing.
-                </p>
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Notification groups</h3>
+                <p className="text-xs text-neutral-500 dark:text-slate-400">Reusable lists of people to email.</p>
               </div>
-
               <button
                 type="button"
                 onClick={handleOpenCreateGroup}
-                disabled={!alertsAvailable}
-                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 self-start sm:self-auto transition"
+                disabled={createDisabled}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900"
               >
-                <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span>Create notification group</span>
+                <HugeiconsIcon icon={Add01Icon} size={13} strokeWidth={2} />
+                New group
               </button>
             </div>
-
             {notificationGroups.length === 0 ? (
-              <div className="py-6 text-center">
-                <p className="text-sm text-neutral-500 dark:text-slate-400">
-                  No notification groups created yet. Group multiple team emails (e.g. SRE, Support, Backend On-Call) to quickly attach them to any alert.
-                </p>
-                <div className="mt-4 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={handleOpenCreateGroup}
-                    disabled={!alertsAvailable}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black transition"
-                  >
-                    + Add first group
-                  </button>
-                </div>
-              </div>
+              <p className="px-4 py-5 text-xs leading-5 text-neutral-500 dark:text-slate-400">
+                Group emails like "Backend on-call" or "Support" once, then attach the group to any alert. Changes to a group apply to
+                every alert that uses it.
+              </p>
             ) : (
-              <div className="divide-y divide-neutral-200/70 dark:divide-slate-800/70">
+              <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
                 {notificationGroups.map((group) => {
                   const usageCount = alerts.filter((a) => a.notificationGroupIds.includes(group.id)).length;
                   return (
-                    <div
-                      key={group.id}
-                      className="py-4 first:pt-4 last:pb-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
-                            {group.name}
-                          </h4>
-                          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                            Used by {usageCount} {usageCount === 1 ? 'alert' : 'alerts'}
-                          </span>
-                        </div>
-                        <p className="truncate text-xs text-neutral-500 dark:text-slate-400">
-                          {group.memberEmails.join(', ')}
+                    <li key={group.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-neutral-900 dark:text-white">{group.name}</p>
+                        <p className="truncate text-xs text-neutral-500 dark:text-slate-400" title={group.memberEmails.join(', ')}>
+                          {group.memberEmails.length} {group.memberEmails.length === 1 ? 'person' : 'people'} · used by {usageCount}{' '}
+                          {usageCount === 1 ? 'alert' : 'alerts'}
                         </p>
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditGroup(group)}
-                          disabled={!alertsAvailable}
-                          className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setGroupToDelete(group)}
-                          disabled={!alertsAvailable}
-                          className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
-                          aria-label={`Delete group ${group.name}`}
-                          title="Delete group"
-                        >
-                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <IconButton label={`Edit ${group.name}`} icon={PencilEdit02Icon} onClick={() => handleOpenEditGroup(group)} disabled={createDisabled} />
+                        <IconButton label={`Delete ${group.name}`} icon={Delete02Icon} onClick={() => setGroupToDelete(group)} disabled={createDisabled} danger />
                       </div>
-                    </div>
+                    </li>
                   );
                 })}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* Right Column: Recent Firings Feed */}
-        <div>
-          <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950 shadow-xs sticky top-24">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-200/80 dark:border-slate-800/80">
-              <div>
-                <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white">
-                  Recent Firings
-                </h3>
-                <p className="text-xs text-neutral-500 dark:text-slate-400">
-                  Incident events detected by active monitors.
-                </p>
-              </div>
-              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-slate-900 dark:text-slate-400">
-                {recentEvents.length} logged
-              </span>
-            </div>
-
-            {recentEvents.length === 0 ? (
-              <div className="py-10 text-center">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 mb-3">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                </div>
-                <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                  No firings recorded
-                </h4>
-                <p className="mt-1 text-xs text-neutral-500 dark:text-slate-400">
-                  All metrics are operating within specified threshold parameters.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-neutral-200/70 dark:divide-slate-800/70 max-h-[650px] overflow-y-auto">
-                {recentEvents.map((event) => (
-                  <div key={event.id} className="py-3.5 first:pt-3 last:pb-0 space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-bold text-neutral-900 dark:text-white">
-                        {event.alertName}
-                      </p>
-                      <span className="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-700 dark:bg-red-950/60 dark:text-red-300">
-                        Triggered
-                      </span>
-                    </div>
-                    <p className="text-xs text-neutral-600 dark:text-slate-300 leading-relaxed">
-                      {event.message}
-                    </p>
-                    <p className="text-[11px] text-neutral-400 dark:text-slate-500">
-                      {formatDate(event.triggeredAt)}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              </ul>
             )}
           </section>
         </div>

@@ -23,6 +23,7 @@ import { ProjectSwitcher } from './ProjectSwitcher';
 import { Skeleton } from '@/components/Skeleton';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import { CodeBlock } from '../docs/CodeBlock';
 import {
   CopyButton,
   Notice,
@@ -46,6 +47,16 @@ interface SetupResponse {
 }
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+/**
+ * The API fills the snippet's `endpoint` from its own environment, which may
+ * be an internal address (production had http://localhost:4000). The
+ * dashboard's NEXT_PUBLIC_API_URL is the address browsers actually reach, so
+ * use that.
+ */
+function withPublicEndpoint(snippet: string): string {
+  return snippet.replace(/endpoint: '[^']*'/, `endpoint: '${apiBaseUrl}'`);
+}
 
 export function SetupPanel({
   organizationId,
@@ -729,11 +740,9 @@ export function SetupPanel({
                   icon={CodeIcon}
                   title="SDK snippet"
                   description="Add this to your client application to begin tracking events."
-                  actions={<CopyButton value={setup.sdkSnippet} label="Copy snippet" />}
+                  actions={<CopyButton value={withPublicEndpoint(setup.sdkSnippet)} label="Copy snippet" />}
                 >
-                  <pre className="overflow-x-auto bg-neutral-950 p-5 font-mono text-xs leading-6 text-neutral-100 dark:bg-slate-950">
-                    <code>{setup.sdkSnippet}</code>
-                  </pre>
+                  <CodeBlock bare lang="ts" codeText={withPublicEndpoint(setup.sdkSnippet)} />
                 </SettingsCard>
               ) : null}
             </SettingsSection>

@@ -7,10 +7,13 @@ import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 
 export function CodeBlock({
   codeText,
-  lang = 'ts'
+  lang = 'ts',
+  bare = false
 }: {
   codeText: string;
   lang?: string;
+  /** No header bar or outer frame, for a container that already has its own title and copy button. */
+  bare?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [html, setHtml] = useState<string | null>(null);
@@ -21,11 +24,9 @@ export function CodeBlock({
     // imports it) an async module, which breaks server rendering of /docs.
     import('shiki')
       .then(({ codeToHtml }) =>
-        codeToHtml(codeText, {
-          lang,
-          themes: { light: 'github-light', dark: 'github-dark' },
-          defaultColor: false
-        })
+        // The block is always dark, so always use the dark palette (inline
+        // colors). A light palette here put dark text on the dark background.
+        codeToHtml(codeText, { lang, theme: 'github-dark' })
       )
       .then((res) => {
         if (active) setHtml(res);
@@ -47,6 +48,21 @@ export function CodeBlock({
       // Fallback
     }
   };
+
+  const body = html ? (
+    <div
+      className="overflow-x-auto p-4 text-xs leading-6 text-slate-100 [&_pre]:!bg-transparent [&_pre]:font-mono"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  ) : (
+    <div className="overflow-x-auto p-4 text-xs leading-6 text-slate-100">
+      <pre className="font-mono whitespace-pre">{codeText}</pre>
+    </div>
+  );
+
+  if (bare) {
+    return <div className="bg-slate-950 [&>div]:p-5">{body}</div>;
+  }
 
   return (
     <div className="group relative my-4 overflow-hidden rounded-xl border border-neutral-200 bg-slate-950 dark:border-slate-800">
@@ -73,16 +89,7 @@ export function CodeBlock({
       </div>
 
       {/* Code Body */}
-      {html ? (
-        <div
-          className="overflow-x-auto p-4 text-xs leading-6 text-slate-100 [&_pre]:!bg-transparent [&_pre]:font-mono"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      ) : (
-        <div className="overflow-x-auto p-4 text-xs leading-6 text-slate-100">
-          <pre className="font-mono whitespace-pre">{codeText}</pre>
-        </div>
-      )}
+      {body}
     </div>
   );
 }
