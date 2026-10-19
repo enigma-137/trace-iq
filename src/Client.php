@@ -33,7 +33,7 @@ namespace TraceIQ;
  * (registered automatically). `flushInterval` is accepted for parity with the
  * Python/Rust SDKs and reserved for a future async transport.
  */
-final class Client
+class Client
 {
     private const DEFAULT_ENDPOINT = 'http://localhost:4000';
     private const BATCH_URL_PATH = '/v1/events/batch';

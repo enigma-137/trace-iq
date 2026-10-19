@@ -162,6 +162,26 @@ describe('ReplayRecorder security gates', () => {
     expect(serialized).toContain('background:none');
   });
 
+  it('keeps SVG geometry intact while still masking text and inputs', () => {
+    const event = { type: 2, timestamp: 1, data: { node: { tagName: 'svg', attributes: { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor' }, childNodes: [
+      { tagName: 'polyline', attributes: { points: '22 12 18 12 15 21 9 3 6 12 2 12' }, childNodes: [] },
+      { tagName: 'path', attributes: { d: 'M4111 1111 1111 1111L12 2a10 10 0 1 0 0 20Z', transform: 'matrix(1 0 0 1 120 340) rotate(45 12 12)' }, childNodes: [] },
+      { tagName: 'text', attributes: { 'data-card': '4111 1111 1111 1111' }, childNodes: [{ type: 3, textContent: 'Card 4111 1111 1111 1111' }] },
+      { tagName: 'input', attributes: { value: 'secret-value', width: '4111 1111 1111 1111 hello' }, childNodes: [] }
+    ] } } };
+    const sanitized = sanitizeTransportEvent(event, 'strict') as typeof event;
+    const [polyline, path, text, input] = sanitized.data.node.childNodes as Array<{ attributes: Record<string, string>; childNodes: Array<{ textContent: string }> }>;
+    expect(sanitized.data.node.attributes).toEqual({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor' });
+    expect(polyline.attributes.points).toBe('22 12 18 12 15 21 9 3 6 12 2 12');
+    expect(path.attributes.d).toBe('M4111 1111 1111 1111L12 2a10 10 0 1 0 0 20Z');
+    expect(path.attributes.transform).toBe('matrix(1 0 0 1 120 340) rotate(45 12 12)');
+    expect(text.attributes['data-card']).not.toContain('4111');
+    expect(text.childNodes[0].textContent).not.toContain('4111');
+    expect(input.attributes.value).toMatch(/^\*+$/);
+    // Only pure geometry passes through: anything else in a geometry attribute is still scrubbed.
+    expect(input.attributes.width).toContain('[redacted]');
+  });
+
   it('prevents recording attempts until revoked consent is explicitly granted again', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

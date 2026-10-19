@@ -348,6 +348,21 @@ describe('Session Replay security', () => {
     expect(projected).toContain('data:,');
   });
 
+  it('keeps SVG geometry and paint values intact through sanitizing and playback', () => {
+    const source = [{ type: 2, timestamp: 1, data: { node: { tagName: 'svg', attributes: { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor' }, childNodes: [
+      { tagName: 'polyline', attributes: { points: '22 12 18 12 15 21 9 3 6 12 2 12' }, childNodes: [] },
+      { tagName: 'path', attributes: { d: 'M4111 1111 1111 1111L12 2Z', fill: 'url(https://images.example/pattern.svg#p)' }, childNodes: [] },
+      { type: 3, textContent: 'Card 4111 1111 1111 1111' }
+    ] } } }];
+    const played = isolateReplayEventsForPlayback(sanitizeReplayEvents(source, 'balanced')) as unknown as typeof source;
+    const [polyline, path, text] = played[0].data.node.childNodes as Array<{ attributes: Record<string, string>; textContent: string }>;
+    expect(played[0].data.node.attributes).toEqual({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor' });
+    expect(polyline.attributes.points).toBe('22 12 18 12 15 21 9 3 6 12 2 12');
+    expect(path.attributes.d).toBe('M4111 1111 1111 1111L12 2Z');
+    expect(path.attributes.fill).toBe('none');
+    expect(text.textContent).not.toContain('4111');
+  });
+
   it('preserves safe inline CSS while removing stylesheet network references', () => {
     const source = [{ type: 2, timestamp: 1, data: { node: {
       tagName: 'link', attributes: { _cssText: `@import "https://styles.example/base.css";

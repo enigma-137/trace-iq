@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LocalTime } from '@/components/LocalTime';
 import { HugeiconsIcon } from '@hugeicons/react';
 import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
@@ -71,7 +72,8 @@ export function ReplaysWorkspace({
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState<'24h' | '7d' | '30d' | 'all'>('7d');
+  // A link to one session (e.g. from an error) should find its replay however old it is.
+  const [dateRange, setDateRange] = useState<'24h' | '7d' | '30d' | 'all'>(initialSessionId ? 'all' : '7d');
   const [deviceFilter, setDeviceFilter] = useState<'all' | 'desktop' | 'mobile' | 'tablet'>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [durationFilter, setDurationFilter] = useState<'all' | 'short' | 'medium' | 'long'>('all');
@@ -1310,37 +1312,17 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
-function formatDateOnly(value: string): string {
-  try {
-    const d = new Date(value);
-    return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(d);
-  } catch {
-    return value;
-  }
+// Formatted after mount so server (UTC) and client (local) markup match.
+function formatDateOnly(value: string) {
+  return <LocalTime value={value} options={{ month: 'short', day: 'numeric', year: 'numeric' }} />;
 }
 
-function formatTimeOnly(value: string): string {
-  try {
-    const d = new Date(value);
-    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(d);
-  } catch {
-    return value;
-  }
+function formatTimeOnly(value: string) {
+  return <LocalTime value={value} options={{ hour: 'numeric', minute: '2-digit' }} />;
 }
 
-function formatFullDateTime(value: string): string {
-  try {
-    const d = new Date(value);
-    return new Intl.DateTimeFormat('en', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    }).format(d);
-  } catch {
-    return value;
-  }
+function formatFullDateTime(value: string) {
+  return <LocalTime value={value} options={{ month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }} />;
 }
 
 function generatePaginationItems(current: number, total: number): (number | string)[] {

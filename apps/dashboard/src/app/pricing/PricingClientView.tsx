@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
@@ -340,10 +340,12 @@ export function PricingClientView() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {COMPARISON_DATA.map((group) => (
-                <tr key={group.category} className="contents">
-                  <td colSpan={4} className="bg-white/[0.02] px-6 py-3 font-bold text-zinc-300">
-                    {group.category}
-                  </td>
+                <Fragment key={group.category}>
+                  <tr>
+                    <td colSpan={4} className="bg-white/[0.02] px-6 py-3 font-bold text-zinc-300">
+                      {group.category}
+                    </td>
+                  </tr>
                   {group.items.map((item) => (
                     <tr key={item.name} className="transition hover:bg-white/[0.02]">
                       <td className="py-3 pl-6 pr-4 font-medium text-zinc-300">{item.name}</td>
@@ -382,7 +384,7 @@ export function PricingClientView() {
                       </td>
                     </tr>
                   ))}
-                </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

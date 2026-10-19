@@ -15,6 +15,14 @@ const CSS_URL_ATTRIBUTES = new Set([
 const CSS_KEYS = new Set(['style', '_csstext', 'csstext', 'rule', 'replace', 'replacesync', 'fontsource']);
 const FORM_TAGS = new Set(['input', 'textarea', 'select', 'option']);
 const TEXT_ATTRIBUTES = new Set(['title', 'alt', 'placeholder', 'content', 'aria-label', 'aria-description', 'aria-valuetext']);
+// SVG geometry is numeric data, not user content. Runs of digits in `d` or
+// `points` otherwise trip the card-number pattern and break every icon.
+const SVG_GEOMETRY_ATTRIBUTES = new Set([
+  'd', 'points', 'viewbox', 'transform', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
+  'fx', 'fy', 'dx', 'dy', 'width', 'height', 'path', 'pathlength', 'offset', 'rotate', 'preserveaspectratio',
+  'stroke-width', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit', 'gradienttransform', 'patterntransform'
+]);
+const SVG_GEOMETRY_VALUE = /^(?:[\s\d.,+\-%()eEMmLlHhVvCcSsQqTtAaZz]|matrix|translate|scale|rotate|skew[XY]|none|meet|slice|x(?:Min|Mid|Max)Y(?:Min|Mid|Max)|px)*$/;
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
@@ -71,6 +79,7 @@ function sanitizeAttributes(attributes: JsonObject, tagName: string, privacyMode
     const normalized = key.toLowerCase();
     if (normalized === '__proto__' || normalized === 'constructor' || normalized === 'prototype') continue;
     if (SENSITIVE_NAME.test(key) || /^(?:rr_)?data_?url$/i.test(key) || normalized.includes('canvasdata')) next[key] = REDACTED;
+    else if (isSvgGeometry(normalized, child)) next[key] = child;
     else if (privacyMode === 'strict' && typeof child === 'string' && isTextBearingAttribute(normalized)) next[key] = mask(child);
     else if (URL_ATTRIBUTES.has(normalized) && typeof child === 'string') next[key] = scrubUrl(child);
     else if (URL_LIST_ATTRIBUTES.has(normalized) && typeof child === 'string') next[key] = child.split(/\s+/).map(scrubUrl).join(' ');
@@ -266,6 +275,9 @@ function decodeCssEscape(hex: string | undefined, escaped: string | undefined) {
 }
 
 function mask(value: unknown) { return typeof value === 'string' && value.length ? '*'.repeat(Math.min(value.length, 128)) : REDACTED; }
+function isSvgGeometry(attribute: string, value: unknown): value is string {
+  return SVG_GEOMETRY_ATTRIBUTES.has(attribute) && typeof value === 'string' && SVG_GEOMETRY_VALUE.test(value);
+}
 function isTextBearingAttribute(attribute: string) {
   return TEXT_ATTRIBUTES.has(attribute)
     || (attribute.startsWith('data-') && !attribute.startsWith('data-traceiq-'));

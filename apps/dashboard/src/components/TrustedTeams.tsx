@@ -50,14 +50,41 @@ export function NuwellLogo({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-interface Partner {
+// Crisp vector icon for FUNAAB Life (academic mortarboard & campus emblem)
+export function FunaabLifeLogo({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      {/* Mortarboard cap diamond top */}
+      <path
+        d="M 50 18 L 92 37 L 50 56 L 8 37 Z"
+      />
+      {/* Cap skull bowl */}
+      <path
+        d="M 23 48 L 23 64 C 23 75 77 75 77 64 L 77 48 C 69 54 59.8 57.5 50 57.5 C 40.2 57.5 31 54 23 48 Z"
+      />
+      {/* Hanging tassel cord and fringe */}
+      <path
+        d="M 85 41 L 85 67 C 82.5 68 81 70.5 81 73.5 C 81 77 83.5 79.5 86.5 79.5 C 89.5 79.5 92 77 92 73.5 C 92 70.5 90.5 68 88 67 L 88 40 Z"
+      />
+      {/* Center cap button */}
+      <circle cx="50" cy="37" r="3.5" />
+    </svg>
+  );
+}
+
+export interface Partner {
   name: string;
   href: string;
   subtitle?: string;
   logo: React.ComponentType<{ className?: string }>;
 }
 
-const PARTNERS: Partner[] = [
+export const PARTNERS: Partner[] = [
   {
     name: 'Nuwell',
     href: 'https://www.nuwellai.com/',
@@ -71,16 +98,10 @@ const PARTNERS: Partner[] = [
     logo: AshipaLogo
   },
   {
-    name: 'Nuwell AI',
-    href: 'https://www.nuwellai.com/',
-    subtitle: 'Smart Calorie Intelligence',
-    logo: NuwellLogo
-  },
-  {
-    name: "Ashipa",
-    href: 'https://ashipaelectric.com/',
-    subtitle: 'Renewable & Microgrid Systems',
-    logo: AshipaLogo
+    name: 'FUNAAB Life',
+    href: 'https://funaab-life.pages.dev/',
+    subtitle: 'The Campus Is Online',
+    logo: FunaabLifeLogo
   }
 ];
 

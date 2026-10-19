@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LocalTime } from '@/components/LocalTime';
 import {
   AlertTriangle,
   AlertCircle,
@@ -149,18 +150,25 @@ function getErrorExplanation(type: string, message: string): string {
   return `This unhandled ${type} occurred during runtime execution. Review the stack trace below to trace the originating source line and inspect user session events.`;
 }
 
+// Formatted after mount so server (UTC) and client (local) markup match.
 function formatDate(value?: string) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+  return <LocalTime value={value} options={{ month: 'short', day: 'numeric', year: 'numeric' }} />;
 }
 
 function formatDateTime(value?: string) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }).format(date);
+  return <LocalTime value={value} options={{ month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }} />;
+}
+
+const DAY_OPTIONS = [
+  { value: '1', label: 'Last 24 hours' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '14', label: 'Last 14 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' }
+];
+
+function replayHref(sessionId?: string | null) {
+  return sessionId ? `/dashboard/replays?sessionId=${encodeURIComponent(sessionId)}` : '/dashboard/replays';
 }
 
 export function ErrorTrackingClientView({
@@ -183,6 +191,8 @@ export function ErrorTrackingClientView({
   const [environment, setEnvironment] = useState<string>('All environments');
   const [activeTab, setActiveTab] = useState<'overview' | 'stack' | 'occurrences' | 'replay'>('overview');
   const [copied, setCopied] = useState(false);
+  // Workflow state returned by the last PATCH, so the buttons update without waiting on router.refresh().
+  const [savedState, setSavedState] = useState<Record<string, { status: IssueStatus; assigneeUserId: string | null }>>({});
 
   // Derive top KPIs
   const totalIssuesCount = counts.all || initialIssues.length;
@@ -227,8 +237,9 @@ export function ErrorTrackingClientView({
 
   const activeDetail = initialDetail;
   const detailMatches = Boolean(activeIssue && activeDetail?.issue.id === activeIssue.id);
-  const activeStatus: IssueStatus = (detailMatches ? activeDetail?.issue.status : activeIssue?.status) ?? 'open';
-  const activeAssignee = (detailMatches ? activeDetail?.issue.assigneeUserId : activeIssue?.assigneeUserId) ?? null;
+  const saved = activeIssue ? savedState[activeIssue.id] : undefined;
+  const activeStatus: IssueStatus = saved?.status ?? (detailMatches ? activeDetail?.issue.status : activeIssue?.status) ?? 'open';
+  const activeAssignee = (saved ? saved.assigneeUserId : detailMatches ? activeDetail?.issue.assigneeUserId : activeIssue?.assigneeUserId) ?? null;
 
   const navigate = (changes: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
@@ -266,6 +277,11 @@ export function ErrorTrackingClientView({
       if (!response.ok) {
         toast.error(await readApiError(response, 'Could not update the issue.'));
         return;
+      }
+      const result = (await response.json().catch(() => null)) as { issue?: { status: IssueStatus; assigneeUserId: string | null } } | null;
+      if (result?.issue) {
+        const { status, assigneeUserId } = result.issue;
+        setSavedState((previous) => ({ ...previous, [id]: { status, assigneeUserId } }));
       }
       toast.success(success);
       router.refresh();
@@ -317,10 +333,10 @@ export function ErrorTrackingClientView({
               }}
               className="bg-transparent font-medium focus:outline-none"
             >
-              <option value="7">Last 7 days</option>
-              <option value="14">Last 14 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
+              {!DAY_OPTIONS.some((option) => option.value === days) ? <option value={days}>Last {days} days</option> : null}
+              {DAY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 
@@ -527,7 +543,7 @@ export function ErrorTrackingClientView({
               <div className="divide-y divide-neutral-200 dark:divide-slate-800">
                 {filteredIssues.length === 0 ? (
                   <p className="px-5 py-8 text-center text-xs text-neutral-500 dark:text-slate-400">
-                    {searchQuery.trim() || severityFilter !== 'All' ? 'No issues match these filters.' : `No ${statusFilter === 'all' ? '' : `${statusFilter} `}issues in the last ${days} days.`}
+                    {searchQuery.trim() || severityFilter !== 'All' ? 'No issues match these filters.' : `No ${statusFilter === 'all' ? '' : `${statusFilter} `}issues in the last ${days === '1' ? '24 hours' : `${days} days`}.`}
                   </p>
                 ) : null}
                 {filteredIssues.map((issue) => {
@@ -843,7 +859,7 @@ export function ErrorTrackingClientView({
 
                             {sample.sessionId && (
                               <Link
-                                href={`/dashboard/sessions/${sample.sessionId}`}
+                                href={replayHref(sample.sessionId)}
                                 className="inline-flex items-center gap-1.5 rounded border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:text-blue-400 dark:hover:bg-blue-900/50"
                               >
                                 <Film className="h-3.5 w-3.5" />
@@ -866,7 +882,7 @@ export function ErrorTrackingClientView({
                       </p>
                       {activeDetail?.samples.find((s) => s.sessionId)?.sessionId ? (
                         <Link
-                          href={`/dashboard/sessions/${activeDetail.samples.find((s) => s.sessionId)!.sessionId}`}
+                          href={replayHref(activeDetail.samples.find((s) => s.sessionId)!.sessionId)}
                           className="mt-4 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
                         >
                           <Film className="h-4 w-4" />
@@ -874,7 +890,7 @@ export function ErrorTrackingClientView({
                         </Link>
                       ) : (
                         <Link
-                          href="/dashboard/sessions"
+                          href={replayHref()}
                           className="mt-4 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
                         >
                           <Film className="h-4 w-4" />
@@ -1063,7 +1079,7 @@ export function ErrorTrackingClientView({
                     </p>
                     {activeDetail?.samples.find((s) => s.sessionId)?.sessionId ? (
                       <Link
-                        href={`/dashboard/sessions/${activeDetail.samples.find((s) => s.sessionId)!.sessionId}`}
+                        href={replayHref(activeDetail.samples.find((s) => s.sessionId)!.sessionId)}
                         className="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
                       >
                         <Film className="h-3.5 w-3.5" />
@@ -1071,7 +1087,7 @@ export function ErrorTrackingClientView({
                       </Link>
                     ) : (
                       <Link
-                        href="/dashboard/sessions"
+                        href={replayHref()}
                         className="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
                       >
                         <Film className="h-3.5 w-3.5" />

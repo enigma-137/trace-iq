@@ -27,6 +27,8 @@ jobs:
         run: npm ci --legacy-peer-deps
       - name: Typecheck
         run: npm run typecheck
+      - name: Install Chromium for API synthetic tests
+        run: npm exec --workspace=@traceiq/api -- playwright install --with-deps chromium
       - name: Test API
         run: npm test --workspace=@traceiq/api
       - name: Test dashboard
@@ -35,6 +37,12 @@ jobs:
         run: npm test --workspace=traceiq-cli
       - name: Build
         run: npm run build
+        # Placeholders so `next build` can prerender pages that construct a
+        # Supabase client; nothing contacts a real project. Scoped to dashboard
+        # steps because the API reads the same names to enable Supabase auth.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
   dashboard-e2e:
     name: Dashboard browser smoke tests
@@ -53,8 +61,17 @@ jobs:
         working-directory: apps/dashboard
       - name: Build dashboard
         run: npm run build --workspace=@traceiq/dashboard
+        # Placeholders so `next build` can prerender pages that construct a
+        # Supabase client; nothing contacts a real project. Scoped to dashboard
+        # steps because the API reads the same names to enable Supabase auth.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
       - name: Run smoke tests
         run: npm run test:e2e --workspace=@traceiq/dashboard
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
       - name: Upload traces
         if: failure()
         uses: actions/upload-artifact@v4
