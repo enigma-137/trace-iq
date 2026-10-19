@@ -16,6 +16,7 @@ import {
   TraceIQToolDefinition
 } from './tool.interface';
 import { AiToolDefinition } from '../providers/ai-provider.interface';
+import { PRODUCT_GUIDE, searchProductGuide } from './product-guide';
 
 @Injectable()
 export class ToolRegistryService {
@@ -791,6 +792,59 @@ export class ToolRegistryService {
           success: true,
           summary: `Found ${cohortList.length} saved user cohorts.`,
           data: { cohorts: cohortList },
+          evidence
+        };
+      }
+    });
+    // Product guide: how to use TraceIQ itself (no project data).
+    this.register({
+      name: 'get_product_guide',
+      description:
+        'How to use TraceIQ itself: setup steps, where a feature lives in the dashboard, and the docs page. Use for "how do I…", "where is…", "what is…" questions about TraceIQ features (synthetic monitors, alerts, funnels, flags, replays, errors, dashboards, CLI, billing, team and more). Does not read project data.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The feature or task the user asked about, e.g. "create a synthetic monitor".' }
+        },
+        required: ['query']
+      },
+      execute: async (_ctx, args) => {
+        const query = String(args.query ?? '').slice(0, 300);
+        const topics = searchProductGuide(query);
+        if (topics.length === 0) {
+          return {
+            success: true,
+            summary: 'No matching guide topic; listing available topics.',
+            data: { matches: [], availableTopics: PRODUCT_GUIDE.map((t) => t.title) },
+            evidence: []
+          };
+        }
+
+        const evidence: EvidenceItem[] = topics.flatMap((t) => {
+          const items: EvidenceItem[] = [
+            { type: 'guide', id: `guide_${t.id}`, title: t.title, url: t.route, summary: t.summary }
+          ];
+          if (t.docs) {
+            items.push({ type: 'guide', id: `docs_${t.id}`, title: `Docs: ${t.title}`, url: t.docs, summary: 'Read the full guide in the docs.' });
+          }
+          return items;
+        });
+
+        return {
+          success: true,
+          summary: `Found guide: ${topics.map((t) => t.title).join(', ')}.`,
+          data: {
+            matches: topics.map((t) => ({
+              title: t.title,
+              summary: t.summary,
+              steps: t.steps,
+              dashboardRoute: t.route,
+              docsUrl: t.docs ?? null,
+              relatedTopics: (t.related ?? [])
+                .map((id) => PRODUCT_GUIDE.find((g) => g.id === id)?.title)
+                .filter(Boolean)
+            }))
+          },
           evidence
         };
       }

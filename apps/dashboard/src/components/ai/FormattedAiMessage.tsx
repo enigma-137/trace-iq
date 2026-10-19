@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import Link from 'next/link';
 
 interface FormattedAiMessageProps {
   content: string;
@@ -236,7 +237,9 @@ function renderInline(text: string): React.ReactNode[] {
   // 2: **bold** or __bold__
   // 3: *italic* or _italic_
   // 4: [link text](url)
-  const tokenRegex = /(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|\[[^\]]+\]\([^)]+\))/g;
+  // Underscore emphasis only counts at word boundaries, so snake_case names
+  // like payment_gateway_returned stay intact.
+  const tokenRegex = /(`[^`]+`|\*\*[^*]+\*\*|(?<![A-Za-z0-9])__[^_]+__(?![A-Za-z0-9])|\*[^*]+\*|(?<![A-Za-z0-9])_[^_]+_(?![A-Za-z0-9])|\[[^\]]+\]\([^)]+\))/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -315,6 +318,20 @@ function renderInline(text: string): React.ReactNode[] {
       const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (linkMatch) {
         const [, label, href] = linkMatch;
+        // In-app paths (dashboard pages, docs) open in place; others in a new tab.
+        if (href.startsWith('/') && !href.startsWith('//')) {
+          parts.push(
+            <Link
+              key={match.index}
+              href={href}
+              className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              {label}
+            </Link>
+          );
+          lastIndex = match.index + token.length;
+          continue;
+        }
         parts.push(
           <a
             key={match.index}

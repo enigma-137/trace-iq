@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAskTraceIQ, EvidenceItem } from './AskTraceIQContext';
 import { FormattedAiMessage } from './FormattedAiMessage';
 import AiBrain02Icon from '@hugeicons/core-free-icons/AiBrain02Icon';
@@ -35,6 +36,16 @@ export function AskTraceIQDrawer() {
     }
   }, [isOpen]);
 
+  // Close after following a link from an answer, so the new page is visible.
+  const pathname = usePathname();
+  const lastPathname = useRef(pathname);
+  useEffect(() => {
+    if (pathname !== lastPathname.current) {
+      lastPathname.current = pathname;
+      if (isOpen) closeAsk();
+    }
+  }, [pathname, isOpen, closeAsk]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isInvestigating, progressStep]);
@@ -60,7 +71,8 @@ export function AskTraceIQDrawer() {
     'Why did checkout conversion change?',
     'What are today’s biggest error issues?',
     'Which API endpoints are failing most?',
-    'What changed after my latest feature flag rollout?'
+    'What changed after my latest feature flag rollout?',
+    'How do I set up a synthetic monitor?'
   ];
 
   return (
@@ -203,7 +215,7 @@ export function AskTraceIQDrawer() {
               </div>
               <h3 className="text-base font-semibold text-neutral-900 dark:text-white">What do you want to understand?</h3>
               <p className="mt-1 max-w-sm text-xs text-neutral-500 dark:text-neutral-400">
-                Ask TraceIQ will safely query funnels, errors, telemetry, feature flags, user journeys, and session replays.
+                Ask TraceIQ will safely query funnels, errors, telemetry, feature flags, user journeys, and session replays, or show you how to use any TraceIQ feature.
               </p>
 
               <div className="mt-8 grid w-full max-w-md gap-2">
@@ -376,7 +388,8 @@ function EvidenceCard({ item }: { item: EvidenceItem }) {
     alert: '🔔',
     retention: '📈',
     event: '📊',
-    cohort: '👥'
+    cohort: '👥',
+    guide: '📘'
   };
 
   return (
@@ -399,7 +412,7 @@ function EvidenceCard({ item }: { item: EvidenceItem }) {
       </div>
       <div className="mt-2 text-right">
         <span className="text-[10px] font-medium text-blue-600 group-hover:underline dark:text-blue-400">
-          View in TraceIQ →
+          {item.type === 'guide' && item.url.startsWith('/docs') ? 'Open docs →' : 'View in TraceIQ →'}
         </span>
       </div>
     </Link>

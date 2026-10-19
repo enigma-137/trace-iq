@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolRegistryService } from '../src/modules/ai/tools/tool-registry.service';
+import { PRODUCT_GUIDE, searchProductGuide } from '../src/modules/ai/tools/product-guide';
 import { AiSanitizerService } from '../src/modules/ai/context/ai-sanitizer.service';
 import { AskOrchestratorService } from '../src/modules/ai/ask/ask-orchestrator.service';
 import { AskService } from '../src/modules/ai/ask/ask.service';
@@ -78,6 +79,51 @@ describe('Ask TraceIQ - Tool Registry & Tenant Security', () => {
     expect(names).toContain('list_funnels');
     expect(names).toContain('get_event_trends');
     expect(names).toContain('get_api_performance');
+  });
+
+  it('answers how-to questions from the product guide with dashboard and docs links', async () => {
+    const context = {
+      user: { id: 'usr_alice', email: 'alice@example.com' } as DashboardUser,
+      organizationId: 'org_legit',
+      projectId: 'proj_legit'
+    };
+
+    const result = await toolRegistry.executeTool('get_product_guide', context, {
+      query: 'How do I set up a synthetic monitor?'
+    });
+
+    expect(result.success).toBe(true);
+    const data = result.data as { matches: Array<{ title: string; steps: string[]; dashboardRoute: string; docsUrl: string | null }> };
+    expect(data.matches[0].title).toBe('Create a synthetic monitor');
+    expect(data.matches[0].steps.length).toBeGreaterThan(2);
+    expect(data.matches[0].dashboardRoute).toBe('/dashboard/synthetic-monitors/new');
+    expect(result.evidence.map((e) => e.url)).toEqual(
+      expect.arrayContaining(['/dashboard/synthetic-monitors/new', '/docs?page=features'])
+    );
+    expect(result.evidence.every((e) => e.type === 'guide')).toBe(true);
+  });
+
+  it('routes common how-to questions to the right guide topic', () => {
+    expect(searchProductGuide('send alerts to slack')[0].id).toBe('alerts');
+    expect(searchProductGuide('invite a teammate')[0].id).toBe('team');
+    expect(searchProductGuide('turn on session replay')[0].id).toBe('session-replay');
+    expect(searchProductGuide('roll out a feature flag to 10%')[0].id).toBe('feature-flags');
+    expect(searchProductGuide('install the sdk')[0].id).toBe('setup');
+    expect(searchProductGuide('qwertyuiop')).toEqual([]);
+  });
+
+  it('links every guide topic to a dashboard route and only to real docs pages', () => {
+    const docsPages = new Set([
+      'welcome', 'quickstart', 'methods', 'config', 'autocapture', 'self-hosting', 'web-analytics', 'session-replay',
+      'flags', 'alerts', 'dashboards', 'public-sharing', 'api-performance', 'logs', 'webhooks', 'export', 'events',
+      'features', 'ingestion', 'cli', 'mcp'
+    ]);
+    for (const topic of PRODUCT_GUIDE) {
+      expect(topic.route.startsWith('/dashboard')).toBe(true);
+      if (topic.docs) {
+        expect(docsPages.has(topic.docs.replace('/docs?page=', ''))).toBe(true);
+      }
+    }
   });
 
   it('strictly binds tool execution to context project without tenant switching', async () => {

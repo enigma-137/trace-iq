@@ -11,7 +11,8 @@ export type EvidenceType =
   | 'alert'
   | 'retention'
   | 'event'
-  | 'cohort';
+  | 'cohort'
+  | 'guide';
 
 export interface EvidenceItem {
   type: EvidenceType;
