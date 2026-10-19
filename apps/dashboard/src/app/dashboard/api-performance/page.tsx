@@ -28,15 +28,25 @@ interface ErrorRow {
   count: number;
 }
 
+type TimingSource = 'server' | 'client' | 'all';
+
 interface ApiPerformanceResponse {
   project: { id: string; name: string } | null;
   days: number;
-  summary: { totalRequests: number; errorCount: number; errorRate: number; p95: number; avg: number };
+  source?: TimingSource;
+  sources?: { server: number; client: number };
+  summary: { totalRequests: number; errorCount: number; errorRate: number; p50?: number; p95: number; avg: number };
   highestLatency: EndpointRow[];
   highestError: ErrorRow[];
   mostRequests: EndpointRow[];
   leastRequests: EndpointRow[];
 }
+
+const SOURCES: Array<{ label: string; value: TimingSource }> = [
+  { label: 'Server', value: 'server' },
+  { label: 'Browser', value: 'client' },
+  { label: 'All', value: 'all' }
+];
 
 const RANGES = [
   { label: '24h', value: '1' },
@@ -57,8 +67,10 @@ export default async function ApiPerformancePage({
   const { user, token } = await requireDashboardSession('/dashboard/api-performance');
   const days = firstParam(searchParams.days) ?? '7';
   const projectId = firstParam(searchParams.projectId);
+  const requestedSource = firstParam(searchParams.source);
   const apiParams = new URLSearchParams({ days });
   if (projectId) apiParams.set('projectId', projectId);
+  if (requestedSource) apiParams.set('source', requestedSource);
   const { data, error } = await dashboardGet<ApiPerformanceResponse>(
     `/v1/dashboard/api-performance?${apiParams.toString()}`,
     token
@@ -69,6 +81,14 @@ export default async function ApiPerformancePage({
   }
 
   const canonicalProjectId = data?.project?.id ?? projectId;
+  const source: TimingSource = data?.source ?? 'all';
+  const sourceCounts = data?.sources ?? { server: 0, client: 0 };
+  const pageHref = (params: { days?: string; source?: string }) => {
+    const query = new URLSearchParams({ days: params.days ?? days });
+    const nextSource = params.source ?? requestedSource;
+    if (nextSource) query.set('source', nextSource);
+    return withProjectId(`/dashboard/api-performance?${query.toString()}`, canonicalProjectId);
+  };
 
   const summary = data?.summary;
   const hasData = (summary?.totalRequests ?? 0) > 0;
@@ -95,11 +115,10 @@ export default async function ApiPerformancePage({
             .
           </p>
           <div className="flex items-center gap-2">
-            <RangeTabs
-              ranges={RANGES}
-              active={days}
-              hrefFor={(value) => withProjectId(`/dashboard/api-performance?days=${value}`, canonicalProjectId)}
-            />
+            {sourceCounts.server > 0 && sourceCounts.client > 0 ? (
+              <RangeTabs ranges={SOURCES} active={source} hrefFor={(value) => pageHref({ source: value })} />
+            ) : null}
+            <RangeTabs ranges={RANGES} active={days} hrefFor={(value) => pageHref({ days: value })} />
             <AddCurrentViewToDashboardButton
               title="API Requests & Latency"
               type="api_performance"
@@ -114,6 +133,20 @@ export default async function ApiPerformancePage({
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
             {error}
+          </div>
+        ) : null}
+
+        {hasData && source !== 'server' && sourceCounts.client > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            {source === 'client' ? 'These are' : 'This view includes'} browser timings: the full round trip from the
+            visitor&apos;s device (DNS, TLS, network distance to your host, queueing), so they run far higher than the
+            handler time your host reports.{' '}
+            {sourceCounts.server === 0 ? (
+              <>
+                Add <code className="font-mono text-xs">traceiq.middleware()</code> to your server to see server-side
+                response times.
+              </>
+            ) : null}
           </div>
         ) : null}
 
@@ -138,6 +171,7 @@ export default async function ApiPerformancePage({
                   value: `${summary?.errorRate ?? 0}%`,
                   hint: `${(summary?.errorCount ?? 0).toLocaleString()} 4xx/5xx responses`
                 },
+                { label: 'Median latency', value: formatMs(summary?.p50 ?? 0), hint: 'Half of requests are faster' },
                 { label: 'p95 latency', value: formatMs(summary?.p95 ?? 0), hint: '95% of requests are faster' },
                 { label: 'Avg latency', value: formatMs(summary?.avg ?? 0), hint: slowest ? `Slowest: ${slowest.method} ${slowest.path}` : 'Mean response time' }
               ]}
@@ -149,27 +183,27 @@ export default async function ApiPerformancePage({
                 subtitle="By p95 response time"
                 rows={data?.highestLatency ?? []}
                 metric="p95"
-                link={{ days, projectId: canonicalProjectId, sort: 'duration' }}
+                link={{ days, projectId: canonicalProjectId, sort: 'duration', source }}
               />
               <ErrorPanel
                 title="Most errors"
                 subtitle="4xx and 5xx responses"
                 rows={data?.highestError ?? []}
-                link={{ days, projectId: canonicalProjectId }}
+                link={{ days, projectId: canonicalProjectId, source }}
               />
               <EndpointPanel
                 title="Busiest endpoints"
                 subtitle="By request volume"
                 rows={data?.mostRequests ?? []}
                 metric="avg"
-                link={{ days, projectId: canonicalProjectId }}
+                link={{ days, projectId: canonicalProjectId, source }}
               />
               <EndpointPanel
                 title="Quietest endpoints"
                 subtitle="Fewest requests"
                 rows={data?.leastRequests ?? []}
                 metric="avg"
-                link={{ days, projectId: canonicalProjectId }}
+                link={{ days, projectId: canonicalProjectId, source }}
               />
             </div>
 
@@ -191,6 +225,7 @@ interface RowLink {
   days: string;
   projectId?: string | null;
   sort?: RequestSort;
+  source?: string;
 }
 
 function EndpointPanel({

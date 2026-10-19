@@ -11,11 +11,17 @@ export interface TraceIQInitOptions {
   /** Automatically record an exposure event when a feature flag is read. Defaults to true. */
   autoTrackFlagExposures?: boolean;
   /**
-   * Auto-capture outgoing fetch() calls as `$api_request` events (method, path,
-   * status, durationMs) to power the API performance view. Off by default —
-   * enabling it records every non-TraceIQ request the page makes.
+   * Auto-capture outgoing fetch() and XMLHttpRequest (axios, jQuery, …) calls as
+   * `$api_request` events (method, path, status, durationMs). Off by default —
+   * enabling it records every non-TraceIQ request the page makes. Browser timings
+   * are full round trips, so API performance reports them apart from server timings.
    */
   autoCaptureRequests?: boolean;
+  /**
+   * Forward console output to TraceIQ Logs (service "web-console"). `true` captures
+   * log/info/warn/error; pass `{ levels }` to choose. Off by default.
+   */
+  autoCaptureConsole?: boolean | { levels?: Array<'log' | 'info' | 'warn' | 'error' | 'debug'> };
   /** @deprecated Use replay.enabled. */
   enableReplay?: boolean;
   replay?: TraceIQReplayOptions;

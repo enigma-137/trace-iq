@@ -17,6 +17,8 @@ export interface RequestListItem {
   durationMs: number;
   responseSize: number | null;
   captureState: CaptureState;
+  /** `client` = browser round trip, `server` = handler time from the SDK middleware. */
+  timedBy?: 'server' | 'client';
 }
 
 export interface CapturedBody {
@@ -123,6 +125,11 @@ export const CAPTURE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'unavailable', label: 'Unavailable' }
 ];
 
+export const SOURCE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'server', label: 'Server timings' },
+  { value: 'client', label: 'Browser timings' }
+];
+
 export const CAPTURE_LABELS: Record<CaptureState, string> = {
   captured: 'Captured',
   redacted: 'Redacted',
@@ -142,6 +149,7 @@ export interface RequestFilters {
   environment: string;
   capture: string;
   route: string;
+  source: string;
   sort: RequestSort;
   request: string;
 }
@@ -157,6 +165,7 @@ export const DEFAULT_FILTERS: RequestFilters = {
   environment: '',
   capture: '',
   route: '',
+  source: '',
   sort: 'time',
   request: ''
 };
@@ -213,7 +222,7 @@ export function filtersToApiQuery(
   } else {
     params.set('range', filters.range);
   }
-  for (const key of ['search', 'service', 'method', 'status', 'environment', 'capture', 'route'] as const) {
+  for (const key of ['search', 'service', 'method', 'status', 'environment', 'capture', 'route', 'source'] as const) {
     if (filters[key]) params.set(key, filters[key]);
   }
   if (filters.sort === 'duration') params.set('sort', 'duration');
@@ -235,6 +244,7 @@ export function requestsHrefForEndpoint(params: {
   status?: string;
   projectId?: string | null;
   sort?: RequestSort;
+  source?: string;
   now?: Date;
 }): string {
   const filters: RequestFilters = { ...DEFAULT_FILTERS, route: params.path };
@@ -243,6 +253,7 @@ export function requestsHrefForEndpoint(params: {
   }
   if (params.status) filters.status = params.status;
   if (params.sort) filters.sort = params.sort;
+  if (params.source === 'server' || params.source === 'client') filters.source = params.source;
   const days = params.days ?? '7';
   const preset = API_PERF_DAYS_TO_RANGE[days];
   if (preset) {
@@ -257,7 +268,7 @@ export function requestsHrefForEndpoint(params: {
 }
 
 export function activeFilterCount(filters: RequestFilters): number {
-  return (['service', 'method', 'status', 'environment', 'capture', 'route', 'search'] as const).filter(
+  return (['service', 'method', 'status', 'environment', 'capture', 'route', 'search', 'source'] as const).filter(
     (key) => !!filters[key]
   ).length;
 }

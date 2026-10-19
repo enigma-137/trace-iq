@@ -25,6 +25,11 @@ export interface TraceIQNodeOptions {
   serviceName?: string;
   /** Environment stamped on log() entries. Defaults to NODE_ENV, then "production". */
   environment?: string;
+  /**
+   * Forward console.log/info/warn/error to TraceIQ Logs (the console still prints).
+   * Inside traceiq.middleware() each line is tagged with the request's ids. Default false.
+   */
+  captureConsole?: boolean;
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
@@ -85,11 +90,12 @@ const DEFAULTS = {
  *   await traceiq.shutdown(); // flush before the process exits
  */
 export class TraceIQ {
-  private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl'>> &
+  private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl' | 'captureConsole'>> &
     Pick<TraceIQNodeOptions, 'onError' | 'fetchImpl'>;
   private queue: QueuedEvent[] = [];
   private logQueue: Array<Record<string, unknown>> = [];
   private timer: ReturnType<typeof setInterval> | null = null;
+  private forwardingConsole = false;
 
   constructor(options: TraceIQNodeOptions) {
     if (!options.projectId) throw new Error('TraceIQ: projectId is required.');
@@ -117,6 +123,37 @@ export class TraceIQ {
       // Don't keep the Node process alive just for the flush timer.
       (timer as unknown as { unref?: () => void }).unref?.();
       this.timer = timer;
+    }
+
+    if (options.captureConsole) this.installConsoleCapture();
+  }
+
+  private installConsoleCapture(): void {
+    const levels: Array<[keyof Console & string, LogLevel]> = [
+      ['log', 'info'],
+      ['info', 'info'],
+      ['warn', 'warn'],
+      ['error', 'error']
+    ];
+    const consoleRef = console as unknown as Record<string, (...args: unknown[]) => void>;
+    for (const [method, level] of levels) {
+      const original = consoleRef[method];
+      if (typeof original !== 'function') continue;
+      consoleRef[method] = (...args: unknown[]) => {
+        original.apply(console, args);
+        // Skip our own diagnostics and re-entrant calls so delivery can never loop.
+        if (this.forwardingConsole || args.length === 0) return;
+        if (typeof args[0] === 'string' && args[0].startsWith('[traceiq]')) return;
+        this.forwardingConsole = true;
+        try {
+          const error = args.find((arg) => arg instanceof Error);
+          this.log(level, args.map(formatConsoleArg).join(' '), error ? { error } : {});
+        } catch {
+          // Never let instrumentation break the app's own logging.
+        } finally {
+          this.forwardingConsole = false;
+        }
+      };
     }
   }
 
@@ -454,3 +491,13 @@ export class TraceIQ {
   }
 }
 
+function formatConsoleArg(arg: unknown): string {
+  if (typeof arg === 'string') return arg;
+  if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+  if (arg === undefined) return 'undefined';
+  try {
+    return JSON.stringify(arg) ?? String(arg);
+  } catch {
+    return String(arg);
+  }
+}

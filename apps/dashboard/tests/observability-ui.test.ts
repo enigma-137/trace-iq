@@ -32,7 +32,8 @@ describe('Logs & Observability UI', () => {
     expect(source).toContain('Errors');
     expect(source).toContain('Auth & Security');
     expect(source).toContain('Jobs & Triggers');
-    expect(source).toContain('SDK Telemetry');
+    expect(source).toContain('App logs (SDK)');
+    expect(source).toContain('User actions');
     expect(source).toContain('Live');
     expect(source).toContain('All levels');
     expect(source).toContain('All status');

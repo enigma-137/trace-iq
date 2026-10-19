@@ -44,6 +44,7 @@ const SOURCE_ICONS: Record<string, string> = {
   auth: '🔒',
   job: '⏱️',
   sdk: '📦',
+  event: '👆',
   custom: '📝'
 };
 

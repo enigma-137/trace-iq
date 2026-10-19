@@ -47,11 +47,12 @@ export class AnalyticsController {
   async getApiPerformance(
     @Headers('authorization') authorization?: string,
     @Query('days') days?: string,
-    @Query('projectId') projectId?: string
+    @Query('projectId') projectId?: string,
+    @Query('source') source?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'analytics:read');
-    return this.analyticsService.getApiPerformance(user, days, projectId);
+    return this.analyticsService.getApiPerformance(user, days, projectId, source);
   }
 
   @Get('insights/event-names')

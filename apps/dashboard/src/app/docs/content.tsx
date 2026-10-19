@@ -1201,15 +1201,27 @@ app.use(traceiq.middleware({
           exploding per id.
         </P>
         <P>
-          <strong>Browser</strong> — opt in and the SDK wraps <Mono>fetch</Mono> to time each call (its own calls to
-          TraceIQ are skipped):
+          <strong>Browser</strong> — opt in and the SDK wraps <Mono>fetch</Mono> and <Mono>XMLHttpRequest</Mono>{' '}
+          (so axios and other XHR clients are included) to time each call. Its own calls to TraceIQ are skipped:
         </P>
         <Code lang="ts">{`traceiq.initialize({
   projectId: '${projectId}',
   writeKey: 'YOUR_WRITE_KEY',
   endpoint: '${apiBaseUrl}',
-  autoCaptureRequests: true, // capture outgoing fetch() as $api_request
+  autoCaptureRequests: true, // capture outgoing fetch() and XHR as $api_request
 });`}</Code>
+        <P>
+          <strong>Server vs browser timings.</strong> The middleware measures how long your handler took, which is the
+          number your host (Railway, Render, Fly…) reports. A browser timing is the full round trip from the
+          visitor&apos;s device: DNS, TLS, the network distance to your host&apos;s region, and the server time. So a
+          5 ms endpoint can easily show 300–700 ms from a browser on another continent. API performance shows server
+          timings by default whenever your backend sends any; switch to <em>Browser</em> to see what users actually
+          wait for. The Requests explorer has the same filter.
+        </P>
+        <P>
+          WebSocket messages (multiplayer, live updates) aren&apos;t HTTP requests, so they never show up here. Record
+          them with <Mono>traceiq.track()</Mono> or <Mono>traceiq.log()</Mono>; both appear in Logs.
+        </P>
         <P>
           Anything else (gRPC, background jobs) can report directly by sending an <Mono>$api_request</Mono> event
           with <Mono>method</Mono>, <Mono>path</Mono>, <Mono>status</Mono>, and <Mono>durationMs</Mono> properties.
@@ -1226,8 +1238,15 @@ app.use(traceiq.middleware({
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/logs">
             Logs
           </a>{' '}
-          page. Logs show only what your app sends, plus a warning whenever TraceIQ rejects one of your SDK
-          deliveries (for example an invalid write key), so you know data isn&apos;t arriving.
+          page. Logs show what your app sends with <Mono>traceiq.log()</Mono>, every custom event you{' '}
+          <Mono>track()</Mono> (as <em>User actions</em>: the event name plus its first few properties, linked to the
+          session, user and request), exceptions, and a warning whenever TraceIQ rejects one of your SDK deliveries
+          (for example an invalid write key), so you know data isn&apos;t arriving.
+        </P>
+        <P>
+          Already logging with <Mono>console.log</Mono>? Turn on <Mono>autoCaptureConsole: true</Mono> in the browser
+          SDK (or <Mono>captureConsole: true</Mono> in the Node SDK) and console output is forwarded to Logs as well;
+          the console still prints as usual.
         </P>
         <P>
           <strong>Browser / games</strong>: entries are buffered, sent in batches, and tagged with the current session

@@ -18,7 +18,8 @@ export interface RequestLike {
 
 export interface ResponseLike {
   statusCode?: number;
-  on(event: 'finish', listener: () => void): void;
+  on(event: 'finish' | 'close', listener: () => void): void;
+  writableFinished?: boolean;
   setHeader?(name: string, value: string): unknown;
   getHeader?(name: string): unknown;
   getHeaders?(): Record<string, unknown>;
@@ -136,10 +137,16 @@ export function createRequestMiddleware(client: Capturer, options: MiddlewareOpt
     const captureThis = capture && (capture.shouldCapture?.(req) ?? true);
     const responseBody = captureThis && capture.bodies ? tapResponseBody(res, capture.maxBodyBytes) : null;
 
-    res.on('finish', () => {
+    // `finish` fires once the response is fully handed off; `close` without it means
+    // the client went away first. Both are recorded (once) so aborted requests and
+    // long-polls that are cut off still show up instead of silently vanishing.
+    let recorded = false;
+    const record = (aborted: boolean) => {
+      if (recorded) return;
+      recorded = true;
       try {
         const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
-        const status = res.statusCode ?? 0;
+        const status = aborted ? 499 : res.statusCode ?? 0;
         const rawUrl = req.originalUrl ?? req.url ?? '/';
         const properties: Record<string, unknown> = {
           method: (req.method ?? 'GET').toUpperCase(),
@@ -153,6 +160,7 @@ export function createRequestMiddleware(client: Capturer, options: MiddlewareOpt
           url: rawUrl.split(/[?#]/)[0],
           instrumentation: 'node'
         };
+        if (aborted) properties.aborted = true;
         if (parent) properties.parentSpanId = parent[2].toLowerCase();
         if (options.service) properties.service = options.service;
         if (environment) properties.environment = environment;
@@ -176,7 +184,9 @@ export function createRequestMiddleware(client: Capturer, options: MiddlewareOpt
       } catch {
         // Never let instrumentation break the request.
       }
-    });
+    };
+    res.on('finish', () => record(false));
+    res.on('close', () => record(res.writableFinished === false));
 
     requestContext.run(context, () => next());
   };

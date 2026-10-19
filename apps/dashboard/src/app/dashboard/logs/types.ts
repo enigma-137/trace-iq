@@ -10,6 +10,7 @@ export type LogSource =
   | 'auth'
   | 'job'
   | 'sdk'
+  | 'event'
   | 'custom';
 
 export interface ObservabilityLog {

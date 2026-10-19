@@ -27,7 +27,8 @@ const SOURCES: { id: LogSource; label: string; icon: string }[] = [
   { id: 'error', label: 'Errors', icon: '⚠️' },
   { id: 'auth', label: 'Auth & Security', icon: '🔒' },
   { id: 'job', label: 'Jobs & Triggers', icon: '⏱️' },
-  { id: 'sdk', label: 'SDK Telemetry', icon: '📦' },
+  { id: 'sdk', label: 'App logs (SDK)', icon: '📦' },
+  { id: 'event', label: 'User actions', icon: '👆' },
   { id: 'custom', label: 'Custom logs', icon: '📝' }
 ];
 

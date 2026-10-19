@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
+import { RequestSource, clientRequestSql, parseRequestSource } from '../requests/request-capture';
 import { DIMENSION_SOURCES, FilterCondition, buildFilterClause, parseFiltersParam } from '../../common/filters';
 import { ALLOWED_MEASURES, NUMERIC_GUARD, TrendMeasure, buildMeasureExpr } from '../../common/measures';
 
@@ -43,6 +44,7 @@ type ApiSummaryRow = {
   total: number;
   errors: number;
   avg: number;
+  p50: number;
   p95: number;
 };
 
@@ -365,6 +367,22 @@ export class AnalyticsService {
       [project.id]
     );
 
+    // Latency tiles follow API performance: server timings when the project sends any,
+    // since browser round trips would otherwise dominate the averages.
+    const isClientRequest = clientRequestSql("properties->>'instrumentation'", 'session_id');
+    const serverTimed = await this.database
+      .query<{ present: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM events
+           WHERE project_id = $1 AND event_name = '$api_request'
+             AND occurred_at >= now() - interval '14 days' AND NOT ${isClientRequest}
+         ) AS present`,
+        [project.id]
+      )
+      .then((result) => result.rows[0]?.present === true)
+      .catch(() => false);
+    const latencySourceFilter = serverTimed ? `AND NOT ${isClientRequest}` : '';
+
     const [
       apiTelemetryResult,
       apiLatencyResult,
@@ -399,6 +417,7 @@ export class AnalyticsService {
               AND occurred_at >= now() - interval '14 days'
               AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
               AND properties->>'status' ~ '^[0-9]+$'
+              ${latencySourceFilter}
           )
           SELECT
             count(*)::int AS total_requests,
@@ -433,6 +452,7 @@ export class AnalyticsService {
               AND occurred_at >= now() - interval '14 days'
               AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
               AND properties->>'status' ~ '^[0-9]+$'
+              ${latencySourceFilter}
           )
           SELECT
             to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
@@ -1712,17 +1732,24 @@ export class AnalyticsService {
   }
 
   // API performance: aggregates `$api_request` events (emitted by the SDK middleware /
-  // browser fetch autocapture) into the endpoints that are slowest, erroring, and
+  // browser fetch+XHR autocapture) into the endpoints that are slowest, erroring, and
   // busiest. Latency is ranked by p95, which reflects real pain better than an average.
-  async getApiPerformance(user: DashboardUser, daysParam?: string, projectId?: string) {
+  //
+  // Server-timed and browser-timed requests are reported separately: a browser timing
+  // is the whole round trip (DNS, TLS, the network to the host, queueing), so mixing
+  // it with handler time makes a 5 ms endpoint look like a 700 ms one. With no
+  // explicit `source`, server timings are shown whenever the project sends any.
+  async getApiPerformance(user: DashboardUser, daysParam?: string, projectId?: string, sourceParam?: string) {
     const project = await this.projects.resolveActiveProject(user, projectId);
     const days = this.clampApiDays(daysParam);
 
-    const emptySummary = { totalRequests: 0, errorCount: 0, errorRate: 0, p95: 0, avg: 0 };
+    const emptySummary = { totalRequests: 0, errorCount: 0, errorRate: 0, p50: 0, p95: 0, avg: 0 };
     if (!project) {
       return {
         project: null,
         days,
+        source: 'all' as RequestSource,
+        sources: { server: 0, client: 0 },
         summary: emptySummary,
         highestLatency: [],
         highestError: [],
@@ -1731,7 +1758,28 @@ export class AnalyticsService {
       };
     }
 
+    const isClient = clientRequestSql("properties->>'instrumentation'", 'session_id');
     // Guard the numeric casts so a malformed event can't blow up the whole query.
+    const scope = `
+      FROM events
+      WHERE project_id = $1 AND event_name = '$api_request'
+        AND occurred_at >= now() - make_interval(days => $2::int)
+        AND properties->>'path' IS NOT NULL
+        AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+        AND properties->>'status' ~ '^[0-9]+$'
+    `;
+    const counts = await this.database
+      .query<{ client: number; server: number }>(
+        `SELECT count(*) FILTER (WHERE ${isClient})::int AS client,
+           count(*) FILTER (WHERE NOT ${isClient})::int AS server
+         ${scope}`,
+        [project.id, days]
+      )
+      .catch(() => ({ rows: [] as Array<{ client: number; server: number }> }));
+    const sources = { server: Number(counts.rows[0]?.server) || 0, client: Number(counts.rows[0]?.client) || 0 };
+    const source: RequestSource = parseRequestSource(sourceParam) ?? (sources.server > 0 ? 'server' : 'all');
+    const sourceFilter = source === 'client' ? `AND ${isClient}` : source === 'server' ? `AND NOT ${isClient}` : '';
+
     const base = `
       WITH base AS (
         SELECT
@@ -1739,12 +1787,8 @@ export class AnalyticsService {
           properties->>'path' AS path,
           (properties->>'durationMs')::numeric AS duration,
           (properties->>'status')::int AS status
-        FROM events
-        WHERE project_id = $1 AND event_name = '$api_request'
-          AND occurred_at >= now() - make_interval(days => $2::int)
-          AND properties->>'path' IS NOT NULL
-          AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
-          AND properties->>'status' ~ '^[0-9]+$'
+        ${scope}
+        ${sourceFilter}
       )
     `;
 
@@ -1774,6 +1818,7 @@ export class AnalyticsService {
          SELECT count(*)::int AS total,
            count(*) FILTER (WHERE status >= 400)::int AS errors,
            round(avg(duration), 1)::float AS avg,
+           round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p50,
            round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p95
          FROM base`,
         [project.id, days]
@@ -1788,10 +1833,13 @@ export class AnalyticsService {
     return {
       project,
       days,
+      source,
+      sources,
       summary: {
         totalRequests: total,
         errorCount,
         errorRate: total > 0 ? Math.round((errorCount / total) * 1000) / 10 : 0,
+        p50: s?.p50 ?? 0,
         p95: s?.p95 ?? 0,
         avg: s?.avg ?? 0
       },

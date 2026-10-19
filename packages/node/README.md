@@ -59,6 +59,7 @@ await traceiq.shutdown();
 | `timeoutMs` | `10000` | Per-request timeout. |
 | `onError` | — | Called when a batch is dropped after exhausting retries. |
 | `debug` | `false` | Log warnings to the console. |
+| `captureConsole` | `false` | Forward `console.log/info/warn/error` to Logs (the console still prints). Inside the middleware each line carries the request's ids. |
 | `fetchImpl` | global `fetch` | Inject a fetch (tests, or Node < 18 with a polyfill). |
 
 ## Request telemetry (Requests explorer)
@@ -82,7 +83,8 @@ app.use(traceiq.middleware({ service: 'billing-api', environment: 'production' }
 Each request carries a request id, a W3C trace id (continued from an incoming
 `traceparent`), and a span id. Any `capture()` call made while the request is being
 handled — e.g. an `$exception` event — is stamped with the same `requestId`/`traceId`,
-so Requests can link to it. Use `getRequestContext()` to read the ids yourself (for
+so Requests can link to it. Requests the client abandons before the response finishes
+are still recorded, with status `499` and `aborted: true`. Use `getRequestContext()` to read the ids yourself (for
 example to put them on structured logs sent to `POST /v1/logs`).
 
 Payload capture is opt-in twice: the middleware must send payloads, **and** the project
