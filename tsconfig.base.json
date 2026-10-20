@@ -18,6 +18,7 @@
       "@traceiq/ui": ["packages/ui/src"],
       "@traceiq/sdk-js": ["packages/sdk-js/src"],
       "@traceiq/node": ["packages/node/src"],
+      "traceiq-node": ["packages/node/src"],
       "@traceiq/react-native": ["packages/react-native/src"]
     }
   }

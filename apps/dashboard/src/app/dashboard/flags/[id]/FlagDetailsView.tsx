@@ -2018,7 +2018,7 @@ export function FeatureToggleComponent({ user }: { user: { id: string; plan: str
   if (!enabled) return <DefaultComponent />;
   return <NewComponent config={payload} />;
 }`,
-    nextjs: `import { TraceIQ } from '@traceiq/node';
+    nextjs: `import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: process.env.TRACEIQ_PROJECT_ID!,
@@ -2041,7 +2041,7 @@ export default async function Page({ params }: { params: { userId: string } }) {
 
   return isEnabled ? <NewExperience config={payload} /> : <LegacyExperience />;
 }`,
-    node: `import { TraceIQ } from '@traceiq/node';
+    node: `import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: process.env.TRACEIQ_PROJECT_ID!,

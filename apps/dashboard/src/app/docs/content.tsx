@@ -502,12 +502,12 @@ try {
     return (
       <Section id="node" title="Server-side SDK (Node.js)">
         <P>
-          For backend events — payments, payouts, settlements, jobs — use <Mono>@traceiq/node</Mono>. Server events
+          For backend events — payments, payouts, settlements, jobs — use <Mono>traceiq-node</Mono>. Server events
           are the most trustworthy source of revenue: the <Mono>amount</Mono> comes from your systems, not the
           browser. Events are queued and flushed in batches, so request handlers never block on the network.
         </P>
-        <Code lang="bash">{`npm install @traceiq/node`}</Code>
-        <Code lang="ts">{`import { TraceIQ } from '@traceiq/node';
+        <Code lang="bash">{`npm install traceiq-node`}</Code>
+        <Code lang="ts">{`import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: '${projectId}',
@@ -714,7 +714,7 @@ $traceiq->shutdown(); // flush before a short-lived process exits`}</Code>
         <P>
           To send many events in one request, POST to <Mono>/v1/events/batch</Mono> with a{' '}
           <Mono>{'{ projectId, batch: [...] }'}</Mono> body (up to 500 events). Each event is validated
-          independently — one bad event fails only itself. This is what <Mono>@traceiq/node</Mono> uses.
+          independently — one bad event fails only itself. This is what <Mono>traceiq-node</Mono> uses.
         </P>
       </Section>
     );
@@ -817,7 +817,7 @@ export function AddMealButton() {
 }`}</Code>
 
         <P><strong>3. Node.js (Server SDK):</strong></P>
-        <Code lang="ts">{`import { TraceIQ } from '@traceiq/node';
+        <Code lang="ts">{`import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: process.env.TRACEIQ_PROJECT_ID!,
@@ -1183,7 +1183,7 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
         <P>
           <strong>Backend (Node/Express)</strong> — one line of middleware times every request:
         </P>
-        <Code lang="ts">{`import { TraceIQ } from '@traceiq/node';
+        <Code lang="ts">{`import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: '${projectId}',

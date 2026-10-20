@@ -1,4 +1,4 @@
-# @traceiq/node
+# traceiq-node
 
 Server-side TraceIQ SDK for Node.js (18+). Use it to capture **backend** events —
 payments, payouts, settlements, background jobs — where the data is trustworthy and
@@ -10,13 +10,13 @@ handlers never block on the network.
 ## Install
 
 ```bash
-npm install @traceiq/node
+npm install traceiq-node
 ```
 
 ## Quickstart
 
 ```ts
-import { TraceIQ } from '@traceiq/node';
+import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: 'YOUR_PROJECT_ID',

@@ -86,11 +86,11 @@ export const SDK_INTEGRATIONS: SdkIntegration[] = [
     badge: 'Node.js',
     language: 'TypeScript',
     shikiLang: 'ts',
-    install: 'npm install @traceiq/node',
+    install: 'npm install traceiq-node',
     docsUrl: '/docs?page=node',
     repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/packages/node',
     icon: SdkIcons.Node,
-    code: `import { TraceIQ } from '@traceiq/node';
+    code: `import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: 'YOUR_PROJECT_ID',

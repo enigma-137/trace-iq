@@ -1,15 +1,31 @@
 {
-  "name": "@traceiq/node",
+  "name": "traceiq-node",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "TraceIQ server-side SDK for Node.js — capture backend events (payments, payouts, jobs) with trustworthy properties.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit"
   }
 }
