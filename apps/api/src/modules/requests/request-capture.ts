@@ -9,6 +9,29 @@ type JsonObject = Record<string, unknown>;
 
 export const API_REQUEST_EVENT = '$api_request';
 
+// Where a request was timed. Server timings (SDK middleware) measure handler time;
+// client timings (browser fetch/XHR capture) are full network round trips, so the
+// two are never averaged together by default.
+export type RequestSource = 'server' | 'client' | 'all';
+export const REQUEST_SOURCES: readonly RequestSource[] = ['server', 'client', 'all'];
+export const CLIENT_INSTRUMENTATIONS = ['browser'] as const;
+
+export function parseRequestSource(value: unknown): RequestSource | null {
+  return typeof value === 'string' && (REQUEST_SOURCES as readonly string[]).includes(value)
+    ? (value as RequestSource)
+    : null;
+}
+
+/**
+ * SQL predicate that is true for client-timed requests. Rows written before the
+ * browser SDK tagged itself have no instrumentation but do carry a session id,
+ * which server middleware never sets.
+ */
+export function clientRequestSql(instrumentation: string, sessionId: string): string {
+  const names = CLIENT_INSTRUMENTATIONS.map((name) => `'${name}'`).join(', ');
+  return `(${instrumentation} IN (${names}) OR (${instrumentation} IS NULL AND ${sessionId} IS NOT NULL))`;
+}
+
 export type CaptureState = 'captured' | 'redacted' | 'metadata_only' | 'unavailable';
 export const CAPTURE_STATES: readonly CaptureState[] = ['captured', 'redacted', 'metadata_only', 'unavailable'];
 

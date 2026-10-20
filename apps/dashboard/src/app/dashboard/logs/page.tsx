@@ -3,7 +3,8 @@ import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { ObservabilityApp } from './ObservabilityApp';
 import {
   ObservabilityLog,
-  HistogramResponse
+  HistogramResponse,
+  LogSource
 } from './types';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,11 @@ export default async function DashboardLogsPage({
   if (hasWindow) {
     queryParams.set('from', from);
     queryParams.set('to', to);
+  } else {
+    // Match the client's default 24h window (the API alone would default to 1h).
+    const now = Date.now();
+    queryParams.set('from', new Date(now - 24 * 60 * 60 * 1000).toISOString());
+    queryParams.set('to', new Date(now).toISOString());
   }
   queryParams.set('limit', '50');
 
@@ -116,6 +122,7 @@ export default async function DashboardLogsPage({
         initialSelectedLog={logDetailResult.data?.log ?? null}
         initialFilters={{
           search,
+          ...(source !== 'all' ? { source: source as LogSource } : {}),
           ...(hasWindow ? { timeRange: 'custom' as const, from, to } : {})
         }}
       />

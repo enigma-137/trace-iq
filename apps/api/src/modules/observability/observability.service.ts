@@ -16,6 +16,7 @@ export type LogSource =
   | 'auth'
   | 'job'
   | 'sdk'
+  | 'event'
   | 'custom';
 
 export interface ObservabilityLogEntry {
@@ -184,6 +185,68 @@ function boundedObject(value: unknown): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** A tracked event as the ingest path sees it, for mirroring into Logs. */
+export interface EventLogInput {
+  eventId: string;
+  eventName: string;
+  occurredAt: Date;
+  properties?: Record<string, unknown> | null;
+  sessionId?: string | null;
+  distinctId?: string | null;
+  route?: string | null;
+}
+
+// Reserved events that are telemetry, not app activity: they have their own views
+// (Requests, Web vitals, Replay, …) and would only drown out real log lines.
+const MIRRORED_SYSTEM_EVENTS = new Set(['$exception', '$error']);
+const MAX_SUMMARY_PROPS = 4;
+
+/**
+ * Turns a tracked app event (`traceiq.track('challenge_sent', …)`) or an exception
+ * into a log line so what users did shows up in Logs next to explicit log() calls,
+ * correlated by session, user and request. Returns null for events that aren't
+ * mirrored.
+ */
+export function eventToLog(input: EventLogInput): (Partial<ObservabilityLogEntry> & { message: string }) | null {
+  const name = input.eventName;
+  const isException = MIRRORED_SYSTEM_EVENTS.has(name);
+  if (!name || (name.startsWith('$') && !isException)) return null;
+  const props = input.properties && typeof input.properties === 'object' ? input.properties : {};
+
+  let message: string;
+  let errorDetails: Record<string, unknown> | undefined;
+  if (isException) {
+    const type = cap(props.type, 128) ?? 'Error';
+    const text = cap(props.message, 2000) ?? '(no message)';
+    message = `${type}: ${text}`;
+    errorDetails = { name: type, message: text, stack: cap(props.stack, 8000), handled: props.handled };
+  } else {
+    // "challenge_sent · opponent=ada mode=ranked" — the first few scalar properties.
+    const summary = Object.entries(props)
+      .filter(([key, value]) => !key.startsWith('$') && ['string', 'number', 'boolean'].includes(typeof value))
+      .slice(0, MAX_SUMMARY_PROPS)
+      .map(([key, value]) => `${key}=${String(value).slice(0, 80)}`)
+      .join(' ');
+    message = summary ? `${name} · ${summary}` : name;
+  }
+
+  return normalizeSdkLog({
+    timestamp: input.occurredAt.toISOString(),
+    level: isException ? (props.handled === true ? 'warn' : 'error') : 'info',
+    source: 'event',
+    service: cap(props.service, 128) ?? 'app',
+    message,
+    route: input.route ?? undefined,
+    traceId: cap(props.traceId, 128),
+    requestId: cap(props.requestId, 128),
+    sessionId: input.sessionId ?? undefined,
+    distinctId: input.distinctId ?? undefined,
+    environment: cap(props.environment, 64),
+    metadata: { eventId: input.eventId, eventName: name, properties: props },
+    errorDetails
+  });
 }
 
 @Injectable()
@@ -687,6 +750,49 @@ export class ObservabilityService {
     );
 
     return { id, ok: true };
+  }
+
+  /**
+   * Mirrors tracked events into Logs in one statement. Best-effort: called after the
+   * event write commits, and a failure here never fails ingestion.
+   */
+  async recordEventLogs(projectId: string, events: EventLogInput[]): Promise<number> {
+    const entries = events.map(eventToLog).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+    if (entries.length === 0) return 0;
+    const columns = 16;
+    const values: unknown[] = [];
+    const rows = entries.map((entry, i) => {
+      values.push(
+        `log_${randomUUID()}`,
+        projectId,
+        entry.timestamp,
+        entry.level,
+        entry.source,
+        entry.service,
+        entry.message,
+        entry.status,
+        entry.route ?? null,
+        entry.traceId ?? null,
+        entry.requestId ?? null,
+        entry.sessionId ?? null,
+        entry.distinctId ?? null,
+        entry.environment ?? 'production',
+        JSON.stringify(this.sanitizeObject(entry.metadata) ?? {}),
+        JSON.stringify(this.sanitizeObject(entry.errorDetails))
+      );
+      const slots = Array.from({ length: columns }, (_, k) => `$${i * columns + k + 1}${k >= 14 ? '::jsonb' : ''}`);
+      return `(${slots.join(', ')})`;
+    });
+    await this.database.query(
+      `INSERT INTO observability_logs (
+         id, project_id, timestamp, level, source, service, message, status,
+         route, trace_id, request_id, session_id, distinct_id, environment,
+         metadata, error_details
+       ) VALUES ${rows.join(', ')}
+       ON CONFLICT (id) DO NOTHING`,
+      values
+    );
+    return entries.length;
   }
 
   async ingestLogFromSdk(

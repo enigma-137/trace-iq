@@ -73,7 +73,7 @@ const cfg = traceiq.getFeatureFlagPayload('checkout-limits');`,
   projectId: 'YOUR_PROJECT_ID',
   writeKey: 'YOUR_WRITE_KEY',
   endpoint: '__API_BASE_URL__',
-  autoCaptureRequests: true, // wraps fetch() as $api_request
+  autoCaptureRequests: true, // wraps fetch() and XHR as $api_request
 });`
     },
     docs: [
@@ -330,7 +330,7 @@ const FEATURE_GUIDANCE: Record<Exclude<AiFeatureId, 'general'>, string> = {
   webhooks:
     'Webhooks are registered in the TraceIQ dashboard (Webhooks → New webhook): provide a URL, optionally a signing secret, and the event list to forward. TraceIQ POSTs the payload with an x-traceiq-signature HMAC header when a secret is set.',
   'api-performance':
-    'API performance runs on reserved $api_request events (method, path, status, durationMs). The Node SDK ships a one-line middleware; in the browser enable autoCaptureRequests so the SDK times fetch() calls.'
+    'API performance runs on reserved $api_request events (method, path, status, durationMs). The Node SDK ships a one-line middleware; in the browser enable autoCaptureRequests so the SDK times fetch() and XHR calls. Browser timings are full round trips and are reported separately from server timings.'
 };
 
 export function buildAiPrompt(

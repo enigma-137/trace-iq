@@ -39,7 +39,8 @@ export function ObservabilityApp({
   const supabase = createSupabaseBrowserClient();
 
   const [filters, setFilters] = useState<ObservabilityFilterState>({
-    timeRange: '1h',
+    // A day by default: "I did X earlier today" should not need a range change to find.
+    timeRange: '24h',
     source: 'all',
     level: '',
     status: '',

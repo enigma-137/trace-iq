@@ -11,6 +11,7 @@ import { sanitizeIngestedTraits } from '../users/users.service';
 import { getPreferredProjectId } from '../../common/active-project';
 import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
 import { RequestsService } from '../requests/requests.service';
+import { EventLogInput, ObservabilityService } from '../observability/observability.service';
 import { withExceptionFingerprint } from '../errors/fingerprint';
 import {
   API_REQUEST_EVENT,
@@ -70,6 +71,12 @@ const MAX_BATCH_SIZE = 500;
 const SESSION_UPSERT_ATTEMPTS = 3;
 
 // unique_violation on the sessions keys, or a deadlock: both clear on retry.
+// The page an event happened on (browser SDK context), for the log line's route.
+function pageRoute(context: unknown): string | null {
+  const page = (context as { page?: { path?: unknown } } | undefined)?.page;
+  return typeof page?.path === 'string' && page.path ? page.path : null;
+}
+
 function isTransientSessionConflict(error: unknown): boolean {
   const pg = error as { code?: string; constraint?: string };
   if (pg?.code === '40P01') return true;
@@ -112,7 +119,8 @@ export class EventsService {
     private readonly achievements: AchievementsService,
     private readonly usage: UsageService = new UsageService(new EntitlementService(database)),
     @Optional() private readonly setupVerifications?: SetupVerificationsService,
-    @Optional() private readonly requests?: RequestsService
+    @Optional() private readonly requests?: RequestsService,
+    @Optional() private readonly observability?: ObservabilityService
   ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
@@ -219,6 +227,19 @@ export class EventsService {
         }
       }
     }
+
+    this.mirrorToLogs(
+      auth.project_id,
+      prepared.map((p, i) => ({
+        eventId: eventIds[i],
+        eventName: p.eventName,
+        occurredAt: p.occurredAt,
+        properties: p.properties,
+        sessionId: p.sessionId,
+        distinctId: p.externalId ?? p.anonymousId,
+        route: pageRoute(p.context)
+      }))
+    );
 
     prepared.forEach((p, i) => {
       const eventId = eventIds[i];
@@ -540,6 +561,18 @@ export class EventsService {
       return usage;
     });
 
+    this.mirrorToLogs(auth.project_id, [
+      {
+        eventId,
+        eventName,
+        occurredAt,
+        properties: input.properties,
+        sessionId,
+        distinctId: this.optionalString(input.userId) ?? anonymousId,
+        route: pageRoute(input.context)
+      }
+    ]);
+
     // Forward to outbound webhooks without blocking the ingest response — delivery
     // is best-effort and must never fail or slow down an event write.
     void this.webhooks.deliverForEvent(auth.project_id, {
@@ -579,6 +612,13 @@ export class EventsService {
       eventId,
       ...(consumption.warningThreshold ? { usageWarningPercentage: consumption.warningThreshold } : {})
     };
+  }
+
+  // App events and exceptions also appear in Logs, so "what did this user do" can be
+  // answered from one timeline. Fire-and-forget: Logs must never slow or fail ingest.
+  private mirrorToLogs(projectId: string, events: EventLogInput[]): void {
+    if (!this.observability) return;
+    void this.observability.recordEventLogs(projectId, events).catch(() => undefined);
   }
 
   async listRecentEvents(projectId: string, limit = 25) {

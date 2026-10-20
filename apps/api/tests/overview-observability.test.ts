@@ -42,7 +42,8 @@ describe('overview observability series', () => {
       .toEqual({ bucket: '2026-09-02T00:00:00Z', events: 0, apiCalls: 0, errors: 0 });
 
     const seriesSql = db.queryCalls('AS api_calls')[0].text;
-    expect(seriesSql).toContain("event_name = '$api_request' OR properties->>'durationMs' IS NOT NULL");
+    expect(seriesSql).toContain("FILTER (WHERE event_name = '$api_request')::int AS api_calls");
+    expect(seriesSql).not.toContain("properties->>'durationMs' IS NOT NULL");
     expect(seriesSql).toContain("event_name = '$exception' OR event_name = '$error'");
   });
 

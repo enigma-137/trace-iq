@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientFetch } from '@/lib/analytics-api';
 import {
   CAPTURE_OPTIONS,
+  SOURCE_OPTIONS,
   DEFAULT_FILTERS,
   METHODS,
   STATUS_OPTIONS,
@@ -259,6 +260,14 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
             </option>
           ))}
         </select>
+        <select className={selectClass} value={filters.source} onChange={(e) => setFilters({ source: e.target.value, request: '' })} aria-label="Timed by">
+          <option value="">Server + browser</option>
+          {SOURCE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <select className={selectClass} value={filters.capture} onChange={(e) => setFilters({ capture: e.target.value, request: '' })} aria-label="Capture state">
           <option value="">Any capture state</option>
           {CAPTURE_OPTIONS.map((option) => (
@@ -370,7 +379,9 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
                       </span>
                     </span>
                     <span className="hidden min-w-0 md:block">
-                      <span className="block truncate text-xs text-neutral-800 dark:text-slate-200">{row.service ?? '—'}</span>
+                      <span className="block truncate text-xs text-neutral-800 dark:text-slate-200">
+                        {row.service ?? (row.timedBy === 'client' ? 'browser' : '—')}
+                      </span>
                       <span className="block truncate text-[11px] text-neutral-500 dark:text-slate-500">{row.environment ?? ''}</span>
                     </span>
                     <span>

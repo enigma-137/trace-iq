@@ -10,6 +10,8 @@ import {
   CaptureState,
   DEFAULT_CAPTURE_SETTINGS,
   MAX_BODY_BYTES_LIMIT,
+  clientRequestSql,
+  parseRequestSource,
   rowToCaptureSettings
 } from './request-capture';
 
@@ -25,6 +27,8 @@ export interface RequestsQuery {
   capture?: string;
   route?: string;
   search?: string;
+  /** `server` (SDK middleware), `client` (browser capture) or `all` (default). */
+  source?: string;
   sort?: string;
   cursor?: string;
   limit?: string | number;
@@ -44,6 +48,8 @@ export interface RequestListItem {
   durationMs: number;
   responseSize: number | null;
   captureState: CaptureState;
+  /** `client` for browser-timed round trips, `server` for handler timings. */
+  timedBy: 'server' | 'client';
 }
 
 export interface RequestDetail extends RequestListItem {
@@ -108,7 +114,8 @@ const LIST_COLUMNS = `
   status_code AS "statusCode",
   duration_ms AS "durationMs",
   response_size AS "responseSize",
-  capture_state AS "captureState"
+  capture_state AS "captureState",
+  CASE WHEN ${clientRequestSql('instrumentation', 'session_id')} THEN 'client' ELSE 'server' END AS "timedBy"
 `;
 
 const DETAIL_COLUMNS = `
@@ -740,6 +747,15 @@ export class RequestsService {
       } else {
         throw new BadRequestException(`Unsupported status filter "${status}".`);
       }
+    }
+
+    const rawSource = clean(query.source, 16);
+    if (rawSource) {
+      const source = parseRequestSource(rawSource);
+      if (!source) throw new BadRequestException(`Unsupported source filter "${rawSource}".`);
+      const isClient = clientRequestSql('instrumentation', 'session_id');
+      if (source === 'client') where.push(isClient);
+      if (source === 'server') where.push(`NOT ${isClient}`);
     }
 
     const capture = clean(query.capture, 32);

@@ -26,6 +26,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private errorHandlersInstalled = false;
   private clickHandlersInstalled = false;
   private requestCaptureInstalled = false;
+  private consoleCaptureInstalled = false;
+  private capturingConsole = false;
   private webVitalsInstalled = false;
   private recentClicks: Array<{ t: number; x: number; y: number }> = [];
   private logBuffer: Array<Record<string, unknown>> = [];
@@ -108,6 +110,10 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
     if (options.autoCaptureRequests) {
       this.installRequestCapture();
+    }
+
+    if (options.autoCaptureConsole) {
+      this.installConsoleCapture(options.autoCaptureConsole);
     }
 
     if (options.autoCaptureWebVitals !== false) {
@@ -336,24 +342,30 @@ export class BrowserTraceIQClient implements TraceIQClient {
     );
   }
 
-  // Wrap window.fetch to time each request and emit a `$api_request` event. Our own
+  // Wrap window.fetch and XMLHttpRequest (axios, jQuery and most older clients use
+  // XHR) to time each request and emit a `$api_request` event. Our own
   // ingestion/flag calls are skipped so we never capture (or loop on) ourselves.
   private installRequestCapture(): void {
     if (typeof window === 'undefined' || this.requestCaptureInstalled) {
       return;
     }
+    this.requestCaptureInstalled = true;
+    this.installFetchCapture();
+    this.installXhrCapture();
+  }
+
+  private installFetchCapture(): void {
     const originalFetch = window.fetch;
     if (typeof originalFetch !== 'function') {
       return;
     }
-    this.requestCaptureInstalled = true;
     const self = this;
 
     window.fetch = function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
       const url = self.requestUrl(input);
       const method = self.requestMethod(input, init);
 
-      if (self.isInternalUrl(url)) {
+      if (!self.shouldCaptureRequest(url, (name) => self.requestHeader(input, init, name))) {
         return originalFetch.call(window, input as RequestInfo, init);
       }
 
@@ -372,20 +384,116 @@ export class BrowserTraceIQClient implements TraceIQClient {
     };
   }
 
-  private recordRequest(method: string, url: string, status: number, durationMs: number, response?: Response): void {
+  private installXhrCapture(): void {
+    const Xhr = (window as unknown as { XMLHttpRequest?: typeof XMLHttpRequest }).XMLHttpRequest;
+    if (typeof Xhr !== 'function' || !Xhr.prototype) {
+      return;
+    }
+    const self = this;
+    const originalOpen = Xhr.prototype.open;
+    const originalSend = Xhr.prototype.send;
+    type Tracked = XMLHttpRequest & { __traceiq?: { method: string; url: string } };
+
+    Xhr.prototype.open = function (this: Tracked, method: string, url: string | URL, ...rest: unknown[]) {
+      try {
+        this.__traceiq = { method: String(method || 'GET').toUpperCase(), url: String(url) };
+      } catch {
+        // Never let instrumentation break the request.
+      }
+      return (originalOpen as (...args: unknown[]) => void).call(this, method, url, ...rest);
+    } as typeof Xhr.prototype.open;
+
+    Xhr.prototype.send = function (this: Tracked, body?: Document | XMLHttpRequestBodyInit | null) {
+      const tracked = this.__traceiq;
+      if (tracked && self.shouldCaptureRequest(tracked.url)) {
+        const start = self.nowMs();
+        let recorded = false;
+        const finish = () => {
+          if (recorded) return;
+          recorded = true;
+          try {
+            self.recordRequest(tracked.method, tracked.url, this.status || 0, self.nowMs() - start, undefined, (name) =>
+              this.getResponseHeader(name)
+            );
+          } catch {
+            // Never let instrumentation break the request.
+          }
+        };
+        // `loadend` fires once for success, error, abort and timeout alike.
+        this.addEventListener('loadend', finish);
+      }
+      return originalSend.call(this, body);
+    };
+  }
+
+  // Forwards console output to TraceIQ Logs so ad-hoc `console.log` calls in the app
+  // show up without rewriting them as `traceiq.log()`. The original console still
+  // prints; our own `[TraceIQ]` diagnostics are skipped so delivery can't loop.
+  private installConsoleCapture(option: NonNullable<TraceIQInitOptions['autoCaptureConsole']>): void {
+    if (typeof console === 'undefined' || this.consoleCaptureInstalled) return;
+    this.consoleCaptureInstalled = true;
+    const levels: Array<'log' | 'info' | 'warn' | 'error' | 'debug'> =
+      typeof option === 'object' && option.levels ? option.levels : ['log', 'info', 'warn', 'error'];
+    const consoleRef = console as unknown as Record<string, (...args: unknown[]) => void>;
+    for (const method of levels) {
+      const original = consoleRef[method];
+      if (typeof original !== 'function') continue;
+      consoleRef[method] = (...args: unknown[]) => {
+        original.apply(console, args);
+        this.forwardConsole(method, args);
+      };
+    }
+  }
+
+  private forwardConsole(method: string, args: unknown[]): void {
+    if (this.capturingConsole || args.length === 0) return;
+    const first = args[0];
+    if (typeof first === 'string' && first.startsWith('[TraceIQ]')) return;
+    this.capturingConsole = true;
+    try {
+      const error = args.find((arg) => arg instanceof Error);
+      const message = args.map((arg) => formatConsoleArg(arg)).join(' ');
+      const level: TraceIQLogLevel = method === 'log' ? 'info' : (method as TraceIQLogLevel);
+      this.log(level, message, { service: 'web-console', ...(error ? { error } : {}) });
+    } catch {
+      // Never let instrumentation break the app's own logging.
+    } finally {
+      this.capturingConsole = false;
+    }
+  }
+
+  private recordRequest(
+    method: string,
+    url: string,
+    status: number,
+    durationMs: number,
+    response?: Response,
+    getHeader: (name: string) => string | null = (name) => this.responseHeader(response, name)
+  ): void {
+    // A response that is an HTML document is a page load (Remix/Turbo/htmx-style
+    // navigation, a prefetch, an SPA fallback), not an API call.
+    if (!this.requestCaptureConfig().includePageRequests && /^text\/html\b/i.test(safeHeader(getHeader, 'content-type') ?? '')) {
+      return;
+    }
     const properties: Record<string, unknown> = {
       method,
       path: normalizeApiPath(url, this.getLocation()?.origin),
       status,
       durationMs: Math.round(durationMs),
-      ok: status >= 200 && status < 400
+      ok: status >= 200 && status < 400,
+      // Browser timings are full round trips (DNS, TLS, network, server) and are
+      // reported separately from server-side timings in API performance.
+      instrumentation: 'browser'
     };
+    const host = requestHost(url, this.getLocation()?.origin);
+    if (host) properties.host = host;
     // When an instrumented backend echoes its request id (and CORS exposes it), the
     // browser-side record links to the server-side record of the same request.
-    const requestId = this.responseHeader(response, 'x-request-id');
+    const requestId = safeHeader(getHeader, 'x-request-id');
     if (requestId && /^[A-Za-z0-9._:/+=-]{1,128}$/.test(requestId)) properties.requestId = requestId;
-    const size = Number(this.responseHeader(response, 'content-length'));
-    if (Number.isFinite(size) && size >= 0 && this.responseHeader(response, 'content-length') !== null) {
+    const rawSize = safeHeader(getHeader, 'content-length');
+    const size = Number(rawSize);
+    if (rawSize !== null && Number.isFinite(size) && size >= 0) {
       properties.responseSize = size;
     }
     this.track('$api_request', properties);
@@ -409,6 +517,34 @@ export class BrowserTraceIQClient implements TraceIQClient {
     const fromInit = init?.method;
     const fromRequest = typeof input !== 'string' && !(input instanceof URL) ? input.method : undefined;
     return (fromInit ?? fromRequest ?? 'GET').toUpperCase();
+  }
+
+  private requestCaptureConfig(): RequestCaptureConfig {
+    const option = this.options?.autoCaptureRequests;
+    return typeof option === 'object' && option !== null ? option : {};
+  }
+
+  // Decides before the request is sent whether it is an API call worth recording.
+  // Framework navigation (Next.js RSC payloads and prefetches), dev-server/HMR
+  // traffic and static assets are page loads, not API calls, and are skipped.
+  private shouldCaptureRequest(url: string, header?: (name: string) => string | null): boolean {
+    if (this.isInternalUrl(url)) return false;
+    const config = this.requestCaptureConfig();
+    if (config.exclude?.some((pattern) => matchesUrl(pattern, url))) return false;
+    if (config.include && config.include.length > 0) return config.include.some((pattern) => matchesUrl(pattern, url));
+    if (config.includePageRequests) return true;
+    if (header && (header('rsc') !== null || header('next-router-prefetch') !== null)) return false;
+    return !isFrameworkOrAssetUrl(url, this.getLocation()?.origin);
+  }
+
+  private requestHeader(input: RequestInfo | URL, init: RequestInit | undefined, name: string): string | null {
+    try {
+      const fromInit = init?.headers ? new Headers(init.headers).get(name) : null;
+      if (fromInit !== null) return fromInit;
+      return typeof input !== 'string' && !(input instanceof URL) ? input.headers?.get(name) ?? null : null;
+    } catch {
+      return null;
+    }
   }
 
   private isInternalUrl(url: string): boolean {
@@ -1113,6 +1249,53 @@ export class BrowserTraceIQClient implements TraceIQClient {
         console.log(message);
       }
     }
+  }
+}
+
+type RequestCaptureConfig = Exclude<NonNullable<TraceIQInitOptions['autoCaptureRequests']>, boolean>;
+
+function matchesUrl(pattern: string | RegExp, url: string): boolean {
+  return typeof pattern === 'string' ? url.includes(pattern) : pattern.test(url);
+}
+
+const FRAMEWORK_PATH = /^\/(_next|__nextjs|_nuxt|__vite_ping|@vite|@fs|@id|@react-refresh|__webpack_hmr|sockjs-node|_app\/immutable)\b|\.hot-update\./;
+const ASSET_EXTENSION =
+  /\.(m?js|cjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp3|mp4|webm|ogg|wav|wasm|txt|webmanifest)$/i;
+
+function isFrameworkOrAssetUrl(rawUrl: string, base?: string): boolean {
+  try {
+    const parsed = new URL(rawUrl, base ?? 'http://localhost');
+    if (parsed.searchParams.has('_rsc')) return true;
+    return FRAMEWORK_PATH.test(parsed.pathname) || ASSET_EXTENSION.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function safeHeader(getHeader: (name: string) => string | null, name: string): string | null {
+  try {
+    return getHeader(name) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function requestHost(rawUrl: string, base?: string): string | undefined {
+  try {
+    return new URL(rawUrl, base).host || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatConsoleArg(arg: unknown): string {
+  if (typeof arg === 'string') return arg;
+  if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+  if (arg === undefined) return 'undefined';
+  try {
+    return JSON.stringify(arg) ?? String(arg);
+  } catch {
+    return String(arg);
   }
 }
 
