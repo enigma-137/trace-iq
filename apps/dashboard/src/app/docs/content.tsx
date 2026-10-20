@@ -500,14 +500,26 @@ try {
 
   if (id === 'node') {
     return (
-      <Section id="node" title="Server-side SDK (Node.js)">
-        <P>
-          For backend events — payments, payouts, settlements, jobs — use <Mono>traceiq-node</Mono>. Server events
-          are the most trustworthy source of revenue: the <Mono>amount</Mono> comes from your systems, not the
-          browser. Events are queued and flushed in batches, so request handlers never block on the network.
-        </P>
-        <Code lang="bash">{`npm install traceiq-node`}</Code>
-        <Code lang="ts">{`import { TraceIQ } from 'traceiq-node';
+      <div className="space-y-8">
+        <Section id="node" title="Server-side SDK (Node.js)">
+          <P>
+            For backend events — payments, payouts, settlements, jobs — use <Mono>traceiq-node</Mono>. Server events
+            are the most trustworthy source of revenue: the <Mono>amount</Mono> comes from your systems, not the
+            browser. Events are queued and flushed in batches, so request handlers never block on the network.
+          </P>
+          <P>
+            Package on npm:{' '}
+            <a
+              className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white"
+              href="https://www.npmjs.com/package/traceiq-node"
+              target="_blank"
+              rel="noreferrer"
+            >
+              npm (traceiq-node)
+            </a>
+          </P>
+          <Code lang="bash">{`npm install traceiq-node`}</Code>
+          <Code lang="ts">{`import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: '${projectId}',
@@ -519,17 +531,79 @@ const traceiq = new TraceIQ({
 traceiq.capture({
   event: 'payout_succeeded',
   userId: 'user_123',
-  properties: { amount: 50000, currency: 'NGN' },
+  properties: { amount: 50000, currency: 'NGN', channel: 'bank_transfer' },
 });
 
-traceiq.identify({ userId: 'user_123', traits: { kyc_tier: 2 } });
+traceiq.identify({ userId: 'user_123', traits: { kyc_tier: 2, email: 'user@example.com' } });
+traceiq.group({ organizationId: 'org_9', userId: 'user_123', traits: { plan: 'growth' } });
 
-await traceiq.shutdown(); // flush before a short-lived process exits`}</Code>
-        <P>
-          Events flush automatically by size (<Mono>flushAt</Mono>) or on a timer (<Mono>flushIntervalMs</Mono>).
-          Call <Mono>shutdown()</Mono> in scripts and serverless functions so nothing is lost on exit.
-        </P>
-      </Section>
+// Flush before a short-lived process or serverless function exits:
+await traceiq.shutdown();`}</Code>
+          <P>
+            Events flush automatically by size (<Mono>flushAt</Mono>) or on a timer (<Mono>flushIntervalMs</Mono>).
+            Call <Mono>shutdown()</Mono> in scripts and serverless functions so nothing is lost on exit.
+          </P>
+        </Section>
+
+        <Section id="node-middleware" title="Request telemetry & API performance">
+          <P>
+            <Mono>traceiq.middleware()</Mono> records every request as a <Mono>$api_request</Mono> event, powering the <strong>API Performance</strong> dashboard and the <strong>Requests</strong> explorer.
+          </P>
+          <Code lang="ts">{`import express from 'express';
+import { TraceIQ } from 'traceiq-node';
+
+const app = express();
+const traceiq = new TraceIQ({
+  projectId: '${projectId}',
+  writeKey: process.env.TRACEIQ_WRITE_KEY,
+  endpoint: '${apiBaseUrl}',
+});
+
+// Automatic endpoint latency, status code, and error capture:
+app.use(traceiq.middleware({
+  service: 'billing-api',
+  environment: process.env.NODE_ENV || 'production',
+  resolveUserId: (req) => req.user?.id,
+  ignore: (req) => req.path === '/health',
+}));`}</Code>
+          <P>
+            Any <Mono>capture()</Mono> call made while a request is handled — like an exception or conversion — is automatically stamped with the same distributed <Mono>requestId</Mono> and <Mono>traceId</Mono>.
+          </P>
+        </Section>
+
+        <Section id="node-feature-flags" title="Server-side feature flags">
+          <P>
+            Evaluate feature flags deterministically on your backend or worker with safe local fallbacks:
+          </P>
+          <Code lang="ts">{`// Check if a flag is active for a user:
+const isEnabled = await traceiq.isFeatureEnabled('new-billing-flow', userId, {
+  defaultValue: false,
+  environment: 'production',
+  properties: { plan: 'pro', country: 'NG' }
+});
+
+// Fetch configuration payload:
+const payload = await traceiq.getFeatureFlagPayload('new-billing-flow', userId, {
+  environment: 'production'
+});`}</Code>
+        </Section>
+
+        <Section id="node-options" title="Configuration options">
+          <OptionsTable
+            rows={[
+              ['projectId', 'required', 'Your TraceIQ project identifier.'],
+              ['writeKey', 'required', 'Secret write key for authenticated backend ingestion.'],
+              ['endpoint', 'http://localhost:4000', 'TraceIQ API base URL.'],
+              ['flushAt', '20', 'Flush once this many events are queued.'],
+              ['flushIntervalMs', '10000', 'Periodic background flush timer in milliseconds (0 disables).'],
+              ['maxRetries', '3', 'Retry attempts for network dropouts with exponential backoff.'],
+              ['timeoutMs', '10000', 'Per-request network timeout.'],
+              ['debug', 'false', 'Enable diagnostic debug logs in stdout.'],
+              ['captureConsole', 'false', 'Forward console.log/info/warn/error to TraceIQ Logs.']
+            ]}
+          />
+        </Section>
+      </div>
     );
   }
 
