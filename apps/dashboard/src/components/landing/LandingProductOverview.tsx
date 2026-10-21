@@ -1,64 +1,489 @@
-'use client';
+"use client";
 
-import { useState, type KeyboardEvent } from 'react';
-import { Activity, BarChart3, CircleAlert, House, Info, Layers, CalendarDays } from 'lucide-react';
-import styles from '@/app/landing-light.module.css';
+import { useState, type KeyboardEvent } from "react";
+import { Check, AlertTriangle, ArrowRight, Activity } from "lucide-react";
+import styles from "@/app/landing-light.module.css";
 
-const views = [
-  { key: 'behavior', label: 'Understand behavior', title: 'Product overview', description: 'Explore event data, errors, and performance — all in one place.', chart: 'Event volume', unit: 'events', ticks: ['60K', '40K', '20K', '0'], values: [10, 16, 23, 29, 22, 30, 39, 52, 33, 29], stats: [['Total events', '482K'], ['Active users', '24.3K'], ['Errors', '220'], ['P95 latency', '320 ms']], activity: 'Recent events', entries: [['user_signed_up', 'user_38492 · web', '2m ago'], ['checkout_error', 'error · Payment declined', '4m ago'], ['page_view', '/pricing · web', '6m ago'], ['subscription_created', 'user_91233 · pro plan', '8m ago']] },
-  { key: 'errors', label: 'Investigate errors', title: 'Error context', description: 'Connect exceptions to the user actions that came before them.', chart: 'Errors over time', unit: 'errors', ticks: ['60', '40', '20', '0'], values: [45, 39, 55, 31, 35, 23, 29, 19, 15, 9], stats: [['Captured errors', '220'], ['Affected users', '84'], ['Error groups', '12'], ['Latest occurrence', '2m ago']], activity: 'Error trail', entries: [['checkout_opened', '/checkout · web', '14:32:01'], ['payment_submitted', 'POST /v1/charge', '14:32:05'], ['payment_failed', 'Request returned 500', '14:32:06'], ['exception_captured', 'CheckoutError · stack trace', '14:32:06']] },
-  { key: 'performance', label: 'Monitor performance', title: 'API performance', description: 'Understand request timing and investigate slow endpoints.', chart: 'P95 request latency', unit: 'milliseconds', ticks: ['600ms', '400ms', '200ms', '0'], values: [34, 27, 39, 55, 43, 32, 27, 35, 29, 32], stats: [['Requests', '128K'], ['P95 latency', '320 ms'], ['Error rate', '0.8%'], ['Endpoints', '18']], activity: 'Recent requests', entries: [['GET /v1/products', '200 · 128 ms', '2m ago'], ['POST /v1/charge', '500 · 842 ms', '4m ago'], ['GET /v1/users', '200 · 96 ms', '6m ago'], ['POST /v1/events', '202 · 42 ms', '8m ago']] },
-] as const;
+type TraceEvent = {
+  name: string;
+  time: string;
+  method: string;
+  path: string;
+  status: number;
+  duration: string;
+  state: "success" | "error" | "info";
+  detail: string;
+};
+type View = {
+  key: string;
+  label: string;
+  description: string;
+  title: string;
+  trace: string;
+  events: TraceEvent[];
+};
+const views: View[] = [
+  {
+    key: "behavior",
+    label: "Understand behavior",
+    description:
+      "See how users move through your product, from first touch to conversion.",
+    title: "A journey to conversion",
+    trace: "session_7f9c2e6a",
+    events: [
+      {
+        name: "Product discovered",
+        time: "10:12:01.042",
+        method: "PAGE",
+        path: "/products",
+        status: 200,
+        duration: "84 ms",
+        state: "success",
+        detail: "Page view captured\nSource: organic search\nDevice: desktop",
+      },
+      {
+        name: "Product explored",
+        time: "10:12:05.120",
+        method: "EVENT",
+        path: "product_viewed",
+        status: 202,
+        duration: "42 ms",
+        state: "success",
+        detail:
+          "Product: workspace-pro\nCategory: subscription\nSource: product listing",
+      },
+      {
+        name: "Checkout started",
+        time: "10:12:18.300",
+        method: "EVENT",
+        path: "checkout_started",
+        status: 202,
+        duration: "36 ms",
+        state: "info",
+        detail: "Step 3 of 4\nPlan: pro\nPrevious event: product_viewed",
+      },
+      {
+        name: "Subscription created",
+        time: "10:12:24.560",
+        method: "EVENT",
+        path: "subscription_created",
+        status: 202,
+        duration: "48 ms",
+        state: "success",
+        detail:
+          "Conversion completed\nPlan: pro\nJourney: product to subscription",
+      },
+    ],
+  },
+  {
+    key: "errors",
+    label: "Investigate errors",
+    description:
+      "Go from symptom to cause with context across events, requests, and errors.",
+    title: "Checkout error",
+    trace: "7f9c2e6a-3b21-4d7e-9c1a",
+    events: [
+      {
+        name: "Checkout opened",
+        time: "10:12:03.421",
+        method: "GET",
+        path: "/api/checkout",
+        status: 200,
+        duration: "312 ms",
+        state: "success",
+        detail: "Checkout loaded\nUser: user_8c2f1a44\nSession: sess_3e6b9d0f",
+      },
+      {
+        name: "Payment submitted",
+        time: "10:12:07.118",
+        method: "POST",
+        path: "/api/payments",
+        status: 200,
+        duration: "422 ms",
+        state: "success",
+        detail: "Payment intent created\nMethod: card\nNext: confirm payment",
+      },
+      {
+        name: "Request failed",
+        time: "10:12:08.542",
+        method: "POST",
+        path: "/api/payments/confirm",
+        status: 500,
+        duration: "1.2 s",
+        state: "error",
+        detail:
+          "PaymentProcessingError: Payment was declined\n  at processPayment (payments.ts:187)\n  at async handler (checkout.ts:42)\n  at async route (router.ts:91)",
+      },
+      {
+        name: "Exception captured",
+        time: "10:12:08.543",
+        method: "ERROR",
+        path: "PaymentProcessingError",
+        status: 202,
+        duration: "1 ms",
+        state: "info",
+        detail:
+          "Exception recorded with context\nBreadcrumbs: 3 previous events\nHandled by error boundary",
+      },
+    ],
+  },
+  {
+    key: "performance",
+    label: "Monitor performance",
+    description:
+      "Find bottlenecks and understand the requests behind a slow experience.",
+    title: "The anatomy of a slow request",
+    trace: "request_4f8d2c9e",
+    events: [
+      {
+        name: "Request received",
+        time: "10:14:01.000",
+        method: "GET",
+        path: "/api/products",
+        status: 200,
+        duration: "8 ms",
+        state: "success",
+        detail: "Route matched\nRegion: eu-west\nRequest accepted",
+      },
+      {
+        name: "Cache checked",
+        time: "10:14:01.008",
+        method: "CACHE",
+        path: "products:list",
+        status: 200,
+        duration: "4 ms",
+        state: "info",
+        detail: "Cache result: miss\nFallback: database\nKey: products:list",
+      },
+      {
+        name: "Database queried",
+        time: "10:14:01.012",
+        method: "QUERY",
+        path: "products.select",
+        status: 200,
+        duration: "842 ms",
+        state: "info",
+        detail:
+          "Duration: 842 ms\nRows returned: 120\nLargest share of request time",
+      },
+      {
+        name: "Response returned",
+        time: "10:14:01.892",
+        method: "GET",
+        path: "/api/products",
+        status: 200,
+        duration: "892 ms",
+        state: "success",
+        detail:
+          "Response serialized\nStatus: 200 OK\nTotal request duration: 892 ms",
+      },
+    ],
+  },
+];
+const detailTabs = ["Details", "Payload", "Traces", "Logs"] as const;
+
+function moveTab(
+  event: KeyboardEvent<HTMLButtonElement>,
+  current: number,
+  count: number,
+  change: (index: number) => void,
+  id: (index: number) => string,
+  vertical = false,
+) {
+  let next = current;
+  if (event.key === (vertical ? "ArrowDown" : "ArrowRight"))
+    next = (current + 1) % count;
+  else if (event.key === (vertical ? "ArrowUp" : "ArrowLeft"))
+    next = (current + count - 1) % count;
+  else if (event.key === "Home") next = 0;
+  else if (event.key === "End") next = count - 1;
+  else return;
+  event.preventDefault();
+  change(next);
+  document.getElementById(id(next))?.focus();
+}
 
 export function LandingProductOverview() {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(1);
+  const [eventIndex, setEventIndex] = useState(2);
+  const [detailTab, setDetailTab] = useState(0);
   const view = views[selected];
-  const points = view.values.map((value, index) => `${40 + index * 48},${210 - value * 2.8}`).join(' ');
-
-  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let next = index;
-    if (event.key === 'ArrowRight') next = (index + 1) % views.length;
-    else if (event.key === 'ArrowLeft') next = (index + views.length - 1) % views.length;
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = views.length - 1;
-    else return;
-    event.preventDefault();
-    setSelected(next);
-    document.getElementById(`product-tab-${views[next].key}`)?.focus();
+  const activeEvent = view.events[eventIndex];
+  function changeView(index: number) {
+    setSelected(index);
+    setEventIndex(2);
+    setDetailTab(0);
   }
 
   return (
-    <section className={`${styles.container} ${styles.product}`} id="product" aria-labelledby="product-heading">
-      <h2 id="product-heading">See the story behind every event.</h2>
-      <div className={styles.tabs} role="tablist" aria-label="Explore TraceIQ capabilities">
-        {views.map((tab, index) => <button key={tab.key} id={`product-tab-${tab.key}`} type="button" role="tab" aria-selected={selected === index} aria-controls="product-panel" tabIndex={selected === index ? 0 : -1} onClick={() => setSelected(index)} onKeyDown={(event) => onTabKeyDown(event, index)}>{tab.label}</button>)}
+    <section
+      className={`${styles.frame} ${styles.product}`}
+      id="product"
+      aria-labelledby="product-heading"
+    >
+      <div className={styles.productHeading}>
+        <h2 id="product-heading">
+          Every event has
+          <br />a <mark>backstory.</mark>
+        </h2>
+        <p>
+          Traces turn data
+          <br />
+          into understanding
+          <br />
+          &mdash;
+        </p>
       </div>
-      <div id="product-panel" className={styles.preview} role="tabpanel" aria-labelledby={`product-tab-${view.key}`} tabIndex={0}>
-        <aside className={styles.previewSidebar} aria-hidden="true">
-          <span className={styles.previewBrand}>TraceIQ</span>
-          {[[House, 'Overview'], [BarChart3, 'Events'], [Layers, 'Funnels'], [CircleAlert, 'Errors'], [Activity, 'Performance']].map(([Icon, label], index) => {
-            const Glyph = Icon as typeof House;
-            return <div key={String(label)} className={(selected === 0 ? index === 0 : selected === 1 ? index === 3 : index === 4) ? styles.sidebarSelected : ''}><Glyph size={16} />{String(label)}</div>;
-          })}
-        </aside>
-        <div className={styles.previewBody}>
-          <div className={styles.previewTop}><span>Workspace / {view.title}</span><span className={styles.sampleLabel}><Info size={12} aria-hidden="true" /> Illustrative data</span></div>
-          <div className={styles.previewContent}>
-            <div className={styles.previewHeading}><div><h3>{view.title}</h3><p>{view.description}</p></div><span className={styles.dateLabel}><CalendarDays size={14} aria-hidden="true" />Last 7 days</span></div>
-            <dl className={styles.stats}>{view.stats.map(([label, value], index) => <div key={label}><dt>{label}</dt><dd>{value}<svg viewBox="0 0 70 26" className={index === 2 ? styles.orangeStroke : index === 1 || index === 3 ? styles.greenStroke : styles.blueStroke} aria-hidden="true"><polyline points="1,23 10,17 20,19 31,9 42,14 54,6 68,2" fill="none" strokeWidth="1.6" /></svg></dd></div>)}</dl>
-            <div className={styles.previewGrid}>
-              <div className={styles.chart}><div className={styles.chartHeader}><h4>{view.chart}</h4><span>Apr 7 – Apr 13</span></div>
-                <svg viewBox="0 0 510 250" role="img" aria-label={`Illustrative ${view.chart.toLowerCase()} chart in ${view.unit}; sample data only.`}>
-                  <defs><linearGradient id="traceiq-preview-fill" x1="0" y1="0" x2="0" y2="1"><stop className={styles.chartStop} offset="0%" stopOpacity="0.13" /><stop className={styles.chartStop} offset="100%" stopOpacity="0.01" /></linearGradient></defs>
-                  {[42, 98, 154, 210].map((y, index) => <g key={y}><line x1="40" x2="486" y1={y} y2={y} className={styles.gridStroke} /><text x="0" y={y + 4} className={styles.chartLabel}>{view.ticks[index]}</text></g>)}
-                  {[40, 112, 184, 256, 328, 400, 472].map((x, index) => <g key={x}><line x1={x} x2={x} y1="42" y2="210" className={styles.gridStroke} /><text x={x} y="237" textAnchor="middle" className={styles.chartLabel}>Apr {7 + index}</text></g>)}
-                  <polygon points={`40,210 ${points} 472,210`} fill="url(#traceiq-preview-fill)" />
-                  <polyline points={points} className={styles.blueStroke} fill="none" strokeWidth="2" strokeLinejoin="round" />
-                  {view.values.map((value, index) => <circle key={index} cx={40 + index * 48} cy={210 - value * 2.8} r="3" className={styles.blueFill} />)}
-                </svg>
-              </div>
-              <div className={styles.activity}><h4>{view.activity}</h4><ul>{view.entries.map(([name, detail, time], index) => <li key={name}><span className={`${styles.eventDot} ${index === 1 ? styles.orangeFill : index === 3 ? styles.greenFill : styles.blueFill}`} aria-hidden="true" /><div><strong>{name}</strong><span>{detail}</span></div><time>{time}</time></li>)}</ul></div>
+      <div className={styles.productGrid}>
+        <div
+          className={styles.storyTabs}
+          role="tablist"
+          aria-orientation="vertical"
+          aria-label="Explore TraceIQ capabilities"
+        >
+          {views.map((tab, index) => (
+            <div className={styles.storyItem} key={tab.key}>
+              <button
+                type="button"
+                id={`product-tab-${tab.key}`}
+                role="tab"
+                aria-selected={selected === index}
+                aria-controls="product-panel"
+                aria-describedby={`product-description-${tab.key}`}
+                tabIndex={selected === index ? 0 : -1}
+                onClick={() => changeView(index)}
+                onKeyDown={(event) =>
+                  moveTab(
+                    event,
+                    index,
+                    views.length,
+                    changeView,
+                    (i) => `product-tab-${views[i].key}`,
+                    true,
+                  )
+                }
+              >
+                <span className={styles.tabNumber} aria-hidden="true">
+                  0{index + 1}
+                </span>
+                <span className={styles.tabIndicator} aria-hidden="true" />
+                <span>{tab.label}</span>
+                <ArrowRight
+                  className={styles.tabArrow}
+                  size={16}
+                  aria-hidden="true"
+                />
+              </button>
+              <p id={`product-description-${tab.key}`}>{tab.description}</p>
             </div>
+          ))}
+          <a className={styles.docsLink} href="/docs">
+            Explore the documentation{" "}
+            <ArrowRight size={13} aria-hidden="true" />
+          </a>
+        </div>
+        <div
+          id="product-panel"
+          role="tabpanel"
+          aria-labelledby={`product-tab-${view.key}`}
+          tabIndex={0}
+          className={styles.specimen}
+        >
+          <div className={styles.specimenHeader}>
+            <div>
+              <h3>{view.title}</h3>
+              <span>Trace ID / {view.trace}</span>
+            </div>
+            <span className={styles.sampleLabel}>Illustrative data</span>
+          </div>
+          <div className={styles.tracePanel}>
+            <ol
+              className={styles.timeline}
+              aria-label={`${view.title} event timeline`}
+            >
+              {view.events.map((item, index) => (
+                <li key={item.name}>
+                  <button
+                    className={`${styles.traceEvent} ${styles[item.state]}`}
+                    type="button"
+                    aria-pressed={eventIndex === index}
+                    onClick={() => {
+                      setEventIndex(index);
+                      setDetailTab(0);
+                    }}
+                    aria-label={`${item.name}, ${item.status}, ${item.duration}`}
+                  >
+                    <span className={styles.eventIcon} aria-hidden="true">
+                      {item.state === "success" ? (
+                        <Check size={12} />
+                      ) : item.state === "error" ? (
+                        <AlertTriangle size={11} />
+                      ) : (
+                        <Activity size={11} />
+                      )}
+                    </span>
+                    <span className={styles.eventBody}>
+                      <strong>{item.name}</strong>
+                      <time>{item.time}</time>
+                      <span>
+                        {item.method} {item.path}
+                      </span>
+                      <span>
+                        {item.status} / {item.duration}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+            <div className={styles.inspector}>
+              <div
+                className={styles.detailTabs}
+                role="tablist"
+                aria-label="Event inspection"
+              >
+                {detailTabs.map((tab, index) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    id={`detail-tab-${index}`}
+                    aria-selected={detailTab === index}
+                    aria-controls="event-detail-panel"
+                    tabIndex={detailTab === index ? 0 : -1}
+                    onClick={() => setDetailTab(index)}
+                    onKeyDown={(event) =>
+                      moveTab(
+                        event,
+                        index,
+                        detailTabs.length,
+                        setDetailTab,
+                        (i) => `detail-tab-${i}`,
+                      )
+                    }
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              <div
+                className={styles.detailContent}
+                id="event-detail-panel"
+                role="tabpanel"
+                aria-labelledby={`detail-tab-${detailTab}`}
+                tabIndex={0}
+              >
+                {detailTab === 0 && (
+                  <>
+                    <span
+                      className={`${styles.status} ${styles[activeEvent.state]}`}
+                    >
+                      {activeEvent.status} /{" "}
+                      {activeEvent.state === "error"
+                        ? "Request failed"
+                        : activeEvent.state === "success"
+                          ? "Completed"
+                          : "Captured"}
+                    </span>
+                    <dl className={styles.properties}>
+                      <div>
+                        <dt>{activeEvent.method}</dt>
+                        <dd>{activeEvent.path}</dd>
+                      </div>
+                      <div>
+                        <dt>Time</dt>
+                        <dd>{activeEvent.time}</dd>
+                      </div>
+                      <div>
+                        <dt>Duration</dt>
+                        <dd>{activeEvent.duration}</dd>
+                      </div>
+                      <div>
+                        <dt>User ID</dt>
+                        <dd>user_8c2f1a44</dd>
+                      </div>
+                      <div>
+                        <dt>Session ID</dt>
+                        <dd>sess_3e6b9d0f</dd>
+                      </div>
+                      <div>
+                        <dt>Environment</dt>
+                        <dd>Sample workspace</dd>
+                      </div>
+                    </dl>
+                    <div className={styles.context}>
+                      <h4>
+                        {activeEvent.state === "error"
+                          ? "Exception"
+                          : "Event context"}
+                      </h4>
+                      <pre>{activeEvent.detail}</pre>
+                    </div>
+                  </>
+                )}
+                {detailTab === 1 && (
+                  <div className={styles.context}>
+                    <h4>Event payload</h4>
+                    <pre>
+                      {JSON.stringify(
+                        {
+                          event: activeEvent.name,
+                          method: activeEvent.method,
+                          path: activeEvent.path,
+                          status: activeEvent.status,
+                          duration: activeEvent.duration,
+                          userId: "user_8c2f1a44",
+                          sample: true,
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </div>
+                )}
+                {detailTab === 2 && (
+                  <div className={styles.context}>
+                    <h4>Connected trace</h4>
+                    <p>{view.trace}</p>
+                    <ul className={styles.connectedTrace}>
+                      {view.events.map((item, index) => (
+                        <li
+                          key={item.name}
+                          className={
+                            index === eventIndex ? styles.currentTrace : ""
+                          }
+                        >
+                          <span>0{index + 1}</span>
+                          <span>{item.name}</span>
+                          <span>{item.duration}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {detailTab === 3 && (
+                  <div className={styles.context}>
+                    <h4>Session logs</h4>
+                    <pre>
+                      {view.events
+                        .map(
+                          (item) =>
+                            `[${item.time}] ${item.state.toUpperCase()}\n${item.name}\n${item.method} ${item.path} / ${item.status}`,
+                        )
+                        .join("\n\n")}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className={styles.specimenFoot}>
+            <span className={styles.sampleDot} aria-hidden="true" />
+            <span>One session. The whole story.</span>
+            <span>
+              Select an event to inspect{" "}
+              <ArrowRight size={11} aria-hidden="true" />
+            </span>
           </div>
         </div>
       </div>
