@@ -4,6 +4,7 @@ import { navGroups } from '../src/app/dashboard/nav';
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
+  buildWaterfall,
   errorIssueHref,
   filtersFromParams,
   filtersToApiQuery,
@@ -179,6 +180,37 @@ describe('Requests explorer UI', () => {
     expect(drawer).toContain('never');
     expect(drawer).toContain('guessed from timestamps');
     expect(drawer).toContain('Not recorded for this request');
+  });
+
+  it('nests waterfall rows under recorded parents and hides collapsed subtrees', () => {
+    const entry = (id: string, parentId: string | null) => ({
+      kind: 'request' as const,
+      id,
+      name: id,
+      service: 'api',
+      startedAt: '2026-10-15T10:00:00.000Z',
+      offsetMs: 0,
+      durationMs: 1,
+      status: 'success',
+      statusCode: 200,
+      current: id === 'root',
+      matchedBy: 'trace_id' as const,
+      parentId,
+      level: null,
+      message: null
+    });
+    const entries = [entry('root', null), entry('child', 'root'), entry('grandchild', 'child'), entry('orphan', 'gone'), entry('a', 'b'), entry('b', 'a')];
+    const rows = buildWaterfall(entries);
+    expect(rows.map((row) => [row.entry.id, row.depth])).toEqual([
+      ['root', 0],
+      ['child', 1],
+      ['grandchild', 2],
+      ['orphan', 0],
+      ['a', 0],
+      ['b', 1]
+    ]);
+    expect(rows[0].childCount).toBe(1);
+    expect(buildWaterfall(entries, new Set(['child'])).map((row) => row.entry.id)).toEqual(['root', 'child', 'orphan', 'a', 'b']);
   });
 
   it('cancels stale requests and shows loading, empty, error and retry states', () => {

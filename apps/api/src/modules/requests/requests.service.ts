@@ -80,7 +80,13 @@ export interface TimelineEntry {
   statusCode: number | null;
   current: boolean;
   matchedBy: 'trace_id' | 'request_id' | 'self';
+  /** Recorded parent: span parent for requests, the request a log carries the request id of. */
+  parentId: string | null;
+  level: string | null;
+  message: string | null;
 }
+
+type TracePeerRow = RequestListItem & { spanId: string | null; parentSpanId: string | null };
 
 export const TIME_RANGES: Record<string, number> = {
   '1h': 60 * 60 * 1000,
@@ -426,7 +432,10 @@ export class RequestsService {
       status: request.statusCode >= 500 ? 'error' : request.statusCode >= 400 ? 'warning' : 'success',
       statusCode: request.statusCode,
       current: true,
-      matchedBy: 'self'
+      matchedBy: 'self',
+      parentId: null,
+      level: null,
+      message: null
     };
 
     if (!request.traceId && !request.requestId) {
@@ -441,20 +450,32 @@ export class RequestsService {
     const [peers, logs] = await this.timed((db) =>
       Promise.all([
         request.traceId
-          ? db.query<RequestListItem>(
-              `SELECT ${LIST_COLUMNS} FROM api_requests
+          ? db.query<TracePeerRow>(
+              `SELECT ${LIST_COLUMNS}, span_id AS "spanId", parent_span_id AS "parentSpanId" FROM api_requests
                WHERE project_id = $1 AND trace_id = $2 AND id <> $3
                  AND occurred_at BETWEEN $4 AND $5
                ORDER BY occurred_at ASC LIMIT 50`,
               [project.id, request.traceId, request.id, from, to]
             )
-          : Promise.resolve({ rows: [] as RequestListItem[] }),
+          : Promise.resolve({ rows: [] as TracePeerRow[] }),
         this.correlatedLogs(db, project.id, request, from, to)
       ])
     );
 
     const entries: TimelineEntry[] = [self];
+    // Parents are only ever linked through recorded IDs: a request's parent_span_id,
+    // or the request id a log was written with.
+    const spans = new Map<string, string>();
+    const requestIds = new Map<string, string>();
+    const parentSpans = new Map<string, string>();
+    const remember = (id: string, spanId: string | null, parentSpanId: string | null, requestId: string | null) => {
+      if (spanId && !spans.has(spanId)) spans.set(spanId, id);
+      if (parentSpanId && parentSpanId !== spanId) parentSpans.set(id, parentSpanId);
+      if (requestId && !requestIds.has(requestId)) requestIds.set(requestId, id);
+    };
+    remember(request.id, request.spanId, request.parentSpanId, request.requestId);
     for (const peer of peers.rows.map(normalizeListRow)) {
+      remember(peer.id, peer.spanId, peer.parentSpanId, peer.requestId);
       entries.push({
         kind: 'request',
         id: peer.id,
@@ -466,8 +487,16 @@ export class RequestsService {
         status: peer.statusCode >= 500 ? 'error' : peer.statusCode >= 400 ? 'warning' : 'success',
         statusCode: peer.statusCode,
         current: false,
-        matchedBy: 'trace_id'
+        matchedBy: 'trace_id',
+        parentId: null,
+        level: null,
+        message: null
       });
+    }
+    for (const entry of entries) {
+      const parentSpanId = parentSpans.get(entry.id);
+      const parentId = parentSpanId ? spans.get(parentSpanId) : undefined;
+      if (parentId && parentId !== entry.id) entry.parentId = parentId;
     }
     for (const log of logs) {
       entries.push({
@@ -481,7 +510,10 @@ export class RequestsService {
         status: log.status,
         statusCode: log.statusCode,
         current: false,
-        matchedBy: log.matchedBy
+        matchedBy: log.matchedBy,
+        parentId: (log.requestId && requestIds.get(log.requestId)) || null,
+        level: log.level,
+        message: log.message
       });
     }
 
@@ -672,6 +704,7 @@ export class RequestsService {
       status: string;
       statusCode: number | null;
       durationMs: number | null;
+      requestId: string | null;
       matchedBy: 'trace_id' | 'request_id';
     }>(
       `SELECT
@@ -684,6 +717,7 @@ export class RequestsService {
          status,
          status_code AS "statusCode",
          duration_ms AS "durationMs",
+         request_id AS "requestId",
          CASE WHEN $4::text IS NOT NULL AND request_id = $4 THEN 'request_id' ELSE 'trace_id' END AS "matchedBy"
        FROM observability_logs
        WHERE project_id = $1
