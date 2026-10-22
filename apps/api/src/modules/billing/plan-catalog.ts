@@ -44,7 +44,7 @@ export const CLOUD_PLAN_CATALOG: Readonly<Record<CloudPlanKey, Readonly<CloudPla
   pro: {
     key: 'pro',
     name: 'Cloud Pro',
-    price: { monthlyUsd: 19, yearlyUsd: 190 },
+    price: { monthlyUsd: 9, yearlyUsd: 90 },
     limits: {
       eventsPerMonth: 1_000_000,
       projects: 10,

@@ -1,20 +1,23 @@
 import type { Metadata } from 'next';
-import { PublicPage } from '@/components/PublicSiteChrome';
+import { LandingSiteChrome } from '@/components/landing/LandingSiteChrome';
+import { PRO_PRICE, PRO_YEARLY_PER_MONTH_USD, formatUsd } from '@/lib/pricing';
 import { PricingClientView } from './PricingClientView';
+
+const description = `Self-host TraceIQ for free, or choose managed TraceIQ Cloud Pro for ${formatUsd(PRO_PRICE.monthlyUsd)}/month or ${formatUsd(PRO_PRICE.yearlyUsd)}/year (${formatUsd(PRO_YEARLY_PER_MONTH_USD)}/month).`;
 
 export const metadata: Metadata = {
   title: 'Pricing · TraceIQ',
-  description: 'Simple, transparent pricing for developer-first behavior intelligence. Self-host for free or choose managed TraceIQ Cloud Pro for $19/mo.',
+  description,
   openGraph: {
     title: 'Pricing · TraceIQ',
-    description: 'Simple, transparent pricing for developer-first behavior intelligence. Self-host for free or choose managed TraceIQ Cloud Pro for $19/mo.'
+    description
   }
 };
 
 export default function PricingPage() {
   return (
-    <PublicPage>
+    <LandingSiteChrome>
       <PricingClientView />
-    </PublicPage>
+    </LandingSiteChrome>
   );
 }

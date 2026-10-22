@@ -10,7 +10,25 @@ export interface BachsConfig {
   products: {
     proMonthly: string;
     proYearly: string;
+    /**
+     * Retired Pro products that existing subscribers may still renew on. They
+     * keep their entitlements and billing interval, but new checkouts and
+     * interval changes always use the current proMonthly/proYearly products.
+     */
+    legacyProMonthly?: readonly string[];
+    legacyProYearly?: readonly string[];
   };
+}
+
+/** Maps any current or legacy Bachs Pro product to its billing interval. */
+export function bachsProductBillingPeriod(
+  products: BachsConfig['products'] | undefined,
+  productId: string | null | undefined
+): 'monthly' | 'yearly' | null {
+  if (!products || !productId) return null;
+  if (productId === products.proMonthly || products.legacyProMonthly?.includes(productId)) return 'monthly';
+  if (productId === products.proYearly || products.legacyProYearly?.includes(productId)) return 'yearly';
+  return null;
 }
 
 export interface AppConfig {
@@ -81,7 +99,9 @@ function parseBachsConfig(env: NodeJS.ProcessEnv): BachsConfig {
     webhookSecret: required(env, 'BACHS_WEBHOOK_SECRET'),
     products: {
       proMonthly: requiredProductId(env, 'BACHS_PRO_MONTHLY_PRODUCT_ID'),
-      proYearly: requiredProductId(env, 'BACHS_PRO_YEARLY_PRODUCT_ID')
+      proYearly: requiredProductId(env, 'BACHS_PRO_YEARLY_PRODUCT_ID'),
+      legacyProMonthly: optionalProductIds(env, 'BACHS_PRO_LEGACY_MONTHLY_PRODUCT_IDS'),
+      legacyProYearly: optionalProductIds(env, 'BACHS_PRO_LEGACY_YEARLY_PRODUCT_IDS')
     }
   };
 }
@@ -100,6 +120,16 @@ function requiredProductId(env: NodeJS.ProcessEnv, key: string) {
     throw new Error(`${key} must be a Bachs product ID beginning with "prod_".`);
   }
   return value;
+}
+
+function optionalProductIds(env: NodeJS.ProcessEnv, key: string) {
+  const values = (env[key] ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+  for (const value of values) {
+    if (!value.startsWith('prod_')) {
+      throw new Error(`${key} must list Bachs product IDs beginning with "prod_".`);
+    }
+  }
+  return values;
 }
 
 export const appConfig = loadAppConfig();

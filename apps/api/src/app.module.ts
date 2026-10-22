@@ -28,6 +28,7 @@ import { ExperimentsModule } from './modules/experiments/experiments.module';
 import { SurveysModule } from './modules/surveys/surveys.module';
 import { SyntheticMonitoringModule } from './modules/synthetic-monitoring/synthetic-monitoring.module';
 import { SetupVerificationsModule } from './modules/setup-verifications/setup-verifications.module';
+import { StatusModule } from './modules/status/status.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { ObservabilityInterceptor } from './common/interceptors/observability.interceptor';
@@ -69,7 +70,8 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     AchievementsModule,
     InsightsModule,
     BillingModule,
-    AdminModule
+    AdminModule,
+    StatusModule
   ],
   controllers: [AppController],
   providers: [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadAppConfig, parseReplayStorageDriver } from '../src/config/app.config';
+import { bachsProductBillingPeriod, loadAppConfig, parseReplayStorageDriver } from '../src/config/app.config';
 import { CLOUD_BILLING_POLICY, CLOUD_PLAN_CATALOG, SELF_HOSTED_POLICY } from '../src/modules/billing/plan-catalog';
 
 describe('canonical plan catalogue', () => {
@@ -11,7 +11,7 @@ describe('canonical plan catalogue', () => {
       requiresPaymentMethod: false
     });
     expect(CLOUD_PLAN_CATALOG.pro).toMatchObject({
-      price: { monthlyUsd: 19, yearlyUsd: 190 },
+      price: { monthlyUsd: 9, yearlyUsd: 90 },
       limits: { eventsPerMonth: 1_000_000, projects: 10, members: 5, retentionDays: 365, aiInsightsPerMonth: 100 },
       features: { publicDashboards: true }
     });
@@ -62,6 +62,42 @@ describe('deployment configuration', () => {
       products: { proMonthly: 'prod_monthly', proYearly: 'prod_yearly' }
     });
     expect(config.replayStorageDriver).toBe('supabase');
+  });
+
+  it('parses optional legacy Pro product IDs and maps them to their billing interval', () => {
+    const config = loadAppConfig({
+      TRACEIQ_DEPLOYMENT_MODE: 'cloud',
+      BACHS_API_BASE_URL: 'https://sandbox-api.bachs.io',
+      BACHS_API_KEY: 'sk_sandbox_example',
+      BACHS_WEBHOOK_SECRET: 'whsec_example',
+      BACHS_PRO_MONTHLY_PRODUCT_ID: 'prod_monthly',
+      BACHS_PRO_YEARLY_PRODUCT_ID: 'prod_yearly',
+      BACHS_PRO_LEGACY_MONTHLY_PRODUCT_IDS: ' prod_old_monthly , prod_older_monthly ',
+      BACHS_PRO_LEGACY_YEARLY_PRODUCT_IDS: 'prod_old_yearly'
+    });
+    const products = config.bachs!.products;
+    expect(products).toMatchObject({
+      legacyProMonthly: ['prod_old_monthly', 'prod_older_monthly'],
+      legacyProYearly: ['prod_old_yearly']
+    });
+    expect(bachsProductBillingPeriod(products, 'prod_monthly')).toBe('monthly');
+    expect(bachsProductBillingPeriod(products, 'prod_older_monthly')).toBe('monthly');
+    expect(bachsProductBillingPeriod(products, 'prod_yearly')).toBe('yearly');
+    expect(bachsProductBillingPeriod(products, 'prod_old_yearly')).toBe('yearly');
+    expect(bachsProductBillingPeriod(products, 'prod_unknown')).toBeNull();
+    expect(bachsProductBillingPeriod(products, null)).toBeNull();
+  });
+
+  it('rejects malformed legacy Pro product IDs', () => {
+    expect(() => loadAppConfig({
+      TRACEIQ_DEPLOYMENT_MODE: 'cloud',
+      BACHS_API_BASE_URL: 'https://sandbox-api.bachs.io',
+      BACHS_API_KEY: 'sk_sandbox_example',
+      BACHS_WEBHOOK_SECRET: 'whsec_example',
+      BACHS_PRO_MONTHLY_PRODUCT_ID: 'prod_monthly',
+      BACHS_PRO_YEARLY_PRODUCT_ID: 'prod_yearly',
+      BACHS_PRO_LEGACY_MONTHLY_PRODUCT_IDS: 'price_123'
+    })).toThrow('BACHS_PRO_LEGACY_MONTHLY_PRODUCT_IDS');
   });
 
   it('rejects incomplete cloud configuration', () => {

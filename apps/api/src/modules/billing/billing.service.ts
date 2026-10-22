@@ -1,9 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown, Optional } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { QueryResultRow } from 'pg';
-import { appConfig } from '../../config/app.config';
+import { appConfig, bachsProductBillingPeriod } from '../../config/app.config';
 import { DatabaseService, QueryExecutor } from '../../database/database.service';
-import { CLOUD_BILLING_POLICY } from './plan-catalog';
+import { CLOUD_BILLING_POLICY, CLOUD_PLAN_CATALOG } from './plan-catalog';
 import { BachsClient, BachsSubscription } from './bachs.client';
 import { EmailService, isValidEmail } from '../emails/email.service';
 
@@ -302,9 +302,8 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
       throw new BadRequestException('Bachs subscription is missing TraceIQ organization metadata.');
     }
     const productId = this.subscriptionProductId(data);
-    const knownProducts = [this.config.bachs!.products.proMonthly, this.config.bachs!.products.proYearly];
-    if (!productId || !knownProducts.includes(productId)) throw new BadRequestException('Unknown Bachs subscription product.');
-    const billingPeriod = this.billingPeriod(productId);
+    const billingPeriod = bachsProductBillingPeriod(this.config.bachs!.products, productId);
+    if (!productId || !billingPeriod) throw new BadRequestException('Unknown Bachs subscription product.');
     const metadata = { ...(data.metadata ?? {}), billing_period: billingPeriod };
     const graceEnd = data.status === 'past_due'
       ? new Date(new Date(event.created_at).getTime() + CLOUD_BILLING_POLICY.failedPaymentGraceDays * 86_400_000).toISOString()
@@ -594,9 +593,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
   }
 
   private billingPeriod(productId: string | null, stored?: BillingPeriod | null): BillingPeriod | null {
-    if (productId === this.config.bachs!.products.proMonthly) return 'monthly';
-    if (productId === this.config.bachs!.products.proYearly) return 'yearly';
-    return stored ?? null;
+    return bachsProductBillingPeriod(this.config.bachs!.products, productId) ?? stored ?? null;
   }
 
   private checkoutReturnUrls(projectId: string) {
@@ -651,9 +648,10 @@ export function buildProWelcomeEmail(input: {
   dashboardUrl: string;
 }) {
   const organization = escapeHtml(input.organizationName || 'Your organization');
+  const { monthlyUsd, yearlyUsd } = CLOUD_PLAN_CATALOG.pro.price;
   const interval = input.billingPeriod === 'yearly'
-    ? '$190/year'
-    : input.billingPeriod === 'monthly' ? '$19/month' : 'your selected billing interval';
+    ? `$${yearlyUsd}/year`
+    : input.billingPeriod === 'monthly' ? `$${monthlyUsd}/month` : 'your selected billing interval';
   const dashboardUrl = escapeHtml(input.dashboardUrl);
   return `<!doctype html>
 <html lang="en">

@@ -31,8 +31,17 @@ Both paid products map to the internal `pro` plan. The billing period is never
 inferred from `plan_key`; it is mapped from the allowlisted Bachs product ID and
 persisted as `subscriptions.billing_period`.
 
-- Monthly Pro is `$19/month`.
-- Yearly Pro is `$190/year`.
+- Monthly Pro is `$9/month` (`BACHS_PRO_MONTHLY_PRODUCT_ID`).
+- Yearly Pro is `$90/year` (`BACHS_PRO_YEARLY_PRODUCT_ID`), shown as
+  `$7.50/month` and "2 months free" (17% less than 12 monthly payments).
+- Retired Pro products stay recognized through
+  `BACHS_PRO_LEGACY_MONTHLY_PRODUCT_IDS` and `BACHS_PRO_LEGACY_YEARLY_PRODUCT_IDS`
+  (comma-separated). Existing subscribers on those products keep Pro
+  entitlements, renew at the amount Bachs bills them, and receive webhooks,
+  cancellations, and reconciliation exactly like current products. New
+  checkouts and monthly-to-yearly changes always use the current products.
+  When retiring a product, move its ID from the current variable into the
+  matching legacy variable; never remove it while a subscriber still uses it.
 - A monthly-to-yearly interval change updates the existing Bachs subscription
   with `PATCH /v1/subscriptions/{id}` using only the yearly `product_id`.
   `proration_behavior` is deliberately omitted: Bachs schedules a different

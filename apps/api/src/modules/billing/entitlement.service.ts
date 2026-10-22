@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { QueryResultRow } from 'pg';
-import { appConfig } from '../../config/app.config';
+import { appConfig, bachsProductBillingPeriod } from '../../config/app.config';
 import { DatabaseService, QueryExecutor } from '../../database/database.service';
 import { CLOUD_BILLING_POLICY, CLOUD_PLAN_CATALOG, CloudPlanKey } from './plan-catalog';
 
@@ -20,6 +20,9 @@ export interface EntitlementSnapshot {
   subscription: {
     providerProductId: string | null;
     billingPeriod: 'monthly' | 'yearly' | null;
+    /** Recurring amount Bachs reports for this subscription, e.g. "9.00". */
+    amount: string | null;
+    currency: string | null;
     status: string;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
@@ -44,6 +47,8 @@ interface EntitlementRow extends QueryResultRow {
   subscription_updated_at: string | null;
   provider_product_id: string | null;
   billing_period: 'monthly' | 'yearly' | null;
+  amount: string | null;
+  currency: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
   subscription_change_status: 'pending' | 'failed' | null;
@@ -83,7 +88,7 @@ export class EntitlementService {
     const result = await executor.query<EntitlementRow>(`
       SELECT
         s.plan_key, s.status, s.grace_period_ends_at, s.subscription_updated_at,
-        s.provider_product_id, s.billing_period, s.current_period_end, s.cancel_at_period_end,
+        s.provider_product_id, s.billing_period, s.amount, s.currency, s.current_period_end, s.cancel_at_period_end,
         s.subscription_change_status, s.subscription_change_target_billing_period,
         s.subscription_change_requested_at, s.subscription_change_failure_code,
         (SELECT COUNT(*) FROM projects WHERE organization_id = $1) AS projects,
@@ -99,7 +104,7 @@ export class EntitlementService {
       FROM (SELECT 1) seed
       LEFT JOIN LATERAL (
         SELECT plan_key,status,grace_period_ends_at,updated_at AS subscription_updated_at,
-          provider_product_id,billing_period,current_period_end,cancel_at_period_end,
+          provider_product_id,billing_period,amount,currency,current_period_end,cancel_at_period_end,
           subscription_change_status,subscription_change_target_billing_period,
           subscription_change_requested_at,subscription_change_failure_code
         FROM subscriptions
@@ -115,10 +120,8 @@ export class EntitlementService {
     );
     const planKey: CloudPlanKey = paid ? 'pro' : 'free';
     const plan = CLOUD_PLAN_CATALOG[planKey];
-    const configuredProducts = this.config.bachs?.products;
     const billingPeriod = row?.billing_period
-      ?? (row?.provider_product_id === configuredProducts?.proMonthly ? 'monthly'
-        : row?.provider_product_id === configuredProducts?.proYearly ? 'yearly' : null);
+      ?? bachsProductBillingPeriod(this.config.bachs?.products, row?.provider_product_id);
     const overrides = await this.loadOverrides(organizationId, executor);
     const limit = (key: LimitedResource | ReplayLimit | 'retentionDays', fallback: number | null) => overrides.get(key) ?? fallback;
     const usage = {
@@ -142,6 +145,8 @@ export class EntitlementService {
       subscription: row?.status ? {
         providerProductId: row.provider_product_id ?? null,
         billingPeriod,
+        amount: row.amount ?? null,
+        currency: row.currency ?? null,
         status: row.status,
         currentPeriodEnd: row.current_period_end ?? null,
         cancelAtPeriodEnd: row.cancel_at_period_end ?? false,

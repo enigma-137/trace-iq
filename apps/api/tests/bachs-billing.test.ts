@@ -10,7 +10,10 @@ const cloudConfig = {
     apiBaseUrl: 'https://sandbox-api.bachs.io' as const,
     apiKey: 'sk_sandbox_test',
     webhookSecret: 'whsec_test',
-    products: { proMonthly: 'prod_monthly', proYearly: 'prod_yearly' }
+    products: {
+      proMonthly: 'prod_monthly', proYearly: 'prod_yearly',
+      legacyProMonthly: ['prod_legacy_monthly'], legacyProYearly: ['prod_legacy_yearly']
+    }
   }
 };
 
@@ -46,7 +49,7 @@ const subscriptionEvent: BachsEvent = {
     product_id: 'prod_monthly',
     status: 'active',
     currency: 'USD',
-    amount: '19.00',
+    amount: '9.00',
     current_period_start: '2026-08-30T08:00:00Z',
     current_period_end: '2026-09-30T08:00:00Z',
     cancel_at_period_end: false,
@@ -137,13 +140,13 @@ describe('Bachs billing integration', () => {
       created_at: '2026-09-30T08:00:01Z',
       data: {
         ...subscriptionEvent.data,
-        product_id: 'prod_yearly', amount: '190.00',
+        product_id: 'prod_yearly', amount: '90.00',
         current_period_start: '2026-09-30T08:00:00Z',
         current_period_end: '2027-09-30T08:00:00Z'
       }
     });
     const confirmedUpsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
-    expect(confirmedUpsert?.[1]).toEqual(expect.arrayContaining(['sub_bachs_1', 'prod_yearly', 'yearly', '190.00', true]));
+    expect(confirmedUpsert?.[1]).toEqual(expect.arrayContaining(['sub_bachs_1', 'prod_yearly', 'yearly', '90.00', true]));
     expect(String(confirmedUpsert?.[0])).toContain('EXCLUDED.provider_product_id = subscriptions.subscription_change_target_product_id');
   });
 
@@ -253,10 +256,67 @@ describe('Bachs billing integration', () => {
     await service.processWebhook({
       ...subscriptionEvent,
       id: 'evt_yearly',
-      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '90.00' }
     });
     const subscriptionCall = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
-    expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '190.00']));
+    expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['prod_yearly', 'yearly', '90.00']));
+  });
+
+  it('keeps renewing existing subscribers on legacy Pro products with their original interval and amount', async () => {
+    const { service, query } = makeService();
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_legacy_renewal',
+      type: 'customer.subscription.updated',
+      data: { ...subscriptionEvent.data, product_id: 'prod_legacy_monthly', amount: '19.00' }
+    });
+    const subscriptionCall = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO subscriptions'));
+    expect(subscriptionCall?.[1]).toEqual(expect.arrayContaining(['prod_legacy_monthly', 'monthly', 'active', '19.00']));
+
+    await service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_legacy_yearly',
+      type: 'customer.subscription.updated',
+      data: { ...subscriptionEvent.data, product_id: 'prod_legacy_yearly', amount: '190.00' }
+    });
+    const yearlyCall = query.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO subscriptions')).at(-1);
+    expect(yearlyCall?.[1]).toEqual(expect.arrayContaining(['prod_legacy_yearly', 'yearly', '190.00']));
+  });
+
+  it('rejects subscription events for products that are neither current nor legacy Pro products', async () => {
+    const { service } = makeService();
+    await expect(service.processWebhook({
+      ...subscriptionEvent,
+      id: 'evt_unknown_product',
+      data: { ...subscriptionEvent.data, product_id: 'prod_someone_else' }
+    })).rejects.toThrow('Unknown Bachs subscription product.');
+  });
+
+  it('moves a legacy monthly subscriber to the current yearly product at renewal', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT id,provider_subscription_id')) return queryResult(1, [{
+        id: 'sub_local', provider_subscription_id: 'sub_bachs_legacy', provider_product_id: 'prod_legacy_monthly',
+        billing_period: 'monthly', status: 'active', current_period_end: '2026-09-30T08:00:00Z'
+      }]);
+      return queryResult();
+    });
+    const database = {
+      query,
+      transaction: vi.fn(async (callback: (client: { query: typeof query }) => unknown) => callback({ query }))
+    };
+    const bachs = { createCheckout: vi.fn(), createPortalSession: vi.fn(), getSubscription: vi.fn(), updateSubscription: vi.fn().mockResolvedValue({}) };
+    const service = new BillingService(database as never, bachs as never, cloudConfig);
+    await expect(service.upgradeToYearly('org_1')).resolves.toMatchObject({ changed: true, changeStatus: 'scheduled' });
+    expect(bachs.updateSubscription).toHaveBeenCalledWith('sub_bachs_legacy', { product_id: 'prod_yearly' }, expect.any(String));
+  });
+
+  it('creates monthly checkout from the current monthly product, never a legacy one', async () => {
+    const { service, bachs } = makeService();
+    await service.createCheckout({ organizationId: 'org_1', projectId: 'proj_1', email: 'owner@example.com', billingPeriod: 'monthly' });
+    expect(bachs.createCheckout).toHaveBeenCalledWith(expect.objectContaining({
+      product_cart: [{ product_id: 'prod_monthly', quantity: 1 }],
+      metadata: { organization_id: 'org_1', plan_key: 'pro', billing_period: 'monthly' }
+    }));
   });
 
   it('keeps the scheduled change pending and applies normal grace state when renewal payment fails', async () => {
@@ -321,7 +381,7 @@ describe('Bachs billing integration', () => {
     const bachs = {
       createCheckout: vi.fn(), createPortalSession: vi.fn(), updateSubscription: vi.fn(),
       getSubscription: vi.fn().mockResolvedValue({
-        ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00', metadata: {}
+        ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '90.00', metadata: {}
       })
     };
     const service = new BillingService(database as never, bachs as never, cloudConfig);
@@ -432,14 +492,14 @@ describe('Bachs billing integration', () => {
       ...subscriptionEvent,
       id: 'evt_newer_yearly',
       created_at: '2026-09-02T12:00:00Z',
-      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '190.00' }
+      data: { ...subscriptionEvent.data, product_id: 'prod_yearly', amount: '90.00' }
     });
     await service.processWebhook({
       ...subscriptionEvent,
       id: 'evt_older_monthly',
       type: 'customer.subscription.updated',
       created_at: '2026-09-02T11:30:00Z',
-      data: { ...subscriptionEvent.data, product_id: 'prod_monthly', amount: '19.00' }
+      data: { ...subscriptionEvent.data, product_id: 'prod_monthly', amount: '9.00' }
     });
     await service.processWebhook({
       id: 'evt_older_checkout', type: 'checkout.completed', created_at: '2026-09-02T11:00:00Z',
