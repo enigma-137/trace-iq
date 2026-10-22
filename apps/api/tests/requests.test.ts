@@ -489,6 +489,30 @@ describe('RequestsService correlation', () => {
     expect(timeline.entries.map((e) => e.kind)).toEqual(['request', 'log']);
     expect(timeline.entries[1].offsetMs).toBe(10);
   });
+
+  it('nests timeline entries only through recorded span and request ids', async () => {
+    const db = mockDatabase((text) => {
+      if (text.includes('FROM api_requests WHERE id')) return rows([requestRow({ spanId: 'span-a', parentSpanId: null })]);
+      if (text.includes('FROM api_requests')) {
+        return rows([
+          requestRow({ id: 'req_2', requestId: 'rid-2', occurredAt: '2026-10-15T10:00:00.002Z', spanId: 'span-b', parentSpanId: 'span-a' }),
+          requestRow({ id: 'req_3', requestId: null, occurredAt: '2026-10-15T10:00:00.003Z', spanId: 'span-c', parentSpanId: 'span-missing' })
+        ]);
+      }
+      if (text.includes('FROM observability_logs')) {
+        return rows([
+          { id: 'log_1', timestamp: '2026-10-15T10:00:00.004Z', level: 'info', message: 'query ok', service: 'api', operation: 'db.query', status: 'success', durationMs: 4, requestId: 'rid-2', matchedBy: 'trace_id' },
+          { id: 'log_2', timestamp: '2026-10-15T10:00:00.005Z', level: 'warn', message: 'slow', service: 'api', operation: 'cache', status: 'warning', durationMs: 1, requestId: null, matchedBy: 'trace_id' }
+        ]);
+      }
+      return empty();
+    });
+    const service = new RequestsService(db as never, projectsFor() as never);
+    const timeline = await service.timeline(user, 'req_1');
+    const parents = Object.fromEntries(timeline.entries.map((e) => [e.id, e.parentId]));
+    expect(parents).toEqual({ req_1: null, req_2: 'req_1', req_3: null, log_1: 'req_2', log_2: null });
+    expect(timeline.entries.find((e) => e.id === 'log_1')).toMatchObject({ level: 'info', message: 'query ok' });
+  });
 });
 
 describe('capture settings', () => {

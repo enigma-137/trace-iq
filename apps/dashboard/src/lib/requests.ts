@@ -73,6 +73,40 @@ export interface TimelineEntry {
   statusCode: number | null;
   current: boolean;
   matchedBy: 'trace_id' | 'request_id' | 'self';
+  parentId: string | null;
+  level: string | null;
+  message: string | null;
+}
+
+export interface WaterfallRow {
+  entry: TimelineEntry;
+  depth: number;
+  childCount: number;
+}
+
+/**
+ * Flattens timeline entries into waterfall rows, nesting each entry under its recorded
+ * parent. Entries whose parent is missing (or that sit in a cycle) stay at the top level.
+ */
+export function buildWaterfall(entries: TimelineEntry[], collapsed: ReadonlySet<string> = new Set()): WaterfallRow[] {
+  const ids = new Set(entries.map((entry) => entry.id));
+  const children = new Map<string | null, TimelineEntry[]>();
+  for (const entry of entries) {
+    const parent = entry.parentId && entry.parentId !== entry.id && ids.has(entry.parentId) ? entry.parentId : null;
+    children.set(parent, [...(children.get(parent) ?? []), entry]);
+  }
+  const rows: WaterfallRow[] = [];
+  const placed = new Set<string>();
+  const visit = (entry: TimelineEntry, depth: number, hidden: boolean) => {
+    if (placed.has(entry.id)) return;
+    placed.add(entry.id);
+    const kids = children.get(entry.id) ?? [];
+    if (!hidden) rows.push({ entry, depth, childCount: kids.length });
+    for (const child of kids) visit(child, depth + 1, hidden || collapsed.has(entry.id));
+  };
+  for (const root of children.get(null) ?? []) visit(root, 0, false);
+  for (const entry of entries) visit(entry, 0, false);
+  return rows;
 }
 
 export interface RelatedResponse {
@@ -298,6 +332,14 @@ export function statusTone(status: number): StatusTone {
   if (status >= 200) return 'success';
   return 'none';
 }
+
+export const STATUS_LABELS: Record<StatusTone, string> = {
+  success: 'OK',
+  redirect: 'Redirect',
+  client: 'Client error',
+  server: 'Server error',
+  none: 'No response'
+};
 
 /** Deep link into the existing Errors issue view for a correlated exception. */
 export function errorIssueHref(type: string, message: string, projectId?: string | null): string {

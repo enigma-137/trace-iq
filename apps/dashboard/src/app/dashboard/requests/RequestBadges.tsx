@@ -1,4 +1,4 @@
-import { CAPTURE_LABELS, type CaptureState, statusTone } from '@/lib/requests';
+import { CAPTURE_LABELS, type CaptureState, type StatusTone, statusTone } from '@/lib/requests';
 
 // Status codes are the one place the explorer breaks the neutral palette, matching
 // API Performance: green = success, amber = client error, red = server error.
@@ -61,6 +61,33 @@ export function CaptureBadge({ state }: { state: CaptureState }) {
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium ${captureClasses[state]}`}>
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${captureDot[state]}`} aria-hidden />
       {CAPTURE_LABELS[state] ?? state}
+    </span>
+  );
+}
+
+const pillClasses = {
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-300',
+  redirect: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+  client: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/60 dark:text-amber-300',
+  server: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300',
+  none: 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
+};
+
+/** Rounded status pill with an icon, used in the request drawer summaries. */
+export function StatusPill({ tone, label }: { tone: StatusTone; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${pillClasses[tone]}`}>
+      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+        <circle cx="8" cy="8" r="6.25" />
+        {tone === 'success' ? (
+          <path d="M5.5 8.2l1.7 1.7 3.3-3.6" strokeLinecap="round" strokeLinejoin="round" />
+        ) : tone === 'redirect' ? (
+          <path d="M5.5 8h5m-2-2 2 2-2 2" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <path d="M8 5v3.5M8 10.8v.01" strokeLinecap="round" />
+        )}
+      </svg>
+      {label}
     </span>
   );
 }
