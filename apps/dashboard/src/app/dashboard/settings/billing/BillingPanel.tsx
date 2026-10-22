@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import CreditCardIcon from '@hugeicons/core-free-icons/CreditCardIcon';
 import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
@@ -10,6 +10,7 @@ import CrownIcon from '@hugeicons/core-free-icons/CrownIcon';
 import DatabaseIcon from '@hugeicons/core-free-icons/DatabaseIcon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
+import { PRO_PRICE, PRO_YEARLY_PER_MONTH_USD, formatUsd, proPriceLabel, subscriptionPriceLabel, type BillingInterval } from '@/lib/pricing';
 import { Notice, SettingsCard, SettingsSection, StatusPill, primaryButton, secondaryButton } from '../SettingsUI';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -21,6 +22,8 @@ interface Entitlements {
   subscription: {
     providerProductId: string | null;
     billingPeriod: 'monthly' | 'yearly' | null;
+    amount: string | null;
+    currency: string | null;
     status: string;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
@@ -37,13 +40,14 @@ interface Entitlements {
   overLimit: { projects: boolean; members: boolean };
 }
 
-export function BillingPanel({ projectId, billingResult }: { projectId?: string; billingResult?: string }) {
+export function BillingPanel({ projectId, billingResult, requestedCheckout }: { projectId?: string; billingResult?: string; requestedCheckout?: BillingInterval }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<'monthly' | 'yearly' | 'schedule-yearly' | 'portal' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const requestedCheckoutHandled = useRef(false);
 
   const accessToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -110,6 +114,21 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
       setBusy(null);
     }
   }
+
+  // The public pricing page links here with ?checkout=monthly|yearly. Start that
+  // checkout once, and only for an organization that can still buy Pro.
+  useEffect(() => {
+    if (!requestedCheckout || !entitlements || requestedCheckoutHandled.current) return;
+    requestedCheckoutHandled.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('checkout');
+    window.history.replaceState(null, '', url.toString());
+    const subscribed = ['trialing', 'active', 'past_due', 'paused'].includes(entitlements.subscription?.status ?? '');
+    if (entitlements.deploymentMode !== 'cloud' || entitlements.plan === 'pro' || subscribed) return;
+    void beginCheckout(requestedCheckout);
+    // beginCheckout is recreated every render; the ref guarantees a single run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entitlements, requestedCheckout]);
 
   async function openPortal() {
     setBusy('portal');
@@ -189,9 +208,10 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
     && billingChange.targetBillingPeriod === 'yearly';
   const hasNonterminalSubscription = ['trialing', 'active', 'past_due', 'paused']
     .includes(entitlements.subscription?.status ?? '');
+  // Existing subscribers may be on a retired price, so show what Bachs bills them.
   const proPrice = hasNonterminalSubscription
-    ? billingPeriod === 'yearly' ? '$190/year' : billingPeriod === 'monthly' ? '$19/month' : 'Pro'
-    : '$19/month';
+    ? subscriptionPriceLabel(entitlements.subscription?.amount, entitlements.subscription?.currency, billingPeriod) ?? 'Pro'
+    : proPriceLabel('monthly');
   const eventPercent = percentage(entitlements.usage.events, entitlements.limits.events);
   const warningThreshold = eventPercent >= 100 ? 100 : eventPercent >= 90 ? 90 : eventPercent >= 70 ? 70 : null;
   const renewal = formatDate(entitlements.subscription?.currentPeriodEnd ?? null);
@@ -282,7 +302,8 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
             current={!pro}
           />
           <PlanCard
-            name="Pro" price={proPrice} secondaryPrice={!hasNonterminalSubscription ? '$190/year' : undefined}
+            name="Pro" price={proPrice}
+            secondaryPrice={!hasNonterminalSubscription ? `${proPriceLabel('yearly')} (${formatUsd(PRO_YEARLY_PER_MONTH_USD)}/month, 2 months free)` : undefined}
             description={hasNonterminalSubscription && !billingPeriod ? 'Billing interval is syncing from Bachs.' : 'For growing products and teams.'}
             features={['1M events/month', '10 projects', '5 members', '365-day retention', '100 Ask TraceIQ investigations/month', 'Public dashboards']}
             current={pro}
@@ -302,11 +323,11 @@ export function BillingPanel({ projectId, billingResult }: { projectId?: string;
               <div className="grid gap-2 sm:grid-cols-2">
                 <button className={primaryButton} type="button" disabled={busy !== null} onClick={() => void beginCheckout('monthly')}>
                   {busy === 'monthly' ? <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" /> : null}
-                  Upgrade monthly
+                  Upgrade monthly, {formatUsd(PRO_PRICE.monthlyUsd)}/month
                 </button>
                 <button className={secondaryButton} type="button" disabled={busy !== null} onClick={() => void beginCheckout('yearly')}>
                   {busy === 'yearly' ? <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" /> : null}
-                  $190 yearly
+                  Upgrade yearly, {formatUsd(PRO_PRICE.yearlyUsd)}/year
                 </button>
               </div>
             )}

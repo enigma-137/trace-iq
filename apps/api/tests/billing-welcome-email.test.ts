@@ -26,7 +26,7 @@ const subscriptionEvent: BachsEvent = {
     product_id: 'prod_yearly',
     status: 'active',
     currency: 'USD',
-    amount: '190.00',
+    amount: '90.00',
     metadata: { organization_id: 'org_1' }
   }
 };
@@ -39,7 +39,7 @@ describe('Pro welcome email', () => {
       dashboardUrl: 'https://traceiq.run/dashboard/settings/billing'
     });
     expect(html).toContain('&lt;Acme &amp; Co&gt;');
-    expect(html).toContain('$190/year');
+    expect(html).toContain('$90/year');
     expect(html).not.toContain('<Acme & Co>');
   });
 
