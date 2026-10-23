@@ -247,7 +247,9 @@ export class AnalyticsService {
       };
     }
 
-    const totalsResult = await this.database.query<{
+    // Every query below is independent, so they all go out at once rather than
+    // queueing behind each other; only the latency pair waits on serverTimed.
+    const totalsQuery = this.database.query<{
       total_events: number;
       events_24h: number;
       events_1h: number;
@@ -267,7 +269,7 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const topEventsResult = await this.database.query<{ eventName: string; total: number }>(
+    const topEventsQuery = this.database.query<{ eventName: string; total: number }>(
       `
         SELECT event_name AS "eventName", count(*)::int AS total
         FROM events
@@ -279,7 +281,7 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const sparklineRows = await this.database.query<{
+    const sparklineQuery = this.database.query<{
       bucket: string;
       total: number;
       api_calls: number;
@@ -303,7 +305,7 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const topDevices = await this.database.query<{ name: string; total: number }>(
+    const topDevicesQuery = this.database.query<{ name: string; total: number }>(
       `
         SELECT COALESCE(NULLIF(device_info->>'os', ''), 'unknown') AS name, count(*)::int AS total
         FROM events
@@ -315,7 +317,7 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const topCountries = await this.database.query<{ name: string; total: number }>(
+    const topCountriesQuery = this.database.query<{ name: string; total: number }>(
       `
         SELECT network_info->>'country' AS name, count(*)::int AS total
         FROM events
@@ -329,7 +331,7 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const topReferrers = await this.database.query<{ domain: string; visitors: number; views: number }>(
+    const topReferrersQuery = this.database.query<{ domain: string; visitors: number; views: number }>(
       `SELECT
         CASE WHEN ref IS NULL OR ref = '' THEN 'Direct'
           ELSE COALESCE(NULLIF(regexp_replace(split_part(split_part(regexp_replace(ref, '^[a-z][a-z0-9+.-]*://', '', 'i'), '/', 1), ':', 1), '^www\\.', '', 'i'), ''), 'Direct')
@@ -345,7 +347,7 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const revenueResult = await this.database.query<{
+    const revenueQuery = this.database.query<{
       current_revenue: number;
       previous_revenue: number;
       current_transactions: number;
@@ -370,7 +372,7 @@ export class AnalyticsService {
     // Latency tiles follow API performance: server timings when the project sends any,
     // since browser round trips would otherwise dominate the averages.
     const isClientRequest = clientRequestSql("properties->>'instrumentation'", 'session_id');
-    const serverTimed = await this.database
+    const serverTimedQuery = this.database
       .query<{ present: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM events
@@ -381,11 +383,92 @@ export class AnalyticsService {
       )
       .then((result) => result.rows[0]?.present === true)
       .catch(() => false);
-    const latencySourceFilter = serverTimed ? `AND NOT ${isClientRequest}` : '';
+    const latencyQueries = serverTimedQuery.then((serverTimed) => {
+      const latencySourceFilter = serverTimed ? `AND NOT ${isClientRequest}` : '';
+      return Promise.all([
+        this.database.query<{
+          total_requests: number;
+          http_errors: number;
+          avg_duration: number;
+          p50: number;
+          p90: number;
+          p95: number;
+          p99: number;
+          ok_200: number;
+          rate_limit_429: number;
+          error_500: number;
+          other_status: number;
+        }>(
+          `
+            WITH base AS (
+              SELECT
+                (properties->>'durationMs')::numeric AS duration,
+                (properties->>'status')::int AS status
+              FROM events
+              WHERE project_id = $1 AND event_name = '$api_request'
+                AND occurred_at >= now() - interval '14 days'
+                AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+                AND properties->>'status' ~ '^[0-9]+$'
+                ${latencySourceFilter}
+            )
+            SELECT
+              count(*)::int AS total_requests,
+              count(*) FILTER (WHERE status >= 400)::int AS http_errors,
+              COALESCE(round(avg(duration), 1)::float, 0) AS avg_duration,
+              COALESCE(round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p50,
+              COALESCE(round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p90,
+              COALESCE(round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p95,
+              COALESCE(round((percentile_cont(0.99) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p99,
+              count(*) FILTER (WHERE status IS NULL OR status = 200 OR (status >= 200 AND status < 300))::int AS ok_200,
+              count(*) FILTER (WHERE status = 429)::int AS rate_limit_429,
+              count(*) FILTER (WHERE status >= 500)::int AS error_500,
+              count(*) FILTER (WHERE status IS NOT NULL AND (status < 200 OR status >= 300) AND status <> 429 AND status < 500)::int AS other_status
+            FROM base
+          `,
+          [project.id]
+        ).catch(() => ({ rows: [] })),
+
+        this.database.query<{
+          bucket: string;
+          p50: number;
+          p90: number;
+          p99: number;
+        }>(
+          `
+            WITH base AS (
+              SELECT
+                occurred_at,
+                (properties->>'durationMs')::numeric AS duration
+              FROM events
+              WHERE project_id = $1 AND event_name = '$api_request'
+                AND occurred_at >= now() - interval '14 days'
+                AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+                AND properties->>'status' ~ '^[0-9]+$'
+                ${latencySourceFilter}
+            )
+            SELECT
+              to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+              round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p50,
+              round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p90,
+              round((percentile_cont(0.99) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p99
+            FROM base
+            GROUP BY 1
+            ORDER BY 1 ASC
+          `,
+          [project.id]
+        ).catch(() => ({ rows: [] }))
+      ]);
+    });
 
     const [
-      apiTelemetryResult,
-      apiLatencyResult,
+      totalsResult,
+      topEventsResult,
+      sparklineRows,
+      topDevices,
+      topCountries,
+      topReferrers,
+      revenueResult,
+      [apiTelemetryResult, apiLatencyResult],
       topErrorsResult,
       alertsResult,
       tracesResult,
@@ -394,78 +477,14 @@ export class AnalyticsService {
       sessionMetricsResult,
       replaysCountResult
     ] = await Promise.all([
-      this.database.query<{
-        total_requests: number;
-        http_errors: number;
-        avg_duration: number;
-        p50: number;
-        p90: number;
-        p95: number;
-        p99: number;
-        ok_200: number;
-        rate_limit_429: number;
-        error_500: number;
-        other_status: number;
-      }>(
-        `
-          WITH base AS (
-            SELECT
-              (properties->>'durationMs')::numeric AS duration,
-              (properties->>'status')::int AS status
-            FROM events
-            WHERE project_id = $1 AND event_name = '$api_request'
-              AND occurred_at >= now() - interval '14 days'
-              AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
-              AND properties->>'status' ~ '^[0-9]+$'
-              ${latencySourceFilter}
-          )
-          SELECT
-            count(*)::int AS total_requests,
-            count(*) FILTER (WHERE status >= 400)::int AS http_errors,
-            COALESCE(round(avg(duration), 1)::float, 0) AS avg_duration,
-            COALESCE(round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p50,
-            COALESCE(round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p90,
-            COALESCE(round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p95,
-            COALESCE(round((percentile_cont(0.99) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p99,
-            count(*) FILTER (WHERE status IS NULL OR status = 200 OR (status >= 200 AND status < 300))::int AS ok_200,
-            count(*) FILTER (WHERE status = 429)::int AS rate_limit_429,
-            count(*) FILTER (WHERE status >= 500)::int AS error_500,
-            count(*) FILTER (WHERE status IS NOT NULL AND (status < 200 OR status >= 300) AND status <> 429 AND status < 500)::int AS other_status
-          FROM base
-        `,
-        [project.id]
-      ).catch(() => ({ rows: [] })),
-
-      this.database.query<{
-        bucket: string;
-        p50: number;
-        p90: number;
-        p99: number;
-      }>(
-        `
-          WITH base AS (
-            SELECT
-              occurred_at,
-              (properties->>'durationMs')::numeric AS duration
-            FROM events
-            WHERE project_id = $1 AND event_name = '$api_request'
-              AND occurred_at >= now() - interval '14 days'
-              AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
-              AND properties->>'status' ~ '^[0-9]+$'
-              ${latencySourceFilter}
-          )
-          SELECT
-            to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
-            round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p50,
-            round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p90,
-            round((percentile_cont(0.99) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p99
-          FROM base
-          GROUP BY 1
-          ORDER BY 1 ASC
-        `,
-        [project.id]
-      ).catch(() => ({ rows: [] })),
-
+      totalsQuery,
+      topEventsQuery,
+      sparklineQuery,
+      topDevicesQuery,
+      topCountriesQuery,
+      topReferrersQuery,
+      revenueQuery,
+      latencyQueries,
       this.database.query<{
         type: string;
         message: string;
