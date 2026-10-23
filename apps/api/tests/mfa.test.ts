@@ -194,3 +194,66 @@ describe('MfaService.status', () => {
     expect(status.sessionMfaMethod).toBeUndefined();
   });
 });
+
+describe('AuthService.getDashboardUser (Supabase user cache)', () => {
+  function stubSupabase(responses: Array<{ ok: boolean; body: unknown }>) {
+    process.env.SUPABASE_URL = 'https://project.supabase.co';
+    process.env.SUPABASE_ANON_KEY = 'anon';
+    const fetchMock = vi.fn();
+    for (const response of responses) {
+      fetchMock.mockResolvedValueOnce({ ok: response.ok, json: () => Promise.resolve(response.body) });
+    }
+    vi.stubGlobal('fetch', fetchMock);
+    return { fetchMock, service: new AuthService(mockDatabase() as never) };
+  }
+
+  function jwtWithExp(expSeconds: number): string {
+    const header = encodeBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = encodeBase64Url(JSON.stringify({ sub: 'user_1', exp: expSeconds }));
+    return `${header}.${payload}.signature`;
+  }
+
+  it('reuses one Supabase lookup for repeat and concurrent requests with the same token', async () => {
+    const { fetchMock, service } = stubSupabase([{ ok: true, body: { id: 'user_1' } }]);
+    const token = `Bearer ${jwtWithExp(Math.floor(Date.now() / 1000) + 3600)}`;
+
+    const [first, second] = await Promise.all([service.getDashboardUser(token), service.getDashboardUser(token)]);
+    const third = await service.getDashboardUser(token);
+
+    expect([first.id, second.id, third.id]).toEqual(['user_1', 'user_1', 'user_1']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('bypasses the cache when a fresh lookup is requested', async () => {
+    const factors = [{ id: 'fac_1', factor_type: 'totp', status: 'unverified' }];
+    const { fetchMock, service } = stubSupabase([
+      { ok: true, body: { id: 'user_1', factors: [] } },
+      { ok: true, body: { id: 'user_1', factors } }
+    ]);
+    const token = `Bearer ${jwtWithExp(Math.floor(Date.now() / 1000) + 3600)}`;
+
+    await service.getDashboardUser(token);
+    const fresh = await service.getDashboardUser(token, { fresh: true });
+
+    expect(fresh.factors).toEqual(factors);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache rejected or expired tokens', async () => {
+    const { fetchMock, service } = stubSupabase([
+      { ok: false, body: {} },
+      { ok: true, body: { id: 'user_1' } },
+      { ok: true, body: { id: 'user_1' } },
+      { ok: true, body: { id: 'user_1' } }
+    ]);
+    const rejected = `Bearer ${jwtWithExp(Math.floor(Date.now() / 1000) + 3600)}`;
+    const expired = `Bearer ${jwtWithExp(Math.floor(Date.now() / 1000) - 10)}`;
+
+    await expect(service.getDashboardUser(rejected)).rejects.toThrow('Invalid or expired dashboard session.');
+    await service.getDashboardUser(rejected);
+    await service.getDashboardUser(expired);
+    await service.getDashboardUser(expired);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+});

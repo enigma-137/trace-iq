@@ -1,4 +1,3 @@
-import DottedMap from 'dotted-map';
 import countryLocaleMap from 'country-locale-map';
 import { alpha2ToName } from '@/lib/country-codes';
 import { OverviewTrafficMap, type TrafficMapPoint } from './OverviewTrafficMap';
@@ -7,19 +6,6 @@ interface CountryTraffic {
   name: string;
   total: number;
 }
-
-const dottedMap = new DottedMap({
-  height: 100,
-  grid: 'diagonal',
-  projection: { name: 'equirectangular' },
-});
-
-const mapSvg = dottedMap.getSVG({
-  radius: 0.22,
-  color: '#a3a3a3',
-  shape: 'circle',
-  backgroundColor: 'transparent',
-});
 
 function toMapPoint(item: CountryTraffic): TrafficMapPoint | null {
   const code = item.name.trim().toUpperCase();
@@ -48,5 +34,5 @@ export function OverviewGeographyGlobe({ data }: { data: CountryTraffic[] }) {
     .filter((point): point is TrafficMapPoint => point !== null)
     .slice(0, 8);
 
-  return <OverviewTrafficMap mapSvg={mapSvg} points={points} />;
+  return <OverviewTrafficMap points={points} />;
 }

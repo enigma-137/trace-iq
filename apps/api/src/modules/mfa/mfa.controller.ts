@@ -13,7 +13,7 @@ export class MfaController {
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get()
   async me(@Headers('authorization') authorization?: string) {
-    const user = await this.authService.getDashboardUser(authorization);
+    const user = await this.authService.getDashboardUser(authorization, { fresh: true });
 
     return {
       user: {

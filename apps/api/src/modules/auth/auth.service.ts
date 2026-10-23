@@ -37,13 +37,27 @@ interface SupabaseUserResponse {
  */
 const MFA_METHODS = ['totp', 'webauthn', 'phone', 'sms'];
 
+/**
+ * How long a Supabase /auth/v1/user answer is reused for the same token. Every
+ * dashboard request used to make that round trip; a short window removes it from
+ * the hot path while bounding how long a revoked session keeps working.
+ */
+const SUPABASE_USER_CACHE_TTL_MS = 30_000;
+const SUPABASE_USER_CACHE_MAX_ENTRIES = 5_000;
+
 @Injectable()
 export class AuthService {
   private localWorkspaceReady?: Promise<void>;
+  private readonly supabaseUserCache = new Map<string, { user: SupabaseUserResponse; expiresAt: number }>();
+  private readonly supabaseUserInFlight = new Map<string, Promise<SupabaseUserResponse>>();
 
   constructor(private readonly database: DatabaseService) {}
 
-  async getDashboardUser(authorizationHeader?: string): Promise<DashboardUser> {
+  /**
+   * Pass `fresh: true` where the response shows the account's live MFA factors,
+   * so enrolment screens never read a cached factor list.
+   */
+  async getDashboardUser(authorizationHeader?: string, options: { fresh?: boolean } = {}): Promise<DashboardUser> {
     if (this.isLocalAuthMode()) {
       await this.ensureLocalWorkspace();
       return {
@@ -61,7 +75,7 @@ export class AuthService {
       return this.validatePersonalAccessToken(token);
     }
 
-    const user = await this.getSupabaseUser(token);
+    const user = await this.getSupabaseUser(token, options.fresh === true);
 
     if (!user.id) {
       throw new UnauthorizedException('Supabase session is missing a user ID.');
@@ -321,6 +335,22 @@ export class AuthService {
     }
   }
 
+  /** Reads the JWT `exp` claim (ms since epoch) so a cached lookup never outlives its token. */
+  private decodeExpiry(token: string): number | null {
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) {
+        return null;
+      }
+
+      const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+      const claims = JSON.parse(json) as { exp?: unknown };
+      return typeof claims.exp === 'number' ? claims.exp * 1000 : null;
+    } catch {
+      return null;
+    }
+  }
+
   private getBearerToken(authorizationHeader?: string): string {
     if (!authorizationHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token.');
@@ -329,7 +359,41 @@ export class AuthService {
     return authorizationHeader.slice('Bearer '.length).trim();
   }
 
-  private async getSupabaseUser(token: string): Promise<SupabaseUserResponse> {
+  private async getSupabaseUser(token: string, fresh = false): Promise<SupabaseUserResponse> {
+    const cacheKey = createHash('sha256').update(token).digest('hex');
+    const now = Date.now();
+    const cached = this.supabaseUserCache.get(cacheKey);
+    if (!fresh && cached && cached.expiresAt > now) {
+      return cached.user;
+    }
+
+    // A page load fires several API calls with the same token at once; share one lookup.
+    let pending = this.supabaseUserInFlight.get(cacheKey);
+    if (!pending) {
+      pending = this.fetchSupabaseUser(token).finally(() => this.supabaseUserInFlight.delete(cacheKey));
+      this.supabaseUserInFlight.set(cacheKey, pending);
+    }
+    const user = await pending;
+
+    const tokenExpiresAt = this.decodeExpiry(token);
+    const expiresAt = Math.min(now + SUPABASE_USER_CACHE_TTL_MS, tokenExpiresAt ?? Number.POSITIVE_INFINITY);
+    if (expiresAt > now) {
+      if (this.supabaseUserCache.size >= SUPABASE_USER_CACHE_MAX_ENTRIES) {
+        for (const [key, entry] of this.supabaseUserCache) {
+          if (entry.expiresAt <= now) this.supabaseUserCache.delete(key);
+        }
+        if (this.supabaseUserCache.size >= SUPABASE_USER_CACHE_MAX_ENTRIES) {
+          const oldestKey = this.supabaseUserCache.keys().next().value;
+          if (oldestKey !== undefined) this.supabaseUserCache.delete(oldestKey);
+        }
+      }
+      this.supabaseUserCache.set(cacheKey, { user, expiresAt });
+    }
+
+    return user;
+  }
+
+  private async fetchSupabaseUser(token: string): Promise<SupabaseUserResponse> {
     const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

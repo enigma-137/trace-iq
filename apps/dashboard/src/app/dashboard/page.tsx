@@ -137,37 +137,15 @@ export default async function DashboardPage({
   }
 
   const canonicalProjectId = overview?.project?.id ?? projectId;
-  let dashboardReferrers = overview?.topReferrers ?? [];
-  if (canonicalProjectId && dashboardReferrers.length === 0) {
-    const referrerParams = new URLSearchParams({ days: '30', projectId: canonicalProjectId });
-    const referrerPath = `/v1/dashboard/web?${referrerParams.toString()}`;
-    const { data: webReferrers } = await dashboardGet<WebReferrersResponse>(referrerPath, token);
-    dashboardReferrers = webReferrers?.referrers ?? [];
-  }
-
-  let observabilitySeries = overview?.observabilitySeries ?? [];
-  if (canonicalProjectId && observabilitySeries.length === 0) {
-    const trendPath = (event: string) => {
-      const params = new URLSearchParams({
-        event,
-        interval: 'day',
-        days: '14',
-        projectId: canonicalProjectId
-      });
-      return `/v1/dashboard/insights/trends?${params.toString()}`;
-    };
-    const [apiRequests, exceptions, errors] = await Promise.all([
-      dashboardGet<TrendResponse>(trendPath('$api_request'), token),
-      dashboardGet<TrendResponse>(trendPath('$exception'), token),
-      dashboardGet<TrendResponse>(trendPath('$error'), token)
-    ]);
-    observabilitySeries = mergeObservabilitySeries(
-      overview?.sparkline ?? [],
-      apiRequests.data?.series[0]?.points ?? [],
-      exceptions.data?.series[0]?.points ?? [],
-      errors.data?.series[0]?.points ?? []
-    );
-  }
+  // Fallbacks for older APIs that omit these fields; fetched together, not in turn.
+  const needsReferrers = Boolean(canonicalProjectId) && (overview?.topReferrers ?? []).length === 0;
+  const needsObservability = Boolean(canonicalProjectId) && (overview?.observabilitySeries ?? []).length === 0;
+  const [dashboardReferrers, observabilitySeries] = await Promise.all([
+    needsReferrers ? loadReferrers(canonicalProjectId!, token) : Promise.resolve(overview?.topReferrers ?? []),
+    needsObservability
+      ? loadObservabilitySeries(canonicalProjectId!, token, overview?.sparkline ?? [])
+      : Promise.resolve(overview?.observabilitySeries ?? [])
+  ]);
 
   const sparkValues = overview?.sparkline.map((point) => point.total) ?? [];
   const activityDelta = trendLabel(sparkValues);
@@ -471,6 +449,40 @@ export default async function DashboardPage({
         ) : null}
       </div>
     </DashboardShell>
+  );
+}
+
+async function loadReferrers(projectId: string, token: string | null) {
+  const referrerParams = new URLSearchParams({ days: '30', projectId });
+  const referrerPath = `/v1/dashboard/web?${referrerParams.toString()}`;
+  const { data: webReferrers } = await dashboardGet<WebReferrersResponse>(referrerPath, token);
+  return webReferrers?.referrers ?? [];
+}
+
+async function loadObservabilitySeries(
+  projectId: string,
+  token: string | null,
+  sparkline: Array<{ bucket: string; total: number }>
+) {
+  const trendPath = (event: string) => {
+    const params = new URLSearchParams({
+      event,
+      interval: 'day',
+      days: '14',
+      projectId
+    });
+    return `/v1/dashboard/insights/trends?${params.toString()}`;
+  };
+  const [apiRequests, exceptions, errors] = await Promise.all([
+    dashboardGet<TrendResponse>(trendPath('$api_request'), token),
+    dashboardGet<TrendResponse>(trendPath('$exception'), token),
+    dashboardGet<TrendResponse>(trendPath('$error'), token)
+  ]);
+  return mergeObservabilitySeries(
+    sparkline,
+    apiRequests.data?.series[0]?.points ?? [],
+    exceptions.data?.series[0]?.points ?? [],
+    errors.data?.series[0]?.points ?? []
   );
 }
 
