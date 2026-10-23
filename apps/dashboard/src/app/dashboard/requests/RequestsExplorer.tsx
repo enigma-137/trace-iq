@@ -132,8 +132,12 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const closeDrawer = useCallback(() => setFilters({ request: '' }), [setFilters]);
+  const openRequest = useCallback((id: string) => setFilters({ request: id }), [setFilters]);
   const filterCount = activeFilterCount(filters);
   const payloads = summary ? summary.captures.captured + summary.captures.redacted : 0;
+  // The drawer takes the right side of the page, so the list drops to its compact columns.
+  const wideColumns = filters.request ? '' : 'md:grid-cols-[minmax(0,1fr)_160px_64px_84px_92px_120px]';
+  const wideOnly = filters.request ? 'hidden' : 'hidden md:block';
 
   return (
     <div className={filters.request ? 'lg:pr-[min(44vw,860px)]' : undefined}>
@@ -330,13 +334,13 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
 
       {/* Table */}
       <section className="border border-neutral-200 dark:border-slate-800">
-        <div className="grid grid-cols-[minmax(0,1fr)_72px_80px] gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 md:grid-cols-[minmax(0,1fr)_160px_64px_84px_92px_120px]">
+        <div className={`grid grid-cols-[minmax(0,1fr)_72px_80px] gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 ${wideColumns}`}>
           <span>Request</span>
-          <span className="hidden md:block">Service</span>
+          <span className={wideOnly}>Service</span>
           <span>Status</span>
           <span className="text-right">Duration</span>
-          <span className="hidden text-right md:block">Transferred</span>
-          <span className="hidden md:block">Capture</span>
+          <span className={`${wideOnly} text-right`}>Transferred</span>
+          <span className={wideOnly}>Capture</span>
         </div>
 
         {loading ? (
@@ -360,7 +364,7 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
                     type="button"
                     onClick={() => setFilters({ request: row.id })}
                     aria-current={selected ? 'true' : undefined}
-                    className={`grid w-full grid-cols-[minmax(0,1fr)_72px_80px] items-center gap-3 px-3 py-2 text-left md:grid-cols-[minmax(0,1fr)_160px_64px_84px_92px_120px] ${
+                    className={`grid w-full grid-cols-[minmax(0,1fr)_72px_80px] items-center gap-3 px-3 py-2 text-left ${wideColumns} ${
                       selected
                         ? 'bg-blue-50 shadow-[inset_2px_0_0_0_#2563eb] dark:bg-slate-800 dark:shadow-[inset_2px_0_0_0_#fff]'
                         : 'hover:bg-neutral-50 dark:hover:bg-slate-900'
@@ -378,7 +382,7 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
                         {row.requestId ? <span className="font-mono"> · {row.requestId}</span> : null}
                       </span>
                     </span>
-                    <span className="hidden min-w-0 md:block">
+                    <span className={`${wideOnly} min-w-0`}>
                       <span className="block truncate text-xs text-neutral-800 dark:text-slate-200">
                         {row.service ?? (row.timedBy === 'client' ? 'browser' : '—')}
                       </span>
@@ -388,10 +392,10 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
                       <StatusBadge status={row.statusCode} />
                     </span>
                     <span className="text-right font-mono text-xs tabular-nums text-neutral-800 dark:text-slate-200">{formatDuration(row.durationMs)}</span>
-                    <span className="hidden text-right font-mono text-xs tabular-nums text-neutral-600 dark:text-slate-400 md:block">
+                    <span className={`${wideOnly} text-right font-mono text-xs tabular-nums text-neutral-600 dark:text-slate-400`}>
                       {formatBytes(row.responseSize)}
                     </span>
-                    <span className="hidden md:block">
+                    <span className={wideOnly}>
                       <CaptureBadge state={row.captureState} />
                     </span>
                   </button>
@@ -415,7 +419,15 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
         ) : null}
       </section>
 
-      {filters.request ? <RequestDrawer key={filters.request} requestId={filters.request} projectId={projectId} onClose={closeDrawer} /> : null}
+      {filters.request ? (
+        <RequestDrawer
+          key={filters.request}
+          requestId={filters.request}
+          projectId={projectId}
+          onClose={closeDrawer}
+          onOpenRequest={openRequest}
+        />
+      ) : null}
     </div>
   );
 }
