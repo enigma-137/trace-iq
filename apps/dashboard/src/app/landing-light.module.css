@@ -349,7 +349,7 @@
   text-underline-offset: 4px;
 }
 .specimen {
-  background: var(--sky);
+  background: var(--paper);
   padding: 22px;
   min-width: 0;
 }
@@ -443,6 +443,56 @@
   flex: 0 0 19px;
   color: var(--paper);
   background: var(--blue);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .eventIcon {
+    animation: traceStagePulse 3.8s ease-in-out infinite;
+  }
+  .timeline li:nth-child(2) .eventIcon {
+    animation-delay: 0.95s;
+  }
+  .timeline li:nth-child(2):not(:last-child)::before {
+    animation-delay: 0.95s;
+  }
+  .timeline li:nth-child(3) .eventIcon {
+    animation-delay: 1.9s;
+  }
+  .timeline li:nth-child(3):not(:last-child)::before {
+    animation-delay: 1.9s;
+  }
+  .timeline li:nth-child(4) .eventIcon {
+    animation-delay: 2.85s;
+  }
+  .timeline li:nth-child(4):not(:last-child)::before {
+    animation-delay: 2.85s;
+  }
+  .timeline li:not(:last-child)::before {
+    animation: traceLinkPulse 3.8s ease-in-out infinite;
+  }
+}
+@keyframes traceStagePulse {
+  0%,
+  20%,
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+  8%,
+  14% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 3px rgb(36 91 235 / 15%);
+  }
+}
+@keyframes traceLinkPulse {
+  0%,
+  20%,
+  100% {
+    border-color: rgb(36 91 235 / 25%);
+  }
+  8%,
+  14% {
+    border-color: var(--blue);
+  }
 }
 .success .eventIcon {
   background: var(--green);
