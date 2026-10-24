@@ -42,10 +42,14 @@ traceiq.shutdown() // flush before a short-lived process exits
 | `capture(_:userId:anonymousId:properties:timestamp:)` | Track an event. |
 | `identify(userId:traits:)` | Create/update a user profile. |
 | `group(organizationId:userId:traits:)` | Associate a user with an account. |
+| `log(_:_:userId:metadata:error:)` | Send a structured line to Logs. `level` is `debug`, `info`, `warn`, `error` or `fatal`. Lines flush with events. |
 | `flush(completion:)` | Send everything queued now. |
 | `shutdown()` | Stop the timer and flush (blocks briefly). |
 
 ## Behavior
+
+`TraceIQConfig` also takes `serviceName` (default `"server"`) and `environment`
+(default `"production"`), stamped on log lines.
 
 Events flush by size (`flushAt`), on a timer (`flushInterval`), or manually. Batches
 that fail after `maxRetries` (exponential backoff) are dropped. Numeric `amount`

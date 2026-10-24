@@ -20,7 +20,15 @@ data class TraceIQConfig(
     val timeoutMs: Int = 10_000,
     val debug: Boolean = false,
     val onError: ((Throwable) -> Unit)? = null,
+    /** Service name stamped on [TraceIQ.log] lines. */
+    val serviceName: String = "server",
+    /** Environment stamped on [TraceIQ.log] lines. */
+    val environment: String = "production",
 )
+
+private val LOG_LEVELS = setOf("debug", "info", "warn", "error", "fatal")
+private const val MAX_LOG_BATCH = 100 // API limit per /v1/logs/batch request
+private const val MAX_QUEUED_LOGS = 1000
 
 /**
  * Server / Android TraceIQ client. Events are queued and flushed in batches on a
@@ -28,6 +36,7 @@ data class TraceIQConfig(
  *
  *     val traceiq = TraceIQ(TraceIQConfig(projectId = "proj_...", writeKey = "trq_..."))
  *     traceiq.capture("payout_succeeded", userId = "user_123", properties = mapOf("amount" to 50000))
+ *     traceiq.log("error", "Payout provider timed out", metadata = mapOf("provider" to "stripe"))
  *     traceiq.shutdown() // flush before a short-lived process exits
  */
 class TraceIQ(private val config: TraceIQConfig) {
@@ -35,6 +44,7 @@ class TraceIQ(private val config: TraceIQConfig) {
     private val endpoint = config.endpoint.trimEnd('/')
     private val lock = Any()
     private val queue = ArrayList<Map<String, Any?>>()
+    private val logQueue = ArrayList<Map<String, Any?>>()
 
     private val worker = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "traceiq-flush").apply { isDaemon = true }
@@ -99,6 +109,45 @@ class TraceIQ(private val config: TraceIQConfig) {
         enqueue(e)
     }
 
+    /**
+     * Send a structured log line to TraceIQ Logs. [level] is `debug`, `info`, `warn`,
+     * `error` or `fatal` (anything else is sent as `info`). Pass [error] to attach a
+     * throwable's class, message and stack. Lines flush with events.
+     */
+    @JvmOverloads
+    fun log(
+        level: String,
+        message: String,
+        userId: String? = null,
+        metadata: Map<String, Any?> = emptyMap(),
+        error: Throwable? = null,
+    ) {
+        if (message.isBlank()) return
+        val entry = LinkedHashMap<String, Any?>()
+        entry["level"] = if (level in LOG_LEVELS) level else "info"
+        entry["message"] = message.take(4000)
+        entry["timestamp"] = nowIso()
+        entry["service"] = config.serviceName
+        entry["environment"] = config.environment
+        if (userId != null) entry["distinctId"] = userId
+        if (metadata.isNotEmpty()) entry["metadata"] = metadata
+        if (error != null) {
+            entry["errorDetails"] = mapOf(
+                "name" to error.javaClass.name,
+                "message" to error.message,
+                "stack" to error.stackTraceToString(),
+            )
+        }
+        val size: Int
+        synchronized(lock) {
+            logQueue.add(entry)
+            // Bounded so an unreachable API can't grow memory without limit; oldest go first.
+            while (logQueue.size > MAX_QUEUED_LOGS) logQueue.removeAt(0)
+            size = logQueue.size
+        }
+        if (size >= config.flushAt) flush()
+    }
+
     /** Send everything queued now (runs on the worker thread; returns immediately). */
     fun flush() {
         worker.execute { flushInternal() }
@@ -126,27 +175,33 @@ class TraceIQ(private val config: TraceIQConfig) {
 
     private fun flushInternal() {
         val batch: List<Map<String, Any?>>
+        val logs: List<Map<String, Any?>>
         synchronized(lock) {
-            if (queue.isEmpty()) return
+            if (queue.isEmpty() && logQueue.isEmpty()) return
             batch = ArrayList(queue)
             queue.clear()
+            logs = ArrayList(logQueue)
+            logQueue.clear()
         }
-        send(batch)
+        if (batch.isNotEmpty()) send("/v1/events/batch", mapOf("projectId" to config.projectId, "batch" to batch))
+        for (chunk in logs.chunked(MAX_LOG_BATCH)) {
+            send("/v1/logs/batch", mapOf("projectId" to config.projectId, "logs" to chunk))
+        }
     }
 
-    private fun send(batch: List<Map<String, Any?>>) {
-        val body = encodeJson(mapOf("projectId" to config.projectId, "batch" to batch))
+    private fun send(path: String, payload: Map<String, Any?>) {
+        val body = encodeJson(payload)
         var attempt = 0
         while (true) {
             attempt++
             try {
-                val status = post(body)
+                val status = post(path, body)
                 if (status in 200..299) return
                 if (status < 500 && status != 429) {
-                    handleError(RuntimeException("TraceIQ batch rejected with $status."))
+                    handleError(RuntimeException("TraceIQ request to $path rejected with $status."))
                     return
                 }
-                throw RuntimeException("TraceIQ batch failed with $status.")
+                throw RuntimeException("TraceIQ request to $path failed with $status.")
             } catch (error: Throwable) {
                 if (attempt > config.maxRetries) {
                     handleError(error)
@@ -162,8 +217,8 @@ class TraceIQ(private val config: TraceIQConfig) {
         }
     }
 
-    private fun post(body: String): Int {
-        val connection = URL("$endpoint/v1/events/batch").openConnection() as HttpURLConnection
+    private fun post(path: String, body: String): Int {
+        val connection = URL("$endpoint$path").openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
             connection.connectTimeout = config.timeoutMs
