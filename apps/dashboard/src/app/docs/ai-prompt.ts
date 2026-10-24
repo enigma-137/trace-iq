@@ -3,7 +3,17 @@
 
 import { SDK_VERSIONS } from '@/lib/sdkVersions';
 
-export type AiLanguageId = 'javascript' | 'python' | 'rust' | 'php' | 'react-native' | 'swift' | 'mcp' | 'other';
+export type AiLanguageId =
+  | 'javascript'
+  | 'node'
+  | 'python'
+  | 'rust'
+  | 'php'
+  | 'react-native'
+  | 'swift'
+  | 'kotlin'
+  | 'mcp'
+  | 'other';
 
 export type AiFeatureId =
   | 'general'
@@ -83,6 +93,38 @@ const cfg = traceiq.getFeatureFlagPayload('checkout-limits');`,
       { label: 'Autocapture', href: '/docs?page=autocapture' },
       { label: 'Feature flags', href: '/docs?page=flags' },
       { label: 'Webhooks', href: '/docs?page=webhooks' }
+    ]
+  },
+  {
+    id: 'node',
+    label: 'Node.js',
+    blurb: 'Server-side SDK for Node.js 18+ — backend events and request telemetry',
+    install: 'npm install traceiq-node',
+    init: `import { TraceIQ } from 'traceiq-node';
+
+const traceiq = new TraceIQ({
+  projectId: 'YOUR_PROJECT_ID',
+  writeKey: process.env.TRACEIQ_WRITE_KEY!,
+  endpoint: '__API_BASE_URL__',
+});`,
+    steps: [
+      'Install the SDK and create one `TraceIQ` instance for your process.',
+      'Keep the write key in an environment variable — server keys stay secret.',
+      'Capture events with `traceiq.capture({ event, userId, properties })`; they are batched in the background.',
+      'Call `await traceiq.shutdown()` before a short-lived process (script, Lambda) exits.'
+    ],
+    featureSnippets: {
+      'event-tracking': `traceiq.capture({
+  event: 'payout_succeeded',
+  userId: 'user_123',
+  properties: { amount: 50000, currency: 'NGN' }
+});`,
+      'user-identity': `traceiq.identify({ userId: 'user_123', traits: { email: 'a@b.com', kyc_tier: 2 } });`,
+      'api-performance': `app.use(traceiq.middleware({ service: 'billing-api', environment: 'production' }));`
+    },
+    docs: [
+      { label: 'Node.js SDK', href: '/docs?page=node' },
+      { label: 'API performance', href: '/docs?page=api-performance' }
     ]
   },
   {
@@ -251,6 +293,40 @@ let traceiq = TraceIQ(config: .init(
     ]
   },
   {
+    id: 'kotlin',
+    label: 'Kotlin',
+    blurb: 'JVM servers and Android (API 21+), no third-party dependencies',
+    install: 'Gradle → implementation("com.traceiq:traceiq:0.1.0")',
+    init: `import com.traceiq.TraceIQ
+import com.traceiq.TraceIQConfig
+
+val traceiq = TraceIQ(
+    TraceIQConfig(
+        projectId = "YOUR_PROJECT_ID",
+        writeKey = "YOUR_WRITE_KEY",
+        endpoint = "__API_BASE_URL__",
+    )
+)`,
+    steps: [
+      'Add the dependency (or copy the source) — the same code runs on the JVM and Android.',
+      'On Android, add `<uses-permission android:name="android.permission.INTERNET" />`.',
+      'Capture events with `traceiq.capture(...)` and identify users with `traceiq.identify(...)`.',
+      'Call `traceiq.shutdown()` to flush before a short-lived process exits.'
+    ],
+    featureSnippets: {
+      'event-tracking': `traceiq.capture(
+    "transfer_started",
+    userId = "user_123",
+    properties = mapOf("amount" to 5000, "currency" to "NGN"),
+)`,
+      'user-identity': `traceiq.identify("user_123", traits = mapOf("kyc_tier" to 2))`
+    },
+    docs: [
+      { label: 'Kotlin SDK', href: '/docs?page=kotlin' },
+      { label: 'Reserved events', href: '/docs?page=events' }
+    ]
+  },
+  {
     id: 'mcp',
     label: 'MCP',
     blurb: 'Point Claude Desktop, Cursor, or any MCP client at your trace data',
@@ -282,8 +358,7 @@ let traceiq = TraceIQ(config: .init(
   {
     id: 'other',
     label: 'Others',
-    blurb: 'Kotlin, Node server SDK, or anything else — generic HTTP guide',
-    comingSoon: true,
+    blurb: 'Any other language or platform — generic HTTP ingestion guide',
     install: 'N/A — use the HTTP ingestion API directly',
     init: `curl -X POST __API_BASE_URL__/v1/events \\
   -H 'content-type: application/json' \\

@@ -2,7 +2,6 @@
 # the traceiq/traceiq-php package files. Everything else in this monorepo is
 # excluded from the published zip.
 .npmrc export-ignore
-.codebase-memory export-ignore
 .env export-ignore
 .env.example export-ignore
 apps/ export-ignore

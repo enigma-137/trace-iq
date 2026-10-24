@@ -19,3 +19,16 @@ scratch/
 # Playwright
 test-results/
 playwright-report/
+
+# SDK build output
+sdks/swift/.build/
+sdks/kotlin/.gradle/
+sdks/kotlin/build/
+*.egg-info/
+__pycache__/
+
+# Packed tarballs (npm pack)
+*.tgz
+
+# Local tool data
+.codebase-memory/
