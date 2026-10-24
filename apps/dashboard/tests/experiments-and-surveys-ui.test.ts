@@ -31,7 +31,6 @@ describe('Experiments and Surveys - UI & Navigation Tests', () => {
     // 60% Promoters (9-10), 20% Passives (7-8), 20% Detractors (0-6) -> NPS = 60 - 20 = +40
     const total = 100;
     const promoters = 60;
-    const passives = 20;
     const detractors = 20;
 
     const npsScore = Math.round(((promoters / total) - (detractors / total)) * 100);

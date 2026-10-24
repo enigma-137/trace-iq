@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
   SavedInsightView,
-  DashboardView,
-  DashboardWidgetView,
-  InsightType,
-  VisualizationType
+  DashboardView
 } from '../src/types/analytics';
 
 describe('Insights and Dashboards v2 System', () => {
@@ -167,7 +164,6 @@ describe('Insights and Dashboards v2 System', () => {
 
   it('regression: Add to dashboard passes real saved insightId and rejects null/undefined IDs', () => {
     const savedInsightId = 'ins_os_split';
-    const targetDashboardId = 'dash_project_overview';
     const projectId = 'proj_1';
 
     // 1. Existing saved insight payload
@@ -240,16 +236,6 @@ describe('Insights and Dashboards v2 System', () => {
       { label: 'google.com', value: 80 },
       { label: 'direct', value: 40 }
     ]);
-
-    // 3. API performance latencySeries normalization
-    const apiPerfResponse = {
-      summary: { totalRequests: 1500, p50: 45, p95: 120, p99: 250 },
-      latencySeries: [
-        { bucket: '2026-09-20', p50: 40, p95: 110, p99: 230 },
-        { bucket: '2026-09-21', p50: 50, p95: 130, p99: 270 }
-      ],
-      statusBreakdown: { ok200: 1450, rateLimit429: 30, error500: 20, other: 0 }
-    };
 
     // 4. Web analytics WebTotals object normalization for KPI and charts
     const webTotalsResponse = {

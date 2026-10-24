@@ -663,7 +663,7 @@ export class ExperimentsService {
     const controlConversions = conversionMap.get(controlKey) || 0;
     const controlCR = controlExposures > 0 ? controlConversions / controlExposures : 0;
 
-    let hasEnoughData = totalExposures >= 60; // minimum combined threshold
+    const hasEnoughData = totalExposures >= 60; // minimum combined threshold
     let recommendedWinner: string | null = null;
     let highestSignificantUplift = 0;
 

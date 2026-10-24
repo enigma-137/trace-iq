@@ -7,7 +7,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from '../../DashboardDialog';
 import { FlagItem, FlagTarget, FlagTargetGroup } from '../FlagManager';
 import { toast } from '@/lib/toast';
-import { UserDetailHoverCard, UserPreviewData, formatRelativeTime, formatShortId } from '../UserDetailHoverCard';
+import { UserDetailHoverCard, UserPreviewData, formatShortId } from '../UserDetailHoverCard';
 import { UserPickerModal } from '../UserPickerModal';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -122,7 +122,6 @@ export function FlagDetailsView({
   // Specific Users & Overrides state
   const [overrides, setOverrides] = useState<Record<string, boolean>>(flag.overrides ?? {});
   const [resolvedUsersMap, setResolvedUsersMap] = useState<Map<string, UserPreviewData>>(new Map());
-  const [isResolvingUsers, setIsResolvingUsers] = useState(false);
 
   // Modals for adding users
   const [isAddIncludedModalOpen, setIsAddIncludedModalOpen] = useState(false);
@@ -167,7 +166,7 @@ export function FlagDetailsView({
 
   // Analytics state
   const [analyticsDays, setAnalyticsDays] = useState('14');
-  const [conversionEventInput, setConversionEventInput] = useState('');
+  const [conversionEventInput] = useState('');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsResponse | null>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
 
@@ -178,7 +177,7 @@ export function FlagDetailsView({
   // Settings state
   const [editName, setEditName] = useState(flag.name);
   const [editDesc, setEditDesc] = useState(flag.description ?? '');
-  const [editEnv, setEditEnv] = useState(flag.environment);
+  const [editEnv] = useState(flag.environment);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -212,7 +211,6 @@ export function FlagDetailsView({
     if (overrideIds.length === 0) return;
 
     async function resolveIdentities() {
-      setIsResolvingUsers(true);
       try {
         const res = await authFetch('/v1/dashboard/users/resolve', {
           method: 'POST',
@@ -230,8 +228,6 @@ export function FlagDetailsView({
         }
       } catch {
         // fallback
-      } finally {
-        setIsResolvingUsers(false);
       }
     }
 

@@ -66,7 +66,6 @@ describe('Dashboard Setup Wizard and Real Project Scoping', () => {
 
   it('generates real-scoped usetrace CLI and environment snippets', () => {
     const realProjectId = 'proj_healthcorp_live_123';
-    const realProjectName = 'HealthCorp Web';
     const realWriteKey = 'tr_live_abcdef1234567890abcdef1234567890';
     const apiUrl = 'https://api.traceiq.run';
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import type { ExperimentVariant } from '@traceiq/types';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -28,7 +27,7 @@ export function CreateExperimentModal({
   const [environment, setEnvironment] = useState('production');
   const [primaryMetric, setPrimaryMetric] = useState('');
   const [knownEvents, setKnownEvents] = useState<string[]>([]);
-  const [targetPercentage, setTargetPercentage] = useState(100);
+  const [targetPercentage] = useState(100);
   const [variants, setVariants] = useState<Array<{ id: string; key: string; name: string; weight: number; isControl: boolean }>>([
     { id: 'v_ctrl', key: 'control', name: 'Control (Original)', weight: 50, isControl: true },
     { id: 'v_b', key: 'variant_b', name: 'Variant B', weight: 50, isControl: false }
@@ -50,7 +49,9 @@ export function CreateExperimentModal({
           const uniqueNames = Array.from(new Set(eventsList.map((e) => e.eventName).filter((n): n is string => Boolean(n))));
           setKnownEvents(uniqueNames);
         }
-      } catch {}
+      } catch {
+        // Suggestions are optional; the input still accepts any event name.
+      }
     }
     loadEvents();
   }, [isOpen, projectId, initialToken, supabase]);

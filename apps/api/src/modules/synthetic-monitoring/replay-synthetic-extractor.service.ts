@@ -3,8 +3,7 @@ import {
   ReplaySyntheticDraft,
   ReplaySyntheticDraftStep,
   SelectorConfidence,
-  SyntheticBrowser,
-  SyntheticStep
+  SyntheticBrowser
 } from '@traceiq/types';
 
 interface SerializedNode {
@@ -55,7 +54,7 @@ export class ReplaySyntheticExtractorService {
     let baseOrigin = 'https://app.traceiq.dev';
     let viewportWidth = 1280;
     let viewportHeight = 720;
-    let browserType: SyntheticBrowser = 'chromium';
+    const browserType: SyntheticBrowser = 'chromium';
 
     if (replayRecord.deviceInfo?.viewport) {
       viewportWidth = replayRecord.deviceInfo.viewport.width || 1280;
@@ -75,7 +74,7 @@ export class ReplaySyntheticExtractorService {
       node?: SerializedNode;
     } | null = null;
     let currentUrl = '';
-    let hasAuthenticatedElements = false;
+    const hasAuthenticatedElements = false;
 
     // Helper to flush pending buffered input keystrokes into a single fill step
     const flushInputBuffer = () => {

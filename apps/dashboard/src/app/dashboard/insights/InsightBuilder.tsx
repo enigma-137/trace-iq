@@ -7,9 +7,7 @@ import { withProjectId } from '../nav';
 import {
   createInsight,
   updateInsight,
-  duplicateInsight,
   executeInsightQuery,
-  fetchInsight,
   fetchEventNames,
   fetchEventProperties
 } from '@/lib/analytics-api';
@@ -74,7 +72,7 @@ export function InsightBuilder({
   const [availableProperties, setAvailableProperties] = useState<Array<{ key: string; sampleType: string }>>([]);
 
   // Funnel steps state (when type === 'funnel')
-  const [funnelSteps, setFunnelSteps] = useState<string[]>(
+  const [funnelSteps] = useState<string[]>(
     initialInsight?.query?.steps || ['$pageview', '$click', 'letter_published']
   );
 

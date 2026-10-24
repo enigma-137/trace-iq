@@ -2,12 +2,6 @@
 
 import { useState } from 'react';
 
-interface DonutItem {
-  label: string;
-  value: number;
-  color?: string;
-}
-
 interface DonutChartProps {
   items: Array<{ label: string; value: number; color?: string }>;
   size?: number;

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { Subject, Subscription } from 'rxjs';
 import { DatabaseService } from '../../database/database.service';

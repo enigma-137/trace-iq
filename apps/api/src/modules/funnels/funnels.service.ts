@@ -255,7 +255,7 @@ export class FunnelsService {
       ) {
         let path = '/';
         if (step.label && step.label.includes('/')) {
-          const match = step.label.match(/(\/[a-zA-Z0-9_\-\/]+)/);
+          const match = step.label.match(/(\/[a-zA-Z0-9_\-/]+)/);
           if (match) path = match[1];
         } else if (ev.includes('pricing')) {
           path = '/pricing';

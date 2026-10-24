@@ -833,7 +833,9 @@ export class SurveysService {
         `,
         [`evt_${randomUUID()}`, resolvedProjectId, userId || null, anonymousId || null, sessionId || null, JSON.stringify({ surveyId })]
       );
-    } catch {}
+    } catch {
+      // Impression tracking is best-effort; never fail the survey request.
+    }
 
     return { success: true, interactionId };
   }
@@ -874,7 +876,9 @@ export class SurveysService {
         `,
         [`evt_${randomUUID()}`, resolvedProjectId, userId || null, anonymousId || null, sessionId || null, JSON.stringify({ surveyId })]
       );
-    } catch {}
+    } catch {
+      // Impression tracking is best-effort; never fail the survey request.
+    }
 
     return { success: true, interactionId };
   }
@@ -943,7 +947,9 @@ export class SurveysService {
           })
         ]
       );
-    } catch {}
+    } catch {
+      // Impression tracking is best-effort; never fail the survey request.
+    }
 
     return { success: true, responseId };
   }

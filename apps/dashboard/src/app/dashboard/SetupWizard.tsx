@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from '@/lib/toast';
@@ -113,17 +113,10 @@ function maskKey(key: string | undefined): string {
   return `${key.slice(0, 4)}${'•'.repeat(Math.max(12, key.length - 4))}`;
 }
 
-export function SetupWizard({
-  projectId,
-  projectName,
-  organizationId,
-  writeKey: initialWriteKey,
-  apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000',
-  userEmail,
-  onComplete
-}: SetupWizardProps) {
-  // Guard: if projectId is missing, do not render the wizard
-  if (!projectId) {
+export function SetupWizard(props: SetupWizardProps) {
+  // Guard: if projectId is missing, do not render the wizard. The guard lives in
+  // its own component so SetupWizardContent always calls the same hooks.
+  if (!props.projectId) {
     return (
       <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-6 text-center text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
         <h3 className="text-base font-semibold">Project context required</h3>
@@ -134,6 +127,17 @@ export function SetupWizard({
     );
   }
 
+  return <SetupWizardContent {...props} />;
+}
+
+function SetupWizardContent({
+  projectId,
+  projectName,
+  organizationId,
+  writeKey: initialWriteKey,
+  apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000',
+  onComplete
+}: SetupWizardProps) {
   const [writeKey, setWriteKey] = useState<string>(initialWriteKey ?? '');
   const [isKeyRevealed, setIsKeyRevealed] = useState<boolean>(false);
   const [isGeneratingKey, setIsGeneratingKey] = useState<boolean>(false);
@@ -145,7 +149,6 @@ export function SetupWizard({
   const [selectedFramework, setSelectedFramework] = useState<'nextjs' | 'vite' | 'node' | 'html'>('nextjs');
 
   // Verification state
-  const [verificationId, setVerificationId] = useState<string | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [verificationData, setVerificationData] = useState<VerificationEventData | null>(null);
@@ -239,7 +242,6 @@ export function SetupWizard({
 
       const data = await res.json();
       const vId = data.id || data.verificationId;
-      setVerificationId(vId);
       setIsCreatingSession(false);
       setIsListening(true);
 

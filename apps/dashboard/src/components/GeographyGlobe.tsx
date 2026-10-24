@@ -168,54 +168,6 @@ function createGridLines(radius: number): THREE.Line[] {
   return lines;
 }
 
-function computeCentroid(
-  geometry: GeoJSON.Geometry
-): [number, number] | null {
-  let sumLon = 0;
-  let sumLat = 0;
-  let count = 0;
-
-  const processCoords = (
-    coords:
-      | GeoJSON.Position[]
-      | GeoJSON.Position[][]
-      | GeoJSON.Position[][][]
-  ) => {
-    const flatten = (
-      c:
-        | GeoJSON.Position[]
-        | GeoJSON.Position[][]
-        | GeoJSON.Position[][][]
-    ): GeoJSON.Position[] => {
-      if (!Array.isArray(c) || c.length === 0) return [];
-      const first = c[0];
-      if (Array.isArray(first) && typeof first[0] === 'number') {
-        return c as GeoJSON.Position[];
-      }
-      if (Array.isArray(first) && Array.isArray(first[0])) {
-        return (c as GeoJSON.Position[][]).flat();
-      }
-      return (c as GeoJSON.Position[][][]).flat(2);
-    };
-    for (const [lon, lat] of flatten(coords)) {
-      sumLon += lon;
-      sumLat += lat;
-      count++;
-    }
-  };
-
-  if (geometry.type === 'Polygon') {
-    processCoords(geometry.coordinates);
-  } else if (geometry.type === 'MultiPolygon') {
-    for (const polygon of geometry.coordinates) {
-      processCoords(polygon);
-    }
-  }
-
-  if (count === 0) return null;
-  return [sumLon / count, sumLat / count];
-}
-
 function createSafeRenderer(isSmallScreen: boolean): THREE.WebGLRenderer | null {
   const attempts = [
     { antialias: !isSmallScreen, alpha: true, powerPreference: 'default' as const },
@@ -245,7 +197,6 @@ export function GeographyGlobe({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [hovered, setHovered] = useState<HoverState | null>(null);
-  const [debug, setDebug] = useState<string>('init');
 
   const dataMapRef = useRef<Map<string, { value: number; intensity: number }>>(
     new Map()
@@ -639,12 +590,10 @@ export function GeographyGlobe({
           worldTopology.objects.countries as any
         ) as unknown as GeoJSON.FeatureCollection;
         updateCountryMeshes(featureCollection);
-        setDebug('countries rendered');
       } catch (err) {
         console.error('Globe load error:', err);
         setError(true);
         setLoading(false);
-        setDebug('error: ' + (err instanceof Error ? err.message : String(err)));
       }
     }
 

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:traceiq_flutter/src/client.dart';
 import 'package:traceiq_flutter/src/config.dart';

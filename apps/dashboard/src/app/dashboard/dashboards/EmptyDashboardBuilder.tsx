@@ -87,8 +87,7 @@ export function EmptyDashboardBuilder({
   projectId,
   onAddExistingChart,
   onBrowseTemplates,
-  onWidgetAdded,
-  onCreateNewInsight
+  onWidgetAdded
 }: EmptyDashboardBuilderProps) {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');

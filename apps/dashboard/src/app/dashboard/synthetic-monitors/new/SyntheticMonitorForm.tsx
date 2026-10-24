@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import type {
   FunnelSyntheticDraft,
   ReplaySyntheticDraft,
-  ReplaySyntheticDraftStep,
   SyntheticBrowser,
   SyntheticMonitor,
   SyntheticSchedule,
@@ -89,7 +88,7 @@ export function SyntheticMonitorForm({
   const [viewportHeight, setViewportHeight] = useState(
     initialData?.viewportHeight || initialReplayDraft?.monitor.viewportHeight || 720
   );
-  const [timeoutMs, setTimeoutMs] = useState(initialData?.timeoutMs || 30000);
+  const [timeoutMs] = useState(initialData?.timeoutMs || 30000);
 
   const [steps, setSteps] = useState<SyntheticStep[]>(
     initialData?.steps && initialData.steps.length > 0

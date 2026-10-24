@@ -10,7 +10,6 @@ import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
 import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
 import SmartPhone01Icon from '@hugeicons/core-free-icons/SmartPhone01Icon';
 import ComputerIcon from '@hugeicons/core-free-icons/ComputerIcon';
-import Tablet01Icon from '@hugeicons/core-free-icons/Tablet01Icon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
 import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';

@@ -410,7 +410,9 @@ export class SyntheticRunnerService {
       if (page) {
         try {
           finalUrl = this.crypto.redact(page.url(), secretValues);
-        } catch {}
+        } catch {
+          // The page may already be gone; keep the previous URL.
+        }
       }
     } catch (globalErr: any) {
       status = 'failed';
@@ -418,13 +420,13 @@ export class SyntheticRunnerService {
     } finally {
       // Guaranteed resource teardown
       if (page) {
-        try { await page.close(); } catch {}
+        try { await page.close(); } catch { /* already closed */ }
       }
       if (context) {
-        try { await context.close(); } catch {}
+        try { await context.close(); } catch { /* already closed */ }
       }
       if (browserInstance) {
-        try { await browserInstance.close(); } catch {}
+        try { await browserInstance.close(); } catch { /* already closed */ }
       }
 
       this.activeExecutions = Math.max(0, this.activeExecutions - 1);

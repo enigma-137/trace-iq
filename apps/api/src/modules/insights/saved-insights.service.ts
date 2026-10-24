@@ -1,8 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
-import { ProjectsService, ResolvedProject } from '../projects/projects.service';
+import { ProjectsService } from '../projects/projects.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { FunnelsService } from '../funnels/funnels.service';
 import { ErrorsService } from '../errors/errors.service';

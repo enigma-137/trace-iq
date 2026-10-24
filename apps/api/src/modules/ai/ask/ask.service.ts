@@ -1,9 +1,7 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
-  NotFoundException,
   Optional,
   ServiceUnavailableException
 } from '@nestjs/common';
@@ -14,7 +12,7 @@ import { UsageService } from '../../billing/usage.service';
 import { DatabaseService } from '../../../database/database.service';
 import { appConfig } from '../../../config/app.config';
 import { AskOrchestratorService } from './ask-orchestrator.service';
-import { ConversationService, AiMessage, AiInvestigation, FindingItem } from './conversation.service';
+import { ConversationService, FindingItem } from './conversation.service';
 import { EvidenceItem } from '../tools/tool.interface';
 import { AiModelPolicyService } from '../models/ai-model-policy.service';
 

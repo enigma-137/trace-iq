@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
-import { ProjectsService, ResolvedProject } from '../projects/projects.service';
+import { ProjectsService } from '../projects/projects.service';
 import { createHash, randomUUID } from 'node:crypto';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';

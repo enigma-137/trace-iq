@@ -255,7 +255,7 @@ API domain -> Caddy -> 127.0.0.1:4000
                     Docker Compose
                     |- NestJS API
                     |- PostgreSQL 18
-                    \- Redis 7`}</Code>
+                    \\- Redis 7`}</Code>
           <Bullets items={[
             ['Dashboard', 'Deploy apps/dashboard as a Next.js application and set its NEXT_PUBLIC_* values at build time.'],
             ['API', 'Bind port 4000 to loopback and expose it only through a TLS reverse proxy such as Caddy.'],
@@ -1284,7 +1284,7 @@ app.use(traceiq.middleware({
   endpoint: '${apiBaseUrl}',
   autoCaptureRequests: true, // capture outgoing fetch() and XHR as $api_request
   // Or narrow it to your backend:
-  // autoCaptureRequests: { include: ['https://api.example.com'], exclude: [/\/health$/] },
+  // autoCaptureRequests: { include: ['https://api.example.com'], exclude: [/\\/health$/] },
 });`}</Code>
         <P>
           Only API calls are recorded. Page loads are skipped on both sides: Next.js navigations and prefetches (RSC

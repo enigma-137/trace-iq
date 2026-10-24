@@ -435,7 +435,7 @@ export function DashboardsApp({
     );
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const selectionKey = compareIds.sort().join(',');
   useEffect(() => {
     if (compareIds.length >= 2) {
