@@ -667,6 +667,16 @@ traceiq = Client(
 traceiq.capture("payout_succeeded", user_id="user_123",
                 properties={"amount": 50000, "currency": "NGN"})
 traceiq.shutdown()  # flush before exit`}</Code>
+        <P>
+          Structured logs and feature flags. Flag calls are synchronous requests, so evaluate once per request
+          (for example with <Mono>evaluate_flags()</Mono>) and reuse the result.
+        </P>
+        <Code lang="python">{`traceiq.log("error", "Payout provider timed out", provider="stripe", error=exc)
+
+if traceiq.is_feature_enabled("new-payouts", "user_123", properties={"plan": "pro"}):
+    ...
+
+limits = traceiq.get_feature_flag_payload("payout-limits", "user_123", default={})`}</Code>
       </Section>
     );
   }
@@ -762,6 +772,15 @@ $traceiq->capture(
 );
 
 $traceiq->shutdown(); // flush before a short-lived process exits`}</Code>
+        <P>
+          Structured logs are queued and flushed with events. Flag calls are synchronous requests, so evaluate
+          once per request with <Mono>evaluateFlags()</Mono> when you check several flags.
+        </P>
+        <Code lang="php">{`$traceiq->log('error', 'Payout provider timed out', ['provider' => 'stripe', 'error' => $e]);
+
+if ($traceiq->isFeatureEnabled('new-payouts', 'user_123', properties: ['plan' => 'pro'])) {
+    // ...
+}`}</Code>
       </Section>
     );
   }

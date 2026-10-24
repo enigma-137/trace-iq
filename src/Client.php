@@ -25,6 +25,11 @@ namespace TraceIQ;
  *
  *     $traceiq->identify("user_123", traits: ["email" => "a@b.com", "kyc_tier" => 2]);
  *     $traceiq->group("org_9", userId: "user_123", traits: ["plan" => "growth"]);
+ *     $traceiq->log('error', 'Payout provider timed out', ['provider' => 'stripe']);
+ *
+ *     if ($traceiq->isFeatureEnabled('new-payouts', 'user_123')) {
+ *         // ...
+ *     }
  *
  *     $traceiq->shutdown(); // flush before a short-lived process exits
  *
@@ -37,6 +42,10 @@ class Client
 {
     private const DEFAULT_ENDPOINT = 'http://localhost:4000';
     private const BATCH_URL_PATH = '/v1/events/batch';
+    private const LOGS_URL_PATH = '/v1/logs/batch';
+    private const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'fatal'];
+    private const MAX_LOG_BATCH = 100; // API limit per /v1/logs/batch request
+    private const MAX_QUEUED_LOGS = 1000;
     private const MAX_BACKOFF_MS = 30_000;
 
     private readonly string $endpoint;
@@ -48,6 +57,9 @@ class Client
 
     /** @var list<array<string, mixed>> */
     private array $queue = [];
+
+    /** @var list<array<string, mixed>> */
+    private array $logQueue = [];
 
     private bool $shutdown = false;
 
@@ -61,6 +73,8 @@ class Client
         float $timeout = 10.0,
         bool $debug = false,
         ?callable $onError = null,
+        private readonly string $serviceName = 'server',
+        private readonly string $environment = 'production',
     ) {
         if ($projectId === '') {
             throw new \InvalidArgumentException('TraceIQ: project_id is required.');
@@ -169,6 +183,160 @@ class Client
     }
 
     /**
+     * Send a structured log line to TraceIQ Logs. Reserved attribute keys:
+     * `service` (overrides the service name), `userId`, and `error` (a \Throwable
+     * whose class, message and stack are attached). Other keys become metadata.
+     *
+     * @param string $level One of debug, info, warn, error, fatal (others become info).
+     * @param array<string, mixed> $attributes
+     */
+    public function log(string $level, string $message, array $attributes = []): void
+    {
+        if (trim($message) === '') {
+            return;
+        }
+        if ($this->shutdown) {
+            $this->debug('client is shut down; log ignored.');
+            return;
+        }
+        $service = $attributes['service'] ?? null;
+        $userId = $attributes['userId'] ?? null;
+        $error = $attributes['error'] ?? null;
+        unset($attributes['service'], $attributes['userId'], $attributes['error']);
+
+        $entry = [
+            'level' => in_array($level, self::LOG_LEVELS, true) ? $level : 'info',
+            'message' => mb_substr($message, 0, 4000),
+            'timestamp' => $this->toIso(null),
+            'service' => is_string($service) && $service !== '' ? $service : $this->serviceName,
+            'environment' => $this->environment,
+        ];
+        if (is_string($userId) && $userId !== '') {
+            $entry['distinctId'] = $userId;
+        }
+        if ($attributes !== []) {
+            $entry['metadata'] = $attributes;
+        }
+        if ($error instanceof \Throwable) {
+            $entry['errorDetails'] = [
+                'name' => $error::class,
+                'message' => $error->getMessage(),
+                'stack' => $error->getTraceAsString(),
+            ];
+        }
+
+        $this->logQueue[] = $entry;
+        // Bounded so an unreachable API can't grow memory without limit; oldest go first.
+        if (count($this->logQueue) > self::MAX_QUEUED_LOGS) {
+            array_splice($this->logQueue, 0, count($this->logQueue) - self::MAX_QUEUED_LOGS);
+        }
+        if (count($this->logQueue) >= $this->flushAt) {
+            $this->flush();
+        }
+    }
+
+    /**
+     * Evaluate every feature flag for a user. Makes one synchronous request.
+     * On any error the arrays are empty, so callers fall back to their defaults.
+     *
+     * @param array<string, mixed> $properties
+     * @return array{flags: array<string, bool>, payloads: array<string, mixed>, details: array<string, mixed>}
+     */
+    public function evaluateFlags(string $distinctId, array $properties = [], ?string $environment = null): array
+    {
+        $empty = ['flags' => [], 'payloads' => [], 'details' => []];
+        $payload = ['projectId' => $this->projectId, 'distinctId' => $distinctId, 'properties' => (object) $properties];
+        if ($environment !== null) {
+            $payload['environment'] = $environment;
+        }
+        try {
+            [$status, $body] = $this->post('/v1/flags/evaluate', $this->encode($payload));
+        } catch (\Throwable $error) {
+            $this->handleError(new \RuntimeException('TraceIQ flag evaluation failed: ' . $error->getMessage()));
+            return $empty;
+        }
+        $data = $status >= 200 && $status < 300 ? json_decode($body, true) : null;
+        if (!is_array($data)) {
+            $this->debug("evaluateFlags failed with {$status}");
+            return $empty;
+        }
+        return [
+            'flags' => is_array($data['flags'] ?? null) ? $data['flags'] : [],
+            'payloads' => is_array($data['payloads'] ?? null) ? $data['payloads'] : [],
+            'details' => is_array($data['details'] ?? null) ? $data['details'] : [],
+        ];
+    }
+
+    /**
+     * Whether flag `$key` is on for this user, or `$default` if flags can't be evaluated.
+     * Records an exposure (a second synchronous request) unless `$trackExposure` is false.
+     *
+     * @param array<string, mixed> $properties
+     */
+    public function isFeatureEnabled(
+        string $key,
+        string $distinctId,
+        bool $default = false,
+        array $properties = [],
+        ?string $environment = null,
+        bool $trackExposure = true,
+    ): bool {
+        $flags = $this->evaluateFlags($distinctId, $properties, $environment)['flags'];
+        $enabled = (bool) ($flags[$key] ?? $default);
+        if ($trackExposure) {
+            $this->trackFlagExposure($key, $distinctId, $enabled, $environment, $properties);
+        }
+        return $enabled;
+    }
+
+    /**
+     * The remote-config payload of flag `$key` when it is on, else `$default`.
+     *
+     * @param array<string, mixed> $properties
+     */
+    public function getFeatureFlagPayload(
+        string $key,
+        string $distinctId,
+        mixed $default = null,
+        array $properties = [],
+        ?string $environment = null,
+        bool $trackExposure = true,
+    ): mixed {
+        $result = $this->evaluateFlags($distinctId, $properties, $environment);
+        $enabled = ($result['flags'][$key] ?? null) === true;
+        if ($trackExposure) {
+            $this->trackFlagExposure($key, $distinctId, $enabled, $environment, $properties);
+        }
+        return $enabled ? ($result['payloads'][$key] ?? $default) : $default;
+    }
+
+    /**
+     * Record that a user saw a flag's value. Best-effort: failures are only logged in debug mode.
+     *
+     * @param array<string, mixed> $properties
+     */
+    public function trackFlagExposure(
+        string $key,
+        string $distinctId,
+        bool $enabled,
+        ?string $environment = null,
+        array $properties = [],
+    ): void {
+        try {
+            $this->post('/v1/flags/exposure', $this->encode([
+                'projectId' => $this->projectId,
+                'flagKey' => $key,
+                'distinctId' => $distinctId,
+                'enabled' => $enabled,
+                'environment' => $environment ?? $this->environment,
+                'properties' => (object) $properties,
+            ]));
+        } catch (\Throwable $error) {
+            $this->debug('trackFlagExposure failed: ' . $error->getMessage());
+        }
+    }
+
+    /**
      * Send everything queued right now (blocks until sent).
      */
     public function flush(): void
@@ -176,6 +344,13 @@ class Client
         while ($this->queue !== []) {
             $batch = array_splice($this->queue, 0, $this->flushAt);
             $this->sendBatchPayload($batch);
+        }
+        while ($this->logQueue !== []) {
+            $logs = array_splice($this->logQueue, 0, self::MAX_LOG_BATCH);
+            $this->deliver(
+                $this->encode(['projectId' => $this->projectId, 'logs' => $logs]),
+                fn (string $body): int => $this->post(self::LOGS_URL_PATH, $body)[0],
+            );
         }
     }
 
@@ -215,15 +390,23 @@ class Client
      */
     private function sendBatchPayload(array $batch): void
     {
-        $body = json_encode(
-            ['projectId' => $this->projectId, 'batch' => $batch],
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        $this->deliver(
+            $this->encode(['projectId' => $this->projectId, 'batch' => $batch]),
+            fn (string $body): int => $this->sendBatch($body),
         );
+    }
 
+    /**
+     * Send a body with retry: 429, 5xx and network errors back off exponentially.
+     *
+     * @param \Closure(string): int $send Returns the HTTP status, or 0 on a network error.
+     */
+    private function deliver(string $body, \Closure $send): void
+    {
         $attempt = 0;
         while (true) {
             $attempt++;
-            $status = $this->sendBatch($body);
+            $status = $send($body);
 
             if ($status >= 200 && $status < 300) {
                 return;
@@ -248,6 +431,18 @@ class Client
      */
     protected function sendBatch(string $body): int
     {
+        return $this->post(self::BATCH_URL_PATH, $body)[0];
+    }
+
+    /**
+     * POST a JSON body to an API path once and return `[status, responseBody]`.
+     *
+     * The status is 0 on network/timeout/DNS errors. Overridable for tests.
+     *
+     * @return array{0: int, 1: string}
+     */
+    protected function post(string $path, string $body): array
+    {
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
@@ -260,24 +455,34 @@ class Client
             ],
         ]);
 
-        $stream = @fopen($this->endpoint . self::BATCH_URL_PATH, 'rb', false, $context);
+        $stream = @fopen($this->endpoint . $path, 'rb', false, $context);
         if ($stream === false) {
-            return 0;
+            return [0, ''];
         }
-        stream_get_contents($stream);
+        $response = (string) stream_get_contents($stream);
         $meta = stream_get_meta_data($stream);
         fclose($stream);
 
         $headers = $meta['wrapper_data'] ?? null;
         if (!is_array($headers)) {
-            return 0;
+            return [0, ''];
         }
+        // Redirects add earlier status lines; the last one is the final response.
+        $status = 0;
         foreach ($headers as $line) {
             if (preg_match('#^HTTP/\S+\s+(\d{3})#', (string) $line, $matches) === 1) {
-                return (int) $matches[1];
+                $status = (int) $matches[1];
             }
         }
-        return 0;
+        return [$status, $response];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function encode(array $payload): string
+    {
+        return json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     private function handleError(\RuntimeException $error): void

@@ -40,6 +40,25 @@ final class FakeClient extends Client
     }
 }
 
+/** Records every post() and answers from a queue of [status, body] responses. */
+final class HttpFakeClient extends Client
+{
+    /** @var list<array{path: string, body: array<string, mixed>}> */
+    public array $requests = [];
+
+    /** @param list<array{0: int, 1: string}> $responses */
+    public function __construct(private array $responses = [], int $flushAt = 20)
+    {
+        parent::__construct('proj_test', 'key_test', flushAt: $flushAt, maxRetries: 0, serviceName: 'billing');
+    }
+
+    protected function post(string $path, string $body): array
+    {
+        $this->requests[] = ['path' => $path, 'body' => json_decode($body, true, flags: JSON_THROW_ON_ERROR)];
+        return array_shift($this->responses) ?? [202, ''];
+    }
+}
+
 final class ClientTest extends TestCase
 {
     private function decode(string $body): array
@@ -151,5 +170,57 @@ final class ClientTest extends TestCase
 
         $this->assertCount(1, $client->sent);
         $this->assertSame('TraceIQ batch failed with 0.', $called[0]);
+    }
+
+    public function testLogsAreBatchedToTheLogsEndpoint(): void
+    {
+        $client = new HttpFakeClient();
+        $client->log('error', 'Payout provider timed out', [
+            'provider' => 'stripe',
+            'userId' => 'user_1',
+            'error' => new \RuntimeException('30s'),
+        ]);
+        $client->log('loud', 'unknown levels become info');
+        $client->log('info', '   ');
+        $client->flush();
+
+        $this->assertCount(1, $client->requests);
+        $this->assertSame('/v1/logs/batch', $client->requests[0]['path']);
+        [$first, $second] = $client->requests[0]['body']['logs'];
+        $this->assertSame('error', $first['level']);
+        $this->assertSame('billing', $first['service']);
+        $this->assertSame('user_1', $first['distinctId']);
+        $this->assertSame(['provider' => 'stripe'], $first['metadata']);
+        $this->assertSame('RuntimeException', $first['errorDetails']['name']);
+        $this->assertSame('30s', $first['errorDetails']['message']);
+        $this->assertSame('info', $second['level']);
+    }
+
+    public function testFeatureFlagsEvaluateAndTrackExposure(): void
+    {
+        $evaluation = [200, json_encode([
+            'flags' => ['new-payouts' => true, 'beta' => false],
+            'payloads' => ['new-payouts' => ['limit' => 5]],
+        ])];
+        $client = new HttpFakeClient([$evaluation, [202, ''], $evaluation, $evaluation]);
+
+        $this->assertTrue($client->isFeatureEnabled('new-payouts', 'user_1', environment: 'staging'));
+        $this->assertSame('/v1/flags/evaluate', $client->requests[0]['path']);
+        $this->assertSame('user_1', $client->requests[0]['body']['distinctId']);
+        $this->assertSame('/v1/flags/exposure', $client->requests[1]['path']);
+        $this->assertSame('new-payouts', $client->requests[1]['body']['flagKey']);
+        $this->assertTrue($client->requests[1]['body']['enabled']);
+        $this->assertSame('staging', $client->requests[1]['body']['environment']);
+
+        $this->assertSame(['limit' => 5], $client->getFeatureFlagPayload('new-payouts', 'user_1', trackExposure: false));
+        $this->assertSame('off', $client->getFeatureFlagPayload('beta', 'user_1', default: 'off', trackExposure: false));
+        $this->assertCount(4, $client->requests);
+    }
+
+    public function testFlagEvaluationFallsBackToDefaultOnFailure(): void
+    {
+        $client = new HttpFakeClient([[0, ''], [503, 'unavailable']]);
+        $this->assertTrue($client->isFeatureEnabled('anything', 'user_1', default: true, trackExposure: false));
+        $this->assertSame(['flags' => [], 'payloads' => [], 'details' => []], $client->evaluateFlags('user_1'));
     }
 }
