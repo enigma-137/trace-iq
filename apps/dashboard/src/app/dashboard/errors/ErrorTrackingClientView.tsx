@@ -12,25 +12,13 @@ import {
   Film,
   Activity,
   CheckCircle2,
-  ExternalLink,
   Copy,
   Check,
   Search,
   Calendar,
-  Layers,
   Sparkles,
-  ArrowUpRight,
-  ArrowDownRight,
   TrendingUp,
-  Monitor,
-  Globe,
-  SlidersHorizontal,
-  ChevronRight,
-  ChevronDown,
-  Info,
-  Clock,
-  Code2,
-  ListFilter
+  Globe
 } from 'lucide-react';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -178,7 +166,6 @@ export function ErrorTrackingClientView({
   statusFilter,
   counts,
   days,
-  userEmail,
   currentUserId
 }: Props) {
   const router = useRouter();
@@ -186,8 +173,6 @@ export function ErrorTrackingClientView({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
-  const [browserFilter, setBrowserFilter] = useState<string>('All');
-  const [osFilter, setOsFilter] = useState<string>('All');
   const [environment, setEnvironment] = useState<string>('All environments');
   const [activeTab, setActiveTab] = useState<'overview' | 'stack' | 'occurrences' | 'replay'>('overview');
   const [copied, setCopied] = useState(false);
@@ -196,7 +181,6 @@ export function ErrorTrackingClientView({
 
   // Derive top KPIs
   const totalIssuesCount = counts.all || initialIssues.length;
-  const totalOccurrences = initialIssues.reduce((acc, i) => acc + i.occurrences, 0);
   const totalUsersAffected = initialIssues.reduce((acc, i) => acc + i.users, 0);
   const totalSessionsImpacted = initialIssues.reduce((acc, i) => acc + i.sessions, 0);
 

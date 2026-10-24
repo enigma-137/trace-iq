@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { DashboardUser } from '../auth/auth.service';
-import { FunnelResults, FunnelsService } from '../funnels/funnels.service';
+import { FunnelsService } from '../funnels/funnels.service';
 import { appConfig } from '../../config/app.config';
 import { DatabaseService } from '../../database/database.service';
 import { EntitlementService } from '../billing/entitlement.service';

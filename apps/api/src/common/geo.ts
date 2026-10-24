@@ -68,7 +68,7 @@ function getGeoip(): { lookup(ip: string): GeoLookupRecord | null } | null {
     geoipTried = true;
     try {
       // Optional dependency — bundled offline GeoLite2 DB. Skipped if not installed.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded lazily so a missing module is caught
       geoip = require('geoip-lite');
     } catch {
       geoip = null;

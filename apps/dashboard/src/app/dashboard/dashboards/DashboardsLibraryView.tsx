@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { withProjectId } from '../nav';
 import {
   fetchDashboards,
@@ -19,14 +18,12 @@ import { toast } from '@/lib/toast';
 
 export function DashboardsLibraryView({
   projectId,
-  initialDashboards,
-  userId
+  initialDashboards
 }: {
   projectId?: string;
   initialDashboards: DashboardView[];
   userId: string;
 }) {
-  const router = useRouter();
   const [dashboards, setDashboards] = useState<DashboardView[]>(initialDashboards);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');

@@ -18,8 +18,6 @@ export function ProjectIdBadge({ projectId }: { projectId: string }) {
     }
   };
 
-  const shortId = projectId.length > 20 ? `${projectId.slice(0, 10)}...${projectId.slice(-6)}` : projectId;
-
   return (
     <button
       type="button"

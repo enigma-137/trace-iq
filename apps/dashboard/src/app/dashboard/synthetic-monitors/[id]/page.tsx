@@ -5,7 +5,7 @@ import type { SyntheticMonitor, SyntheticRun } from '@traceiq/types';
 
 export const dynamic = 'force-dynamic';
 
-interface MonitorDetailResponse extends SyntheticMonitor {}
+type MonitorDetailResponse = SyntheticMonitor;
 
 interface RunsResponse {
   runs: SyntheticRun[];

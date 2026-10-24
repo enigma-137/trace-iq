@@ -32,7 +32,6 @@ export function ObservabilityApp({
   initialHistogram,
   initialHasMore,
   projectId,
-  project,
   initialFilters,
   initialSelectedLog
 }: ObservabilityAppProps) {

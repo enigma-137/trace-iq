@@ -1,16 +1,12 @@
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import type {
-  SavedInsightView,
   CreateInsightPayload,
   UpdateInsightPayload,
   ExecuteInsightQueryPayload,
-  DashboardView,
-  DashboardWidgetView,
   CreateDashboardPayload,
   UpdateDashboardPayload,
   AddWidgetPayload,
-  UpdateWidgetPayload,
-  DashboardTemplateDefinition
+  UpdateWidgetPayload
 } from '@/types/analytics';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -54,7 +50,9 @@ export async function clientFetch<T>(
       try {
         const errJson = await res.json();
         message = errJson.message || errJson.error || message;
-      } catch {}
+      } catch {
+        // Non-JSON error body; keep the status-based message.
+      }
       return { data: null, error: message };
     }
 

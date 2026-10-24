@@ -2,11 +2,6 @@
 
 import { useId, useRef, useState } from 'react';
 
-interface BarChartItem {
-  label: string;
-  value: number;
-}
-
 interface BarChartProps {
   items: Array<{ label: string; value: number }>;
   height?: number;

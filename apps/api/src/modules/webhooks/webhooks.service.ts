@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -694,7 +694,7 @@ export class WebhooksService implements OnModuleDestroy {
     let ok = false;
     let statusCode: number | null = null;
     let error: string | null = null;
-    let responseHeaders: Record<string, string> = {};
+    const responseHeaders: Record<string, string> = {};
     let responseBody: string | null = null;
 
     const timestampIso = new Date().toISOString();

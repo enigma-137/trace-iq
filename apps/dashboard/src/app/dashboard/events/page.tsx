@@ -152,7 +152,6 @@ function buildOverview(events: RecentEvent[]) {
   const typeCounts = new Map<string, number>();
   const deviceCounts = new Map<string, number>();
   const userCounts = new Map<string, number>();
-  const now = Date.now();
 
   for (const event of events) {
     const hour = hourOf(event);

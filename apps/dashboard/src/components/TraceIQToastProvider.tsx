@@ -42,7 +42,6 @@ export function TraceIQToastProvider({ children }: { children: ReactNode }) {
 
 function ToastItem({ toastItem }: { toastItem: TraceIQToast }) {
   const style = TONE_STYLES[toastItem.tone];
-  const Icon = style.icon;
 
   return (
     <article

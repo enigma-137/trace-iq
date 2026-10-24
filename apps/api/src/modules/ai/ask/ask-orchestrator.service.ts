@@ -220,7 +220,6 @@ export class AskOrchestratorService {
     // Final synthesis call if needed
     if (!finalContent) {
       onProgress?.({ step: 'Finalizing investigation findings', status: 'running' });
-      const startTime = Date.now();
       const finalResponse = await this.provider.chat({
         model,
         messages,

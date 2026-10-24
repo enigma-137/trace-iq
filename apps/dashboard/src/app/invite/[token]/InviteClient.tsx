@@ -35,7 +35,6 @@ export function InviteClient({ token }: { token: string }) {
   const [invite, setInvite] = useState<ValidInvite | null>(null);
   const [invalidReason, setInvalidReason] = useState<string | null>(null);
   const [signedOut, setSignedOut] = useState(false);
-  const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +69,6 @@ export function InviteClient({ token }: { token: string }) {
           return;
         }
 
-        setAccepting(true);
         const response = await fetch(`${apiBaseUrl}/v1/organization/invites/accept`, {
           method: 'POST',
           headers: {
@@ -97,10 +95,6 @@ export function InviteClient({ token }: { token: string }) {
       } catch {
         if (!cancelled) {
           setInvalidReason(INVALID_LABELS['not-found']);
-        }
-      } finally {
-        if (!cancelled) {
-          setAccepting(false);
         }
       }
     }

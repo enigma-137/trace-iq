@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DashboardsService, DASHBOARD_TEMPLATES } from './dashboards.service';
+import { DashboardsService } from './dashboards.service';
 
 describe('DashboardsService', () => {
   let service: DashboardsService;

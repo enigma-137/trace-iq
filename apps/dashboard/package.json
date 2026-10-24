@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "next lint",
+    "lint": "eslint src tests e2e",
     "typecheck": "tsc --noEmit",
     "generate:world-map": "node scripts/generate-world-map.mjs",
     "test": "vitest run",
@@ -44,6 +44,9 @@
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
+    "@eslint/compat": "^2.1.1",
+    "@eslint/js": "^9.39.5",
+    "@next/eslint-plugin-next": "^14.2.35",
     "@playwright/test": "^1.63.0",
     "@types/earcut": "^3.0.0",
     "@types/node": "^20.14.12",
@@ -52,9 +55,13 @@
     "@types/three": "^0.185.4",
     "@types/topojson-client": "^3.1.5",
     "autoprefixer": "^10.4.19",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.13.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.72.0",
     "vitest": "^3.2.7"
   }
 }

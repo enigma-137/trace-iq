@@ -27,6 +27,8 @@ jobs:
         run: npm ci --legacy-peer-deps
       - name: Typecheck
         run: npm run typecheck
+      - name: Lint
+        run: npm run lint
       - name: Install Chromium for API synthetic tests
         run: npm exec --workspace=@traceiq/api -- playwright install --with-deps chromium
       - name: Test API
@@ -35,6 +37,16 @@ jobs:
         run: npm test --workspace=@traceiq/dashboard
       - name: Test CLI
         run: npm test --workspace=traceiq-cli
+      - name: Test browser SDK
+        run: npm test --workspace=traceiq-sdk-js
+      - name: Test Node SDK
+        run: npm test --workspace=traceiq-node
+      - name: Test React Native SDK
+        run: npm test --workspace=traceiq-react-native
+      - name: Test MCP server
+        run: npm test --workspace=traceiq-mcp-server
+      - name: Test GitHub Action
+        run: npm test --workspace=@traceiq/github-action
       - name: Build
         run: npm run build
         # Placeholders so `next build` can prerender pages that construct a
@@ -94,3 +106,91 @@ jobs:
         run: composer install --no-interaction --prefer-dist
       - name: Test
         run: composer test
+
+  python:
+    name: Python SDK checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    defaults:
+      run:
+        working-directory: sdks/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: pip install .
+      - name: Test
+        run: python -m unittest discover -s tests -v
+
+  rust:
+    name: Rust SDK checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: sdks/rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sdks/rust
+      - name: Test
+        run: cargo test --locked
+
+  kotlin:
+    name: Kotlin SDK checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: sdks/kotlin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+      # The SDK has no Gradle wrapper, so pin the Gradle version here.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: Build
+        run: gradle build --no-daemon
+
+  swift:
+    name: Swift SDK checks
+    runs-on: macos-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: sdks/swift
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+
+  flutter:
+    name: Flutter SDK checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/sdk-flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test

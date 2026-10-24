@@ -15,8 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '../auth/auth.service';
 import {
   LogsQuery,
-  ObservabilityService,
-  ObservabilityLogEntry
+  ObservabilityService
 } from './observability.service';
 
 export interface IngestLogDto {

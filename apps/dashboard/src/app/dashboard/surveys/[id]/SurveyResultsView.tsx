@@ -24,7 +24,7 @@ export function SurveyResultsView({
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [survey, setSurvey] = useState<Survey>(initialSurvey);
-  const [results, setResults] = useState<SurveyResults>(initialResults);
+  const [results] = useState<SurveyResults>(initialResults);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'responses'>('summary');
 

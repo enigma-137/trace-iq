@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { DashboardDialog } from '@/app/dashboard/DashboardDialog';
 import { fetchDashboards, createDashboard, addDashboardWidget } from '@/lib/analytics-api';
 import type { DashboardView, InsightType, VisualizationType } from '@/types/analytics';
@@ -37,7 +36,6 @@ export function AddToDashboardModal({
   newInsightPayload,
   onSuccess
 }: AddToDashboardModalProps) {
-  const router = useRouter();
   const [dashboards, setDashboards] = useState<DashboardView[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);

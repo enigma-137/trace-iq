@@ -7,7 +7,7 @@ import { BarChart } from './BarChart';
 import { DonutChart } from './DonutChart';
 import { FunnelChart } from './FunnelChart';
 import type { InsightType, VisualizationType, InsightVisualizationConfig } from '../../types/analytics';
-import { compactNumber, formatCount } from '../../lib/metrics';
+import { compactNumber } from '../../lib/metrics';
 
 export interface InsightChartRendererProps {
   type?: InsightType;
@@ -570,9 +570,7 @@ export function InsightChartRenderer({
 
 // Area Chart helper component
 function AreaChart({
-  buckets,
   series,
-  interval,
   height = 240
 }: {
   buckets: string[];

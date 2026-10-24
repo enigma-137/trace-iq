@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { SetupWizard } from '../SetupWizard';
 import { EmptyState } from '@/components/EmptyState';

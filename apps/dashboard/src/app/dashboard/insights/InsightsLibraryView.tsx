@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { withProjectId } from '../nav';
 import {
   fetchInsights,
@@ -54,7 +53,6 @@ export function InsightsLibraryView({
   projectId?: string;
   initialInsights: SavedInsightView[];
 }) {
-  const router = useRouter();
   const [insights, setInsights] = useState<SavedInsightView[]>(initialInsights);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');

@@ -10,28 +10,14 @@ import {
   UserPlus,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   Download,
   Calendar,
-  Settings,
-  MoreVertical,
   Activity,
-  Layers,
   Film,
-  Globe,
-  ExternalLink,
   ChevronRight,
   ChevronLeft,
-  X,
   Copy,
-  Check,
-  CheckCircle2,
-  MousePointer,
-  Eye,
-  KeyRound,
-  Sparkles,
-  ArrowUpRight,
-  Tag
+  Check
 } from 'lucide-react';
 
 export interface PersonItem {
@@ -178,7 +164,6 @@ export function UsersClientView({
   offset,
   searchParam,
   segment,
-  userEmail,
   projectId
 }: Props) {
   const router = useRouter();

@@ -49,7 +49,7 @@ export function VolumeDistributionTile({
   const circumference = 2 * Math.PI * r;
 
   let offset = 0;
-  const segments = items.map((item, i) => {
+  const segments = items.map((item) => {
     const dash = (item.count / total) * circumference;
     const pct = Math.round((item.count / total) * 100);
     const seg = { ...item, dash, offset, pct };
