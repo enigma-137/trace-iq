@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TraceIQ promo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=IBM+Plex+Mono:wght@400;500&display=block" rel="stylesheet">
+<style>
+  /*
+    The whole video is this page. render(t) in the script below draws the frame
+    at time t (seconds); render.mjs steps t at 30 fps and screenshots each frame.
+    Open the page in a browser with #preview to watch it play in real time.
+  */
+  :root {
+    --bg: #050505;
+    --blue: #3b82f6;
+    --blue-deep: #245beb;
+    --orange: #ee8034;
+    --green: #4ade80;
+    --red: #f87171;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --dim: #52525b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  body { font-family: 'DM Sans', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  .scene { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
+
+  /* Backdrops */
+  .bg-dark { background: radial-gradient(1200px 700px at 50% 35%, #0f1a33 0%, #070a12 55%, #050505 100%); }
+  .bg-warm {
+    background:
+      radial-gradient(900px 600px at 15% 10%, rgba(59,130,246,.55), transparent 60%),
+      radial-gradient(900px 700px at 90% 100%, rgba(238,128,52,.55), transparent 60%),
+      linear-gradient(160deg, #1d3a7a 0%, #33508f 35%, #b8875a 80%, #e3a25f 100%);
+  }
+  .bg-ink { background: radial-gradient(1000px 600px at 50% 0%, #131a2e 0%, #07080d 60%, #050505 100%); }
+
+  .headline {
+    position: absolute; left: 0; right: 0; top: 92px; text-align: center;
+    font-size: 58px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;
+  }
+  .headline .w { display: inline-block; margin: 0 0.12em; will-change: filter, opacity, transform; }
+  .accent { color: #8fb4ff; }
+  .bg-warm .accent { color: #dbe7ff; }
+
+  /* Browser window around real dashboard screenshots */
+  .window {
+    position: absolute; border-radius: 18px; overflow: hidden; background: #0a0a0a;
+    box-shadow: 0 50px 120px -20px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.08);
+    transform-origin: 50% 0%;
+  }
+  .window .bar {
+    height: 44px; display: flex; align-items: center; gap: 9px; padding: 0 18px;
+    background: #141414; border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .window .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .window .url {
+    margin-left: 18px; flex: 1; max-width: 560px; height: 26px; border-radius: 7px; background: #1f1f1f;
+    color: #8b8b93; font: 500 14px 'DM Sans'; display: flex; align-items: center; padding-left: 14px;
+  }
+  .window .shot { display: block; width: 100%; }
+  .window .viewport { overflow: hidden; position: relative; }
+
+  /* Terminal and editor */
+  .term {
+    position: absolute; border-radius: 16px; background: rgba(12,13,18,.92);
+    box-shadow: 0 40px 100px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.08);
+    overflow: hidden;
+  }
+  .term .bar { height: 42px; display: flex; align-items: center; gap: 9px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .term .title { flex: 1; text-align: center; margin-right: 60px; color: #6b6b75; font: 400 14px 'IBM Plex Mono'; }
+  .term .body { padding: 26px 34px; font: 400 23px/1.6 'IBM Plex Mono'; white-space: pre; color: #d4d4d8; }
+  .caret { display: inline-block; width: 12px; height: 26px; background: #8fb4ff; vertical-align: -5px; margin-left: 2px; }
+  .ok { color: var(--green); } .diamond { color: #67e8f9; } .warn { color: #facc15; } .dim { color: #71717a; } .add { color: var(--green); } .mod { color: #facc15; }
+
+  .code .ln { display: inline-block; width: 44px; color: #3f3f46; text-align: right; margin-right: 28px; }
+  .tk-k { color: #c084fc; } .tk-s { color: #86efac; } .tk-f { color: #93c5fd; } .tk-p { color: #fda4af; } .tk-c { color: #52525b; }
+
+  /* SDK cards */
+  .cards { position: absolute; left: 0; right: 0; top: 300px; display: grid; grid-template-columns: repeat(5, 300px); gap: 26px; justify-content: center; }
+  .card {
+    height: 180px; border-radius: 18px; background: #0d0f15; padding: 24px 26px; position: relative;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.07);
+  }
+  .card .tag { font: 500 13px 'IBM Plex Mono'; letter-spacing: .18em; color: #8b8fa3; }
+  .card .live { position: absolute; right: 24px; top: 28px; width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green); }
+  .card .name { font-size: 36px; font-weight: 700; margin-top: 30px; letter-spacing: -0.01em; }
+  .card .cmd { font: 400 16px 'IBM Plex Mono'; color: #86efac; margin-top: 12px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 999px;
+    background: rgba(255,255,255,.06); box-shadow: 0 0 0 1px rgba(255,255,255,.1); font-size: 22px; font-weight: 500; color: #e4e4e7;
+  }
+  .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- 1. Intro -->
+<section class="scene bg-dark" id="s-intro">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+    <img id="intro-logo" src="public/logo.png" style="width:150px;height:150px;margin-bottom:6px">
+    <div id="intro-kicker" class="mono" style="font-size:20px;letter-spacing:.5em;color:#8b8fa3;margin-bottom:22px;padding-left:.5em">INTRODUCING</div>
+    <div id="intro-title" style="font-size:150px;font-weight:800;letter-spacing:-0.045em;line-height:1">TraceIQ</div>
+    <div class="mono" style="font-size:44px;margin-top:34px;color:#a1a1aa;height:60px">for <span id="intro-type" style="color:#8fb4ff"></span><span class="caret" id="intro-caret" style="height:40px;width:4px;vertical-align:-6px"></span></div>
+  </div>
+</section>
+
+<!-- 2. Overview -->
+<section class="scene bg-warm" id="s-overview">
+  <div class="headline" data-words="Every signal about your product, *in *one *place."></div>
+  <div class="window" id="w-overview" style="left:210px;top:240px;width:1500px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard</span></div>
+    <div class="viewport" style="height:940px"><img class="shot" src="public/shots/overview.png"></div>
+  </div>
+</section>
+
+<!-- 3. CLI setup -->
+<section class="scene bg-ink" id="s-cli">
+  <div class="headline" data-words="Set up in *one *command."></div>
+  <div class="term" style="left:360px;top:250px;width:1200px;height:700px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="title">~/acme</span></div>
+    <div class="body" id="cli-body"></div>
+  </div>
+</section>
+
+<!-- 4. SDK code -->
+<section class="scene bg-ink" id="s-code">
+  <div class="headline" data-words="Or add the SDK in *a *few *lines."></div>
+  <div class="term code" style="left:300px;top:250px;width:1320px;height:640px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="title">lib/traceiq.ts</span></div>
+    <div class="body" id="code-body" style="font-size:24px;line-height:1.75"></div>
+  </div>
+</section>
+
+<!-- 5. Web analytics -->
+<section class="scene bg-warm" id="s-web">
+  <div class="headline" data-words="Watch real users *arrive."></div>
+  <div class="window" id="w-web" style="left:210px;top:240px;width:1500px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard/web</span></div>
+    <div class="viewport" style="height:940px"><img class="shot" src="public/shots/web.png"></div>
+  </div>
+</section>
+
+<!-- 6. Funnel -->
+<section class="scene bg-warm" id="s-funnel">
+  <div class="headline" data-words="See exactly where they *drop *off."></div>
+  <div class="window" id="w-funnel" style="left:210px;top:240px;width:1500px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard/funnels</span></div>
+    <div class="viewport" style="height:940px"><img class="shot" src="public/shots/funnel.png"></div>
+  </div>
+</section>
+
+<!-- 7. Retention -->
+<section class="scene bg-warm" id="s-retention">
+  <div class="headline" data-words="And who keeps *coming *back."></div>
+  <div class="window" id="w-retention" style="left:210px;top:240px;width:1500px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard/retention</span></div>
+    <div class="viewport" style="height:940px"><img class="shot" src="public/shots/retention.png"></div>
+  </div>
+</section>
+
+<!-- 8. Errors -->
+<section class="scene bg-ink" id="s-errors">
+  <div class="headline" data-words="Errors, grouped by *stack *trace."></div>
+  <div class="window" id="w-errors" style="left:210px;top:240px;width:1500px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard/errors</span></div>
+    <div class="viewport" style="height:940px"><img class="shot" src="public/shots/errors.png"></div>
+  </div>
+</section>
+
+<!-- 9. Logs + API performance -->
+<section class="scene bg-warm" id="s-logs">
+  <div class="headline" data-words="Logs and latency, tied to *every *session."></div>
+  <div class="window" id="w-logs" style="left:150px;top:250px;width:1300px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard/logs</span></div>
+    <div class="viewport" style="height:812px"><img class="shot" src="public/shots/logs.png"></div>
+  </div>
+  <div class="window" id="w-api" style="left:470px;top:330px;width:1300px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">traceiq.run/dashboard/api-performance</span></div>
+    <div class="viewport" style="height:812px"><img class="shot" src="public/shots/api-performance.png"></div>
+  </div>
+</section>
+
+<!-- 10. SDKs -->
+<section class="scene bg-dark" id="s-sdks">
+  <div class="headline" data-words="Every platform *you *ship *on."></div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<!-- 11. Self-host -->
+<section class="scene bg-ink" id="s-selfhost">
+  <div class="headline" data-words="Open source. *Self-host *in *one *command."></div>
+  <div class="term" style="left:260px;top:280px;width:1400px;height:330px">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="title">~</span></div>
+    <div class="body" id="host-body" style="font-size:24px"></div>
+  </div>
+  <div id="host-pills" style="position:absolute;left:0;right:0;top:680px;display:flex;justify-content:center;gap:22px">
+    <span class="pill"><i></i>MIT licensed</span>
+    <span class="pill"><i></i>Your data, your servers</span>
+    <span class="pill"><i></i>No account needed locally</span>
+  </div>
+</section>
+
+<!-- 12. Outro -->
+<section class="scene bg-dark" id="s-outro">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <div id="outro-mark" style="display:flex;align-items:center;gap:8px">
+      <img src="public/logo.png" style="width:170px;height:170px">
+      <span style="font-size:120px;font-weight:800;letter-spacing:-0.045em">TraceIQ</span>
+    </div>
+    <div id="outro-tag" style="font-size:34px;color:#a1a1aa;margin-top:10px">Open-source product analytics and observability.</div>
+    <div id="outro-url" class="mono" style="font-size:30px;color:#8fb4ff;margin-top:44px">traceiq.run</div>
+  </div>
+</section>
+
+<div id="fade" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none"></div>
+
+<script>
+const DURATION = 60;
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const outCubic = (p) => 1 - Math.pow(1 - p, 3);
+const inOutCubic = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const outBack = (p) => 1 + 2.2 * Math.pow(p - 1, 3) + 1.2 * Math.pow(p - 1, 2);
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// Scene timings: cuts land on 5 s boundaries, which are downbeats in the music.
+const SCENES = [
+  ['s-intro', 0, 5], ['s-overview', 5, 10], ['s-cli', 10, 15], ['s-code', 15, 20],
+  ['s-web', 20, 25], ['s-funnel', 25, 30], ['s-retention', 30, 35], ['s-errors', 35, 40],
+  ['s-logs', 40, 45], ['s-sdks', 45, 50], ['s-selfhost', 50, 55], ['s-outro', 55, 60]
+];
+const XFADE = 0.35;
+
+// Headlines: words marked * are accented. Each word blurs in, staggered.
+for (const h of document.querySelectorAll('.headline')) {
+  h.innerHTML = h.dataset.words.split(' ').map((w) =>
+    `<span class="w${w.startsWith('*') ? ' accent' : ''}">${esc(w.replace(/^\*/, ''))}</span>`).join('');
+}
+function headline(scene, lt) {
+  const words = scene.querySelectorAll('.headline .w');
+  words.forEach((w, i) => {
+    const p = outCubic(prog(lt, 0.15 + i * 0.07, 0.75 + i * 0.07));
+    w.style.opacity = p;
+    w.style.filter = `blur(${(1 - p) * 14}px)`;
+    w.style.transform = `translateY(${(1 - p) * 18}px)`;
+  });
+}
+
+// A dashboard window rising into place, then drifting slowly.
+function windowIn(el, lt, { from = 140, zoom = 0.035, pan = 0, tilt = 10 } = {}) {
+  const p = outCubic(prog(lt, -0.3, 1.1));
+  const drift = prog(lt, -0.3, 5);
+  el.style.opacity = clamp(p * 1.6);
+  el.style.transform =
+    `perspective(2200px) translateY(${(1 - p) * from}px) rotateX(${(1 - p) * tilt}deg) scale(${0.94 + 0.06 * p + zoom * drift})`;
+  const shot = el.querySelector('.shot');
+  if (shot && pan) shot.style.transform = `translateY(${-pan * inOutCubic(prog(lt, 1.6, 4.8))}px)`;
+}
+
+// --- 1. Intro ---------------------------------------------------------------
+const INTRO_WORDS = ['your web app', 'your mobile app', 'your API', 'your whole team'];
+function intro(lt) {
+  const lp = outBack(prog(lt, 0.1, 0.9));
+  $('intro-logo').style.transform = `scale(${0.6 + 0.4 * lp})`;
+  $('intro-logo').style.opacity = prog(lt, 0.1, 0.5);
+  const kp = outCubic(prog(lt, 0.35, 1.0));
+  $('intro-kicker').style.opacity = kp;
+  $('intro-kicker').style.letterSpacing = `${0.8 - 0.3 * kp}em`;
+  const tp = outCubic(prog(lt, 0.5, 1.2));
+  $('intro-title').style.opacity = tp;
+  $('intro-title').style.filter = `blur(${(1 - tp) * 18}px)`;
+  $('intro-title').style.transform = `translateY(${(1 - tp) * 24}px)`;
+  // Type, hold, delete each phrase; the last one stays.
+  const slot = 0.9, start = 1.25;
+  const i = clamp(Math.floor((lt - start) / slot), 0, INTRO_WORDS.length - 1);
+  const word = INTRO_WORDS[i];
+  const local = lt - start - i * slot;
+  let n = 0;
+  if (lt >= start) {
+    const typeT = word.length * 0.035;
+    if (local < typeT) n = Math.floor(local / 0.035);
+    else if (i === INTRO_WORDS.length - 1 || local < slot - word.length * 0.018) n = word.length;
+    else n = Math.max(0, word.length - Math.floor((local - (slot - word.length * 0.018)) / 0.018));
+  }
+  $('intro-type').textContent = word.slice(0, n);
+  $('intro-caret').style.opacity = Math.floor(lt * 2.4) % 2 === 0 ? 1 : 0.15;
+}
+
+// --- 3. CLI (output copied from a real `npx traceiq-cli` run) ----------------
+const CLI_LINES = [
+  [0.0, '<span class="dim">$</span> '],
+  [1.35, '\n  <span class="diamond">◆</span>  <b>TraceIQ Setup</b>'],
+  [1.45, '\n     <span class="dim">Let\'s connect this project.</span>\n'],
+  [1.75, '\n  <span class="ok">✓</span> Project detected: acme'],
+  [1.95, '\n  <span class="ok">✓</span> Framework: Next.js (App Router)'],
+  [2.15, '\n  <span class="ok">✓</span> Package manager: npm'],
+  [2.55, '\n  <span class="ok">✓</span> TraceIQ configured successfully.'],
+  [2.85, '\n    <span class="add">+</span> lib/traceiq.ts'],
+  [2.95, '\n    <span class="add">+</span> components/traceiq-provider.tsx'],
+  [3.05, '\n    <span class="add">+</span> .env.local'],
+  [3.15, '\n    <span class="mod">~</span> app/layout.tsx'],
+  [3.45, '\n  <span class="dim">•</span> Waiting for your first event...'],
+];
+const CLI_CMD = 'npx traceiq-cli';
+function cli(lt) {
+  let html = '';
+  for (const [at, line] of CLI_LINES) if (lt >= at + 0.2) html += line;
+  if (lt >= 0.2) {
+    const n = clamp(Math.floor((lt - 0.45) / 0.055), 0, CLI_CMD.length);
+    html = html.replace('<span class="dim">$</span> ', `<span class="dim">$</span> <b>${CLI_CMD.slice(0, n)}</b>`);
+  }
+  if (lt >= 4.25) html = html.replace('<span class="dim">•</span> Waiting for your first event...', '<span class="ok">✓ Event received!</span>');
+  const caret = Math.floor(lt * 2.4) % 2 === 0 && lt < 1.5 ? '<span class="caret"></span>' : '';
+  $('cli-body').innerHTML = html + caret;
+}
+
+// --- 4. Code ------------------------------------------------------------------
+const CODE = [
+  [['k', 'import'], ['', ' { traceiq } '], ['k', 'from'], ['s', " 'traceiq-sdk-js'"], ['', ';']],
+  [],
+  [['', 'traceiq.'], ['f', 'initialize'], ['', '({']],
+  [['p', '  projectId'], ['', ': process.env.NEXT_PUBLIC_TRACEIQ_PROJECT_ID,']],
+  [['p', '  writeKey'], ['', ': process.env.NEXT_PUBLIC_TRACEIQ_WRITE_KEY,']],
+  [['p', '  autoTrackPageViews'], ['', ': '], ['k', 'true'], ['', ',']],
+  [['', '});']],
+  [],
+  [['', 'traceiq.'], ['f', 'identify'], ['', '({ '], ['p', 'userId'], ['', ': user.id, '], ['p', 'traits'], ['', ': { '], ['p', 'plan'], ['', ': '], ['s', "'pro'"], ['', ' } });']],
+  [['', 'traceiq.'], ['f', 'track'], ['', '('], ['s', "'signup_completed'"], ['', ', { '], ['p', 'plan'], ['', ': '], ['s', "'pro'"], ['', ' });']]
+];
+const CODE_LEN = CODE.reduce((sum, line) => sum + line.reduce((s, [, txt]) => s + txt.length, 0) + 1, 0);
+function code(lt) {
+  let budget = Math.floor(CODE_LEN * prog(lt, 0.5, 4.2));
+  let caretShown = false;
+  const blink = Math.floor(lt * 2.4) % 2 === 0;
+  const out = CODE.map((line, i) => {
+    let html = '';
+    for (const [cls, txt] of line) {
+      if (budget <= 0) break;
+      const part = txt.slice(0, budget);
+      budget -= part.length;
+      html += cls ? `<span class="tk-${cls}">${esc(part)}</span>` : esc(part);
+    }
+    // The caret sits where typing has got to, or blinks on the last line once done.
+    let caret = '';
+    if (!caretShown && (budget <= 0 || i === CODE.length - 1)) {
+      caretShown = true;
+      if (budget <= 0 || blink) caret = '<span class="caret"></span>';
+    }
+    budget -= 1;
+    return `<span class="ln">${i + 1}</span>${html}${caret}`;
+  });
+  $('code-body').innerHTML = out.join('\n');
+}
+
+// --- 10. SDK cards --------------------------------------------------------------
+const SDKS = [
+  ['JavaScript', 'npm i traceiq-sdk-js'], ['Next.js', 'npx traceiq-cli'], ['React Native', 'traceiq-react-native'],
+  ['Flutter', 'traceiq_flutter'], ['Swift', 'Swift Package'], ['Kotlin', 'Android'],
+  ['Node.js', 'npm i traceiq-node'], ['Python', 'pip install traceiq-py'], ['Rust', 'cargo add traceiq'], ['PHP', 'composer']
+];
+$('cards').innerHTML = SDKS.map(([name, cmd]) =>
+  `<div class="card"><div class="tag">AVAILABLE</div><span class="live"></span><div class="name">${name}</div><div class="cmd">${esc(cmd)}</div></div>`).join('');
+function sdks(lt) {
+  document.querySelectorAll('.card').forEach((c, i) => {
+    const p = outBack(prog(lt, 0.45 + i * 0.09, 1.05 + i * 0.09));
+    c.style.opacity = clamp(prog(lt, 0.45 + i * 0.09, 0.8 + i * 0.09));
+    c.style.transform = `translateY(${(1 - p) * 60}px) scale(${0.9 + 0.1 * p})`;
+  });
+}
+
+// --- 11. Self-host ------------------------------------------------------------
+const HOST_CMD = ['git clone https://github.com/enigma-137/trace-iq.git && cd trace-iq', 'docker compose -f compose.local.yml up -d'];
+function selfhost(lt) {
+  const a = clamp(Math.floor((lt - 0.5) / 0.022), 0, HOST_CMD[0].length);
+  const b = clamp(Math.floor((lt - 2.2) / 0.03), 0, HOST_CMD[1].length);
+  let html = `<span class="dim">$</span> ${esc(HOST_CMD[0].slice(0, a))}`;
+  if (lt >= 2.1) html += `\n<span class="dim">$</span> ${esc(HOST_CMD[1].slice(0, b))}`;
+  if (lt >= 3.6) html += `\n\n<span class="ok">✓</span> Dashboard ready at <span style="color:#8fb4ff">http://localhost:3000</span>`;
+  $('host-body').innerHTML = html;
+  const pills = $('host-pills').children;
+  for (let i = 0; i < pills.length; i++) {
+    const p = outCubic(prog(lt, 3.8 + i * 0.15, 4.4 + i * 0.15));
+    pills[i].style.opacity = p;
+    pills[i].style.transform = `translateY(${(1 - p) * 20}px)`;
+  }
+}
+
+// --- 12. Outro ----------------------------------------------------------------
+function outro(lt) {
+  const m = outCubic(prog(lt, 0.2, 1.1));
+  $('outro-mark').style.opacity = m;
+  $('outro-mark').style.filter = `blur(${(1 - m) * 16}px)`;
+  $('outro-mark').style.transform = `scale(${0.92 + 0.08 * m})`;
+  const g = outCubic(prog(lt, 0.9, 1.6));
+  $('outro-tag').style.opacity = g;
+  $('outro-tag').style.transform = `translateY(${(1 - g) * 14}px)`;
+  const u = outCubic(prog(lt, 1.4, 2.1));
+  $('outro-url').style.opacity = u;
+}
+
+const DRAW = {
+  's-intro': intro,
+  's-overview': (lt) => windowIn($('w-overview'), lt, { zoom: 0.03 }),
+  's-cli': cli,
+  's-code': code,
+  's-web': (lt) => windowIn($('w-web'), lt, { pan: 120 }),
+  's-funnel': (lt) => windowIn($('w-funnel'), lt, { pan: 60, zoom: 0.04 }),
+  's-retention': (lt) => windowIn($('w-retention'), lt, { pan: 150 }),
+  's-errors': (lt) => windowIn($('w-errors'), lt, { pan: 100 }),
+  's-logs': (lt) => {
+    windowIn($('w-logs'), lt, { zoom: 0.02 });
+    windowIn($('w-api'), lt - 0.45, { from: 220, zoom: 0.02 });
+  },
+  's-sdks': sdks,
+  's-selfhost': selfhost,
+  's-outro': outro
+};
+
+function render(t) {
+  for (const [id, a, b] of SCENES) {
+    const el = $(id);
+    const visible = t >= a - XFADE && t < b + XFADE;
+    if (!visible) { el.style.opacity = 0; el.style.display = 'none'; continue; }
+    el.style.display = 'block';
+    // Each scene fades in over the tail of the previous one.
+    el.style.opacity = a === 0 ? 1 : clamp((t - a + XFADE) / XFADE);
+    el.style.zIndex = Math.round(a);
+    const lt = t - a;
+    DRAW[id](lt);
+    if (el.querySelector('.headline')) headline(el, lt);
+  }
+  $('fade').style.opacity = prog(t, DURATION - 0.8, DURATION) + (1 - prog(t, 0, 0.4));
+}
+
+window.DURATION = DURATION;
+window.render = render;
+window.ready = Promise.all([
+  document.fonts.ready,
+  ...[...document.images].map((img) => img.decode().catch(() => {}))
+]);
+
+if (location.hash === '#preview') {
+  const t0 = performance.now();
+  const tick = () => { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(tick); };
+  window.ready.then(tick);
+} else {
+  render(0);
+}
+</script>
+</body>
+</html>
