@@ -35,6 +35,10 @@ jobs:
         run: npm test --workspace=@traceiq/api
       - name: Test dashboard
         run: npm test --workspace=@traceiq/dashboard
+      # The CLI's Next.js fixture test imports the workspace traceiq-sdk-js,
+      # whose entry point is its built dist/.
+      - name: Build browser SDK
+        run: npm run build --workspace=traceiq-sdk-js
       - name: Test CLI
         run: npm test --workspace=traceiq-cli
       - name: Test browser SDK
