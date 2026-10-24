@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/widgets.dart';
 
 import '../traceiq_flutter.dart';
-import 'replay.dart';
 
 /// Wrap a screen after TraceIQ.initialize. Only opted-in ReplayRegions appear
 /// in the replay; text, widget properties, and images are never inspected.

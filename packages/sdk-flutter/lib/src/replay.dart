@@ -108,7 +108,9 @@ final class MobileReplayRecorder {
     final rate = settings?['sampleRate'];
     if (epoch != _epoch || !_consent || settings?['enabled'] != true || triggers is! List<Object?> ||
         !triggers.contains(event.eventName) || rate is! num ||
-        !sampleMobileReplaySession(event.sessionId, rate.toDouble()) || _authorizing || !_foreground) return;
+        !sampleMobileReplaySession(event.sessionId, rate.toDouble()) || _authorizing || !_foreground) {
+      return;
+    }
     _authorizing = true;
     try {
       final grant = await _transport.authorize(_grantBody(event));
@@ -135,7 +137,9 @@ final class MobileReplayRecorder {
 
   void snapshot(String screen, Size viewport, List<TraceIQReplayNode> nodes) {
     if (!isRecording || !_screenPattern.hasMatch(screen) || nodes.length > 2000 ||
-        !_dimension(viewport.width) || !_dimension(viewport.height)) return;
+        !_dimension(viewport.width) || !_dimension(viewport.height)) {
+      return;
+    }
     final seen = <int>{};
     final clean = <Map<String, Object?>>[];
     for (final node in nodes) {
@@ -160,9 +164,11 @@ final class MobileReplayRecorder {
   void clearView() => _snapshot = null;
 
   void tap(Offset point) {
-    if (_safePoint(point)) _append(<String, Object?>{
-      'type': 'tap', 'timestamp': _timestamp(), 'x': point.dx, 'y': point.dy,
-    });
+    if (_safePoint(point)) {
+      _append(<String, Object?>{
+        'type': 'tap', 'timestamp': _timestamp(), 'x': point.dx, 'y': point.dy,
+      });
+    }
   }
 
   void scroll(Offset point, Offset delta) {
@@ -234,9 +240,11 @@ final class MobileReplayRecorder {
     if (identity == null) return;
     try {
       final token = await _freshToken(_epoch);
-      if (token != null) await _transport.complete(<String, Object?>{
-        ..._identityBody(identity), 'endedAt': _clock.now().toUtc().toIso8601String(),
-      }, token);
+      if (token != null) {
+        await _transport.complete(<String, Object?>{
+          ..._identityBody(identity), 'endedAt': _clock.now().toUtc().toIso8601String(),
+        }, token);
+      }
     } on Object catch (error) {
       _safeError(error);
     } finally { stop(); }

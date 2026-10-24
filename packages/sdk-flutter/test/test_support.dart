@@ -17,7 +17,7 @@ final class FakeTransport implements TraceIQTransport {
     if (outcomes.isEmpty) return const TransportResponse(statusCode: 200);
     final outcome = outcomes.removeFirst();
     if (outcome is! TransportResponse) throw outcome;
-    return outcome as TransportResponse;
+    return outcome;
   }
 
   @override

@@ -34,7 +34,7 @@ final class RetryPolicy {
 
   Duration delayFor(int retryNumber, {Duration? retryAfter}) {
     if (retryAfter != null && retryAfter > Duration.zero) return retryAfter;
-    final exponent = (retryNumber.clamp(1, 6) as int) - 1;
+    final exponent = retryNumber.clamp(1, 6) - 1;
     final baseMs = min(1000 * (1 << exponent), 30000);
     return Duration(milliseconds: baseMs + _random.nextInt(251));
   }
