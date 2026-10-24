@@ -43,6 +43,9 @@ abstract final class TraceIQ {
     Duration sessionTimeout = const Duration(minutes: 30),
     bool trackingEnabled = true,
     bool replayEnabled = false,
+    String environment = 'production',
+    String serviceName = 'mobile-app',
+    bool autoTrackFlagExposures = true,
   }) {
     if (_client != null) return Future<void>.value();
     return _initializing ??= _initialize(
@@ -60,6 +63,9 @@ abstract final class TraceIQ {
       sessionTimeout: sessionTimeout,
       trackingEnabled: trackingEnabled,
       replayEnabled: replayEnabled,
+      environment: environment,
+      serviceName: serviceName,
+      autoTrackFlagExposures: autoTrackFlagExposures,
     ).whenComplete(() => _initializing = null);
   }
 
@@ -78,6 +84,9 @@ abstract final class TraceIQ {
     required Duration sessionTimeout,
     required bool trackingEnabled,
     required bool replayEnabled,
+    required String environment,
+    required String serviceName,
+    required bool autoTrackFlagExposures,
   }) async {
     final config = TraceIQConfig(
       projectId: projectId,
@@ -94,6 +103,9 @@ abstract final class TraceIQ {
       sessionTimeout: sessionTimeout,
       trackingEnabled: trackingEnabled,
       replayEnabled: replayEnabled,
+      environment: environment,
+      serviceName: serviceName,
+      autoTrackFlagExposures: autoTrackFlagExposures,
     );
     final storage = SharedPreferencesTraceIQStorage.create();
     final client = TraceIQClient(
@@ -145,8 +157,37 @@ abstract final class TraceIQ {
   }) =>
       _required.captureException(error, stackTrace, properties: properties);
 
-  /// Clears user identity and rotates anonymous and session IDs.
+  /// Clears user identity and rotates anonymous and session IDs. Also clears
+  /// loaded feature flags.
   static Future<void> reset() => _required.reset();
+
+  /// Queues a structured log line for TraceIQ Logs, tagged with the session and user.
+  static void log(
+    String level,
+    String message, {
+    Map<String, Object?>? attributes,
+    Object? error,
+    StackTrace? stackTrace,
+    String? service,
+  }) =>
+      _required.log(level, message,
+          attributes: attributes, error: error, stackTrace: stackTrace, service: service);
+
+  /// Fetches and caches feature flags for the current user. Call after
+  /// [initialize] and again after [identify] or [reset].
+  static Future<bool> loadFeatureFlags({Map<String, Object?>? properties}) =>
+      _required.loadFeatureFlags(properties: properties);
+
+  /// Whether a loaded flag is on; [defaultValue] until flags have loaded.
+  static bool isFeatureEnabled(String key, {bool defaultValue = false}) =>
+      _client?.isFeatureEnabled(key, defaultValue: defaultValue) ?? defaultValue;
+
+  /// The loaded remote-config payload of a flag that is on, else [defaultValue].
+  static Object? getFeatureFlagPayload(String key, {Object? defaultValue}) =>
+      _client?.getFeatureFlagPayload(key, defaultValue: defaultValue) ?? defaultValue;
+
+  /// Records a flag exposure yourself (the reads above do it unless disabled).
+  static void recordFlagExposure(String key) => _client?.recordFlagExposure(key);
 
   /// Enables or disables collection. Disabling immediately clears queued events.
   static Future<void> setTrackingEnabled(bool enabled) =>

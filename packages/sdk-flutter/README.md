@@ -112,6 +112,33 @@ and called after TraceIQ queues the exception. Disable it with
 `automaticErrorTracking: false`. The SDK cannot capture errors handled entirely
 inside a zone or framework unless the app calls `captureException`.
 
+## Logs
+
+```dart
+TraceIQ.log('error', 'Transfer failed',
+    attributes: {'provider': 'paystack'}, error: error, stackTrace: stackTrace);
+```
+
+`level` is `debug`, `info`, `warn`, `error` or `fatal`. Lines are tagged with the
+session and user, kept in memory (up to `maxQueueSize`), and sent to TraceIQ Logs
+with each flush. Unlike events, they are not persisted across app restarts.
+
+## Feature flags
+
+```dart
+await TraceIQ.loadFeatureFlags(properties: {'plan': 'pro'});
+if (TraceIQ.isFeatureEnabled('new-wallet')) {
+  // ...
+}
+final limits = TraceIQ.getFeatureFlagPayload('wallet-limits', defaultValue: {});
+```
+
+Call `loadFeatureFlags` after `initialize` and again after `identify` or `reset`
+(`reset` clears loaded flags). Until flags load, reads return their default.
+Reading a flag records one exposure per value unless
+`autoTrackFlagExposures: false`; call `TraceIQ.recordFlagExposure(key)` to record
+one yourself.
+
 ## Flush, lifecycle, and offline delivery
 
 ```dart
@@ -215,6 +242,9 @@ excluded from this v1 recorder. The dashboard mobile player is a later step.
 | `sessionTimeout` | 30 minutes | Background duration that rotates session ID |
 | `trackingEnabled` | `true` | Initial state; persisted opt-out wins |
 | `replayEnabled` | `false` | Opt in to iOS/Android structural replay; explicit consent is still required |
+| `environment` | `production` | Environment for flag evaluation and log lines |
+| `serviceName` | `mobile-app` | Service name stamped on log lines |
+| `autoTrackFlagExposures` | `true` | Record an exposure when a flag is read |
 
 Call `await TraceIQ.shutdown()` when a host can
 explicitly tear down the SDK. It flushes, cancels timers, removes lifecycle/error

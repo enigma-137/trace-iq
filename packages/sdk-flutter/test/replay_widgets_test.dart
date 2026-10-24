@@ -9,7 +9,9 @@ void main() {
 
   testWidgets('opt-in wrappers render normally while replay is disabled', (tester) async {
     SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
-    await TraceIQ.initialize(projectId: 'p', apiKey: 'k', automaticErrorTracking: false);
+    // initialize() and shutdown() do real async work (device info, storage, HTTP),
+    // which never completes inside testWidgets' fake-async zone.
+    await tester.runAsync(() => TraceIQ.initialize(projectId: 'p', apiKey: 'k', automaticErrorTracking: false));
     await tester.pumpWidget(const Directionality(
       textDirection: TextDirection.ltr,
       child: TraceIQReplayScreen(
@@ -23,6 +25,6 @@ void main() {
     expect(find.byType(TraceIQReplayRegion), findsOneWidget);
     expect(TraceIQ.isReplayRecording, isFalse);
     await tester.pumpWidget(const SizedBox.shrink());
-    await TraceIQ.shutdown();
+    await tester.runAsync(TraceIQ.shutdown);
   });
 }

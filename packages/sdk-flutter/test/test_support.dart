@@ -20,6 +20,15 @@ final class FakeTransport implements TraceIQTransport {
     return outcome;
   }
 
+  final List<({String path, Map<String, Object?> body})> posts = <({String path, Map<String, Object?> body})>[];
+  TraceIQJsonResponse Function(String path, Map<String, Object?> body)? onPost;
+
+  @override
+  Future<TraceIQJsonResponse> post(String path, Map<String, Object?> body) async {
+    posts.add((path: path, body: body));
+    return onPost?.call(path, body) ?? const TraceIQJsonResponse(statusCode: 202);
+  }
+
   @override
   void close() => closed = true;
 }

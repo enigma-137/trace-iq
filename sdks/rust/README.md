@@ -55,13 +55,15 @@ let mut traceiq = Client::builder("YOUR_PROJECT_ID", "YOUR_WRITE_KEY")
 | `capture(event, user_id?, anonymous_id?, properties?, context?, timestamp?)` | Track an event. |
 | `identify(user_id, traits?, timestamp?)` | Create/update a user profile. |
 | `group(organization_id, user_id?, anonymous_id?, traits?, timestamp?)` | Associate a user with an account. |
+| `log(level, message, user_id?, metadata?)` | Send a structured line to Logs. `level` is `"debug"`, `"info"`, `"warn"`, `"error"` or `"fatal"`. Lines flush with events. |
 | `flush()` | Send everything queued now (blocks). |
 | `shutdown()` | Stop the worker and flush. |
 
 ## Options
 
 `endpoint`, `flush_at` (20), `flush_interval` (10s), `max_retries` (3),
-`timeout` (10s), `debug` (false), `on_error` (callback).
+`timeout` (10s), `debug` (false), `on_error` (callback), and `service_name` ("server")
+and `environment` ("production") stamped on log lines.
 
 Delivery is at-most-once; a batch that fails after `max_retries` is dropped and passed
 to `on_error`. `properties["amount"]` (a number) powers the dashboard's revenue metrics.
