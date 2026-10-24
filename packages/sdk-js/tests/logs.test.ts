@@ -67,8 +67,12 @@ describe('browser traceiq.log()', () => {
     new BrowserTraceIQClient().log('error', 'not initialized');
     expect(fetchMock).not.toHaveBeenCalled();
 
+    vi.useFakeTimers();
     const traceiq = client();
     traceiq.log('fatal' as never, 'boom');
-    await expect(traceiq.flushLogs()).resolves.toBeUndefined();
+    const flushed = traceiq.flushLogs();
+    await vi.runAllTimersAsync(); // network failures are retried with backoff first
+    await expect(flushed).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });

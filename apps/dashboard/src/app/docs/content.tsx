@@ -401,6 +401,7 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
             ['autoTrackPageViews', 'false', 'Send a $page event automatically on initialize.'],
             ['autoCaptureExceptions', 'true', 'Capture uncaught errors and unhandled promise rejections.'],
             ['autoCaptureRageClicks', 'true', 'Detect rage clicks (3+ rapid clicks in one spot).'],
+            ['maxRetries', '3', 'Retries after a network error, 429 or 5xx, with exponential backoff. Sends wait while the browser is offline.'],
             ['debug', 'false', 'Log SDK warnings to the console.']
           ]}
         />
