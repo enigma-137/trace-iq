@@ -49,12 +49,30 @@ traceiq.reset();
 | `capture({ event, properties?, timestamp? })` | Track an event. |
 | `identify({ userId, traits? })` | Attach the current user to events. |
 | `group({ organizationId, traits? })` | Associate the user with an account. |
-| `reset()` | Clear the user + rotate the anonymous id (on logout). |
+| `reset()` | Clear the user + rotate the anonymous id (on logout). Also clears loaded feature flags. |
+| `log(level, message, attributes?)` | Send a structured line to Logs, tagged with the session and user. `level` is `debug`, `info`, `warn`, `error` or `fatal`; pass `error` to attach an `Error`. |
+| `loadFeatureFlags(properties?)` | Fetch and cache feature flags for the current user. Call after `initialize()` and again after `identify()` or `reset()`. |
+| `isFeatureEnabled(key, defaultValue?)` | Whether a loaded flag is on. Returns `defaultValue` until flags have loaded. |
+| `getFeatureFlagPayload(key, defaultValue?)` | A loaded flag's remote-config payload when it is on. |
+| `recordFlagExposure(key)` | Record an exposure yourself (the two reads above do it unless `autoTrackFlagExposures: false`). |
 | `flush()` / `shutdown()` | Send now / stop timers and flush. |
 | `grantReplayConsent()` / `revokeReplayConsent()` | Explicitly allow or stop mobile replay. |
 | `isReplayRecording` | Whether a mobile upload grant is active in the foreground. |
 | `recordReplaySnapshot`, `recordReplayTap`, `recordReplayScroll` | Manual structural capture for custom views. |
 | `flushReplay()` / `completeReplay()` | Upload pending chunks / finish the current replay. |
+
+```ts
+await traceiq.loadFeatureFlags();
+if (traceiq.isFeatureEnabled('new-wallet')) {
+  // ...
+}
+
+traceiq.log('error', 'Transfer failed', { provider: 'paystack', error });
+```
+
+`initialize()` also accepts `environment` (default `"production"`, used for flags and
+logs), `serviceName` (default `"mobile-app"`, stamped on log lines) and
+`autoTrackFlagExposures` (default `true`).
 
 ## Mobile session replay
 

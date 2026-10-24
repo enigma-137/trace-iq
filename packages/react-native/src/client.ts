@@ -17,6 +17,23 @@ export interface TraceIQInitOptions {
   onError?: (error: Error) => void;
   /** Mobile structural replay is opt-in and also requires grantReplayConsent(). */
   replay?: { enabled: boolean };
+  /** Environment for flag evaluation and log lines. Default "production". */
+  environment?: string;
+  /** Service name stamped on log() lines. Default "mobile-app". */
+  serviceName?: string;
+  /** Record an exposure when a flag is read with isFeatureEnabled()/getFeatureFlagPayload(). Default true. */
+  autoTrackFlagExposures?: boolean;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+const LOG_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
+const MAX_LOG_BATCH = 100; // API limit per /v1/logs/batch request
+const MAX_QUEUED_LOGS = 1000;
+
+export interface TraceIQFeatureFlags {
+  flags: Record<string, boolean>;
+  payloads: Record<string, unknown>;
+  details?: Record<string, { enabled: boolean; reason: string; revision: number }>;
 }
 
 export interface CaptureParams {
@@ -59,7 +76,7 @@ const DEFAULTS = { endpoint: 'http://localhost:4000', flushAt: 20, flushInterval
  *   traceiq.capture({ event: 'transfer_started', properties: { amount: 5000 } });
  */
 export class TraceIQReactNative {
-  private options?: Required<Omit<TraceIQInitOptions, 'onError' | 'appVersion' | 'replay'>> &
+  private options?: Required<Omit<TraceIQInitOptions, 'onError' | 'appVersion' | 'replay' | 'autoTrackFlagExposures'>> &
     Pick<TraceIQInitOptions, 'onError' | 'appVersion' | 'replay'>;
   private queue: QueuedEvent[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -74,6 +91,11 @@ export class TraceIQReactNative {
   private identityGeneration = 0;
   private sessionHasEvents = false;
   private replayListeners = new Set<(recording: boolean) => void>();
+  private logQueue: Array<Record<string, unknown>> = [];
+  private featureFlags: TraceIQFeatureFlags = { flags: {}, payloads: {}, details: {} };
+  private featureFlagsLoaded = false;
+  private recordedExposures = new Set<string>();
+  private autoTrackFlagExposures = true;
 
   initialize(options: TraceIQInitOptions): void {
     if (!options.projectId || !options.writeKey) {
@@ -94,8 +116,11 @@ export class TraceIQReactNative {
       debug: options.debug ?? false,
       flushOnBackground: options.flushOnBackground ?? true,
       onError: options.onError,
-      replay: options.replay
+      replay: options.replay,
+      environment: options.environment ?? 'production',
+      serviceName: options.serviceName ?? 'mobile-app'
     };
+    this.autoTrackFlagExposures = options.autoTrackFlagExposures ?? true;
 
     this.deviceInfo = buildDeviceInfo(options.appVersion);
     void this.loadAnonymousId();
@@ -175,7 +200,107 @@ export class TraceIQReactNative {
     this.anonymousId = generateId('anon');
     this.sessionId = generateId('ses');
     this.sessionHasEvents = false;
+    // Flags were evaluated for the previous user; reload them for the new one.
+    this.featureFlags = { flags: {}, payloads: {}, details: {} };
+    this.featureFlagsLoaded = false;
+    this.recordedExposures.clear();
     void this.persistAnonymousId();
+  }
+
+  /**
+   * Send a structured log line to TraceIQ Logs, tagged with the session and user.
+   * Pass `service` to override `serviceName` and `error` to attach an Error.
+   */
+  log(level: LogLevel, message: string, attributes: Record<string, unknown> = {}): void {
+    if (!this.options) {
+      this.debug('log() before initialize(); ignored.');
+      return;
+    }
+    if (typeof message !== 'string' || !message.trim()) return;
+    const { service, error, ...metadata } = attributes;
+    const err = error instanceof Error ? error : undefined;
+    this.logQueue.push({
+      level: LOG_LEVELS.includes(level) ? level : 'info',
+      message: message.slice(0, 4000),
+      timestamp: toIso(),
+      service: typeof service === 'string' && service ? service : this.options.serviceName,
+      environment: this.options.environment,
+      sessionId: this.sessionId,
+      distinctId: this.userId ?? this.anonymousId,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      errorDetails: err ? { name: err.name, message: err.message, stack: err.stack } : undefined
+    });
+    // Bounded so an offline device can't grow memory without limit; oldest go first.
+    if (this.logQueue.length > MAX_QUEUED_LOGS) this.logQueue.splice(0, this.logQueue.length - MAX_QUEUED_LOGS);
+    if (this.logQueue.length >= this.options.flushAt) void this.flush();
+  }
+
+  /**
+   * Fetch every feature flag for the current user and cache it. Call after
+   * initialize() and again after identify() or reset(). Keeps the last known flags
+   * if the request fails.
+   */
+  async loadFeatureFlags(properties?: Record<string, unknown>): Promise<TraceIQFeatureFlags> {
+    const options = this.options;
+    if (!options) {
+      this.debug('loadFeatureFlags() before initialize(); ignored.');
+      return this.featureFlags;
+    }
+    try {
+      const response = await this.post('/v1/flags/evaluate', {
+        distinctId: this.userId ?? this.anonymousId,
+        environment: options.environment,
+        properties
+      }, 0);
+      if (!response?.ok) {
+        this.debug(`flag evaluation failed${response ? ` with ${response.status}` : ''}.`);
+        return this.featureFlags;
+      }
+      const body = (await response.json()) as Partial<TraceIQFeatureFlags>;
+      this.featureFlags = { flags: body.flags ?? {}, payloads: body.payloads ?? {}, details: body.details ?? {} };
+      this.featureFlagsLoaded = true;
+    } catch (error) {
+      this.debug(`flag evaluation failed: ${(error as Error).message}`);
+    }
+    return this.featureFlags;
+  }
+
+  /** True when the loaded flag is on; `defaultValue` until loadFeatureFlags() has succeeded. */
+  isFeatureEnabled(key: string, defaultValue = false): boolean {
+    if (!this.featureFlagsLoaded) return defaultValue;
+    const enabled = this.featureFlags.flags[key] ?? defaultValue;
+    if (this.autoTrackFlagExposures) this.recordFlagExposure(key);
+    return enabled;
+  }
+
+  /** The loaded remote-config payload of a flag that is on, else `defaultValue`. */
+  getFeatureFlagPayload<T = unknown>(key: string, defaultValue?: T): T | undefined {
+    if (this.featureFlags.flags[key] !== true) return defaultValue;
+    if (this.autoTrackFlagExposures) this.recordFlagExposure(key);
+    return (this.featureFlags.payloads[key] as T) ?? defaultValue;
+  }
+
+  /** Record that the user saw a flag's value. Sent once per flag value and revision. */
+  recordFlagExposure(key: string): void {
+    const options = this.options;
+    if (!options) return;
+    const enabled = this.featureFlags.flags[key] === true;
+    const detail = this.featureFlags.details?.[key];
+    const distinctId = this.userId ?? this.anonymousId;
+    const dedupKey = `${key}:${distinctId}:${detail?.revision ?? 1}:${enabled ? 1 : 0}`;
+    if (this.recordedExposures.has(dedupKey)) return;
+    this.recordedExposures.add(dedupKey);
+    void this.post('/v1/flags/exposure', {
+      flagKey: key,
+      distinctId,
+      userId: this.userId,
+      anonymousId: this.anonymousId,
+      sessionId: this.sessionId,
+      enabled,
+      environment: options.environment,
+      revision: detail?.revision ?? 1,
+      evaluationReason: detail?.reason ?? (enabled ? 'sdk_enabled' : 'sdk_disabled')
+    }, 0).catch((error: Error) => this.debug(`flag exposure failed: ${error.message}`));
   }
 
   /** Consent is never inferred from analytics consent or project settings. */
@@ -204,6 +329,19 @@ export class TraceIQReactNative {
   }
 
   private async flushQueued(): Promise<void> {
+    await this.flushEvents();
+    while (this.options && this.logQueue.length > 0) {
+      const logs = this.logQueue.splice(0, MAX_LOG_BATCH);
+      try {
+        const response = await this.post('/v1/logs/batch', { logs });
+        if (response && !response.ok) this.handleError(new Error(`TraceIQ logs rejected with ${response.status}.`));
+      } catch (error) {
+        this.handleError(error instanceof Error ? error : new Error('TraceIQ log delivery failed.'));
+      }
+    }
+  }
+
+  private async flushEvents(): Promise<void> {
     while (this.options && this.queue.length > 0) {
       const batch = this.queue.splice(0, this.queue.length);
       const results = await this.send(batch);
@@ -243,45 +381,60 @@ export class TraceIQReactNative {
   }
 
   private async send(batch: QueuedEvent[]): Promise<Array<{ accepted: boolean }> | undefined> {
+    let response: Response | undefined;
+    try {
+      response = await this.post('/v1/events/batch', {
+        batch: batch.map(({ generation: _generation, ...event }) => event)
+      });
+    } catch (error) {
+      this.handleError(error instanceof Error ? error : new Error('TraceIQ batch delivery failed.'));
+      return;
+    }
+    if (!response) return;
+    if (!response.ok) {
+      this.handleError(new Error(`TraceIQ batch rejected with ${response.status}.`));
+      return;
+    }
+    const payload = await response.json() as { results?: Array<{ accepted?: boolean }> };
+    if (!Array.isArray(payload.results) || payload.results.length !== batch.length) {
+      this.handleError(new Error('TraceIQ batch response has no per-event acknowledgements.'));
+      return;
+    }
+    return payload.results.map((result) => ({ accepted: result?.accepted === true }));
+  }
+
+  /**
+   * POSTs `payload` (plus projectId) to an API path. Network errors, 429 and 5xx are
+   * retried with backoff up to `retries` times; the last error is thrown. Other
+   * responses are returned for the caller to inspect. Undefined when uninitialized.
+   */
+  private async post(
+    path: string,
+    payload: Record<string, unknown>,
+    retries = this.options?.maxRetries ?? 0
+  ): Promise<Response | undefined> {
     const options = this.options;
     if (!options) return;
     if (typeof fetch !== 'function') {
       this.handleError(new Error('No fetch available in this environment.'));
       return;
     }
-
-    const url = `${options.endpoint}/v1/events/batch`;
-    const body = JSON.stringify({ projectId: options.projectId,
-      batch: batch.map(({ generation: _generation, ...event }) => event) });
+    const body = JSON.stringify({ projectId: options.projectId, ...payload });
 
     for (let attempt = 1; ; attempt += 1) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
       try {
-        const response = await fetch(url, {
+        const response = await fetch(`${options.endpoint}${path}`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-traceiq-write-key': options.writeKey },
           body,
           signal: controller.signal
         });
-        if (response.ok) {
-          const payload = await response.json() as { results?: Array<{ accepted?: boolean }> };
-          if (!Array.isArray(payload.results) || payload.results.length !== batch.length) {
-            this.handleError(new Error('TraceIQ batch response has no per-event acknowledgements.'));
-            return;
-          }
-          return payload.results.map((result) => ({ accepted: result?.accepted === true }));
-        }
-        if (response.status < 500 && response.status !== 429) {
-          this.handleError(new Error(`TraceIQ batch rejected with ${response.status}.`));
-          return;
-        }
-        throw new Error(`TraceIQ batch failed with ${response.status}.`);
+        if (response.ok || (response.status < 500 && response.status !== 429)) return response;
+        throw new Error(`TraceIQ request failed with ${response.status}.`);
       } catch (error) {
-        if (attempt > options.maxRetries) {
-          this.handleError(error instanceof Error ? error : new Error('TraceIQ batch delivery failed.'));
-          return;
-        }
+        if (attempt > retries) throw error;
         await delay(backoffMs(attempt));
       } finally {
         clearTimeout(timeout);

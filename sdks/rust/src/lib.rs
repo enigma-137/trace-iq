@@ -17,6 +17,11 @@ const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_secs(10);
 const DEFAULT_MAX_RETRIES: u32 = 3;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const BATCH_URL_PATH: &str = "/v1/events/batch";
+const LOGS_URL_PATH: &str = "/v1/logs/batch";
+const LOG_LEVELS: [&str; 5] = ["debug", "info", "warn", "error", "fatal"];
+/// API limit per /v1/logs/batch request.
+const MAX_LOG_BATCH: usize = 100;
+const MAX_QUEUED_LOGS: usize = 1000;
 const MAX_BACKOFF_MS: u64 = 30_000;
 
 // ---------------------------------------------------------------------------
@@ -49,7 +54,9 @@ impl std::error::Error for TraceIQError {}
 // Event types (serialised to the /v1/events/batch JSON schema)
 // ---------------------------------------------------------------------------
 
+// The API reads camelCase keys (`projectId`, `eventName`, …).
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Event {
     event_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,9 +70,31 @@ struct Event {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct BatchRequest {
     project_id: String,
     batch: Vec<Event>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LogEntry {
+    level: String,
+    message: String,
+    timestamp: String,
+    service: String,
+    environment: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    distinct_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LogBatchRequest<'a> {
+    project_id: &'a str,
+    logs: &'a [LogEntry],
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +111,10 @@ struct Inner {
     timeout: Duration,
     debug: bool,
     on_error: Option<Arc<dyn Fn(TraceIQError) + Send + Sync + 'static>>,
+    service_name: String,
+    environment: String,
     queue: Mutex<VecDeque<Event>>,
+    log_queue: Mutex<VecDeque<LogEntry>>,
     condvar: Condvar,
     stopped: Mutex<bool>,
 }
@@ -117,6 +149,8 @@ pub struct ClientBuilder {
     timeout: Duration,
     debug: bool,
     on_error: Option<Arc<dyn Fn(TraceIQError) + Send + Sync + 'static>>,
+    service_name: String,
+    environment: String,
 }
 
 impl ClientBuilder {
@@ -131,6 +165,8 @@ impl ClientBuilder {
             timeout: DEFAULT_TIMEOUT,
             debug: false,
             on_error: None,
+            service_name: "server".to_owned(),
+            environment: "production".to_owned(),
         }
     }
 
@@ -176,6 +212,18 @@ impl ClientBuilder {
         F: Fn(TraceIQError) + Send + Sync + 'static,
     {
         self.on_error = Some(Arc::new(callback));
+        self
+    }
+
+    /// Service name stamped on [`Client::log`] lines (default `"server"`).
+    pub fn service_name(mut self, name: &str) -> Self {
+        self.service_name = name.to_owned();
+        self
+    }
+
+    /// Environment stamped on [`Client::log`] lines (default `"production"`).
+    pub fn environment(mut self, environment: &str) -> Self {
+        self.environment = environment.to_owned();
         self
     }
 
@@ -236,7 +284,10 @@ impl Client {
             timeout: builder.timeout,
             debug: builder.debug,
             on_error: builder.on_error,
+            service_name: builder.service_name,
+            environment: builder.environment,
             queue: Mutex::new(VecDeque::new()),
+            log_queue: Mutex::new(VecDeque::new()),
             condvar: Condvar::new(),
             stopped: Mutex::new(false),
         });
@@ -347,19 +398,48 @@ impl Client {
         });
     }
 
+    /// Send a structured log line to TraceIQ Logs.
+    ///
+    /// * `level`    – `"debug"`, `"info"`, `"warn"`, `"error"` or `"fatal"`; anything else is sent as `"info"`.
+    /// * `message`  – The log message (truncated to 4000 characters).
+    /// * `user_id`  – The user this line is about (optional).
+    /// * `metadata` – Structured attributes as a JSON object (optional).
+    ///
+    /// Lines are queued and flushed with events, in batches of up to 100.
+    pub fn log(&self, level: &str, message: &str, user_id: Option<&str>, metadata: Option<Value>) {
+        if message.trim().is_empty() {
+            return;
+        }
+        let entry = LogEntry {
+            level: if LOG_LEVELS.contains(&level) { level } else { "info" }.to_owned(),
+            message: message.chars().take(4000).collect(),
+            timestamp: now_iso(),
+            service: self.inner.service_name.clone(),
+            environment: self.inner.environment.clone(),
+            distinct_id: user_id.map(|s| s.to_owned()),
+            metadata,
+        };
+        let mut logs = self.inner.log_queue.lock().unwrap();
+        logs.push_back(entry);
+        // Bounded so an unreachable API can't grow memory without limit; oldest go first.
+        while logs.len() > MAX_QUEUED_LOGS {
+            logs.pop_front();
+        }
+        if logs.len() >= self.inner.flush_at {
+            self.inner.condvar.notify_all();
+        }
+    }
+
     /// Send everything queued right now (blocks until sent).
     ///
-    /// Safe to call concurrently with `capture` / `identify` / `group`.
+    /// Safe to call concurrently with `capture` / `identify` / `group` / `log`.
     pub fn flush(&self) {
         loop {
-            let batch = {
-                let mut queue = self.inner.queue.lock().unwrap();
-                if queue.is_empty() {
-                    return;
-                }
-                queue.drain(..).collect::<Vec<_>>()
-            };
-            send_batch(&self.inner, &batch);
+            let (events, logs) = take_queued(&self.inner);
+            if events.is_empty() && logs.is_empty() {
+                return;
+            }
+            deliver(&self.inner, &events, &logs);
         }
     }
 
@@ -413,23 +493,36 @@ impl Drop for Client {
 
 fn worker_loop(inner: Arc<Inner>) {
     loop {
-        let batch = {
-            let mut queue = inner.queue.lock().unwrap();
-            if !*inner.stopped.lock().unwrap() && queue.len() < inner.flush_at {
-                let (guard, _) = inner
-                    .condvar
-                    .wait_timeout(queue, inner.flush_interval)
-                    .unwrap();
-                queue = guard;
+        {
+            let queue = inner.queue.lock().unwrap();
+            let logs_full = inner.log_queue.lock().unwrap().len() >= inner.flush_at;
+            if !*inner.stopped.lock().unwrap() && queue.len() < inner.flush_at && !logs_full {
+                drop(inner.condvar.wait_timeout(queue, inner.flush_interval).unwrap());
             }
-            if *inner.stopped.lock().unwrap() && queue.is_empty() {
-                return;
-            }
-            queue.drain(..).collect::<Vec<_>>()
-        };
-        if !batch.is_empty() {
-            send_batch(&inner, &batch);
         }
+        let (events, logs) = take_queued(&inner);
+        if *inner.stopped.lock().unwrap() && events.is_empty() && logs.is_empty() {
+            return;
+        }
+        deliver(&inner, &events, &logs);
+    }
+}
+
+/// Drains both queues. Locks are taken one at a time, never nested with the condvar wait.
+fn take_queued(inner: &Inner) -> (Vec<Event>, Vec<LogEntry>) {
+    let events = inner.queue.lock().unwrap().drain(..).collect();
+    let logs = inner.log_queue.lock().unwrap().drain(..).collect();
+    (events, logs)
+}
+
+fn deliver(inner: &Inner, events: &[Event], logs: &[LogEntry]) {
+    if !events.is_empty() {
+        send_batch(inner, events);
+    }
+    for chunk in logs.chunks(MAX_LOG_BATCH) {
+        let body = serde_json::to_vec(&LogBatchRequest { project_id: &inner.project_id, logs: chunk })
+            .expect("TraceIQ: log serialisation failed (this is a bug)");
+        send_with_retry(inner, LOGS_URL_PATH, &body, "log batch");
     }
 }
 
@@ -443,17 +536,20 @@ fn send_batch(inner: &Inner, batch: &[Event]) {
         batch: batch.to_vec(),
     })
     .expect("TraceIQ: event serialisation failed (this is a bug)");
+    send_with_retry(inner, BATCH_URL_PATH, &body, "batch");
+}
 
-    let url = format!("{}{}", inner.endpoint, BATCH_URL_PATH);
+fn send_with_retry(inner: &Inner, path: &str, body: &[u8], what: &str) {
+    let url = format!("{}{}", inner.endpoint, path);
 
     for attempt in 1.. {
-        let result = try_send(&url, &inner.write_key, &body, inner.timeout);
+        let result = try_send(&url, &inner.write_key, body, inner.timeout);
         match result {
             Ok(()) => return,
-            Err(status) if status < 500 && status != 429 => {
+            Err(status) if status != 0 && status < 500 && status != 429 => {
                 handle_error(
                     inner,
-                    TraceIQError::new(format!("batch rejected with {status}")),
+                    TraceIQError::new(format!("{what} rejected with {status}")),
                 );
                 return;
             }
@@ -461,7 +557,7 @@ fn send_batch(inner: &Inner, batch: &[Event]) {
                 if attempt > inner.max_retries {
                     handle_error(
                         inner,
-                        TraceIQError::new(format!("batch failed after {attempt} attempts")),
+                        TraceIQError::new(format!("{what} failed after {attempt} attempts")),
                     );
                     return;
                 }
@@ -533,6 +629,7 @@ mod tests {
     #[test]
     fn test_capture_enqueues_event() {
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_interval(Duration::ZERO)
             .build();
         client.capture("test_event", Some("user_1"), None, None, None, None);
@@ -546,6 +643,7 @@ mod tests {
     #[test]
     fn test_identify_enqueues_dollar_event() {
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_interval(Duration::ZERO)
             .build();
         client.identify("user_1", None, None);
@@ -558,6 +656,7 @@ mod tests {
     #[test]
     fn test_group_enqueues_dollar_group() {
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_interval(Duration::ZERO)
             .build();
         client.group("org_1", Some("user_1"), None, None, None);
@@ -572,6 +671,7 @@ mod tests {
     #[test]
     fn test_empty_event_name_is_ignored() {
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_interval(Duration::ZERO)
             .build();
         client.capture("", Some("user_1"), None, None, None, None);
@@ -583,6 +683,7 @@ mod tests {
     #[test]
     fn test_flush_drains_queue() {
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_interval(Duration::ZERO)
             .build();
         client.capture("e1", None, None, None, None, None);
@@ -596,6 +697,7 @@ mod tests {
     #[test]
     fn test_flush_at_triggers_immediate_flush() {
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_at(2)
             .flush_interval(Duration::ZERO)
             .build();
@@ -612,6 +714,7 @@ mod tests {
     #[test]
     fn test_shutdown_joins_worker() {
         let mut client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .flush_interval(Duration::from_millis(50))
             .build();
         client.capture("e1", None, None, None, None, None);
@@ -624,6 +727,7 @@ mod tests {
         let called = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let called_clone = Arc::clone(&called);
         let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
             .endpoint("http://127.0.0.1:1") // unreachable -> network error
             .flush_interval(Duration::ZERO)
             .on_error(move |_| {
@@ -650,9 +754,109 @@ mod tests {
             batch: vec![event],
         };
         let json = serde_json::to_value(&req).unwrap();
-        assert_eq!(json["project_id"], "proj_test");
-        assert_eq!(json["batch"][0]["event_name"], "test");
-        assert_eq!(json["batch"][0]["user_id"], "usr_123");
-        assert!(json["batch"][0]["anonymous_id"].is_null());
+        // The ingestion API reads camelCase keys.
+        assert_eq!(json["projectId"], "proj_test");
+        assert_eq!(json["batch"][0]["eventName"], "test");
+        assert_eq!(json["batch"][0]["userId"], "usr_123");
+        assert!(json["batch"][0].get("anonymousId").is_none());
+        assert!(json.get("project_id").is_none());
+    }
+
+    #[test]
+    fn test_log_enqueues_normalised_entry() {
+        let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
+            .flush_interval(Duration::ZERO)
+            .service_name("billing")
+            .environment("staging")
+            .build();
+        client.log("error", "Payout provider timed out", Some("user_1"), Some(serde_json::json!({"provider": "stripe"})));
+        client.log("loud", "unknown levels become info", None, None);
+        client.log("info", "   ", None, None);
+
+        let logs = client.inner.log_queue.lock().unwrap();
+        assert_eq!(logs.len(), 2);
+        let first = serde_json::to_value(&logs[0]).unwrap();
+        assert_eq!(first["level"], "error");
+        assert_eq!(first["service"], "billing");
+        assert_eq!(first["environment"], "staging");
+        assert_eq!(first["distinctId"], "user_1");
+        assert_eq!(first["metadata"]["provider"], "stripe");
+        assert_eq!(logs[1].level, "info");
+    }
+
+    #[test]
+    fn test_log_queue_is_bounded() {
+        let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
+            .flush_interval(Duration::ZERO)
+            .flush_at(usize::MAX)
+            .build();
+        for i in 0..(MAX_QUEUED_LOGS + 5) {
+            client.log("info", &format!("line {i}"), None, None);
+        }
+        let logs = client.inner.log_queue.lock().unwrap();
+        assert_eq!(logs.len(), MAX_QUEUED_LOGS);
+        assert_eq!(logs[0].message, "line 5");
+    }
+
+    /// Accepts `count` HTTP requests on a local port, answering 202, and returns
+    /// each request's path and JSON body.
+    fn record_requests(count: usize) -> (String, thread::JoinHandle<Vec<(String, Value)>>) {
+        use std::io::{BufRead, BufReader, Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let handle = thread::spawn(move || {
+            let mut seen = Vec::new();
+            for stream in listener.incoming().take(count) {
+                let mut stream = stream.unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut request_line = String::new();
+                reader.read_line(&mut request_line).unwrap();
+                let path = request_line.split_whitespace().nth(1).unwrap().to_owned();
+                let mut length = 0;
+                loop {
+                    let mut header = String::new();
+                    reader.read_line(&mut header).unwrap();
+                    if header == "\r\n" {
+                        break;
+                    }
+                    if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse().unwrap();
+                    }
+                }
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                stream
+                    .write_all(b"HTTP/1.1 202 Accepted\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+                    .unwrap();
+                seen.push((path, serde_json::from_slice(&body).unwrap()));
+            }
+            seen
+        });
+        (endpoint, handle)
+    }
+
+    #[test]
+    fn test_flush_sends_camel_case_events_and_logs_over_http() {
+        let (endpoint, server) = record_requests(2);
+        let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
+            .endpoint(&endpoint)
+            .flush_interval(Duration::ZERO)
+            .build();
+        client.capture("payout_succeeded", Some("user_1"), None, Some(serde_json::json!({"amount": 500})), None, None);
+        client.log("warn", "slow payout", Some("user_1"), None);
+        client.flush();
+
+        let requests = server.join().unwrap();
+        assert_eq!(requests[0].0, "/v1/events/batch");
+        assert_eq!(requests[0].1["projectId"], "proj_test");
+        assert_eq!(requests[0].1["batch"][0]["eventName"], "payout_succeeded");
+        assert_eq!(requests[0].1["batch"][0]["userId"], "user_1");
+        assert_eq!(requests[1].0, "/v1/logs/batch");
+        assert_eq!(requests[1].1["projectId"], "proj_test");
+        assert_eq!(requests[1].1["logs"][0]["message"], "slow payout");
+        assert_eq!(requests[1].1["logs"][0]["distinctId"], "user_1");
     }
 }

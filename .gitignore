@@ -21,6 +21,9 @@ test-results/
 playwright-report/
 
 # SDK build output
+.dart_tool/
+packages/sdk-flutter/build/
+**/pubspec.lock
 sdks/swift/.build/
 sdks/kotlin/.gradle/
 sdks/kotlin/build/

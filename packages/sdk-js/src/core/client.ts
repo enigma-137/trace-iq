@@ -16,6 +16,10 @@ const LOG_LEVELS: readonly TraceIQLogLevel[] = ['debug', 'info', 'warn', 'error'
 const LOG_BATCH_SIZE = 20;
 const LOG_FLUSH_DELAY_MS = 2000;
 const MAX_BUFFERED_LOGS = 200;
+const DEFAULT_MAX_RETRIES = 3;
+const MAX_RETRY_DELAY_MS = 30_000;
+// Sends parked while the browser is offline; beyond this, new ones are dropped.
+const MAX_OFFLINE_WAITERS = 100;
 
 export class BrowserTraceIQClient implements TraceIQClient {
   private options?: TraceIQInitOptions;
@@ -33,6 +37,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
   private logBuffer: Array<Record<string, unknown>> = [];
   private logFlushTimer?: ReturnType<typeof setTimeout>;
   private logFlushOnHideInstalled = false;
+  private offlineWaiters = 0;
   private lastRageAt = 0;
   private featureFlags: Record<string, boolean> = {};
   private featureFlagPayloads: Record<string, unknown> = {};
@@ -243,7 +248,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
 
     const batch = this.logBuffer.splice(0, LOG_BATCH_SIZE);
     try {
-      const response = await fetch(`${(options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/logs/batch`, {
+      const response = await this.deliver(`${(options.endpoint ?? DEFAULT_ENDPOINT).replace(/\/$/, '')}/v1/logs/batch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-traceiq-write-key': options.writeKey },
         body: JSON.stringify({ projectId: options.projectId, logs: batch }),
@@ -1013,7 +1018,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.debug(`[TraceIQ] Sending event ${eventName} to ${endpoint}`);
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await this.deliver(endpoint, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -1034,6 +1039,40 @@ export class BrowserTraceIQClient implements TraceIQClient {
       }
     } catch (error) {
       this.debug('[TraceIQ] Event delivery failed:', error);
+    }
+  }
+
+  /**
+   * POSTs a TraceIQ payload, retrying network errors, 429 and 5xx with exponential
+   * backoff (or the server's Retry-After) up to `maxRetries` times. Other responses
+   * are returned as-is. Throws the last network error if no attempt got a response.
+   * The server assigns event ids, so a retry after a lost response can duplicate an
+   * event; like the server SDKs, delivery prefers that over dropping it.
+   */
+  private async deliver(url: string, init: RequestInit): Promise<Response> {
+    const maxRetries = Math.max(0, this.options?.maxRetries ?? DEFAULT_MAX_RETRIES);
+    for (let attempt = 0; ; attempt += 1) {
+      await this.waitUntilOnline();
+      let response: Response | undefined;
+      try {
+        response = await fetch(url, init);
+      } catch (error) {
+        if (attempt >= maxRetries) throw error;
+      }
+      if (response && (!isRetryableStatus(response.status) || attempt >= maxRetries)) return response;
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs(attempt + 1, response)));
+    }
+  }
+
+  private async waitUntilOnline(): Promise<void> {
+    const navigator = this.getNavigator();
+    if (typeof window === 'undefined' || navigator?.onLine !== false) return;
+    if (this.offlineWaiters >= MAX_OFFLINE_WAITERS) throw new Error('TraceIQ: offline send queue is full.');
+    this.offlineWaiters += 1;
+    try {
+      await new Promise<void>((resolve) => window.addEventListener('online', () => resolve(), { once: true }));
+    } finally {
+      this.offlineWaiters -= 1;
     }
   }
 
@@ -1256,6 +1295,17 @@ type RequestCaptureConfig = Exclude<NonNullable<TraceIQInitOptions['autoCaptureR
 
 function matchesUrl(pattern: string | RegExp, url: string): boolean {
   return typeof pattern === 'string' ? url.includes(pattern) : pattern.test(url);
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function retryDelayMs(retry: number, response?: Response): number {
+  const retryAfter = Number(response?.headers?.get?.('retry-after'));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS);
+  const base = Math.min(1000 * 2 ** (retry - 1), MAX_RETRY_DELAY_MS);
+  return base + Math.floor(Math.random() * 250); // jitter so many tabs don't retry in lockstep
 }
 
 const FRAMEWORK_PATH = /^\/(_next|__nextjs|_nuxt|__vite_ping|@vite|@fs|@id|@react-refresh|__webpack_hmr|sockjs-node|_app\/immutable)\b|\.hot-update\./;

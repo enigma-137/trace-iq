@@ -49,10 +49,14 @@ On Android, remember `<uses-permission android:name="android.permission.INTERNET
 | `capture(event, userId?, anonymousId?, properties?, timestamp?)` | Track an event. |
 | `identify(userId, traits?)` | Create/update a user profile. |
 | `group(organizationId, userId?, traits?)` | Associate a user with an account. |
+| `log(level, message, userId?, metadata?, error?)` | Send a structured line to Logs. `level` is `debug`, `info`, `warn`, `error` or `fatal`; `error` attaches a throwable's class, message and stack. Lines flush with events. |
 | `flush()` | Send everything queued now (async). |
 | `shutdown()` | Flush and stop the worker. |
 
 ## Behavior
+
+`TraceIQConfig` also takes `serviceName` (default `"server"`) and `environment`
+(default `"production"`), stamped on log lines.
 
 Events flush by size (`flushAt`), on a timer (`flushIntervalMs`), or manually. Batches
 that fail after `maxRetries` (exponential backoff) are dropped and passed to `onError`.

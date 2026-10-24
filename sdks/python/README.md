@@ -44,13 +44,29 @@ need to call `shutdown()` explicitly.
 | `capture(event, user_id=None, anonymous_id=None, properties=None, context=None, timestamp=None)` | Track an event. |
 | `identify(user_id, traits=None, timestamp=None)` | Create/update a user profile. |
 | `group(organization_id, user_id=None, anonymous_id=None, traits=None, timestamp=None)` | Associate a user with an account. |
+| `log(level, message, service=None, user_id=None, error=None, **metadata)` | Send a structured line to Logs. `level` is `debug`, `info`, `warn`, `error` or `fatal`. |
+| `is_feature_enabled(key, distinct_id, default=False, properties=None, environment=None, track_exposure=True)` | Whether a feature flag is on for a user. Returns `default` if flags can't be evaluated. |
+| `get_feature_flag_payload(key, distinct_id, default=None, ...)` | A flag's remote-config payload when it is on, else `default`. |
+| `evaluate_flags(distinct_id, properties=None, environment=None)` | Every flag for a user: `{"flags", "payloads", "details"}`. |
+| `track_flag_exposure(key, distinct_id, enabled, environment=None, properties=None)` | Record a flag exposure yourself (the helpers above do it unless `track_exposure=False`). |
 | `flush()` | Send everything queued now (blocks). |
 | `shutdown()` | Stop the worker and flush. |
+
+```python
+traceiq.log("error", "Payout provider timed out", provider="stripe", error=exc)
+
+if traceiq.is_feature_enabled("new-payouts", "user_123", properties={"plan": "pro"}):
+    ...
+```
+
+Flag calls are synchronous HTTP requests (one per call), so evaluate once per request and
+reuse the result, for example with `evaluate_flags()`.
 
 ## Options
 
 `endpoint`, `flush_at` (20), `flush_interval` (10.0s), `max_retries` (3),
-`timeout` (10.0s), `debug` (False), `on_error` (callback).
+`timeout` (10.0s), `debug` (False), `on_error` (callback), `service_name` ("server") and
+`environment` ("production") stamped on log lines.
 
 Delivery is at-most-once; a batch that fails after `max_retries` is dropped and passed
 to `on_error`. `properties["amount"]` (a number) powers the dashboard's revenue metrics.

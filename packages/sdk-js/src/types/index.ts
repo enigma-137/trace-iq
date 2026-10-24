@@ -38,6 +38,13 @@ export interface TraceIQInitOptions {
   /** @deprecated Use replay.enabled. */
   enableReplay?: boolean;
   replay?: TraceIQReplayOptions;
+  /**
+   * Retries per event or log batch after a network error, HTTP 429 or 5xx, with
+   * exponential backoff (1s, 2s, 4s, …) or the server's Retry-After. Other 4xx
+   * responses are never retried. While the browser is offline, delivery waits for
+   * it to come back online instead of spending retries. Defaults to 3; 0 disables.
+   */
+  maxRetries?: number;
   debug?: boolean;
 }
 

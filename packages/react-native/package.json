@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test tests/replay.test.cjs",
+    "test": "npm run build && node --test tests/replay.test.cjs tests/flags-logs.test.cjs",
     "prepublishOnly": "npm run test"
   },
   "files": [

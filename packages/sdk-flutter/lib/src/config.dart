@@ -16,6 +16,9 @@ final class TraceIQConfig {
     this.sessionTimeout = const Duration(minutes: 30),
     this.trackingEnabled = true,
     this.replayEnabled = false,
+    this.environment = 'production',
+    this.serviceName = 'mobile-app',
+    this.autoTrackFlagExposures = true,
   }) {
     if (projectId.trim().isEmpty) {
       throw ArgumentError.value(projectId, 'projectId', 'must not be empty');
@@ -90,6 +93,18 @@ final class TraceIQConfig {
   /// Mobile structural replay is off unless explicitly enabled and consented.
   final bool replayEnabled;
 
+  /// Environment used for flag evaluation and stamped on log lines.
+  final String environment;
+
+  /// Service name stamped on log lines.
+  final String serviceName;
+
+  /// Records an exposure when a flag is read with `isFeatureEnabled` or `getFeatureFlagPayload`.
+  final bool autoTrackFlagExposures;
+
   /// Batch endpoint derived from [apiUrl].
-  Uri get batchUri => Uri.parse('${apiUrl.replaceFirst(RegExp(r'/+$'), '')}/v1/events/batch');
+  Uri get batchUri => endpoint('/v1/events/batch');
+
+  /// An API endpoint such as `/v1/logs/batch`, derived from [apiUrl].
+  Uri endpoint(String path) => Uri.parse('${apiUrl.replaceFirst(RegExp(r'/+$'), '')}$path');
 }

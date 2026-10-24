@@ -15,8 +15,21 @@ final class TransportResponse {
   bool get isSuccess => statusCode >= 200 && statusCode < 300;
 }
 
+/// Response to a JSON request other than an event batch.
+final class TraceIQJsonResponse {
+  const TraceIQJsonResponse({required this.statusCode, this.body, this.retryAfter});
+  final int statusCode;
+  /// Decoded JSON body, or null if it was empty or not JSON.
+  final Object? body;
+  final Duration? retryAfter;
+  bool get isSuccess => statusCode >= 200 && statusCode < 300;
+}
+
 abstract interface class TraceIQTransport {
   Future<TransportResponse> send(List<TraceIQEvent> events);
+
+  /// POSTs [body] plus the project id as JSON to an API path such as `/v1/logs/batch`.
+  Future<TraceIQJsonResponse> post(String path, Map<String, Object?> body);
   void close();
 }
 
@@ -44,6 +57,31 @@ final class HttpTraceIQTransport implements TraceIQTransport {
       statusCode: response.statusCode,
       retryAfter: _parseRetryAfter(response.headers['retry-after']),
       acceptedEvents: _acceptedEvents(response.body, events.length),
+    );
+  }
+
+  @override
+  Future<TraceIQJsonResponse> post(String path, Map<String, Object?> body) async {
+    final response = await _client
+        .post(
+          _config.endpoint(path),
+          headers: <String, String>{
+            'content-type': 'application/json',
+            'x-traceiq-write-key': _config.apiKey,
+          },
+          body: jsonEncode(<String, Object?>{'projectId': _config.projectId, ...body}),
+        )
+        .timeout(_config.requestTimeout);
+    Object? decoded;
+    try {
+      decoded = response.body.isEmpty ? null : jsonDecode(response.body);
+    } on FormatException {
+      decoded = null;
+    }
+    return TraceIQJsonResponse(
+      statusCode: response.statusCode,
+      body: decoded,
+      retryAfter: _parseRetryAfter(response.headers['retry-after']),
     );
   }
 

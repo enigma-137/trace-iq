@@ -84,6 +84,7 @@ The `initialize()` call accepts:
 - `projectId`: your TraceIQ project ID
 - `writeKey`: your public SDK write key
 - `endpoint`: the TraceIQ API base URL
+- `maxRetries`: retries after a network error, HTTP 429 or 5xx, with exponential backoff (default `3`; `0` disables). While the browser is offline, sends wait for it to reconnect.
 - `debug`: enable console logging for troubleshooting
 
 ## Notes
