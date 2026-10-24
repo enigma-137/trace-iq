@@ -21,6 +21,7 @@
     --text: #f4f4f5;
     --muted: #a1a1aa;
     --dim: #52525b;
+    --fade: #000;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
@@ -45,6 +46,8 @@
   }
   .headline .w { display: inline-block; margin: 0 0.12em; will-change: filter, opacity, transform; }
   .accent { color: #8fb4ff; }
+  .muted { color: #a1a1aa; }
+  .kicker { color: #8b8fa3; }
   .bg-warm .accent { color: #dbe7ff; }
 
   /* Browser window around real dashboard screenshots */
@@ -96,6 +99,41 @@
     background: rgba(255,255,255,.06); box-shadow: 0 0 0 1px rgba(255,255,255,.1); font-size: 22px; font-weight: 500; color: #e4e4e7;
   }
   .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); display: inline-block; }
+
+  /* Light theme: promo.html?theme=light, with screens from public/shots-light/. */
+  html[data-theme="light"] { --bg: #ffffff; --text: #0a0a0a; --green: #16a34a; --fade: #fff; }
+  [data-theme="light"] .bg-dark { background: radial-gradient(1200px 700px at 50% 35%, #e9f0ff 0%, #f7f9fd 55%, #ffffff 100%); }
+  [data-theme="light"] .bg-warm {
+    background:
+      radial-gradient(900px 600px at 15% 10%, rgba(147,182,255,.55), transparent 60%),
+      radial-gradient(900px 700px at 90% 100%, rgba(255,190,140,.6), transparent 60%),
+      linear-gradient(160deg, #dbe6ff 0%, #e8eefc 40%, #fbe9da 80%, #fcdcc0 100%);
+  }
+  [data-theme="light"] .bg-ink { background: radial-gradient(1000px 600px at 50% 0%, #eef2fb 0%, #f6f7f9 60%, #fafafa 100%); }
+  [data-theme="light"] .accent, [data-theme="light"] .bg-warm .accent { color: var(--blue-deep); }
+  [data-theme="light"] .muted { color: #71717a; }
+  [data-theme="light"] .kicker { color: #71717a; }
+  [data-theme="light"] .caret { background: var(--blue-deep); }
+  [data-theme="light"] .window { background: #fff; box-shadow: 0 50px 110px -30px rgba(30,41,80,.35), 0 0 0 1px rgba(15,23,42,.08); }
+  [data-theme="light"] .window .bar { background: #f4f4f5; border-bottom-color: rgba(15,23,42,.07); }
+  [data-theme="light"] .window .url { background: #e4e4e7; color: #52525b; }
+  [data-theme="light"] .term { background: rgba(255,255,255,.96); box-shadow: 0 40px 100px -30px rgba(30,41,80,.3), 0 0 0 1px rgba(15,23,42,.08); }
+  [data-theme="light"] .term .bar { border-bottom-color: rgba(15,23,42,.06); }
+  [data-theme="light"] .term .title { color: #a1a1aa; }
+  [data-theme="light"] .term .body { color: #27272a; }
+  [data-theme="light"] .diamond { color: #0891b2; }
+  [data-theme="light"] .warn, [data-theme="light"] .mod { color: #b45309; }
+  [data-theme="light"] .dim { color: #a1a1aa; }
+  [data-theme="light"] .code .ln { color: #d4d4d8; }
+  [data-theme="light"] .tk-k { color: #9333ea; }
+  [data-theme="light"] .tk-s { color: #15803d; }
+  [data-theme="light"] .tk-f { color: #1d4ed8; }
+  [data-theme="light"] .tk-p { color: #be123c; }
+  [data-theme="light"] .card { background: #fff; box-shadow: 0 30px 60px -30px rgba(30,41,80,.3), 0 0 0 1px rgba(15,23,42,.08); }
+  [data-theme="light"] .card .tag { color: #a1a1aa; }
+  [data-theme="light"] .card .cmd { color: #15803d; }
+  [data-theme="light"] .card .live { box-shadow: 0 0 10px rgba(22,163,74,.5); }
+  [data-theme="light"] .pill { background: #fff; box-shadow: 0 0 0 1px rgba(15,23,42,.1), 0 10px 30px -15px rgba(30,41,80,.3); color: #27272a; }
 </style>
 </head>
 <body>
@@ -104,9 +142,9 @@
 <section class="scene bg-dark" id="s-intro">
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <img id="intro-logo" src="public/logo.png" style="width:150px;height:150px;margin-bottom:6px">
-    <div id="intro-kicker" class="mono" style="font-size:20px;letter-spacing:.5em;color:#8b8fa3;margin-bottom:22px;padding-left:.5em">INTRODUCING</div>
+    <div id="intro-kicker" class="mono kicker" style="font-size:20px;letter-spacing:.5em;margin-bottom:22px;padding-left:.5em">INTRODUCING</div>
     <div id="intro-title" style="font-size:150px;font-weight:800;letter-spacing:-0.045em;line-height:1">TraceIQ</div>
-    <div class="mono" style="font-size:44px;margin-top:34px;color:#a1a1aa;height:60px">for <span id="intro-type" style="color:#8fb4ff"></span><span class="caret" id="intro-caret" style="height:40px;width:4px;vertical-align:-6px"></span></div>
+    <div class="mono muted" style="font-size:44px;margin-top:34px;height:60px">for <span id="intro-type" class="accent"></span><span class="caret" id="intro-caret" style="height:40px;width:4px;vertical-align:-6px"></span></div>
   </div>
 </section>
 
@@ -213,14 +251,22 @@
       <img src="public/logo.png" style="width:170px;height:170px">
       <span style="font-size:120px;font-weight:800;letter-spacing:-0.045em">TraceIQ</span>
     </div>
-    <div id="outro-tag" style="font-size:34px;color:#a1a1aa;margin-top:10px">Open-source product analytics and observability.</div>
-    <div id="outro-url" class="mono" style="font-size:30px;color:#8fb4ff;margin-top:44px">traceiq.run</div>
+    <div id="outro-tag" class="muted" style="font-size:34px;margin-top:10px">Open-source product analytics and observability.</div>
+    <div id="outro-url" class="mono accent" style="font-size:30px;margin-top:44px">traceiq.run</div>
   </div>
 </section>
 
-<div id="fade" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none"></div>
+<div id="fade" style="position:absolute;inset:0;background:var(--fade);opacity:0;pointer-events:none"></div>
 
 <script>
+// ?theme=light swaps in light-theme screens and the dark logo.
+if (new URLSearchParams(location.search).get('theme') === 'light') {
+  document.documentElement.dataset.theme = 'light';
+  for (const img of document.images) {
+    img.src = img.getAttribute('src').replace('public/shots/', 'public/shots-light/').replace('public/logo.png', 'public/logo-dark.png');
+  }
+}
+
 const DURATION = 60;
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -382,7 +428,7 @@ function selfhost(lt) {
   const b = clamp(Math.floor((lt - 2.2) / 0.03), 0, HOST_CMD[1].length);
   let html = `<span class="dim">$</span> ${esc(HOST_CMD[0].slice(0, a))}`;
   if (lt >= 2.1) html += `\n<span class="dim">$</span> ${esc(HOST_CMD[1].slice(0, b))}`;
-  if (lt >= 3.6) html += `\n\n<span class="ok">✓</span> Dashboard ready at <span style="color:#8fb4ff">http://localhost:3000</span>`;
+  if (lt >= 3.6) html += `\n\n<span class="ok">✓</span> Dashboard ready at <span class="accent">http://localhost:3000</span>`;
   $('host-body').innerHTML = html;
   const pills = $('host-pills').children;
   for (let i = 0; i < pills.length; i++) {

@@ -1,14 +1,17 @@
 // Captures real dashboard screens from a local, seeded TraceIQ instance for
 // the promo video. Run seed-demo.mjs first.
 //
-// Usage: node video/capture.mjs [dashboardUrl] [apiUrl]
+// Usage: node video/capture.mjs [--theme light] [dashboardUrl] [apiUrl]
+// Dark screens go to public/shots/, light ones to public/shots-light/.
 
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
-const BASE = process.argv[2] ?? 'http://localhost:3000';
-const API = process.argv[3] ?? 'http://localhost:4000';
-const OUT = new URL('./public/shots/', import.meta.url).pathname;
+const args = process.argv.slice(2);
+const THEME = args.includes('--theme') ? args.splice(args.indexOf('--theme'), 2)[1] : 'dark';
+const BASE = args[0] ?? 'http://localhost:3000';
+const API = args[1] ?? 'http://localhost:4000';
+const OUT = new URL(THEME === 'light' ? './public/shots-light/' : './public/shots/', import.meta.url).pathname;
 
 const PAGES = [
   ['overview', '/dashboard'],
@@ -48,7 +51,9 @@ if (funnels?.[0]) PAGES.push(['funnel', `/dashboard/funnels/${funnels[0].id}`]);
 
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: THEME });
+// The dashboard reads its theme from localStorage before first paint.
+await page.addInitScript((theme) => localStorage.setItem('traceiq-theme', theme), THEME);
 
 for (const [name, path] of PAGES) {
   // Live pages (logs) stream forever, so never reach networkidle.
