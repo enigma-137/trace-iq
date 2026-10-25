@@ -13,6 +13,22 @@ const WEEK_MS = 7 * DAY_MS;
 const ALLOWED_INTERVALS: TrendInterval[] = ['hour', 'day', 'week'];
 const BUCKET_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS"Z"';
 
+export type OverviewRange = '24h' | '7d' | '30d';
+const OVERVIEW_RANGES: Record<OverviewRange, { sql: string; ms: number; bucket: TrendInterval }> = {
+  '24h': { sql: '24 hours', ms: DAY_MS, bucket: 'hour' },
+  '7d': { sql: '7 days', ms: 7 * DAY_MS, bucket: 'day' },
+  '30d': { sql: '30 days', ms: 30 * DAY_MS, bucket: 'day' }
+};
+const DEFAULT_OVERVIEW_RANGE: OverviewRange = '7d';
+// The overview is the most expensive dashboard page; reloads and several
+// viewers of one project within this window reuse a single computation.
+const OVERVIEW_CACHE_TTL_MS = 60_000;
+const OVERVIEW_CACHE_MAX_ENTRIES = 500;
+
+export function parseOverviewRange(value?: string): OverviewRange {
+  return value && Object.prototype.hasOwnProperty.call(OVERVIEW_RANGES, value) ? (value as OverviewRange) : DEFAULT_OVERVIEW_RANGE;
+}
+
 export interface TrendPoint {
   bucket: string;
   total: number;
@@ -134,6 +150,7 @@ export interface AlertsSummaryOverview {
 
 export interface OverviewResponse {
   project: ResolvedProject | null;
+  range: OverviewRange;
   totals: {
     events: number;
     events24h: number;
@@ -220,6 +237,8 @@ export interface WebAnalyticsResponse {
 
 @Injectable()
 export class AnalyticsService {
+  private readonly overviewCache = new Map<string, { expiresAt: number; value: Promise<OverviewResponse> }>();
+
   constructor(
     private readonly database: DatabaseService,
     private readonly projects: ProjectsService
@@ -228,13 +247,16 @@ export class AnalyticsService {
   async getOverview(
     user: DashboardUser,
     projectId?: string,
-    organizationId?: string
+    organizationId?: string,
+    rangeParam?: string
   ): Promise<OverviewResponse> {
     const project = await this.projects.resolveActiveProject(user, projectId, organizationId);
+    const range = parseOverviewRange(rangeParam);
 
     if (!project) {
       return {
         project: null,
+        range,
         totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0 },
         lastEventAt: null,
         revenue: { total: 0, previous: 0, transactions: 0 },
@@ -246,6 +268,34 @@ export class AnalyticsService {
         observabilitySeries: []
       };
     }
+
+    // Access is checked above on every request; only the computed numbers are
+    // shared, so a refresh or a second viewer within the TTL costs no queries.
+    return this.cachedOverview(`${project.id}:${range}`, () => this.computeOverview(project, range));
+  }
+
+  private cachedOverview(key: string, compute: () => Promise<OverviewResponse>): Promise<OverviewResponse> {
+    const now = Date.now();
+    const hit = this.overviewCache.get(key);
+    if (hit && hit.expiresAt > now) return hit.value;
+
+    const value = compute();
+    this.overviewCache.set(key, { expiresAt: now + OVERVIEW_CACHE_TTL_MS, value });
+    // A failed computation must not be served to the next caller.
+    value.catch(() => {
+      if (this.overviewCache.get(key)?.value === value) this.overviewCache.delete(key);
+    });
+    if (this.overviewCache.size > OVERVIEW_CACHE_MAX_ENTRIES) {
+      for (const [entryKey, entry] of this.overviewCache) {
+        if (entry.expiresAt <= now || this.overviewCache.size > OVERVIEW_CACHE_MAX_ENTRIES) this.overviewCache.delete(entryKey);
+      }
+    }
+    return value;
+  }
+
+  private async computeOverview(project: ResolvedProject, range: OverviewRange): Promise<OverviewResponse> {
+    const span = OVERVIEW_RANGES[range];
+    const since = `now() - interval '${span.sql}'`;
 
     // Every query below is independent, so they all go out at once rather than
     // queueing behind each other; only the latency pair waits on serverTimed.
@@ -259,12 +309,20 @@ export class AnalyticsService {
     }>(
       `
         SELECT
-          (SELECT count(*) FROM events WHERE project_id = $1)::int AS total_events,
-          (SELECT count(*) FROM events WHERE project_id = $1 AND occurred_at >= now() - interval '24 hours')::int AS events_24h,
-          (SELECT count(*) FROM events WHERE project_id = $1 AND occurred_at >= now() - interval '1 hour')::int AS events_1h,
+          counts.total_events,
+          counts.events_24h,
+          counts.events_1h,
           (SELECT count(*) FROM users WHERE project_id = $1)::int AS total_users,
-          (SELECT count(*) FROM sessions WHERE project_id = $1)::int AS total_sessions,
+          (SELECT count(*) FROM sessions WHERE project_id = $1 AND started_at >= ${since})::int AS total_sessions,
           (SELECT max(occurred_at) FROM events WHERE project_id = $1) AS last_event_at
+        FROM (
+          SELECT
+            count(*)::int AS total_events,
+            count(*) FILTER (WHERE occurred_at >= now() - interval '24 hours')::int AS events_24h,
+            count(*) FILTER (WHERE occurred_at >= now() - interval '1 hour')::int AS events_1h
+          FROM events
+          WHERE project_id = $1 AND occurred_at >= ${since}
+        ) counts
       `,
       [project.id]
     );
@@ -273,7 +331,7 @@ export class AnalyticsService {
       `
         SELECT event_name AS "eventName", count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
+        WHERE project_id = $1 AND occurred_at >= ${since}
         GROUP BY event_name
         ORDER BY total DESC
         LIMIT 10
@@ -289,7 +347,7 @@ export class AnalyticsService {
     }>(
       `
         SELECT
-          to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+          to_char(date_trunc('${span.bucket}', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
           count(*)::int AS total,
           -- Only real request telemetry: a custom event that happens to carry a
           -- durationMs (time on page, a video watched) is not an API call.
@@ -298,7 +356,7 @@ export class AnalyticsService {
             WHERE event_name = '$exception' OR event_name = '$error'
           )::int AS errors
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - interval '14 days'
+        WHERE project_id = $1 AND occurred_at >= ${since}
         GROUP BY 1
         ORDER BY 1 ASC
       `,
@@ -309,7 +367,7 @@ export class AnalyticsService {
       `
         SELECT COALESCE(NULLIF(device_info->>'os', ''), 'unknown') AS name, count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
+        WHERE project_id = $1 AND occurred_at >= ${since}
         GROUP BY 1
         ORDER BY total DESC
         LIMIT 6
@@ -321,7 +379,7 @@ export class AnalyticsService {
       `
         SELECT network_info->>'country' AS name, count(*)::int AS total
         FROM events
-        WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
+        WHERE project_id = $1 AND occurred_at >= ${since}
           AND NULLIF(network_info->>'country', '') IS NOT NULL
           AND network_info->>'country' != 'unknown'
         GROUP BY 1
@@ -341,7 +399,7 @@ export class AnalyticsService {
        FROM (
          SELECT context->'page'->>'referrer' AS ref, COALESCE(user_id::text, anonymous_id) AS actor
          FROM events WHERE project_id = $1 AND event_name = '$page'
-           AND occurred_at >= now() - interval '30 days'
+           AND occurred_at >= ${since}
        ) pageviews
        GROUP BY 1 ORDER BY views DESC LIMIT 6`,
       [project.id]
@@ -358,12 +416,12 @@ export class AnalyticsService {
             occurred_at,
             CASE WHEN properties->>'amount' ~ ${NUMERIC_GUARD} THEN (properties->>'amount')::numeric END AS amount
           FROM events
-          WHERE project_id = $1 AND occurred_at >= now() - interval '60 days'
+          WHERE project_id = $1 AND occurred_at >= now() - interval '${span.sql}' * 2
         )
         SELECT
-          COALESCE(sum(amount) FILTER (WHERE occurred_at >= now() - interval '30 days'), 0)::float AS current_revenue,
-          COALESCE(sum(amount) FILTER (WHERE occurred_at < now() - interval '30 days'), 0)::float AS previous_revenue,
-          count(amount) FILTER (WHERE occurred_at >= now() - interval '30 days')::int AS current_transactions
+          COALESCE(sum(amount) FILTER (WHERE occurred_at >= ${since}), 0)::float AS current_revenue,
+          COALESCE(sum(amount) FILTER (WHERE occurred_at < ${since}), 0)::float AS previous_revenue,
+          count(amount) FILTER (WHERE occurred_at >= ${since})::int AS current_transactions
         FROM rev
       `,
       [project.id]
@@ -377,7 +435,7 @@ export class AnalyticsService {
         `SELECT EXISTS (
            SELECT 1 FROM events
            WHERE project_id = $1 AND event_name = '$api_request'
-             AND occurred_at >= now() - interval '14 days' AND NOT ${isClientRequest}
+             AND occurred_at >= ${since} AND NOT ${isClientRequest}
          ) AS present`,
         [project.id]
       )
@@ -406,7 +464,7 @@ export class AnalyticsService {
                 (properties->>'status')::int AS status
               FROM events
               WHERE project_id = $1 AND event_name = '$api_request'
-                AND occurred_at >= now() - interval '14 days'
+                AND occurred_at >= ${since}
                 AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
                 AND properties->>'status' ~ '^[0-9]+$'
                 ${latencySourceFilter}
@@ -441,13 +499,13 @@ export class AnalyticsService {
                 (properties->>'durationMs')::numeric AS duration
               FROM events
               WHERE project_id = $1 AND event_name = '$api_request'
-                AND occurred_at >= now() - interval '14 days'
+                AND occurred_at >= ${since}
                 AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
                 AND properties->>'status' ~ '^[0-9]+$'
                 ${latencySourceFilter}
             )
             SELECT
-              to_char(date_trunc('day', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
+              to_char(date_trunc('${span.bucket}', occurred_at AT TIME ZONE 'UTC'), '${BUCKET_FORMAT}') AS bucket,
               round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p50,
               round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p90,
               round((percentile_cont(0.99) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p99
@@ -503,7 +561,7 @@ export class AnalyticsService {
             max(occurred_at) AS last_seen
           FROM events
           WHERE project_id = $1 AND (event_name = '$exception' OR event_name = '$error')
-            AND occurred_at >= now() - interval '14 days'
+            AND occurred_at >= ${since}
           GROUP BY 1, 2
           ORDER BY occurrences DESC
           LIMIT 4
@@ -547,7 +605,7 @@ export class AnalyticsService {
             COALESCE(user_id::text, anonymous_id) AS actor
           FROM events
           WHERE project_id = $1 AND event_name = '$api_request'
-            AND occurred_at >= now() - interval '14 days'
+            AND occurred_at >= ${since}
             AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
             AND properties->>'status' ~ '^[0-9]+$'
           ORDER BY occurred_at DESC
@@ -567,7 +625,7 @@ export class AnalyticsService {
             count(*) FILTER (WHERE event_name = '$deadclick' OR properties->>'dead' = 'true')::int AS dead_clicks,
             count(DISTINCT session_id) FILTER (WHERE event_name = '$exception' OR event_name = '$error')::int AS error_sessions
           FROM events
-          WHERE project_id = $1 AND occurred_at >= now() - interval '14 days'
+          WHERE project_id = $1 AND occurred_at >= ${since}
         `,
         [project.id]
       ).catch(() => ({ rows: [{ rage_clicks: 0, dead_clicks: 0, error_sessions: 0 }] })),
@@ -581,7 +639,7 @@ export class AnalyticsService {
             count(*) FILTER (WHERE event_name = '$page' OR event_name = '$autocapture')::int AS autocapture_count,
             count(*) FILTER (WHERE event_name NOT IN ('$page', '$autocapture'))::int AS custom_count
           FROM events
-          WHERE project_id = $1 AND occurred_at >= now() - interval '30 days'
+          WHERE project_id = $1 AND occurred_at >= ${since}
         `,
         [project.id]
       ).catch(() => ({ rows: [{ autocapture_count: 0, custom_count: 0 }] })),
@@ -593,7 +651,7 @@ export class AnalyticsService {
           SELECT
             COALESCE(round(avg(EXTRACT(EPOCH FROM (last_seen_at - started_at))))::int, 0) AS avg_duration_sec
           FROM sessions
-          WHERE project_id = $1 AND started_at >= now() - interval '30 days'
+          WHERE project_id = $1 AND started_at >= ${since}
         `,
         [project.id]
       ).catch(() => ({ rows: [{ avg_duration_sec: 0 }] })),
@@ -611,11 +669,11 @@ export class AnalyticsService {
     ]);
 
     const to = new Date();
-    const from = new Date(to.getTime() - 14 * DAY_MS);
-    const buckets14 = this.generateBuckets(from, to, 'day');
-    const sparkline = this.zeroFill(buckets14, sparklineRows.rows);
+    const from = new Date(to.getTime() - span.ms);
+    const buckets = this.generateBuckets(from, to, span.bucket);
+    const sparkline = this.zeroFill(buckets, sparklineRows.rows);
     const observabilityRows = new Map(sparklineRows.rows.map((row) => [row.bucket, row]));
-    const observabilitySeries = buckets14.map((bucket) => {
+    const observabilitySeries = buckets.map((bucket) => {
       const row = observabilityRows.get(bucket);
       return {
         bucket,
@@ -639,7 +697,7 @@ export class AnalyticsService {
     const errorRate = totalRequests > 0 ? Number(((errCount / totalRequests) * 100).toFixed(2)) : 0;
 
     const latencyByBucket = new Map(apiLatencyResult.rows.map((row) => [row.bucket, row]));
-    const latencySeries = buckets14.flatMap((bucket) => {
+    const latencySeries = buckets.flatMap((bucket) => {
       const row = latencyByBucket.get(bucket);
       return row ? [{ bucket, p50: row.p50, p90: row.p90, p99: row.p99 }] : [];
     });
@@ -666,6 +724,7 @@ export class AnalyticsService {
 
     return {
       project,
+      range,
       totals: {
         events: totals?.total_events ?? 0,
         events24h: totals?.events_24h ?? 0,

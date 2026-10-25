@@ -12,12 +12,15 @@ interface RequestStatusBreakdown {
 interface RequestStatusCardProps {
   breakdown: RequestStatusBreakdown;
   totalRequests?: number;
+  /** Short label for the window the counts cover. */
+  windowLabel?: string;
   className?: string;
 }
 
 export function RequestStatusCard({
   breakdown,
   totalRequests,
+  windowLabel = '14d',
   className = ''
 }: RequestStatusCardProps) {
   const ok = breakdown.ok200 ?? 0;
@@ -53,7 +56,7 @@ export function RequestStatusCard({
           <span className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
             {total.toLocaleString()}
           </span>
-          <span className="text-sm font-medium text-neutral-500 dark:text-slate-400">Total requests (14d)</span>
+          <span className="text-sm font-medium text-neutral-500 dark:text-slate-400">Total requests ({windowLabel})</span>
         </div>
       </div>
 

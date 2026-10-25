@@ -7,11 +7,13 @@ interface TopEvent {
 
 interface TopEventsListProps {
   events: TopEvent[];
+  /** Window the list covers, for the empty state. */
+  windowLabel?: string;
 }
 
-export function TopEventsList({ events }: TopEventsListProps) {
+export function TopEventsList({ events, windowLabel = '30 days' }: TopEventsListProps) {
   if (events.length === 0) {
-    return <p className="text-sm text-neutral-500 dark:text-neutral-500">No events captured in the last 30 days.</p>;
+    return <p className="text-sm text-neutral-500 dark:text-neutral-500">No events captured in the last {windowLabel}.</p>;
   }
 
   const maxTotal = Math.max(1, ...events.map((event) => event.total));
