@@ -9,6 +9,7 @@ import { clearPendingInvite, peekPendingInvite } from '@/lib/pending-invite';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import { createOtpSubmissionGuard, isCompleteOtpCode, normalizeOtpCode } from '@/lib/otp-code';
+import { PasswordInput } from '@/components/PasswordInput';
 
 type AuthMode = 'signin' | 'signup';
 type AuthStage = 'credentials' | 'setup-prompt' | 'mfa-challenge';
@@ -434,11 +435,10 @@ export function AuthForm() {
                       </Link>
                     ) : null}
                   </div>
-                  <input
+                  <PasswordInput
                     className={inputClass}
                     id="password"
                     name="password"
-                    type="password"
                     placeholder="••••••••"
                     value={password}
                     autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}

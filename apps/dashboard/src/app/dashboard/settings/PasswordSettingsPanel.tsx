@@ -6,6 +6,7 @@ import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import LockPasswordIcon from '@hugeicons/core-free-icons/LockPasswordIcon';
 import { Notice, SettingsCard, fieldLabelClass, inputClass, primaryButton, secondaryButton } from './SettingsUI';
+import { PasswordInput } from '@/components/PasswordInput';
 
 interface PasswordSettingsPanelProps {
   userEmail?: string | null;
@@ -164,11 +165,10 @@ export function PasswordSettingsPanel({ userEmail }: PasswordSettingsPanelProps)
             <form className="grid max-w-md gap-4" onSubmit={handlePasswordUpdate}>
               <label className={fieldLabelClass} htmlFor="settings-new-password">
                 New password
-                <input
+                <PasswordInput
                   className={inputClass}
                   id="settings-new-password"
                   name="newPassword"
-                  type="password"
                   placeholder="••••••••"
                   value={newPassword}
                   minLength={6}
@@ -181,11 +181,10 @@ export function PasswordSettingsPanel({ userEmail }: PasswordSettingsPanelProps)
 
               <label className={fieldLabelClass} htmlFor="settings-confirm-password">
                 Confirm new password
-                <input
+                <PasswordInput
                   className={inputClass}
                   id="settings-confirm-password"
                   name="confirmPassword"
-                  type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
                   minLength={6}
