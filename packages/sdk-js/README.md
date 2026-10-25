@@ -34,7 +34,7 @@ import { traceiq } from 'traceiq-sdk-js';
 traceiq.initialize({
   projectId: 'your-project-id',
   writeKey: 'your-write-key',
-  endpoint: 'https://api.traceiq.dev'
+  endpoint: 'https://api.traceiq.run'
 });
 
 traceiq.track('signup_completed', { plan: 'pro' });

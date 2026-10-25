@@ -187,7 +187,7 @@ are intentionally **not exposed** through the MCP server.
       "args": ["-y", "traceiq-mcp-server"],
       "env": {
         "TRACEIQ_API_KEY": "tiq_pat_your_token_here",
-        "TRACEIQ_API_URL": "https://api.traceiq.dev"
+        "TRACEIQ_API_URL": "https://api.traceiq.run"
       }
     }
   }

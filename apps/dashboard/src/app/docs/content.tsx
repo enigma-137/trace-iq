@@ -474,13 +474,8 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
             anonymous identity, sessions, an offline queue, batching, retries, lifecycle flushing, navigation
             tracking, and chained Flutter error handlers.
           </P>
-          <P>
-            Version 0.1.0 is currently prepared in this repository under <Mono>packages/sdk-flutter</Mono>. Until
-            the first pub.dev release, monorepo applications can use a local path dependency.
-          </P>
-          <Code lang="yaml">{`dependencies:
-  traceiq_flutter:
-    path: ../../packages/sdk-flutter`}</Code>
+          <P>Install it from pub.dev:</P>
+          <Code lang="bash">{`flutter pub add traceiq_flutter`}</Code>
           <Code lang="dart">{`await TraceIQ.initialize(
   projectId: '${projectId}',
   apiKey: 'YOUR_PROJECT_WRITE_KEY',
