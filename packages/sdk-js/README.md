@@ -85,6 +85,7 @@ The `initialize()` call accepts:
 - `projectId`: your TraceIQ project ID
 - `writeKey`: your public SDK write key
 - `endpoint`: the TraceIQ API base URL
+- `release`: your app version or build, such as a git SHA. It is sent with every event, and Error tracking shows which release each error was first and last seen in, and which release it regressed in
 - `propagateTraceHeaders`: with `autoCaptureRequests`, captured API calls carry a W3C `traceparent` header so a `traceiq-node` backend joins the same trace. Same-origin only by default, because cross-origin it needs the API's CORS config to allow `traceparent`; pass a list of allowed origins (e.g. `['https://api.example.com']`), or `false` to turn it off.
 - `maxRetries`: retries after a network error, HTTP 429 or 5xx, with exponential backoff (default `3`; `0` disables). While the browser is offline, sends wait for it to reconnect.
 - `persistUndeliveredEvents`: save events whose delivery is delayed (offline, or a failed first attempt) to `localStorage` and resend them on the next page load if the page closes first (default `true`; up to 100 events, kept 24 hours). Events sent on the first try are never stored.

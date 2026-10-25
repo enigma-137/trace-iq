@@ -15,11 +15,12 @@ export class ErrorsController {
     @Headers('authorization') authorization?: string,
     @Query('days') days?: string,
     @Query('projectId') projectId?: string,
-    @Query('status') status?: string
+    @Query('status') status?: string,
+    @Query('release') release?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'errors:read');
-    return this.errorsService.listIssues(user, days, projectId, status);
+    return this.errorsService.listIssues(user, days, projectId, status, release);
   }
 
   @Get('issue')

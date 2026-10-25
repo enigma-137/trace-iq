@@ -3,6 +3,12 @@ export interface TraceIQInitOptions {
   writeKey: string;
   endpoint?: string;
   environment?: 'development' | 'staging' | 'production' | string;
+  /**
+   * The version of your app that is running, e.g. a version number or git SHA. Sent with every event
+   * so errors show which release they first and last appeared in. Must match the `--release` you
+   * upload source maps for.
+   */
+  release?: string;
   autoTrackPageViews?: boolean;
   autoCaptureExceptions?: boolean;
   autoCaptureRageClicks?: boolean;

@@ -59,6 +59,28 @@ describe('TraceIQ node client', () => {
     expect(body.batch[0]).toMatchObject({ eventName: '$alias', userId: 'user_1', properties: { previousId: 'guest_1' } });
   });
 
+  it('stamps the release on every event, from the option or TRACEIQ_RELEASE', async () => {
+    const fetchImpl = fetchReturning(202);
+    const traceiq = client(fetchImpl, { release: '2.4.0' });
+    traceiq.capture({ event: 'a', context: { server: 'web-1' } });
+    traceiq.capture({ event: 'b', context: { release: 'hotfix' } });
+    await traceiq.shutdown();
+    const { body } = sentBody(fetchImpl);
+    expect(body.batch[0].context).toEqual({ server: 'web-1', release: '2.4.0' });
+    expect(body.batch[1].context).toEqual({ release: 'hotfix' });
+
+    process.env.TRACEIQ_RELEASE = 'sha-abc123';
+    try {
+      const fromEnv = fetchReturning(202);
+      const envClient = client(fromEnv);
+      envClient.identify({ userId: 'user_1' });
+      await envClient.shutdown();
+      expect(sentBody(fromEnv).body.batch[0].context).toEqual({ release: 'sha-abc123' });
+    } finally {
+      delete process.env.TRACEIQ_RELEASE;
+    }
+  });
+
   it('flushes automatically once flushAt events are queued', async () => {
     const fetchImpl = fetchReturning(202);
     const traceiq = client(fetchImpl, { flushAt: 2 });
