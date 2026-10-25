@@ -30,7 +30,7 @@ export default async function GroupsPage({
 
   const groups = data?.groups ?? [];
   const activeGroups = groups.filter((group) => group.events > 0).length;
-  const members = groups.reduce((sum, group) => sum + group.members, 0);
+  const memberships = groups.reduce((sum, group) => sum + group.members, 0);
 
   return (
     <DashboardShell active="groups" title="Groups" userEmail={user.email ?? undefined} projectId={data?.project?.id ?? projectId}>
@@ -72,7 +72,7 @@ export default async function GroupsPage({
         <section className="mb-4 grid gap-3 sm:grid-cols-3">
           <Stat label="Groups" value={(data.total ?? groups.length).toLocaleString()} hint={search ? `matching “${search}”` : 'reported with group()'} />
           <Stat label="Active groups" value={activeGroups.toLocaleString()} hint={`with activity in the last ${data.days} days`} />
-          <Stat label="Members" value={members.toLocaleString()} hint="people who joined a listed group" />
+          <Stat label="Memberships" value={memberships.toLocaleString()} hint="across listed groups; a person can be in several" />
         </section>
       ) : null}
 
