@@ -69,6 +69,7 @@ if (traceiq.flags.isEnabled('nuwell-new-add-meal')) {
 
 ```ts
 traceiq.identify({ userId: 'user_123', traits: { plan: 'pro' } });
+traceiq.alias('user_123', 'guest_8f2c'); // link another ID for the same person
 traceiq.track('checkout_started', { cartValue: 4200, currency: 'NGN' });
 traceiq.page('Pricing');
 traceiq.group({ organizationId: 'org_123', traits: { plan: 'growth' } });

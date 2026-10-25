@@ -99,6 +99,21 @@ final class ClientTest extends TestCase
         $this->assertSame(['traits' => ['email' => 'a@b.com']], $body['batch'][0]['properties']);
     }
 
+    public function testAliasEmitsDollarAliasAndIgnoresSelfAlias(): void
+    {
+        $client = new FakeClient();
+        $client->alias('user_1', 'guest_1');
+        $client->alias('user_1', 'user_1');
+        $client->alias('user_2', 'guest_2');
+
+        $body = $this->decode($client->sent[0]);
+        $this->assertCount(2, $body['batch']);
+        $this->assertSame('$alias', $body['batch'][0]['eventName']);
+        $this->assertSame('user_1', $body['batch'][0]['userId']);
+        $this->assertSame(['previousId' => 'guest_1'], $body['batch'][0]['properties']);
+        $this->assertSame('user_2', $body['batch'][1]['userId']);
+    }
+
     public function testGroupEmitsDollarGroup(): void
     {
         $client = new FakeClient();

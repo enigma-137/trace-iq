@@ -131,6 +131,26 @@ class Client:
             }
         )
 
+    def alias(
+        self,
+        user_id: str,
+        previous_id: str,
+        timestamp: Optional[Union[str, datetime]] = None,
+    ) -> None:
+        """Tell TraceIQ that ``previous_id`` and ``user_id`` are the same person, so
+        their events and profiles can be merged into ``user_id``."""
+        if not user_id or not previous_id or user_id == previous_id:
+            self._debug("alias() needs two different IDs; ignored.")
+            return
+        self._enqueue(
+            {
+                "eventName": "$alias",
+                "userId": user_id,
+                "properties": {"previousId": previous_id},
+                "timestamp": _to_iso(timestamp),
+            }
+        )
+
     def group(
         self,
         organization_id: str,

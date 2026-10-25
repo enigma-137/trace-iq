@@ -136,6 +136,12 @@ abstract final class TraceIQ {
   static Future<void> identify(String userId, {Map<String, Object?>? traits}) =>
       _required.identify(userId, traits: traits);
 
+  /// Tells TraceIQ that [previousId] and [userId] are the same person, so their
+  /// events and profiles can be merged into [userId]. [previousId] defaults to the
+  /// current user (or anonymous) ID; [identify] already links the anonymous ID.
+  static Future<void> alias(String userId, {String? previousId}) =>
+      _required.alias(userId, previousId: previousId);
+
   /// Queues a `$page` screen event.
   static Future<void> screen(String name, {Map<String, Object?>? properties}) =>
       _required.screen(name, properties: properties);

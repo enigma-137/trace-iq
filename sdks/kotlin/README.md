@@ -50,6 +50,7 @@ On Android, remember `<uses-permission android:name="android.permission.INTERNET
 | --- | --- |
 | `capture(event, userId?, anonymousId?, properties?, timestamp?)` | Track an event. |
 | `identify(userId, traits?)` | Create/update a user profile. |
+| `alias(userId, previousId)` | Link another ID for the same person (e.g. a guest ID) to `userId`. |
 | `group(organizationId, userId?, traits?)` | Associate a user with an account. |
 | `log(level, message, userId?, metadata?, error?)` | Send a structured line to Logs. `level` is `debug`, `info`, `warn`, `error` or `fatal`; `error` attaches a throwable's class, message and stack. Lines flush with events. |
 | `flush()` | Send everything queued now (async). |

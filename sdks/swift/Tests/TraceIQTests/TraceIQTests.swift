@@ -103,6 +103,19 @@ final class TraceIQTests: XCTestCase {
         XCTAssertEqual((batch.first?["properties"] as? [String: Any])?["amount"] as? Int, 500)
     }
 
+    func testAliasLinksThePreviousIdAndIgnoresSelfAlias() {
+        let traceiq = client()
+        traceiq.alias(userId: "user_1", previousId: "guest_1")
+        traceiq.alias(userId: "user_1", previousId: "user_1")
+        traceiq.shutdown()
+
+        let batch = StubProtocol.requests.first?.json["batch"] as? [[String: Any]] ?? []
+        XCTAssertEqual(batch.count, 1)
+        XCTAssertEqual(batch.first?["eventName"] as? String, "$alias")
+        XCTAssertEqual(batch.first?["userId"] as? String, "user_1")
+        XCTAssertEqual((batch.first?["properties"] as? [String: Any])?["previousId"] as? String, "guest_1")
+    }
+
     func testLogLinesGoToTheLogsEndpointAfterEvents() {
         let traceiq = client()
         traceiq.capture("checkout_started")

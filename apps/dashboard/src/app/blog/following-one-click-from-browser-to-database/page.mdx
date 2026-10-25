@@ -1,0 +1,115 @@
+import { BlogPostLayout } from '@/components/BlogPostLayout'
+
+export const post = {
+  title: 'Following one click from the browser to your database',
+  description: 'How TraceIQ links a browser request, the API that served it and every service behind it into one waterfall, using the W3C traceparent header.',
+  lede: 'A slow checkout is rarely slow in one place. TraceIQ now follows a single click from the browser, through your Node API, into the services it calls, and shows the whole path in one waterfall.',
+  date: '2026-10-25',
+  readTime: '6 min read',
+  tag: 'Engineering'
+}
+
+export const metadata = { title: post.title, description: post.description }
+
+<BlogPostLayout {...post}>
+
+## The question every slow request raises
+
+A user taps **Pay** and waits four seconds. Your browser telemetry says the `POST /checkout` call took 4.1 s. Your API logs say the checkout handler took 3.9 s. Somewhere inside it, an orders service, a fraud check and a payment provider were called. Which one was slow?
+
+Answering that usually means opening three tools, lining up timestamps by hand and hoping the clocks agree. The data exists, but nothing connects it.
+
+TraceIQ already recorded each side of that story: the browser SDK captures API calls, and the Node middleware records every request your API handles. What was missing was the thread between them. Tracing adds that thread.
+
+## One ID, carried along
+
+Distributed tracing rests on a small idea. When a request starts, it gets a **trace ID**. Every piece of work done for that request, in any service, records the same trace ID, plus its own **span ID** and the span ID of whatever called it (its **parent**). Put those records together and you get a tree: the click at the top, each downstream call nested under the one that made it.
+
+The ID travels in an HTTP header. TraceIQ uses the [W3C Trace Context](https://www.w3.org/TR/trace-context/) standard, `traceparent`, so it works with anything else that speaks it:
+
+```
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+```
+
+Between the dashes: the format version (`00`), the trace ID shared by every span in the trace, the span ID of the caller, and a flag saying the trace is sampled (`01`).
+
+Using the standard instead of a TraceIQ-only header means a service already instrumented with OpenTelemetry can continue the same trace instead of starting a new one.
+
+## What each SDK does
+
+**In the browser**, `traceiq-sdk-js` adds a `traceparent` header to the API calls it captures. Each call becomes the root of its trace:
+
+```ts
+import { traceiq } from 'traceiq-sdk-js';
+
+traceiq.initialize({
+  projectId: 'YOUR_PROJECT_ID',
+  writeKey: 'YOUR_WRITE_KEY',
+  autoCaptureRequests: true,
+  // Same-origin calls get the header by default. List your API's origin if it is
+  // on another domain and its CORS config allows the traceparent header.
+  propagateTraceHeaders: ['https://api.example.com']
+});
+```
+
+The header goes to same-origin requests only unless you list more. That default is deliberate: on a cross-origin request, a custom header makes the browser send a CORS preflight, and if your API does not allow `traceparent`, the request fails. Telemetry should never break the product it measures, so you opt in per origin once your API allows it.
+
+**In your Node API**, `traceiq.middleware()` reads the incoming `traceparent`. The request it records keeps the browser's trace ID and stores the browser's span as its parent. Without a header, it starts a new trace.
+
+```ts
+import { TraceIQ } from 'traceiq-node';
+
+const traceiq = new TraceIQ({
+  projectId: 'YOUR_PROJECT_ID',
+  writeKey: process.env.TRACEIQ_WRITE_KEY!,
+  // Add traceparent to fetch() calls made while handling a request,
+  // but only to your own services.
+  propagateTraceHeaders: ['http://orders.internal', 'http://fraud.internal']
+});
+
+app.use(traceiq.middleware({ service: 'checkout-api' }));
+```
+
+**Calls to the next service** carry the trace on. With `propagateTraceHeaders`, any `fetch()` made while handling a request gets a `traceparent` pointing at the current request's span. If you use another HTTP client, ask for the headers directly:
+
+```ts
+await axios.post('http://payments.internal/charge', body, {
+  headers: traceiq.traceHeaders()
+});
+```
+
+Each downstream service running the same middleware records its request under the caller's span, and the tree grows one level per hop.
+
+Two details keep this safe. Propagation to outgoing calls is **off by default**, and we recommend a list of your own service URLs over `true`, so third-party APIs like your payment provider never receive your trace IDs. And calls to TraceIQ itself are never tagged, so telemetry traffic does not show up inside the traces it describes.
+
+## Reading the waterfall
+
+Open any request in **Requests** and the drawer shows an **operation waterfall**: the request, every span that shares its trace, and the logs and errors recorded while it ran, nested by parent and laid out on one timeline.
+
+For the slow checkout, that turns "the API took 3.9 s" into something you can act on:
+
+- `POST /checkout` in the browser: 4.1 s
+  - `POST /checkout` in checkout-api: 3.9 s
+    - `GET /orders/:id` in orders: 80 ms
+    - `POST /score` in fraud: 3.6 s
+      - a timeout log from the fraud model client
+
+The fraud check is the problem, and you found it from the user's click without searching three tools for matching timestamps.
+
+## What tracing does not do yet
+
+Being clear about limits matters as much as the feature.
+
+- **Node is the only server SDK that joins traces automatically.** Python, PHP, Rust, Kotlin and Swift services do not read `traceparent` yet, so a call into one of them ends the tree there.
+- **Spans are requests.** TraceIQ records one span per HTTP request a service handles. A slow database query shows up as time inside its request's span, not as a span of its own.
+- **Mobile apps start their own traces.** The React Native and Flutter SDKs do not send `traceparent` on their API calls yet.
+
+These are the next steps, in roughly that order.
+
+## Try it
+
+Trace propagation ships in the next releases of `traceiq-sdk-js` and `traceiq-node`. Turn on `autoCaptureRequests` in the browser, add the middleware to your API, list the internal services that should join the trace, and open a slow request in Requests.
+
+The [JavaScript](/docs?page=javascript) and [Node](/docs?page=node) docs cover every option.
+
+</BlogPostLayout>

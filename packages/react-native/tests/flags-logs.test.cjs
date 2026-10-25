@@ -113,3 +113,20 @@ test('rejected log batches are reported through onError', async () => {
   assert.equal(errors.length, 1);
   assert.match(errors[0].message, /logs rejected with 400/);
 });
+
+test('alias() links the previous ID (default: current user or anonymous ID) to the new user ID', async () => {
+  const { client, calls } = harness();
+  client.alias('user_a');
+  client.identify({ userId: 'user_a' });
+  client.alias('user_b');
+  client.alias('user_c', 'guest_1');
+  client.alias('user_b', 'user_b');
+  await client.flush();
+  const aliases = calls.filter((c) => c.url.endsWith('/v1/events/batch')).flatMap((c) => c.body.batch).filter((e) => e.eventName === '$alias');
+  assert.equal(aliases.length, 3);
+  assert.equal(aliases[0].userId, 'user_a');
+  assert.equal(aliases[0].properties.previousId, aliases[0].anonymousId);
+  assert.match(aliases[0].properties.previousId, /^anon/);
+  assert.deepEqual([aliases[1].userId, aliases[1].properties.previousId], ['user_b', 'user_a']);
+  assert.deepEqual([aliases[2].userId, aliases[2].properties.previousId], ['user_c', 'guest_1']);
+});

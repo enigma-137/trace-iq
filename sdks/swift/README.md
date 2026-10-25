@@ -41,6 +41,7 @@ traceiq.shutdown() // flush before a short-lived process exits
 | --- | --- |
 | `capture(_:userId:anonymousId:properties:timestamp:)` | Track an event. |
 | `identify(userId:traits:)` | Create/update a user profile. |
+| `alias(userId:previousId:)` | Link another ID for the same person (e.g. a guest ID) to `userId`. |
 | `group(organizationId:userId:traits:)` | Associate a user with an account. |
 | `log(_:_:userId:metadata:error:)` | Send a structured line to Logs. `level` is `debug`, `info`, `warn`, `error` or `fatal`. Lines flush with events. |
 | `flush(completion:)` | Send everything queued now. |

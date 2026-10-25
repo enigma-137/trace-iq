@@ -365,6 +365,33 @@ impl Client {
         });
     }
 
+    /// Tell TraceIQ that `previous_id` and `user_id` are the same person, so their
+    /// events and profiles can be merged into `user_id`.
+    ///
+    /// Emits a `$alias` event with the previous ID in `properties.previousId`.
+    /// Aliasing an ID to itself is ignored.
+    ///
+    /// * `user_id`     – The ID to keep.
+    /// * `previous_id` – The other ID for the same person, e.g. a guest ID.
+    /// * `timestamp`   – ISO-8601 timestamp; defaults to now.
+    pub fn alias(&self, user_id: &str, previous_id: &str, timestamp: Option<&str>) {
+        if user_id.is_empty() || previous_id.is_empty() || user_id == previous_id {
+            self.debug("alias() needs two different IDs; ignored.");
+            return;
+        }
+        self.enqueue(Event {
+            event_name: "$alias".to_owned(),
+            user_id: Some(user_id.to_owned()),
+            anonymous_id: None,
+            properties: serde_json::json!({ "previousId": previous_id }),
+            context: None,
+            timestamp: timestamp
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_owned())
+                .unwrap_or_else(now_iso),
+        });
+    }
+
     /// Associate a user with an organization / account.
     ///
     /// Emits a `$group` event.
@@ -651,6 +678,22 @@ mod tests {
         let queue = client.inner.queue.lock().unwrap();
         assert_eq!(queue.len(), 1);
         assert_eq!(queue[0].event_name, "$identify");
+    }
+
+    #[test]
+    fn test_alias_enqueues_dollar_alias_and_ignores_self_alias() {
+        let client = Client::builder("proj_test", "key_test")
+            .max_retries(0) // the default endpoint is unreachable in tests; fail fast
+            .flush_interval(Duration::ZERO)
+            .build();
+        client.alias("user_1", "guest_1", None);
+        client.alias("user_1", "user_1", None);
+
+        let queue = client.inner.queue.lock().unwrap();
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].event_name, "$alias");
+        assert_eq!(queue[0].user_id.as_deref(), Some("user_1"));
+        assert_eq!(queue[0].properties["previousId"], "guest_1");
     }
 
     #[test]

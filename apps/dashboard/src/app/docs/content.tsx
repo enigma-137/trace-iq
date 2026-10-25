@@ -372,6 +372,9 @@ curl http://127.0.0.1:4000/health`}</Code>
         <Code lang="ts">{`// Identify the current person (creates/updates a user profile)
 traceiq.identify({ userId: 'user_123', traits: { email: 'a@b.com', plan: 'pro' } });
 
+// Link another ID for the same person (e.g. a guest ID) to this user
+traceiq.alias('user_123', 'guest_8f2c');
+
 // Track a custom event with properties
 traceiq.track('checkout_started', { cartValue: 4200, currency: 'NGN' });
 
@@ -383,6 +386,13 @@ traceiq.group({ organizationId: 'org_123', traits: { plan: 'growth' } });
 
 // Report a handled error
 traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</Code>
+        <P>
+          <Mono>identify()</Mono> already links the browser&apos;s anonymous ID to the user. Use{' '}
+          <Mono>alias(userId, previousId)</Mono> when a person has had two user IDs, such as a guest checkout ID that
+          becomes an account. <Mono>previousId</Mono> defaults to the current ID. Server SDKs take both IDs
+          explicitly. TraceIQ records the link as a <Mono>$alias</Mono> event today; merging the two profiles in
+          reports is coming in a later release.
+        </P>
       </Section>
     );
   }
@@ -1538,6 +1548,7 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
           items={[
             ['$page', 'A page view.'],
             ['$identify', 'Emitted by identify().'],
+            ['$alias', 'Emitted by alias(); properties.previousId is the other ID for the same person.'],
             ['$group', 'Emitted by group().'],
             ['$exception', 'An error occurrence (powers Error tracking).'],
             ['$rageclick', 'A rage click (powers Frustrating pages).'],

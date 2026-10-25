@@ -45,6 +45,7 @@ need to call `shutdown()` explicitly.
 | --- | --- |
 | `capture(event, user_id=None, anonymous_id=None, properties=None, context=None, timestamp=None)` | Track an event. |
 | `identify(user_id, traits=None, timestamp=None)` | Create/update a user profile. |
+| `alias(user_id, previous_id, timestamp=None)` | Link another ID for the same person (e.g. a guest ID) to `user_id`. |
 | `group(organization_id, user_id=None, anonymous_id=None, traits=None, timestamp=None)` | Associate a user with an account. |
 | `log(level, message, service=None, user_id=None, error=None, **metadata)` | Send a structured line to Logs. `level` is `debug`, `info`, `warn`, `error` or `fatal`. |
 | `is_feature_enabled(key, distinct_id, default=False, properties=None, environment=None, track_exposure=True)` | Whether a feature flag is on for a user. Returns `default` if flags can't be evaluated. |

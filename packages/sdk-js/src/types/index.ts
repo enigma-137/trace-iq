@@ -150,6 +150,15 @@ export type TraceIQLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 export interface TraceIQClient {
   initialize(options: TraceIQInitOptions): void;
   identify(identity: TraceIQIdentity): void;
+  /**
+   * Tells TraceIQ that `previousId` and `userId` are the same person, so their
+   * events and profiles can be merged into `userId`. `previousId` defaults to
+   * the current user (or anonymous) ID. Use it when a user's ID changes, e.g. a
+   * guest ID becoming an account ID; identify() already links the anonymous ID.
+   *
+   *   traceiq.alias('user_123', 'guest_8f2c');
+   */
+  alias(userId: string, previousId?: string): void;
   track(eventName: string, properties?: Record<string, unknown>): void;
   page(name?: string, properties?: Record<string, unknown>): void;
   group(group: TraceIQGroup): void;

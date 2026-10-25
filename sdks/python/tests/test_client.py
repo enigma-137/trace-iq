@@ -65,6 +65,18 @@ class ClientDeliveryTest(unittest.TestCase):
         self.assertEqual(names, ["payout_succeeded", "$identify"])
         self.assertEqual(sent["body"]["batch"][0]["properties"], {"amount": 500})
 
+    def test_alias_links_previous_id_and_ignores_self_alias(self):
+        client = Client("proj_test", "trq_test", endpoint=self.endpoint, flush_interval=60)
+        client.alias("user_1", "guest_1")
+        client.alias("user_1", "user_1")
+        client.shutdown()
+
+        batch = _Recorder.requests[0]["body"]["batch"]
+        self.assertEqual(len(batch), 1)
+        self.assertEqual(batch[0]["eventName"], "$alias")
+        self.assertEqual(batch[0]["userId"], "user_1")
+        self.assertEqual(batch[0]["properties"], {"previousId": "guest_1"})
+
     def test_logs_go_to_the_logs_endpoint_with_metadata_and_error(self):
         client = Client("proj_test", "trq_test", endpoint=self.endpoint, flush_interval=60, service_name="billing")
         client.log("error", "Payout provider timed out", user_id="user_1", error=TimeoutError("30s"), provider="stripe")

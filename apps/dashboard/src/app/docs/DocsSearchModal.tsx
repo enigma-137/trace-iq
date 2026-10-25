@@ -21,7 +21,7 @@ interface DocsSearchModalProps {
 const SECTION_DESCRIPTIONS: Record<string, string> = {
   welcome: 'Overview of TraceIQ behavior intelligence platform and docs structure.',
   quickstart: 'Install JS SDK, initialize write keys, and send your first event.',
-  methods: 'traceiq.identify, track, page, group, and captureException API reference.',
+  methods: 'traceiq.identify, alias, track, page, group, and captureException API reference.',
   config: 'SDK initialization parameters, flush intervals, and batch options.',
   autocapture: 'Automatic click tracking, page views, and rage click detection.',
   'self-hosting': 'One-command local setup, production deployment, auth modes, backups, migrations, and upgrades.',
@@ -43,7 +43,7 @@ const SECTION_DESCRIPTIONS: Record<string, string> = {
   logs: 'Send structured logs from your app with traceiq.log().',
   webhooks: 'Real-time HTTP event forwarders with HMAC signature verification.',
   export: 'Download raw event payloads via CSV, JSON, or Export API.',
-  events: 'Reserved event conventions ($page, $identify, $rageclick, etc.).',
+  events: 'Reserved event conventions ($page, $identify, $alias, $rageclick, etc.).',
   features: 'Complete feature breakdown and capability guide.',
   ingestion: 'Raw HTTP POST ingestion endpoint specification.',
   cli: 'traceiq-cli: setup wizard, projects, env pull, and tailing logs and events from the terminal.',

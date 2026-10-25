@@ -8,6 +8,7 @@ const navigation = [
   ["Product", "/#product"],
   ["Docs", "/docs"],
   ["Pricing", "/pricing"],
+  ["Blog", "/blog"],
   ["GitHub", "https://github.com/enigma-137/trace-iq"],
 ] as const;
 
