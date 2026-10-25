@@ -160,10 +160,13 @@ export default function PrivacyPage() {
               </p>
               <ul>
                 <li>
-                  <code>localStorage</code>: Used to retain a pseudorandom first-party anonymous device identifier (e.g. <code>tiq_anon_id</code>) to connect sessions over time on the same domain.
+                  <code>localStorage</code>: Used to retain a pseudorandom first-party anonymous device identifier (<code>traceiq.anonymousId</code>) to connect sessions over time on the same domain.
                 </li>
                 <li>
-                  <code>sessionStorage</code>: Used to retain an ephemeral session identifier (e.g. <code>tiq_session_id</code>) that expires automatically when the user closes their browser tab.
+                  <code>sessionStorage</code>: Used to retain an ephemeral session identifier (<code>traceiq.sessionId</code>) that expires automatically when the user closes their browser tab.
+                </li>
+                <li>
+                  <code>localStorage</code>: Events whose delivery is delayed (the device is offline, or the first attempt failed) are kept under <code>traceiq.pendingEvents.&lt;projectId&gt;</code>, including their properties, until they are delivered or for at most 24 hours, so they are not lost if the page closes. Site owners can disable this with <code>persistUndeliveredEvents: false</code>.
                 </li>
               </ul>
               <p>

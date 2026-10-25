@@ -402,6 +402,8 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
             ['autoCaptureExceptions', 'true', 'Capture uncaught errors and unhandled promise rejections.'],
             ['autoCaptureRageClicks', 'true', 'Detect rage clicks (3+ rapid clicks in one spot).'],
             ['maxRetries', '3', 'Retries after a network error, 429 or 5xx, with exponential backoff. Sends wait while the browser is offline.'],
+            ['persistUndeliveredEvents', 'true', 'Keep delayed events (offline or failed first attempt) in localStorage and resend them on the next page load. Up to 100 events for 24 hours.'],
+            ['propagateTraceHeaders', 'same-origin', 'Send a W3C traceparent on captured API calls so backend requests join the trace. Pass allowed cross-origin URLs, or false.'],
             ['debug', 'false', 'Log SDK warnings to the console.']
           ]}
         />

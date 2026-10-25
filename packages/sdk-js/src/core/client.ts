@@ -20,6 +20,16 @@ const DEFAULT_MAX_RETRIES = 3;
 const MAX_RETRY_DELAY_MS = 30_000;
 // Sends parked while the browser is offline; beyond this, new ones are dropped.
 const MAX_OFFLINE_WAITERS = 100;
+const PENDING_EVENTS_KEY_PREFIX = 'traceiq.pendingEvents.';
+const MAX_PENDING_EVENTS = 100;
+const MAX_PENDING_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** An event whose delivery was delayed, saved so a later page load can resend it. */
+interface PendingEvent {
+  id: string;
+  savedAt: number;
+  payload: Record<string, unknown>;
+}
 
 export class BrowserTraceIQClient implements TraceIQClient {
   private options?: TraceIQInitOptions;
@@ -90,6 +100,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.anonymousId = this.loadOrCreateId('localStorage', ANONYMOUS_ID_STORAGE_KEY, 'anon');
     this.sessionId = this.loadOrCreateId('sessionStorage', SESSION_ID_STORAGE_KEY, 'sess');
     this.debug(`[TraceIQ] SDK initialized (endpoint: ${this.options.endpoint})`);
+    this.resendPendingEvents();
 
     if (options.replay?.enabled === true || options.enableReplay === true) {
       this.replayRecorder = new ReplayRecorder(
@@ -1073,29 +1084,126 @@ export class BrowserTraceIQClient implements TraceIQClient {
     };
 
     this.debug(`[TraceIQ] Sending event ${eventName} to ${endpoint}`);
+    const accepted = await this.sendPayload(payload);
+    // Replay flow eligibility is evaluated only after TraceIQ accepted the
+    // event, allowing the API to prove the session entered a selected
+    // funnel instead of trusting an SDK-supplied funnel identifier.
+    if (accepted) this.replayRecorder?.eventAccepted(eventName);
+  }
+
+  /**
+   * Delivers one event payload. If delivery is delayed (offline, or the first
+   * attempt failed) the event is saved to localStorage so a later page load can
+   * resend it should this page close first; it is removed once TraceIQ accepts or
+   * permanently rejects it. Returns whether TraceIQ accepted the event.
+   */
+  private async sendPayload(payload: Record<string, unknown>, pendingId = this.generateId()): Promise<boolean> {
+    const options = this.options;
+    if (!options) return false;
+    let saved = false;
+    const save = () => {
+      if (options.persistUndeliveredEvents !== false) {
+        saved = this.savePendingEvent({ id: pendingId, savedAt: Date.now(), payload });
+      }
+    };
 
     try {
-      const response = await this.deliver(endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-traceiq-write-key': options.writeKey
+      const response = await this.deliver(
+        this.eventEndpoint(options.endpoint ?? DEFAULT_ENDPOINT),
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-traceiq-write-key': options.writeKey
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
         },
-        body: JSON.stringify(payload),
-        keepalive: true
-      });
-
+        save
+      );
+      // A retryable status after the last retry stays saved for the next page load.
+      if (saved && !isRetryableStatus(response.status)) this.removePendingEvent(pendingId);
       if (!response.ok) {
         this.debug(`[TraceIQ] Event rejected: HTTP ${response.status}`);
-      } else {
-        this.debug(`[TraceIQ] Event accepted: ${response.status}`);
-        // Replay flow eligibility is evaluated only after TraceIQ accepted the
-        // event, allowing the API to prove the session entered a selected
-        // funnel instead of trusting an SDK-supplied funnel identifier.
-        this.replayRecorder?.eventAccepted(eventName);
+        return false;
       }
+      this.debug(`[TraceIQ] Event accepted: ${response.status}`);
+      return true;
     } catch (error) {
       this.debug('[TraceIQ] Event delivery failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Resends events a previous page saved but could not deliver. They are claimed
+   * (removed from storage) first so another open tab doesn't send them too; any
+   * that fail again are saved again by sendPayload().
+   */
+  private resendPendingEvents(): void {
+    if (this.options?.persistUndeliveredEvents === false) return;
+    const pending = this.readPendingEvents();
+    if (pending.length === 0) return;
+    this.writePendingEvents([]);
+    this.debug(`[TraceIQ] Resending ${pending.length} undelivered event(s) from an earlier page.`);
+    for (const entry of pending) void this.sendPayload(entry.payload, entry.id);
+  }
+
+  private pendingEventsKey(): string | undefined {
+    return this.options ? `${PENDING_EVENTS_KEY_PREFIX}${this.options.projectId}` : undefined;
+  }
+
+  private readPendingEvents(): PendingEvent[] {
+    const key = this.pendingEventsKey();
+    const raw = key ? this.safeStorageGet(key) : null;
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const cutoff = Date.now() - MAX_PENDING_AGE_MS;
+      return parsed.filter(
+        (entry): entry is PendingEvent =>
+          typeof entry === 'object' && entry !== null &&
+          typeof entry.id === 'string' && typeof entry.savedAt === 'number' && entry.savedAt >= cutoff &&
+          typeof entry.payload === 'object' && entry.payload !== null
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /** Returns false when storage is unavailable or full. */
+  private writePendingEvents(entries: PendingEvent[]): boolean {
+    const key = this.pendingEventsKey();
+    const storage = this.getStorage('localStorage');
+    if (!key || !storage) return false;
+    try {
+      if (entries.length === 0) storage.removeItem(key);
+      else storage.setItem(key, JSON.stringify(entries));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private savePendingEvent(entry: PendingEvent): boolean {
+    const entries = this.readPendingEvents().filter((existing) => existing.id !== entry.id);
+    entries.push(entry);
+    // Bounded; the oldest go first.
+    return this.writePendingEvents(entries.slice(-MAX_PENDING_EVENTS));
+  }
+
+  private removePendingEvent(id: string): void {
+    const entries = this.readPendingEvents();
+    const remaining = entries.filter((entry) => entry.id !== id);
+    if (remaining.length !== entries.length) this.writePendingEvents(remaining);
+  }
+
+  private safeStorageGet(key: string): string | null {
+    try {
+      return this.getStorage('localStorage')?.getItem(key) ?? null;
+    } catch {
+      return null;
     }
   }
 
@@ -1106,24 +1214,42 @@ export class BrowserTraceIQClient implements TraceIQClient {
    * The server assigns event ids, so a retry after a lost response can duplicate an
    * event; like the server SDKs, delivery prefers that over dropping it.
    */
-  private async deliver(url: string, init: RequestInit): Promise<Response> {
+  private async deliver(url: string, init: RequestInit, onDelayed?: () => void): Promise<Response> {
     const maxRetries = Math.max(0, this.options?.maxRetries ?? DEFAULT_MAX_RETRIES);
+    // Called once, the first time this send has to wait (offline, or before a retry).
+    let delayed = false;
+    const markDelayed = () => {
+      if (delayed) return;
+      delayed = true;
+      onDelayed?.();
+    };
     for (let attempt = 0; ; attempt += 1) {
+      if (this.isOffline()) markDelayed();
       await this.waitUntilOnline();
       let response: Response | undefined;
       try {
         response = await fetch(url, init);
       } catch (error) {
-        if (attempt >= maxRetries) throw error;
+        if (attempt >= maxRetries) {
+          markDelayed();
+          throw error;
+        }
       }
-      if (response && (!isRetryableStatus(response.status) || attempt >= maxRetries)) return response;
+      if (response && (!isRetryableStatus(response.status) || attempt >= maxRetries)) {
+        if (isRetryableStatus(response.status)) markDelayed();
+        return response;
+      }
+      markDelayed();
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs(attempt + 1, response)));
     }
   }
 
+  private isOffline(): boolean {
+    return typeof window !== 'undefined' && this.getNavigator()?.onLine === false;
+  }
+
   private async waitUntilOnline(): Promise<void> {
-    const navigator = this.getNavigator();
-    if (typeof window === 'undefined' || navigator?.onLine !== false) return;
+    if (!this.isOffline()) return;
     if (this.offlineWaiters >= MAX_OFFLINE_WAITERS) throw new Error('TraceIQ: offline send queue is full.');
     this.offlineWaiters += 1;
     try {

@@ -58,6 +58,14 @@ export interface TraceIQInitOptions {
    * it to come back online instead of spending retries. Defaults to 3; 0 disables.
    */
   maxRetries?: number;
+  /**
+   * Save events whose delivery is delayed (offline, or a failed first attempt) to
+   * `localStorage`, and resend them on the next page load if the page closes first.
+   * Only delayed events are saved, never every event. Up to 100 events, kept for
+   * 24 hours. Saved events include their properties, so set `false` if those may
+   * hold data you don't want at rest in the browser. Defaults to true.
+   */
+  persistUndeliveredEvents?: boolean;
   debug?: boolean;
 }
 

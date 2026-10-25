@@ -86,12 +86,13 @@ The `initialize()` call accepts:
 - `endpoint`: the TraceIQ API base URL
 - `propagateTraceHeaders`: with `autoCaptureRequests`, captured API calls carry a W3C `traceparent` header so a `traceiq-node` backend joins the same trace. Same-origin only by default, because cross-origin it needs the API's CORS config to allow `traceparent`; pass a list of allowed origins (e.g. `['https://api.example.com']`), or `false` to turn it off.
 - `maxRetries`: retries after a network error, HTTP 429 or 5xx, with exponential backoff (default `3`; `0` disables). While the browser is offline, sends wait for it to reconnect.
+- `persistUndeliveredEvents`: save events whose delivery is delayed (offline, or a failed first attempt) to `localStorage` and resend them on the next page load if the page closes first (default `true`; up to 100 events, kept 24 hours). Events sent on the first try are never stored.
 - `debug`: enable console logging for troubleshooting
 
 ## Notes
 
 - The browser SDK is intended for client-side integrations.
-- It does not set cookies. It stores a persistent anonymous ID in `localStorage` and a visit-scoped session ID in `sessionStorage` when browser storage is available.
+- It does not set cookies. It stores a persistent anonymous ID in `localStorage` and a visit-scoped session ID in `sessionStorage` when browser storage is available. Events whose delivery is delayed are also kept in `localStorage` until delivered (at most 24 hours), including their properties; set `persistUndeliveredEvents: false` to disable this.
 - Page context can include the full URL, path, query string, referrer, page title, user agent, locale, viewport, and timezone. The API can add the request IP address and approximate geography.
 - User IDs, traits, event properties, URLs, and exception messages or stacks can contain personal or sensitive data. Only send fields you are authorized to collect.
 - TraceIQ does not make an application automatically compliant with GDPR, CCPA, PECR, or other privacy laws. Operators are responsible for notices, consent or another legal basis, retention, access, and deletion processes.

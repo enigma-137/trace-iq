@@ -8,6 +8,7 @@ The JavaScript SDK does not set browser cookies. When storage is available, it c
 
 - `traceiq.anonymousId` in `localStorage`, which persists until it is cleared or rotated.
 - `traceiq.sessionId` in `sessionStorage`, which normally lasts for the browser-tab session.
+- `traceiq.pendingEvents.<projectId>` in `localStorage`, only while an event's delivery is delayed (offline, or the first attempt failed). It holds those events, including their properties, until they are delivered or for at most 24 hours. Disable it with `persistUndeliveredEvents: false`.
 
 Cookie rules in some jurisdictions also cover local storage, scripts, tags, and similar storage or access technologies. “Cookie-free” therefore does not mean that notice or consent is never required.
 
