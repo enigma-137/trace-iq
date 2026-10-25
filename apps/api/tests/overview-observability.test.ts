@@ -23,7 +23,7 @@ describe('overview observability series', () => {
       }
       if (sql.includes('AS api_calls') && sql.includes("date_trunc('day'")) {
         return rows([{
-          bucket: '2026-09-01T00:00:00Z', total: 12, api_calls: 4, errors: 2
+          bucket: '2026-09-01T00:00:00Z', total: 12, api_calls: 4, failed_requests: 1, errors: 2
         }]);
       }
       if (sql.includes('WITH rev AS')) {
@@ -37,12 +37,13 @@ describe('overview observability series', () => {
     const result = await service.getOverview(user);
 
     expect(result.observabilitySeries.find((point) => point.bucket === '2026-09-01T00:00:00Z'))
-      .toEqual({ bucket: '2026-09-01T00:00:00Z', events: 12, apiCalls: 4, errors: 2 });
+      .toEqual({ bucket: '2026-09-01T00:00:00Z', events: 12, apiCalls: 4, failedRequests: 1, errors: 2 });
     expect(result.observabilitySeries.find((point) => point.bucket === '2026-09-02T00:00:00Z'))
-      .toEqual({ bucket: '2026-09-02T00:00:00Z', events: 0, apiCalls: 0, errors: 0 });
+      .toEqual({ bucket: '2026-09-02T00:00:00Z', events: 0, apiCalls: 0, failedRequests: 0, errors: 0 });
 
     const seriesSql = db.queryCalls('AS api_calls')[0].text;
     expect(seriesSql).toContain("FILTER (WHERE event_name = '$api_request')::int AS api_calls");
+    expect(seriesSql).toContain('AS failed_requests');
     expect(seriesSql).not.toContain("properties->>'durationMs' IS NOT NULL");
     expect(seriesSql).toContain("event_name = '$exception' OR event_name = '$error'");
   });
@@ -120,5 +121,28 @@ describe('overview observability series', () => {
     expect(tracesSql).toContain("event_name = '$api_request'");
     expect(tracesSql).toContain('LIMIT 5');
     expect(tracesSql).not.toContain('random()');
+  });
+});
+
+describe('overview API telemetry', () => {
+  it('drops calls over 10 minutes from latency and reports failed and 5xx counts', async () => {
+    const db = mockDatabase((sql) => {
+      if (sql.includes('AS http_errors')) {
+        return rows([{ total_requests: 200, http_errors: 6, error_500: 2, avg_duration: 300, p50: 120, p90: 400, p95: 900, p99: 2000, ok_200: 194, rate_limit_429: 0, other_status: 4 }]);
+      }
+      return rows([]);
+    });
+    const projects = { resolveActiveProject: vi.fn().mockResolvedValue(project) };
+    const service = new AnalyticsService(db as never, projects as never);
+
+    const result = await service.getOverview(user);
+
+    expect(result.apiTelemetry).toMatchObject({ totalRequests: 200, p50: 120, errorRate: 3, failedRequests: 6, serverErrors: 2 });
+    // Both latency queries (totals and the per-bucket series) apply the cap.
+    const latencyCalls = db.queryCalls('percentile_cont(0.99)');
+    expect(latencyCalls).toHaveLength(2);
+    for (const call of latencyCalls) {
+      expect(call.text).toContain("THEN (properties->>'durationMs')::numeric END) <= 600000");
+    }
   });
 });

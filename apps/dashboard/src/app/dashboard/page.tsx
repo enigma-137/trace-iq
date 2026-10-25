@@ -38,6 +38,9 @@ interface ApiTelemetryOverview {
   p99: number;
   avgDuration: number;
   errorRate: number;
+  /** 4xx and 5xx responses. Missing from APIs older than the field. */
+  failedRequests?: number;
+  serverErrors?: number;
   statusBreakdown: {
     ok200: number;
     rateLimit429: number;
@@ -113,7 +116,7 @@ interface OverviewResponse {
   topCountries: Array<{ name: string; total: number }>;
   topReferrers: Array<{ domain: string; visitors: number; views: number }>;
   sparkline: Array<{ bucket: string; total: number }>;
-  observabilitySeries?: Array<{ bucket: string; events: number; apiCalls: number; errors: number }>;
+  observabilitySeries?: Array<{ bucket: string; events: number; apiCalls: number; failedRequests?: number; errors: number }>;
   apiTelemetry?: ApiTelemetryOverview;
   topErrors?: ErrorIssueOverview[];
   funnelSummary?: FunnelOverview;
@@ -180,7 +183,9 @@ export default async function DashboardPage({
 
   // Sparkline data arrays for KPI cards - purely from API response without hardcoded numbers
   const latencySparkline = overview?.apiTelemetry?.latencySeries?.map((p) => p.p90) ?? [];
-  const errorSparkline = observabilitySeries.map((p) => p.errors ?? 0);
+  const failedSparkline = observabilitySeries.map((p) => ('failedRequests' in p ? Number(p.failedRequests ?? 0) : 0));
+  const failedRequests = overview?.apiTelemetry?.failedRequests;
+  const serverErrors = overview?.apiTelemetry?.serverErrors ?? 0;
   const usersSparkline: number[] = [];
   const apiSparkline = observabilitySeries.map((p) => p.apiCalls ?? 0);
 
@@ -277,7 +282,7 @@ export default async function DashboardPage({
             icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
             title="P95 Latency"
             value={overview?.apiTelemetry?.p95 !== undefined && overview.apiTelemetry.p95 > 0 ? `${overview.apiTelemetry.p95.toLocaleString()} ms` : '-'}
-            delta={overview?.apiTelemetry?.avgDuration ? `Avg ${overview.apiTelemetry.avgDuration} ms` : undefined}
+            delta={overview?.apiTelemetry?.p50 ? `Median ${overview.apiTelemetry.p50.toLocaleString()} ms` : undefined}
             deltaTone="neutral"
             deltaDirection="up"
             color="emerald"
@@ -288,12 +293,12 @@ export default async function DashboardPage({
             icon={<HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.8} />}
             title="Failure Rate"
             value={overview?.apiTelemetry?.errorRate !== undefined ? `${overview.apiTelemetry.errorRate}%` : '0%'}
-            delta={overview?.topErrors && overview.topErrors.length > 0 ? `${overview.topErrors.length} types` : undefined}
-            deltaTone={overview?.topErrors && overview.topErrors.length > 0 ? 'red' : 'neutral'}
-            deltaDirection={overview?.topErrors && overview.topErrors.length > 0 ? 'up' : undefined}
-            deltaSubtext={overview?.topErrors && overview.topErrors.length > 0 ? `${overview.topErrors.reduce((s, e) => s + e.occurrences, 0)} occurrences` : undefined}
+            delta={failedRequests !== undefined ? `${failedRequests.toLocaleString()} failed` : undefined}
+            deltaTone={failedRequests ? 'red' : 'neutral'}
+            deltaDirection={failedRequests ? 'up' : undefined}
+            deltaSubtext={failedRequests !== undefined ? `${serverErrors.toLocaleString()} server errors (5xx)` : undefined}
             color="rose"
-            sparklineData={errorSparkline}
+            sparklineData={failedSparkline}
           />
 
           <OverviewMetricCard
