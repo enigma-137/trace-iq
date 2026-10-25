@@ -83,6 +83,66 @@ export function getRequestContext(): RequestContext | undefined {
   return requestContext.getStore();
 }
 
+/**
+ * A W3C `traceparent` header for calls made while handling a request, so a
+ * downstream service instrumented with traceiq.middleware() joins the same trace
+ * and nests under this request. Empty outside a request. Works with any HTTP client:
+ *
+ *   await axios.get(url, { headers: getTraceHeaders() });
+ */
+export function getTraceHeaders(): Record<string, string> {
+  const context = requestContext.getStore();
+  return context ? { traceparent: traceparentFor(context) } : {};
+}
+
+function traceparentFor(context: RequestContext): string {
+  // This request's span is the parent of whatever the downstream service records.
+  return `00-${context.traceId}-${context.spanId}-01`;
+}
+
+export type TracePropagationTargets = true | Array<string | RegExp>;
+
+let fetchPatched = false;
+let propagation: { targets: TracePropagationTargets; skip: string[] } | undefined;
+
+/**
+ * Wraps the global fetch (once per process) so calls made inside a request handled
+ * by traceiq.middleware() carry a traceparent header. `true` propagates to every
+ * URL; a list limits it to URLs containing a string or matching a RegExp. Calls to
+ * `skipPrefix` (TraceIQ itself) and requests that already set traceparent are left
+ * alone. The latest client's targets apply when several clients enable it.
+ */
+export function installFetchTracePropagation(targets: TracePropagationTargets, skipPrefix: string): void {
+  propagation = { targets, skip: [...(propagation?.skip ?? []), skipPrefix] };
+  if (fetchPatched || typeof globalThis.fetch !== 'function') return;
+  fetchPatched = true;
+  const original = globalThis.fetch;
+  globalThis.fetch = function traceiqFetch(input: Parameters<typeof fetch>[0], init?: RequestInit) {
+    const context = requestContext.getStore();
+    if (context && propagation) {
+      try {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (shouldPropagate(url, propagation)) {
+          const headers = new Headers(init?.headers ?? (typeof input === 'object' && 'headers' in input ? input.headers : undefined));
+          if (!headers.has('traceparent')) {
+            headers.set('traceparent', traceparentFor(context));
+            init = { ...init, headers };
+          }
+        }
+      } catch {
+        // Never let instrumentation break the request.
+      }
+    }
+    return original.call(globalThis, input, init);
+  } as typeof fetch;
+}
+
+function shouldPropagate(url: string, config: { targets: TracePropagationTargets; skip: string[] }): boolean {
+  if (config.skip.some((prefix) => url.startsWith(prefix))) return false;
+  if (config.targets === true) return true;
+  return config.targets.some((target) => (typeof target === 'string' ? url.includes(target) : target.test(url)));
+}
+
 interface Capturer {
   capture(params: CaptureParams): void;
 }

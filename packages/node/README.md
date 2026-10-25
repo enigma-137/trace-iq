@@ -61,6 +61,7 @@ await traceiq.shutdown();
 | `debug` | `false` | Log warnings to the console. |
 | `captureConsole` | `false` | Forward `console.log/info/warn/error` to Logs (the console still prints). Inside the middleware each line carries the request's ids. |
 | `fetchImpl` | global `fetch` | Inject a fetch (tests, or Node < 18 with a polyfill). |
+| `propagateTraceHeaders` | off | `true` or a list of URLs/RegExps: add `traceparent` to `fetch()` calls made inside a request, so downstream services join the trace. |
 
 ## Request telemetry (Requests explorer)
 
@@ -87,6 +88,24 @@ handled — e.g. an `$exception` event — is stamped with the same `requestId`/
 so Requests can link to it. Requests the client abandons before the response finishes
 are still recorded, with status `499` and `aborted: true`. Use `getRequestContext()` to read the ids yourself (for
 example to put them on structured logs sent to `POST /v1/logs`).
+
+### Tracing into downstream services
+
+To follow a request into the services it calls, send its trace on outgoing calls.
+Each downstream service running `traceiq.middleware()` then joins the same trace and
+nests under the caller in the Requests waterfall.
+
+```ts
+// Automatic for fetch(): only calls made while handling a request, only to these URLs.
+const traceiq = new TraceIQ({ projectId, writeKey, propagateTraceHeaders: ['http://orders.internal'] });
+
+// Any other client (axios, got, undici): pass the headers yourself.
+await axios.post('http://billing.internal/charge', body, { headers: traceiq.traceHeaders() });
+```
+
+`propagateTraceHeaders: true` adds the header to every `fetch()`. A list of your own
+services is safer, because third-party APIs would otherwise receive your trace ids.
+Calls to TraceIQ itself, and requests that already set `traceparent`, are never changed.
 
 Payload capture is opt-in twice: the middleware must send payloads, **and** the project
 must enable capture (Requests → Capture settings). Sensitive headers (authorization,
