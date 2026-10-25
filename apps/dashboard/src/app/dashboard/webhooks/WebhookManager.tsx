@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from '../DashboardDialog';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import { retryAfterStepUp } from '@/lib/step-up';
 import { Webhook, Delivery, WebhooksMetrics, WebhookStatus } from './page';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -56,7 +57,13 @@ export function WebhookManager({
     return session?.access_token ?? null;
   }
 
+  // Actions that need a recent 2FA check prompt for a code and retry once.
   async function authFetch(path: string, init: RequestInit = {}): Promise<Response | null> {
+    const response = await sendAuthed(path, init);
+    return response ? retryAfterStepUp(response, () => sendAuthed(path, init)) : null;
+  }
+
+  async function sendAuthed(path: string, init: RequestInit): Promise<Response | null> {
     const token = await getToken();
     if (!token) {
       toast.error('Your dashboard session expired. Sign in again.');

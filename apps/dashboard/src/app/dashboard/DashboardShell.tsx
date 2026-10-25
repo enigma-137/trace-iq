@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardPlanProvider } from './DashboardPlan';
 import { AskTraceIQProvider } from '@/components/ai/AskTraceIQContext';
+import { StepUpDialogHost } from './StepUpDialogHost';
 import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
 import { FeatureSpotlightCard } from '@/components/FeatureSpotlightCard';
 import { readActiveProjectCookie } from '@/lib/dashboard';
@@ -73,6 +74,7 @@ export function DashboardShell({
             </section>
           </div>
           <AskTraceIQDrawer />
+          <StepUpDialogHost />
           <FeatureSpotlightCard projectId={projectId ?? undefined} surface="dashboard-shell" />
         </main>
       </AskTraceIQProvider>
