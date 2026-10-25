@@ -42,7 +42,7 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
     });
   });
 
-  it('Analytics group renders all 8 core analytics items in order', () => {
+  it('Analytics group renders all 9 core analytics items in order', () => {
     const analytics = navGroups.find((g) => g.key === 'analytics');
     expect(analytics).toBeDefined();
     expect(analytics?.label).toBe('Analytics');
@@ -54,6 +54,7 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
       { label: 'Funnels', href: '/dashboard/funnels', key: 'funnels' },
       { label: 'Retention', href: '/dashboard/retention', key: 'retention' },
       { label: 'Users', href: '/dashboard/users', key: 'users' },
+      { label: 'Groups', href: '/dashboard/groups', key: 'groups' },
       { label: 'Web analytics', href: '/dashboard/web', key: 'web' },
       { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' }
     ];
@@ -111,8 +112,8 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
   });
 
   it('navItems and allNavItems contain all grouped and standalone items without omissions', () => {
-    expect(navItems).toHaveLength(22);
-    expect(allNavItems).toHaveLength(24);
+    expect(navItems).toHaveLength(23);
+    expect(allNavItems).toHaveLength(25);
   });
 
   it('findGroupForActiveItem maps active child keys to their parent group', () => {

@@ -394,6 +394,11 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
           explicitly. TraceIQ records the link as a <Mono>$alias</Mono> event today; merging the two profiles in
           reports is coming in a later release.
         </P>
+        <P>
+          <Mono>group()</Mono> puts the person in an account (a company, team or school). Pass a{' '}
+          <Mono>name</Mono> trait to label it. Each account then appears under <strong>Groups</strong> with its traits,
+          members, daily activity and top events; activity counts every event its members send.
+        </P>
       </Section>
     );
   }
