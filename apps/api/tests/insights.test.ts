@@ -6,7 +6,7 @@ import { AiService } from '../src/modules/ai/ai.service';
 import { EmailService } from '../src/modules/emails/email.service';
 import { ProjectsService } from '../src/modules/projects/projects.service';
 import { DashboardUser } from '../src/modules/auth/auth.service';
-import { mockDatabase, rows, empty, affected } from './helpers/mock-db';
+import { mockDatabase, rows, empty } from './helpers/mock-db';
 
 const PROJECT = {
   id: 'proj1',
@@ -17,45 +17,12 @@ const PROJECT = {
   role: 'owner'
 };
 
-function setup(options: { aiNull?: boolean } = {}) {
-  const db = mockDatabase((text) => {
-    if (/SELECT count\(\*\)/.test(text)) return empty();
-    if (/aggregate|::float AS "previousRevenue"/.test(text)) return empty();
-    return empty();
-  });
-
-  const projects = {
-    resolveActiveProject: vi.fn().mockResolvedValue(PROJECT)
-  } as unknown as ProjectsService;
-
-  const ai = {
-    completeSafely: vi.fn().mockResolvedValue(options.aiNull ? null : 'Today is a big day for Acme App.')
-  } as unknown as AiService;
-
-  const digest = new DigestService(db as unknown as DatabaseService, {} as EmailService);
-  const service = new InsightsService(db as unknown as DatabaseService, projects, ai, digest);
-  const user: DashboardUser = { id: 'user1', email: 'test@example.com' };
-  return { db, projects, ai, service, user };
-}
-
 describe('today story', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   it('falls back to the template narrative when the AI is unavailable', async () => {
-    const facts = {
-      eventsToday: 120,
-      eventsYesterday: 100,
-      deltaPct: 20,
-      uniquesToday: 34,
-      topEvent: { name: 'signup', count: 9 },
-      topCountry: { name: 'Brazil', count: 40, pct: 33 },
-      topDevice: { name: 'mobile', count: 70 },
-      activeNow: 3,
-      lastEventAt: '2026-08-17T10:00:00.000Z'
-    };
-
     const db = mockDatabase((text) => {
       if (/AS today/.test(text)) {
         return rows([{ today: 120, yesterday: 100, uniques_today: 34, active_now: 3 }]);
@@ -279,12 +246,7 @@ describe('now activity', () => {
   });
 
   it('supports universal wildcard analytics and top events breakdown', async () => {
-    let capturedSql = '';
-    let capturedParams: unknown[] = [];
-
-    const db = mockDatabase((text, params) => {
-      capturedSql = text;
-      capturedParams = params ?? [];
+    const db = mockDatabase((text) => {
       if (/breakdown_key/.test(text)) {
         return rows([
           { bucket: '2026-09-26T00:00:00Z', breakdown_key: 'letter_published', total: 42, value: 42 },
@@ -382,7 +344,7 @@ describe('now activity', () => {
   });
 
   it('rejects cross-project insight attachment and requires insightId', async () => {
-    const db = mockDatabase((text, params) => {
+    const db = mockDatabase((text) => {
       if (/FROM\s+dashboards/i.test(text)) {
         return rows([
           {
@@ -445,7 +407,7 @@ describe('now activity', () => {
   });
 
   it('discovers real event names and properties including telemetry context dimensions', async () => {
-    const db = mockDatabase((text, params) => {
+    const db = mockDatabase((text) => {
       if (/FROM\s+events/i.test(text)) {
         if (/SELECT\s+event_name/i.test(text)) {
           return rows([

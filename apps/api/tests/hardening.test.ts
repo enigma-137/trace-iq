@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
 import { mockDatabase, rows, affected, type MockDb } from './helpers/mock-db';
 import { OrganizationsService, MemberRole } from '../src/modules/organizations/organizations.service';
 import { InvitesService } from '../src/modules/organizations/invites.service';

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ProjectsService } from '../src/modules/projects/projects.service';
-import { mockDatabase, rows, affected, type MockDb } from './helpers/mock-db';
+import { mockDatabase, rows, affected } from './helpers/mock-db';
 
 type ProjectRow = {
   id: string;

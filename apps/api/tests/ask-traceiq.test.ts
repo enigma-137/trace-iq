@@ -275,7 +275,7 @@ SUGGESTED_QUESTIONS:
 
 describe('Ask TraceIQ - Quota Concurrency & Atomic Reservation Hardening', () => {
   it('correctly rejects concurrent requests when usage + active reservations reach quota limit', async () => {
-    let mockConsumed = 2; // Free plan: limit is 3, already consumed 2
+    const mockConsumed = 2; // Free plan: limit is 3, already consumed 2
     let activeReservations = 0;
 
     const mockEntitlements = {

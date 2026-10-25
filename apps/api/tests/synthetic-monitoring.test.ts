@@ -344,10 +344,8 @@ describe('SyntheticMonitoringService - Multi-Instance Claiming & Stale Recovery'
 
   it('handles two scheduler instances competing for the same due monitor safely', async () => {
     // Simulate DB where first transaction locks row, second replica gets 0 rows due to SKIP LOCKED
-    let firstClaimed = false;
     const { service: replica1 } = makeService((sql) => {
       if (sql.includes('FOR UPDATE SKIP LOCKED')) {
-        firstClaimed = true;
         return rows([{ id: 'sym_due_1' }]);
       }
       if (sql.includes('UPDATE synthetic_monitors')) {
@@ -510,7 +508,7 @@ describe('SyntheticMonitoring - Funnel Provenance & Integration', () => {
 describe('SyntheticMonitoring - CI Run Groups & PR Preview Testing', () => {
   it('triggers CI run group overriding base URL and preserving git metadata', async () => {
     let capturedGroupInsert: any[] = [];
-    let capturedRunInserts: any[][] = [];
+    const capturedRunInserts: any[][] = [];
 
     const { service } = makeService((sql, params) => {
       if (sql.includes('FROM synthetic_monitors') && sql.includes('WHERE id = ANY')) {

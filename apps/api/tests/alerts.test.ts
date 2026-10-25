@@ -58,7 +58,7 @@ interface Harness {
 
 // `values` is returned in order for consecutive metric queries (used for
 // drops/spikes, which compute current then previous).
-function makeService(metricValues: number[], overrides: Partial<AlertRow> = {}): Harness {
+function makeService(metricValues: number[]): Harness {
   const db = mockDatabase((text) => {
     if (text.includes('FROM events')) {
       const value = metricValues.shift() ?? 0;

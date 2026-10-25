@@ -1,4 +1,3 @@
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 import { SetupVerificationsService } from '../src/modules/setup-verifications/setup-verifications.service';
@@ -123,7 +122,7 @@ describe('SetupVerificationsService Core & Ingestion', () => {
   });
 
   it('rejects events that occurred before the verification session started', async () => {
-    const db = mockDatabase((text, values) => {
+    const db = mockDatabase((text) => {
       if (text.includes('UPDATE setup_verifications')) {
         // SQL query has "created_at <= eventOccurredAt"
         // If event occurred in past, DB UPDATE returns empty
@@ -221,7 +220,7 @@ describe('SetupVerificationsService Core & Ingestion', () => {
     const service = new SetupVerificationsService(db as never);
 
     let callbackFiredCount = 0;
-    const unsubscribe = service.subscribeToVerification('verify_sub_123', (payload) => {
+    const unsubscribe = service.subscribeToVerification('verify_sub_123', () => {
       callbackFiredCount++;
     });
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService } from '../src/modules/analytics/analytics.service';
 import { extractClientIp, resolveGeo } from '../src/common/geo';
 import { mockDatabase, rows } from './helpers/mock-db';
