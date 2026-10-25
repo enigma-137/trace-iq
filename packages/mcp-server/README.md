@@ -93,7 +93,7 @@ Read-only tokens cannot perform mutations.
 
 ## Analytics
 
-- `get_analytics_overview`
+- `get_analytics_overview` (optional `range`: `24h`, `7d` or `30d`; default `7d`)
 - `get_web_analytics`
 - `get_api_performance`
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compactTimeline, shapeResponse, summarizeList } from '../src/shape.js';
 import { tools } from '../src/tools.js';
 import { InputSchema } from '../src/types.js';
@@ -90,5 +90,34 @@ describe('tool registry', () => {
     for (const key of tool.schema.required ?? []) {
       expect(tool.schema.properties, `required "${key}" is not a declared property`).toHaveProperty(key);
     }
+  });
+});
+
+describe('get_analytics_overview', () => {
+  const tool = tools.find((candidate) => candidate.name === 'get_analytics_overview')!;
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stubApi() {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify({ range: '24h', totals: { events: 3 } }), { status: 200 });
+    }));
+    return urls;
+  }
+
+  it('passes the requested range to the API', async () => {
+    const urls = stubApi();
+    await tool.handler(validateArgs(tool.schema, { projectId: 'proj_1', range: '24h' }));
+    expect(new URL(urls[0]).searchParams.get('range')).toBe('24h');
+    expect(new URL(urls[0]).searchParams.get('projectId')).toBe('proj_1');
+  });
+
+  it('defaults to the last 7 days and rejects other windows', async () => {
+    const urls = stubApi();
+    await tool.handler(validateArgs(tool.schema, {}));
+    expect(new URL(urls[0]).searchParams.get('range')).toBe('7d');
+    expect(() => validateArgs(tool.schema, { range: '90d' })).toThrow('must be one of: 24h, 7d, 30d');
   });
 });
