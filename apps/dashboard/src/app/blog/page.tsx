@@ -1,13 +1,67 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
-import { PublicPage } from '@/components/PublicSiteChrome';
-import { formatPostDate } from '@/lib/blog';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { LandingSiteChrome } from '@/components/landing/LandingSiteChrome';
+import { formatPostDate, type BlogPost } from '@/lib/blog';
+import landing from '../landing-light.module.css';
+import styles from './blog.module.css';
 import { posts } from './posts';
 
 export const metadata: Metadata = { title: 'Blog', description: 'Notes on self-hosted analytics, product telemetry, privacy and building TraceIQ.' };
 
+function PostMeta({ post }: { post: BlogPost }) {
+  return (
+    <div className={styles.meta}>
+      <span className={styles.tag}>{post.tag}</span>
+      <time dateTime={post.date}>{formatPostDate(post.date)}</time>
+      <span>{post.readTime}</span>
+    </div>
+  );
+}
+
 export default function BlogPage() {
-  return <PublicPage><main className="mx-auto max-w-5xl px-5 py-20 sm:px-8 sm:py-28"><header className="max-w-3xl"><p className="font-mono text-xs uppercase tracking-[0.16em] text-blue-400">TraceIQ journal</p><h1 className="mt-4 text-5xl font-semibold tracking-tight sm:text-6xl">Building analytics<br /><span className="text-zinc-500">in the open.</span></h1><p className="mt-6 text-lg leading-8 text-zinc-400">Engineering notes, product decisions and clear-eyed comparisons for teams deciding how to understand their users.</p></header><section className="mt-14 grid gap-4">{posts.map((post) => <Link key={post.slug} href={`/blog/${post.slug}`} className="group rounded-xl border border-white/10 bg-white/[0.025] p-6 transition hover:border-white/20 hover:bg-white/[0.045] sm:p-8"><div className="flex flex-wrap items-center gap-3 font-mono text-xs uppercase tracking-wide text-zinc-500"><span className="text-blue-400">{post.tag}</span><span>{formatPostDate(post.date)}</span><span>{post.readTime}</span></div><div className="mt-4 flex items-start justify-between gap-5"><div><h2 className="text-2xl font-semibold tracking-tight group-hover:text-white sm:text-3xl">{post.title}</h2><p className="mt-3 max-w-3xl leading-7 text-zinc-400">{post.description}</p></div><HugeiconsIcon icon={ArrowUpRight01Icon} size={20} className="mt-1 shrink-0 text-zinc-600 transition group-hover:text-white" /></div></Link>)}</section></main></PublicPage>;
+  const [latest, ...rest] = posts;
+  return (
+    <LandingSiteChrome>
+      <section className={`${landing.frame} ${styles.intro}`} aria-labelledby="blog-title">
+        <div className={styles.introHeading}>
+          <h1 id="blog-title">
+            Building analytics <span>in the open.</span>
+          </h1>
+          <p className={styles.kicker}>TraceIQ journal / {posts.length} posts</p>
+        </div>
+        <p className={styles.lede}>
+          Engineering notes, product decisions and clear-eyed comparisons for teams deciding how to understand their users.
+        </p>
+      </section>
+
+      <section className={`${landing.frame} ${styles.posts}`} aria-label="Posts">
+        {latest && (
+          <Link href={`/blog/${latest.slug}`} className={styles.featured}>
+            <div>
+              <p className={styles.featuredLabel}>Latest</p>
+              <PostMeta post={latest} />
+              <h2>{latest.title}</h2>
+            </div>
+            <div className={styles.featuredAside}>
+              <p>{latest.description}</p>
+              <span className={styles.readLink}>
+                Read the post <ArrowRight size={14} aria-hidden="true" />
+              </span>
+            </div>
+          </Link>
+        )}
+        {rest.map((post) => (
+          <Link key={post.slug} href={`/blog/${post.slug}`} className={styles.row}>
+            <PostMeta post={post} />
+            <div>
+              <h2>{post.title}</h2>
+              <p>{post.description}</p>
+            </div>
+            <ArrowUpRight size={20} className={styles.rowArrow} aria-hidden="true" />
+          </Link>
+        ))}
+      </section>
+    </LandingSiteChrome>
+  );
 }
