@@ -58,7 +58,7 @@ describe('overview time range', () => {
     expect(db.queryCalls('AS api_calls')[0].text).toContain("date_trunc('hour'");
     expect(result.observabilitySeries).toHaveLength(25);
     expect(result.observabilitySeries.find((point) => point.bucket === '2026-09-03T11:00:00Z'))
-      .toEqual({ bucket: '2026-09-03T11:00:00Z', events: 9, apiCalls: 3, errors: 1 });
+      .toEqual({ bucket: '2026-09-03T11:00:00Z', events: 9, apiCalls: 3, failedRequests: 0, errors: 1 });
   });
 
   it('defaults to the last 7 days with daily buckets', async () => {

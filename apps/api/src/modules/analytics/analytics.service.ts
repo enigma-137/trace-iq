@@ -12,6 +12,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 const ALLOWED_INTERVALS: TrendInterval[] = ['hour', 'day', 'week'];
 const BUCKET_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS"Z"';
+/**
+ * Overview latency ignores calls reported as taking over 10 minutes. Those are
+ * timing artifacts (a phone asleep or a backgrounded tab mid-request, a
+ * long-lived connection), and a handful of them made the average exceed p95.
+ */
+// CASE keeps the cast safe: Postgres may test WHERE conditions in any order.
+const MAX_LATENCY_FILTER = `AND (CASE WHEN properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+  THEN (properties->>'durationMs')::numeric END) <= 600000`;
 
 export type OverviewRange = '24h' | '7d' | '30d';
 const OVERVIEW_RANGES: Record<OverviewRange, { sql: string; ms: number; bucket: TrendInterval }> = {
@@ -96,7 +104,12 @@ export interface ApiTelemetryOverview {
   p95: number;
   p99: number;
   avgDuration: number;
+  /** Percentage of requests that got an HTTP status of 400 or above. */
   errorRate: number;
+  /** Requests with a status of 400 or above (4xx and 5xx). */
+  failedRequests: number;
+  /** Requests with a 5xx status. */
+  serverErrors: number;
   statusBreakdown: {
     ok200: number;
     rateLimit429: number;
@@ -171,7 +184,7 @@ export interface OverviewResponse {
   topCountries: Array<{ name: string; total: number }>;
   topReferrers: Array<{ domain: string; visitors: number; views: number }>;
   sparkline: TrendPoint[];
-  observabilitySeries: Array<{ bucket: string; events: number; apiCalls: number; errors: number }>;
+  observabilitySeries: Array<{ bucket: string; events: number; apiCalls: number; failedRequests: number; errors: number }>;
   apiTelemetry?: ApiTelemetryOverview;
   topErrors?: ErrorIssueOverview[];
   funnelSummary?: FunnelOverview;
@@ -343,6 +356,7 @@ export class AnalyticsService {
       bucket: string;
       total: number;
       api_calls: number;
+      failed_requests: number;
       errors: number;
     }>(
       `
@@ -352,6 +366,10 @@ export class AnalyticsService {
           -- Only real request telemetry: a custom event that happens to carry a
           -- durationMs (time on page, a video watched) is not an API call.
           count(*) FILTER (WHERE event_name = '$api_request')::int AS api_calls,
+          count(*) FILTER (
+            WHERE event_name = '$api_request'
+              AND (CASE WHEN properties->>'status' ~ '^[0-9]+$' THEN (properties->>'status')::int ELSE 0 END) >= 400
+          )::int AS failed_requests,
           count(*) FILTER (
             WHERE event_name = '$exception' OR event_name = '$error'
           )::int AS errors
@@ -467,6 +485,7 @@ export class AnalyticsService {
                 AND occurred_at >= ${since}
                 AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
                 AND properties->>'status' ~ '^[0-9]+$'
+                ${MAX_LATENCY_FILTER}
                 ${latencySourceFilter}
             )
             SELECT
@@ -502,6 +521,7 @@ export class AnalyticsService {
                 AND occurred_at >= ${since}
                 AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
                 AND properties->>'status' ~ '^[0-9]+$'
+                ${MAX_LATENCY_FILTER}
                 ${latencySourceFilter}
             )
             SELECT
@@ -679,6 +699,7 @@ export class AnalyticsService {
         bucket,
         events: Number(row?.total ?? 0),
         apiCalls: Number(row?.api_calls ?? 0),
+        failedRequests: Number(row?.failed_requests ?? 0),
         errors: Number(row?.errors ?? 0)
       };
     });
@@ -752,6 +773,8 @@ export class AnalyticsService {
         p99: apiTel?.p99 || 0,
         avgDuration: apiTel?.avg_duration || 0,
         errorRate,
+        failedRequests: errCount,
+        serverErrors: apiTel?.error_500 || 0,
         statusBreakdown: {
           ok200: apiTel?.ok_200 || 0,
           rateLimit429: apiTel?.rate_limit_429 || 0,
