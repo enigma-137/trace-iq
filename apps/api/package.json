@@ -8,7 +8,7 @@
     "prebuild": "node scripts/clean-dist.js",
     "build": "nest build",
     "start": "node -e \"const fs = require('fs'); const p = fs.existsSync('dist/apps/api/src/main.js') ? './dist/apps/api/src/main.js' : './dist/main.js'; require(p);\"",
-    "lint": "eslint \"src/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "node scripts/migrate.js",

@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { FunnelsService } from '../src/modules/funnels/funnels.service';
-import { affected, empty, mockDatabase, rows, type MockDb } from './helpers/mock-db';
+import { affected, empty, mockDatabase, rows } from './helpers/mock-db';
 
 const PROJECT = {
   id: 'proj_1',

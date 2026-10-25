@@ -1,7 +1,15 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { EventsService } from '../src/modules/events/events.service';
-import { affected, empty, mockDatabase, rows, type MockDb } from './helpers/mock-db';
+import { affected, empty, mockDatabase, rows } from './helpers/mock-db';
+
+// A public IP makes the real resolveGeo() lazily load the ~150 MB geoip-lite
+// database, which took over a second here and occasionally ran past the test
+// timeout. Geo lookup has its own tests (analytics-geo-replay.test.ts).
+vi.mock('../src/common/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/common/geo')>()),
+  resolveGeo: (ip?: string) => (ip ? { ipAddress: ip } : {})
+}));
 
 function makeService(onQuery: (text: string, values: unknown[]) => unknown) {
   const db = mockDatabase((text, values) => {

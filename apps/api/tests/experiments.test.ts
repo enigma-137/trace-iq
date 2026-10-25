@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { ExperimentsService } from '../src/modules/experiments/experiments.service';
-import { affected, empty, mockDatabase, rows } from './helpers/mock-db';
+import { mockDatabase, rows } from './helpers/mock-db';
 
 const PROJECT = {
   id: 'proj_1',
@@ -318,10 +318,10 @@ describe('ExperimentsService - Unit & Integration Tests', () => {
       return rows([]);
     });
 
-    const resRunning = await service.updateStatus(USER, 'exp_1', 'running', undefined, PROJECT.id);
+    await service.updateStatus(USER, 'exp_1', 'running', undefined, PROJECT.id);
     expect(updatedStatus).toBe('running');
 
-    const resCompleted = await service.updateStatus(USER, 'exp_1', 'completed', 'variant_b', PROJECT.id);
+    await service.updateStatus(USER, 'exp_1', 'completed', 'variant_b', PROJECT.id);
     expect(updatedStatus).toBe('completed');
   });
 });

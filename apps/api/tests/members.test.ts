@@ -61,7 +61,7 @@ function makeService(
       return rows([{ exists: duplicate }]);
     }
     if (/INSERT INTO organization_members/.test(text)) {
-      const [orgId, userId, insertRole, email] = values as [string, string, MemberRole, string];
+      const [, userId, insertRole, email] = values as [string, string, MemberRole, string];
       return rows([
         { user_id: userId, role: insertRole, email, created_at: '2026-01-01T00:00:00Z' }
       ]);

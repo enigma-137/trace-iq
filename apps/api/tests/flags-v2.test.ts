@@ -4,9 +4,7 @@ import {
   evaluateFlag,
   evaluateFlagDetailed,
   evaluateRule,
-  matchesTargeting,
   type FlagRow,
-  type FlagTarget,
   type FlagTargetGroup
 } from '../src/modules/flags/flags.service';
 

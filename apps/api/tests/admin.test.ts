@@ -149,9 +149,7 @@ describe('requirePlatformAdmin', () => {
 
 describe('admin controller', () => {
   it('routes through the auth guard on every endpoint', async () => {
-    const { AuthService: AuthClass } = await import('../src/modules/auth/auth.service');
     const { AdminController } = await import('../src/modules/admin/admin.controller');
-    const { AdminService: AdminClass } = await import('../src/modules/admin/admin.service');
 
     const adminUser: DashboardUser = { id: 'u1', email: 'emmanuelonoja291@gmail.com' };
     const auth = {

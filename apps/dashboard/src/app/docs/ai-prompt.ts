@@ -47,7 +47,7 @@ export const AI_LANGUAGES: AiLanguage[] = [
   {
     id: 'javascript',
     label: 'JavaScript',
-    blurb: 'Browser SDK — single script, under 25 KB',
+    blurb: 'Browser SDK — single script, about 40 KB gzipped',
     install: 'npm install traceiq-sdk-js@latest',
     init: `import { traceiq } from 'traceiq-sdk-js';
 
