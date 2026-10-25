@@ -1,16 +1,17 @@
 import { BlogPostLayout } from '@/components/BlogPostLayout'
 
-export const metadata = {
+export const post = {
   title: 'Meet Ask TraceIQ: Investigate Your Product by Asking Questions',
-  description: 'Ask about funnels, errors, users, APIs, feature flags, replays, and more — and get answers grounded in your own product data.'
+  description: 'Ask about funnels, errors, users, APIs, feature flags, replays, and more — and get evidence-grounded answers across your entire product telemetry.',
+  lede: 'Most analytics tools give you dashboards. The hard part is connecting what happened across errors, funnels, flags, APIs, and replays. That is what we built Ask TraceIQ for.',
+  date: '2026-09-22',
+  readTime: '6 min read',
+  tag: 'Product Announcement'
 }
 
-<BlogPostLayout
-  title="Meet Ask TraceIQ: Investigate Your Product by Asking Questions"
-  description="Most analytics tools give you dashboards. The hard part is connecting what happened across errors, funnels, flags, APIs, and replays. That is what we built Ask TraceIQ for."
-  date="September 22, 2026"
-  readTime="6 min read"
->
+export const metadata = { title: post.title, description: post.description }
+
+<BlogPostLayout {...post}>
 
 **Ask about funnels, errors, users, APIs, feature flags, replays, and more — and get answers grounded in your own product data.**
 
