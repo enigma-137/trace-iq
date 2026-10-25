@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import { PasswordInput } from '@/components/PasswordInput';
 
 type Status = { tone: 'success' | 'error'; message: string };
 
@@ -264,11 +265,10 @@ export function ResetPasswordForm() {
                   <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="new-password">
                     New Password
                   </label>
-                  <input
+                  <PasswordInput
                     className={inputClass}
                     id="new-password"
                     name="newPassword"
-                    type="password"
                     placeholder="••••••••"
                     value={password}
                     autoComplete="new-password"
@@ -284,11 +284,10 @@ export function ResetPasswordForm() {
                   <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="confirm-password">
                     Confirm New Password
                   </label>
-                  <input
+                  <PasswordInput
                     className={inputClass}
                     id="confirm-password"
                     name="confirmPassword"
-                    type="password"
                     placeholder="••••••••"
                     value={confirmPassword}
                     autoComplete="new-password"
