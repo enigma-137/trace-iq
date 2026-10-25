@@ -7,7 +7,7 @@ background thread, so your code never blocks on the network.
 
 ```toml
 [dependencies]
-traceiq = "0.1.0"
+traceiq = "0.2.0"
 ```
 
 ## Quickstart
