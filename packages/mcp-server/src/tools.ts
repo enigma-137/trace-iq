@@ -31,19 +31,27 @@ export const tools: Tool[] = [
   {
     name: 'get_analytics_overview',
     title: 'Analytics overview',
-    description: `Headline health of a project: total events, active users, sessions (last 30d), revenue, top events/devices/countries, and the recent event sparkline. Good for a high-level "how are we doing?" answer.`,
+    description: `Headline health of a project over a time range (24h, 7d or 30d; default 7d): events, identified users, sessions, revenue vs the previous period, API latency and error rate, top events/devices/countries/referrers, and an event series (hourly for 24h, daily otherwise). The response's "range" field says which window was applied. Good for a high-level "how are we doing?" answer.`,
     requiredScopes: ['analytics:read'],
     annotations: { readOnlyHint: true },
     schema: {
       type: 'object',
       properties: {
-        projectId: { type: 'string', description: 'Optional project id. Defaults to the first accessible project.' }
+        projectId: { type: 'string', description: 'Optional project id. Defaults to the first accessible project.' },
+        range: {
+          type: 'string',
+          enum: ['24h', '7d', '30d'],
+          default: '7d',
+          description: 'Time window for every number in the overview.'
+        }
       },
       additionalProperties: false
     },
     handler: async (args) => {
       return shapeResponse(
-        await request('GET', '/v1/dashboard/overview', { query: withProject(args.projectId as string) }),
+        await request('GET', '/v1/dashboard/overview', {
+          query: { ...withProject(args.projectId as string), range: (args.range as string) ?? '7d' }
+        }),
         { maxItems: 20 }
       );
     }
