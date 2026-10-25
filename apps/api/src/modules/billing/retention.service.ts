@@ -23,7 +23,7 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
   onApplicationBootstrap() {
     const configured = Number(process.env.RETENTION_SWEEP_INTERVAL_MS ?? 21_600_000);
     const interval = Number.isFinite(configured) ? Math.max(configured, 60_000) : 21_600_000;
-    this.timer = setInterval(() => void this.runSweep().catch((error) => {
+    this.timer = setInterval(() => void this.database.runExclusive('billing.retention-sweep', () => this.runSweep()).catch((error) => {
       this.logger.error('Retention sweep failed.', error instanceof Error ? error.stack : error);
     }), interval);
     this.timer.unref();

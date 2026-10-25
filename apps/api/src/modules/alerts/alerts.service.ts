@@ -77,7 +77,11 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.evaluateDueAlerts(), EVAL_TICK_MS);
+    // One replica evaluates per tick, so a firing alert notifies once, not once per replica.
+    this.timer = setInterval(
+      () => void this.database.runExclusive('alerts.evaluate', () => this.evaluateDueAlerts()).catch(() => undefined),
+      EVAL_TICK_MS
+    );
   }
 
   onModuleDestroy(): void {
