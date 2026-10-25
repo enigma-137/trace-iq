@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "TraceIQ", targets: ["TraceIQ"])
     ],
     targets: [
-        .target(name: "TraceIQ", path: "Sources/TraceIQ")
+        .target(name: "TraceIQ", path: "Sources/TraceIQ"),
+        .testTarget(name: "TraceIQTests", dependencies: ["TraceIQ"], path: "Tests/TraceIQTests")
     ]
 )
