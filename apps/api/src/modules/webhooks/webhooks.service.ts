@@ -133,7 +133,8 @@ export class WebhooksService implements OnModuleDestroy {
 
   private startRetrySweep() {
     this.sweepTimer = setInterval(() => {
-      this.retryPendingDeliveries().catch(() => undefined);
+      // One replica sweeps at a time, so a retried delivery is sent once, not once per replica.
+      this.database.runExclusive('webhooks.retry-sweep', () => this.retryPendingDeliveries()).catch(() => undefined);
     }, RETRY_SWEEP_INTERVAL_MS);
   }
 

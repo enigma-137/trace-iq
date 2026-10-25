@@ -19,7 +19,8 @@ declare module 'pg' {
       text: string,
       values?: readonly unknown[]
     ): Promise<QueryResult<T>>;
-    release(): void;
+    /** Passing an error (or true) destroys the connection instead of returning it to the pool. */
+    release(destroy?: Error | boolean): void;
   }
 
   export class Pool {

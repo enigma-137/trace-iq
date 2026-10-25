@@ -72,7 +72,7 @@ export class BillingService implements OnApplicationBootstrap, OnApplicationShut
     });
     const configured = Number(process.env.BILLING_RECONCILIATION_INTERVAL_MS ?? 21_600_000);
     const interval = Number.isFinite(configured) ? Math.max(configured, 60_000) : 21_600_000;
-    this.reconciliationTimer = setInterval(() => void this.reconcile().catch((error) => {
+    this.reconciliationTimer = setInterval(() => void this.database.runExclusive('billing.reconcile', () => this.reconcile()).catch((error) => {
       this.logger.error('Bachs reconciliation failed.', error instanceof Error ? error.stack : error);
     }), interval);
     this.reconciliationTimer.unref();

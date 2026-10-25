@@ -12,7 +12,7 @@ export class ReplayRetentionService implements OnApplicationBootstrap, OnApplica
   onApplicationBootstrap() {
     const configured = Number(process.env.REPLAY_RETENTION_SWEEP_INTERVAL_MS ?? 21_600_000);
     const interval = Number.isFinite(configured) ? Math.max(60_000, configured) : 21_600_000;
-    this.timer = setInterval(() => void this.runSweep().catch((error) => {
+    this.timer = setInterval(() => void this.database.runExclusive('replay.retention-sweep', () => this.runSweep()).catch((error) => {
       this.logger.error('replay_retention_sweep_failed', error instanceof Error ? error.stack : undefined);
     }), interval);
     this.timer.unref();
