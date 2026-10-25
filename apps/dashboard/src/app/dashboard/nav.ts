@@ -25,6 +25,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Funnels', href: '/dashboard/funnels', key: 'funnels' },
       { label: 'Retention', href: '/dashboard/retention', key: 'retention' },
       { label: 'Users', href: '/dashboard/users', key: 'users' },
+      { label: 'Groups', href: '/dashboard/groups', key: 'groups' },
       { label: 'Web analytics', href: '/dashboard/web', key: 'web' },
       { label: 'Cohorts', href: '/dashboard/cohorts', key: 'cohorts' }
     ]
