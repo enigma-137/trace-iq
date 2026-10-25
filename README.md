@@ -14,6 +14,10 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <a href="https://www.npmjs.com/package/traceiq-sdk-js"><img alt="traceiq-sdk-js on npm" src="https://img.shields.io/npm/v/traceiq-sdk-js?label=traceiq-sdk-js"></a>
   <a href="https://www.npmjs.com/package/traceiq-cli"><img alt="traceiq-cli on npm" src="https://img.shields.io/npm/v/traceiq-cli?label=traceiq-cli"></a>
+  <a href="https://www.npmjs.com/package/traceiq-node"><img alt="traceiq-node on npm" src="https://img.shields.io/npm/v/traceiq-node?label=traceiq-node"></a>
+  <a href="https://pypi.org/project/traceiq-py/"><img alt="traceiq-py on PyPI" src="https://img.shields.io/pypi/v/traceiq-py?label=traceiq-py"></a>
+  <a href="https://crates.io/crates/traceiq"><img alt="traceiq on crates.io" src="https://img.shields.io/crates/v/traceiq?label=crates.io"></a>
+  <a href="https://pub.dev/packages/traceiq_flutter"><img alt="traceiq_flutter on pub.dev" src="https://img.shields.io/pub/v/traceiq_flutter?label=traceiq_flutter"></a>
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
 </p>
 
