@@ -2,9 +2,10 @@ import './config/env';
 import { NestFactory } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
-import { json } from 'express';
+import { json, raw } from 'express';
 import { AppModule } from './app.module';
 import { activeProjectMiddleware } from './common/active-project';
+import { MAX_SOURCE_MAP_BYTES } from './modules/sourcemaps/sourcemaps.service';
 
 // Cap request bodies. Ingestion batches of 500 events are the largest legitimate
 // payloads; 1MB is generous for them and still bounds memory/disk abuse.
@@ -57,6 +58,10 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+
+  // Source map uploads are raw map JSON, often several MB and gzip-encoded.
+  // Parsed first so the 1MB JSON parser below skips them.
+  app.use('/v1/sourcemaps', raw({ type: () => true, limit: MAX_SOURCE_MAP_BYTES }));
 
   app.use(json({
     limit: MAX_BODY_BYTES,

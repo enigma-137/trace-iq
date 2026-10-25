@@ -4,7 +4,7 @@ const GLOBAL_FLAGS = `
 Global flags
   --api-url <url>        API to talk to (env TRACEIQ_API_URL, default https://api.traceiq.run)
   --token <tiq_pat_...>  Personal access token for this run (env TRACEIQ_TOKEN)
-  -p, --project <id>     Project for this run instead of the one picked with \`projects use\`
+  -p, --project <id>     Project for this run instead of the one picked with \`projects use\` (env TRACEIQ_PROJECT_ID)
   -h, --help             Show help for a command`;
 
 export const MAIN_HELP = `
@@ -34,6 +34,10 @@ ${colors.bold('Data')}
   errors                 List error issues
   status                 Check API health and when data last arrived
 
+${colors.bold('Builds')}
+  sourcemaps upload      Upload a build's source maps so error stacks show original code
+  sourcemaps list        List releases with uploaded source maps
+
 ${colors.bold('Other')}
   open [page]            Open the dashboard (overview, logs, events, errors, settings, ...)
   help [command]         Show help for a command
@@ -53,6 +57,7 @@ Scopes the CLI uses:
   projects:read    projects list / use, whoami
   analytics:read   logs, status
   errors:read      errors
+  sourcemaps:write sourcemaps upload (a CI token can have only this scope)
 
 Without --token you are prompted for it (input is hidden). In CI, set
 TRACEIQ_TOKEN instead of logging in.
@@ -128,6 +133,31 @@ ${colors.bold('traceiq errors')} [--days <n>] [--json]
 
 Lists error issues (grouped by type and message) for the active project,
 most frequent first. --days defaults to 7.
+`,
+  sourcemaps: `
+${colors.bold('traceiq sourcemaps upload')} --release <version> [--dir <build folder>] [--delete-after] [--dry-run]
+${colors.bold('traceiq sourcemaps list')} [--release <version>] [--json]
+
+upload sends every *.js.map under --dir (default ./dist) for one release. Use
+the same release value you pass to the SDK's \`release\` option; errors from
+that release then show original file names, lines and code. Each map is
+stored under the path of the file next to it (dist/assets/index.js.map →
+assets/index.js) and matches stack frames whose URL ends with that path.
+Uploading the same release again replaces its maps.
+
+  --release <version>  Required (env TRACEIQ_RELEASE)
+  --dir <path>         Build output folder (default dist)
+  --delete-after       Delete the local .map files after a successful upload,
+                       so they are not deployed with your site
+  --dry-run            List the maps without uploading
+
+Needs a token with the sourcemaps:write scope and a project (--project or
+TRACEIQ_PROJECT_ID in CI). Example GitHub Actions step:
+
+  - run: npx traceiq-cli sourcemaps upload --release \${{ github.sha }} --dir dist --delete-after
+    env:
+      TRACEIQ_TOKEN: \${{ secrets.TRACEIQ_TOKEN }}
+      TRACEIQ_PROJECT_ID: proj_...
 `,
   status: `
 ${colors.bold('traceiq status')} [--json]

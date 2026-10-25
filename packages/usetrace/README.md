@@ -42,6 +42,7 @@ Management commands use a **personal access token**. Create one in the dashboard
 | `projects:read` | `projects list`, `projects use`, `whoami` |
 | `analytics:read` | `logs`, `status` |
 | `errors:read` | `errors` |
+| `sourcemaps:write` | `sourcemaps upload` (a CI token can have only this scope) |
 
 ```bash
 traceiq login                       # prompts for the token (input hidden)
@@ -107,6 +108,33 @@ traceiq errors --days 30
 
 Logs written with `traceiq.log()` in the browser and Node SDKs show up here.
 
+## Source maps
+
+Upload a build's source maps so error stacks in the dashboard show original file names,
+lines, function names and code:
+
+```bash
+traceiq sourcemaps upload --release 1.4.2 --dir dist   # every *.js.map under dist, gzipped
+traceiq sourcemaps upload --release 1.4.2 --dry-run    # list what would be uploaded
+traceiq sourcemaps list                                # releases with maps
+traceiq sourcemaps list --release 1.4.2
+```
+
+Use the same release you pass to the SDK's `release` option. Each map is stored under
+the path of the file next to it (`dist/assets/index.js.map` → `assets/index.js`) and
+matches stack frames whose URL ends with that path. `--delete-after` removes the local
+`.map` files once they are uploaded, so they are not deployed with your site.
+
+In CI, use a token with only `sourcemaps:write`:
+
+```yaml
+- run: npx traceiq-cli sourcemaps upload --release ${{ github.sha }} --dir dist --delete-after
+  env:
+    TRACEIQ_TOKEN: ${{ secrets.TRACEIQ_TOKEN }}
+    TRACEIQ_PROJECT_ID: proj_...
+    TRACEIQ_API_URL: https://api.traceiq.run
+```
+
 ## Status and dashboard
 
 ```bash
@@ -133,7 +161,7 @@ The CLI explains this and points you to `traceiq open settings` when you try the
 | --- | --- | --- |
 | `--api-url <url>` | `TRACEIQ_API_URL` | `https://api.traceiq.run` |
 | `--token <tiq_pat_...>` | `TRACEIQ_TOKEN` | saved by `login` |
-| `-p, --project <id>` | | saved by `projects use` |
+| `-p, --project <id>` | `TRACEIQ_PROJECT_ID` | saved by `projects use` |
 | `--dashboard-url <url>` | `TRACEIQ_DASHBOARD_URL` | derived from the API URL |
 | | `TRACEIQ_CONFIG_DIR` | `~/.traceiq` |
 

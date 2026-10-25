@@ -72,7 +72,8 @@ const SCOPE_GROUPS: ScopeGroup[] = [
   { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: false },
   { key: 'dashboards', label: 'Dashboards', read: 'dashboards:read', write: 'dashboards:write', mcp: false },
   { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: false },
-  { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false }
+  { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false },
+  { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false }
 ];
 
 const ALL_SCOPES = SCOPE_GROUPS.flatMap((group) => [group.read, group.write].filter(Boolean) as string[]);

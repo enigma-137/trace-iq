@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
+import { SourceMapsService } from '../sourcemaps/sourcemaps.service';
+import type { SymbolicatedStack } from '../sourcemaps/symbolicate';
 import { EXCEPTION_EVENT } from './fingerprint';
 
 /** Workflow state as stored. */
@@ -61,6 +63,8 @@ export type ErrorSample = {
   url?: string | null;
   release?: string | null;
   occurredAt: string;
+  /** The stack mapped to original source with the release's uploaded source maps, when any matched. */
+  symbolicated?: SymbolicatedStack | null;
 };
 
 type IssueStateRow = { status: StoredIssueStatus; assignee_user_id: string | null; resolved_at: string | null };
@@ -76,7 +80,8 @@ export interface UpdateIssueRequest {
 export class ErrorsService {
   constructor(
     private readonly database: DatabaseService,
-    private readonly projects: ProjectsService
+    private readonly projects: ProjectsService,
+    private readonly sourceMaps?: SourceMapsService
   ) {}
 
   /**
@@ -348,7 +353,7 @@ export class ErrorsService {
       },
       days,
       totals: totals.rows[0] ?? { occurrences: 0, sessions: 0, users: 0, firstSeen: '', lastSeen: '', firstRelease: null, lastRelease: null },
-      samples: samples.rows,
+      samples: await this.withSymbolicatedStacks(project.id, samples.rows),
       timeline,
       browsers,
       operatingSystems,
@@ -458,6 +463,12 @@ export class ErrorsService {
     if (!value) return 'all';
     if ((STATUS_FILTERS as string[]).includes(value)) return value as IssueStatusFilter;
     throw new BadRequestException(`status must be one of: ${STATUS_FILTERS.join(', ')}.`);
+  }
+
+  private async withSymbolicatedStacks(projectId: string, samples: ErrorSample[]): Promise<ErrorSample[]> {
+    if (!this.sourceMaps || samples.length === 0) return samples;
+    const mapped = await this.sourceMaps.symbolicate(projectId, samples);
+    return samples.map((sample, index) => ({ ...sample, symbolicated: mapped[index] ?? null }));
   }
 
   private async breakdown(filter: string, values: unknown[], source: string) {

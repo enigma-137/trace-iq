@@ -21,6 +21,7 @@ export const docsSections = [
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
   { id: 'public-sharing', label: 'Public sharing', category: 'Features' },
   { id: 'api-performance', label: 'API performance', category: 'Features' },
+  { id: 'source-maps', label: 'Source maps', category: 'Features' },
   { id: 'logs', label: 'Logs', category: 'Features' },
   { id: 'webhooks', label: 'Webhooks', category: 'Features' },
   { id: 'export', label: 'Data export', category: 'Features' },
@@ -1152,7 +1153,10 @@ traceiq logs --trace 4bf92f35... --json   # one JSON object per line
 traceiq events --follow
 traceiq events --name signup_completed -n 50
 
-traceiq errors --days 30`}</Code>
+traceiq errors --days 30
+
+traceiq sourcemaps upload --release 1.4.2 --dir dist   # see Source maps
+traceiq sourcemaps list`}</Code>
         <OptionsTable
           rows={[
             ['-l, --level', 'all', 'debug, info, warn or error.'],
@@ -1374,6 +1378,64 @@ app.use(traceiq.middleware({
         <P>
           Anything else (gRPC, background jobs) can report directly by sending an <Mono>$api_request</Mono> event
           with <Mono>method</Mono>, <Mono>path</Mono>, <Mono>status</Mono>, and <Mono>durationMs</Mono> properties.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'source-maps') {
+    return (
+      <Section id="source-maps" title="Source maps">
+        <P>
+          Production JavaScript is minified, so error stacks point at lines like <Mono>index-3f2a9c1b.js:1:48213</Mono>.
+          Upload your build&apos;s source maps for each release and Error tracking shows the original file, line, function
+          name and the surrounding code instead. Stored events are never changed: stacks are mapped when you open an
+          issue, so maps uploaded after a deploy also apply to errors already captured from that release.
+        </P>
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">1. Tag events with a release</h3>
+        <Code lang="ts">{`traceiq.initialize({
+  projectId: 'YOUR_PROJECT_ID',
+  writeKey: 'YOUR_PROJECT_WRITE_KEY',
+  release: process.env.NEXT_PUBLIC_RELEASE, // e.g. the git SHA or 1.4.2
+});`}</Code>
+        <P>
+          Use the same value when you upload. Mobile SDKs report the app version, which is used when no release is set.
+        </P>
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">2. Build with source maps</h3>
+        <OptionsTable
+          rows={[
+            ['Vite', "build.sourcemap: 'hidden'", 'Writes .map files without a sourceMappingURL comment, so browsers never fetch them.'],
+            ['Next.js', 'productionBrowserSourceMaps: true', 'Then upload from .next (frames under /_next/static/... match).'],
+            ['webpack', "devtool: 'hidden-source-map'", 'Same as Vite’s hidden option.'],
+            ['esbuild', '--sourcemap=external', 'Writes .map files without a comment.']
+          ]}
+        />
+
+        <h3 className="pt-2 text-base font-semibold text-neutral-900 dark:text-white">3. Upload from CI</h3>
+        <P>
+          Create a personal access token with only the <Mono>sourcemaps:write</Mono> scope (Settings → Personal access
+          tokens) and store it as a CI secret. Then, after the build:
+        </P>
+        <Code lang="yaml">{`- name: Upload source maps to TraceIQ
+  run: npx traceiq-cli sourcemaps upload --release \${{ github.sha }} --dir dist --delete-after
+  env:
+    TRACEIQ_TOKEN: \${{ secrets.TRACEIQ_TOKEN }}
+    TRACEIQ_PROJECT_ID: YOUR_PROJECT_ID`}</Code>
+        <OptionsTable
+          rows={[
+            ['--release', 'TRACEIQ_RELEASE', 'Required. Must equal the SDK release option.'],
+            ['--dir', 'dist', 'Build output folder. Every *.js.map under it is uploaded, gzipped.'],
+            ['--delete-after', 'off', 'Delete the local .map files after a successful upload so they are not deployed.'],
+            ['--dry-run', 'off', 'List the maps that would be uploaded.']
+          ]}
+        />
+        <P>
+          Each map is stored under the path of the file next to it (<Mono>dist/assets/index.js.map</Mono> →{' '}
+          <Mono>assets/index.js</Mono>) and matches stack frames whose URL path ends with that path, so it does not
+          matter which domain or CDN serves the bundle. Uploading the same release again replaces its maps. Maps can be up
+          to 25 MB each; <Mono>traceiq sourcemaps list</Mono> shows what has been uploaded.
         </P>
       </Section>
     );
