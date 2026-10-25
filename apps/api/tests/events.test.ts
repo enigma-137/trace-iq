@@ -194,3 +194,27 @@ describe('EventsService.ingestBatch', () => {
     expect(db.queryCalls(/UPDATE events e/)).toHaveLength(0);
   });
 });
+
+describe('profile traits', () => {
+  function traitService() {
+    return makeService((text) => {
+      if (text.includes('FROM project_write_keys pwk')) return rows([{ project_id: 'proj_1', organization_id: 'org_1' }]);
+      if (text.includes('INSERT INTO users')) return rows([{ external_id: 'u1', id: 'usr_1' }]);
+      return affected(1);
+    });
+  }
+
+  it('merges $identify traits onto the profile but never $group account traits', async () => {
+    const { db, service } = traitService();
+
+    await service.ingestBatch('key_abc', 'proj_1', [
+      { eventName: '$identify', userId: 'u1', properties: { traits: { name: 'Ada' } } },
+      { eventName: '$group', userId: 'u1', properties: { organizationId: 'org_9', traits: { name: 'Acme Inc' } } }
+    ]);
+    await service.ingest({ ...validRequest, userId: 'u1', eventName: '$group', properties: { organizationId: 'org_9', traits: { name: 'Acme Inc' } } });
+
+    const updates = db.queryCalls('UPDATE users SET traits');
+    expect(updates).toHaveLength(1);
+    expect(JSON.parse(updates[0].values[2] as string)).toEqual({ name: 'Ada' });
+  });
+});

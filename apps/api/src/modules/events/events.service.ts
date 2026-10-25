@@ -214,9 +214,10 @@ export class EventsService {
     const { eventIds, usageWarningPercentage } = await this.bulkInsertEvents(auth, prepared);
     await this.backfillSessionIdentities(auth.project_id, sessionIds);
 
-    // Merge traits onto user profiles if identified
+    // Merge traits onto user profiles if identified. A `$group` event's traits
+    // describe the account, not the person, so they never touch the profile.
     for (const p of prepared) {
-      if (p.userId && (p.eventName === '$identify' || (p.properties && p.properties.traits))) {
+      if (p.userId && p.eventName !== '$group' && (p.eventName === '$identify' || (p.properties && p.properties.traits))) {
         const rawTraits = (p.properties?.traits ?? (p.eventName === '$identify' ? p.properties : {})) as Record<string, unknown>;
         const sanitized = sanitizeIngestedTraits(rawTraits);
         if (sanitized && Object.keys(sanitized).length > 0) {
@@ -495,8 +496,8 @@ export class EventsService {
       await this.backfillSessionIdentities(auth.project_id, [sessionId]);
     }
 
-    // Merge traits onto user profile if identified
-    if (userId && (eventName === '$identify' || input.properties?.traits)) {
+    // Merge traits onto user profile if identified (never a `$group` event's account traits).
+    if (userId && eventName !== '$group' && (eventName === '$identify' || input.properties?.traits)) {
       const rawTraits = (input.properties?.traits ?? (eventName === '$identify' ? input.properties : {})) as Record<string, unknown>;
       const sanitized = sanitizeIngestedTraits(rawTraits);
       if (sanitized && Object.keys(sanitized).length > 0) {

@@ -88,13 +88,19 @@ export function Bullets({ items }: { items: Array<[string, string]> }) {
   );
 }
 
-export function OptionsTable({ rows }: { rows: Array<[string, string, string]> }) {
+export function OptionsTable({
+  rows,
+  headers = ['Option', 'Default', 'Description']
+}: {
+  rows: Array<[string, string, string]>;
+  headers?: [string, string, string];
+}) {
   return (
     <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
       <div className="hidden grid-cols-[minmax(120px,.7fr)_minmax(110px,.8fr)_minmax(0,1.5fr)] gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500 md:grid">
-        <span>Option</span>
-        <span>Default</span>
-        <span>Description</span>
+        {headers.map((header) => (
+          <span key={header}>{header}</span>
+        ))}
       </div>
       <div className="divide-y divide-neutral-200 dark:divide-slate-800">
         {rows.map(([name, def, desc]) => (
@@ -367,39 +373,230 @@ curl http://127.0.0.1:4000/health`}</Code>
   }
 
   if (id === 'methods') {
+    const h3 = 'pt-2 text-base font-semibold text-neutral-900 dark:text-white';
     return (
-      <Section id="methods" title="SDK methods">
-        <P>Core methods on the default <Mono>traceiq</Mono> singleton (feature flags are covered in their own section).</P>
-        <Code lang="ts">{`// Identify the current person (creates/updates a user profile)
-traceiq.identify({ userId: 'user_123', traits: { email: 'a@b.com', plan: 'pro' } });
+      <div className="space-y-8">
+        <Section id="methods" title="SDK methods">
+          <P>
+            Every SDK has the same small set of methods. The examples use the browser SDK (the <Mono>traceiq</Mono>{' '}
+            singleton from <Mono>traceiq-sdk-js</Mono>); the last section lists the names in the other SDKs.
+          </P>
+          <OptionsTable
+            headers={['Method', 'Answers', 'What it does']}
+            rows={[
+              ['identify()', 'Who is this?', 'Ties events to a signed-in person and saves their traits to a profile.'],
+              ['track()', 'What did they do?', 'Records an action, such as checkout_started, with its details.'],
+              ['page()', 'Where are they?', 'Records a page view. Single-page apps call it on every route change.'],
+              ['group()', 'Which account are they in?', 'Puts the person in a company, team, school or department.'],
+              ['alias()', 'Same person, new ID?', 'Links an old ID (for example a guest ID) to the new one.'],
+              ['captureException()', 'What broke?', 'Reports an error you caught. Uncaught errors are captured for you.'],
+              ['log()', 'What happened inside?', 'Sends a structured log line to Logs.']
+            ]}
+          />
+        </Section>
 
-// Link another ID for the same person (e.g. a guest ID) to this user
-traceiq.alias('user_123', 'guest_8f2c');
+        <Section id="methods-people" title="How TraceIQ tracks a person">
+          <P>
+            On the first visit the SDK creates an <strong>anonymous ID</strong> and keeps it in{' '}
+            <Mono>localStorage</Mono>, so every event from that browser is connected even before sign-in. When you call{' '}
+            <Mono>identify()</Mono>, the events that follow carry your user ID, and TraceIQ links the anonymous history
+            to the same profile.
+          </P>
+          <P>
+            The signed-in user and their group live in memory, not in storage. Call <Mono>identify()</Mono> and{' '}
+            <Mono>group()</Mono> <strong>every time your app loads</strong> with a signed-in user (for example where
+            your auth state resolves), not only on the sign-in screen. Otherwise events after a page refresh are
+            recorded as anonymous.
+          </P>
+          <Code lang="ts">{`// e.g. in your auth provider, once the session is known
+if (session?.user) {
+  traceiq.identify({
+    userId: session.user.id,
+    traits: { email: session.user.email, name: session.user.name, plan: session.user.plan }
+  });
+  traceiq.group({
+    organizationId: session.user.departmentId,
+    traits: { name: session.user.departmentName }
+  });
+}`}</Code>
+        </Section>
 
-// Track a custom event with properties
-traceiq.track('checkout_started', { cartValue: 4200, currency: 'NGN' });
+        <Section id="methods-identify" title="identify()">
+          <Code lang="ts">{`traceiq.identify({ userId: 'user_123', traits: { email: 'ada@example.com', name: 'Ada', plan: 'pro' } });`}</Code>
+          <OptionsTable
+            headers={['Parameter', 'Required', 'Description']}
+            rows={[
+              ['userId', 'required', 'Your own stable ID for the person, such as the database ID. Avoid email addresses: they change.'],
+              ['traits', 'optional', 'Facts about the person (name, email, plan, role). Shown on their profile in Users.']
+            ]}
+          />
+          <P>
+            The first call creates the person&apos;s profile in <strong>Users</strong>; later calls merge new traits into
+            it, so a trait you send again replaces the old value and traits you leave out are kept. Traits that look
+            like secrets (<Mono>password</Mono>, <Mono>token</Mono>, <Mono>api_key</Mono>, card details) are dropped
+            before they are stored. Calling <Mono>identify()</Mono> again with the same ID is cheap, so it is safe to
+            call on every load.
+          </P>
+        </Section>
 
-// Track a page view
-traceiq.page('Pricing');
+        <Section id="methods-track" title="track()">
+          <Code lang="ts">{`traceiq.track('checkout_started', { cartValue: 4200, currency: 'NGN', items: 3 });`}</Code>
+          <OptionsTable
+            headers={['Parameter', 'Required', 'Description']}
+            rows={[
+              ['eventName', 'required', 'What happened, in object_action form: signup_completed, result_viewed, course_registered.'],
+              ['properties', 'optional', 'Details you want to filter or break down by later. Keep values flat: strings, numbers, booleans.']
+            ]}
+          />
+          <P>
+            Events appear in <strong>Events</strong> within seconds and can be counted in Insights, chained in Funnels
+            and compared in Retention. Pick names once and keep them stable, because a renamed event starts a new
+            series. Names starting with <Mono>$</Mono> are reserved for events the SDK sends itself (
+            <Mono>$page</Mono>, <Mono>$identify</Mono>, <Mono>$group</Mono>, <Mono>$exception</Mono>,{' '}
+            <Mono>$api_request</Mono>).
+          </P>
+        </Section>
 
-// Associate the person with an organization / account
-traceiq.group({ organizationId: 'org_123', traits: { plan: 'growth' } });
+        <Section id="methods-page" title="page()">
+          <Code lang="ts">{`traceiq.page();                         // uses document.title
+traceiq.page('Pricing', { plan: 'pro' }); // custom name and extra properties`}</Code>
+          <P>
+            Sends a <Mono>$page</Mono> event with the URL, path, referrer and title; it powers Web analytics and page
+            breakdowns elsewhere. <Mono>autoTrackPageViews: true</Mono> only records the first page, so single-page
+            apps (React, Next.js, Vue) should also call <Mono>page()</Mono> when the route changes:
+          </P>
+          <Code lang="tsx">{`'use client';
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { traceiq } from 'traceiq-sdk-js';
 
-// Report a handled error
-traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</Code>
-        <P>
-          <Mono>identify()</Mono> already links the browser&apos;s anonymous ID to the user. Use{' '}
-          <Mono>alias(userId, previousId)</Mono> when a person has had two user IDs, such as a guest checkout ID that
-          becomes an account. <Mono>previousId</Mono> defaults to the current ID. Server SDKs take both IDs
-          explicitly. TraceIQ records the link as a <Mono>$alias</Mono> event today; merging the two profiles in
-          reports is coming in a later release.
-        </P>
-        <P>
-          <Mono>group()</Mono> puts the person in an account (a company, team or school). Pass a{' '}
-          <Mono>name</Mono> trait to label it. Each account then appears under <strong>Groups</strong> with its traits,
-          members, daily activity and top events; activity counts every event its members send.
-        </P>
-      </Section>
+export function PageViews() {
+  const pathname = usePathname();
+  useEffect(() => { traceiq.page(); }, [pathname]);
+  return null;
+}`}</Code>
+        </Section>
+
+        <Section id="methods-group" title="group()">
+          <P>
+            A <strong>group</strong> is the account a person belongs to: the company in a B2B product, a team, a school,
+            or a department in a university portal. <Mono>group()</Mono> tells TraceIQ which group the signed-in person
+            is in, so you can see activity per account and not only per person.
+          </P>
+          <Code lang="ts">{`traceiq.group({
+  organizationId: 'dept_csc',              // your stable ID for the account
+  traits: { name: 'Computer Science', faculty: 'COLPHYS', plan: 'campus' }
+});`}</Code>
+          <OptionsTable
+            headers={['Parameter', 'Required', 'Description']}
+            rows={[
+              ['organizationId', 'required', 'Your own stable ID for the account (database ID or slug). The same account must always send the same ID.'],
+              ['traits', 'optional', 'Facts about the account. name labels it on the Groups page; any other traits are shown with it.']
+            ]}
+          />
+
+          <h3 className={h3}>What you get</h3>
+          <P>
+            Each group appears on the <strong>Groups</strong> page (under Analytics) as soon as its first{' '}
+            <Mono>group()</Mono> call arrives. The list shows its members, how many were active in the chosen range,
+            their event count and when they were last active. Opening a group shows its traits, a daily activity chart,
+            its top events and every member, linked to their user timeline.
+          </P>
+
+          <h3 className={h3}>How it works</h3>
+          <Bullets
+            items={[
+              ['Members', 'Anyone who called group() for that organizationId becomes a member. Call identify() first, so the member is the signed-in user and not an anonymous ID.'],
+              ['Activity', 'Every event a member sends counts toward the group: their page views, tracked events, errors and API calls. The $group, $identify and $alias events themselves are not counted.'],
+              ['Traits', 'The group shows the traits from its most recent group() call that included any. They describe the account and never change the person’s own profile.'],
+              ['Several groups', 'A person can be in more than one group: call group() once for each. Their activity then counts toward each of them.']
+            ]}
+          />
+
+          <h3 className={h3}>Setting it up</h3>
+          <ol className="ml-5 list-decimal space-y-1.5 text-sm leading-6 text-neutral-600 dark:text-slate-300">
+            <li>Decide what an account is in your product (company, team, department) and which ID identifies it.</li>
+            <li>Where your app learns who is signed in, call <Mono>identify()</Mono> and then <Mono>group()</Mono>, on every load.</li>
+            <li>Pass a <Mono>name</Mono> trait, or the Groups page shows the raw ID.</li>
+            <li>Open Groups and check the account is listed, then open it to see its members.</li>
+          </ol>
+
+          <h3 className={h3}>From a server or another SDK</h3>
+          <P>
+            Server SDKs have no session, so pass the person as well. This is also how to backfill memberships for people
+            who will not open the app soon:
+          </P>
+          <Code lang="ts">{`// traceiq-node
+traceiq.group({ organizationId: 'dept_csc', userId: 'user_123', traits: { name: 'Computer Science' } });`}</Code>
+          <Code lang="python">{`# traceiq-py
+client.group("dept_csc", user_id="user_123", traits={"name": "Computer Science"})`}</Code>
+          <P>
+            The Flutter SDK has no <Mono>group()</Mono> yet. Send the same event with <Mono>track()</Mono>; TraceIQ
+            reads it the same way:
+          </P>
+          <Code lang="dart">{`await TraceIQ.track(r'$group', properties: {
+  'organizationId': 'dept_csc',
+  'traits': {'name': 'Computer Science'},
+});`}</Code>
+        </Section>
+
+        <Section id="methods-alias" title="alias()">
+          <Code lang="ts">{`traceiq.alias('user_123', 'guest_8f2c'); // the new ID first, then the old one`}</Code>
+          <P>
+            <Mono>identify()</Mono> already links the browser&apos;s anonymous ID, so most apps never need{' '}
+            <Mono>alias()</Mono>. Use it when one person has had two of <em>your</em> user IDs, such as a guest checkout
+            ID that later becomes an account. <Mono>previousId</Mono> defaults to the current ID in the browser; server
+            SDKs take both IDs. TraceIQ records the link as an <Mono>$alias</Mono> event today; merging the two profiles
+            in reports is coming in a later release.
+          </P>
+        </Section>
+
+        <Section id="methods-errors" title="captureException()">
+          <Code lang="ts">{`try {
+  await pay(order);
+} catch (error) {
+  traceiq.captureException(error, { orderId: order.id });
+  showPaymentError();
+}`}</Code>
+          <P>
+            Uncaught errors and unhandled promise rejections are captured automatically (
+            <Mono>autoCaptureExceptions</Mono>). Use <Mono>captureException()</Mono> for errors you catch and handle,
+            which would otherwise go unseen. Each one becomes a <Mono>$exception</Mono> event, grouped into issues on
+            the <strong>Errors</strong> page; the extra properties show on each occurrence. Set the{' '}
+            <Mono>release</Mono> option and upload{' '}
+            <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=source-maps">
+              source maps
+            </Link>{' '}
+            to see the original code in stack traces.
+          </P>
+        </Section>
+
+        <Section id="methods-log" title="log()">
+          <Code lang="ts">{`traceiq.log('warn', 'Payment provider slow', { provider: 'paystack', ms: 4200 });
+traceiq.log('error', 'Result upload failed', { error, courseId: 'CSC201' });`}</Code>
+          <P>
+            Sends a structured line to <strong>Logs</strong>, tagged with the session and user. Levels are{' '}
+            <Mono>debug</Mono>, <Mono>info</Mono>, <Mono>warn</Mono> and <Mono>error</Mono>. Lines are sent in small
+            batches, and any left are flushed when the page is hidden. Pass <Mono>error</Mono> to attach its stack, or <Mono>service</Mono> to name the
+            source.
+          </P>
+        </Section>
+
+        <Section id="methods-other-sdks" title="Names in other SDKs">
+          <OptionsTable
+            headers={['SDK', 'Methods', 'Notes']}
+            rows={[
+              ['Node, Python, Rust', 'capture(), identify(), group(), alias()', 'No session or stored user: pass userId (or anonymousId) on every call.'],
+              ['Kotlin, Swift', 'capture(), identify(), group()', 'Same payloads as the other SDKs; pass userId to group().'],
+              ['React Native', 'capture(), screen(), identify(), group(), alias(), reset()', 'screen() replaces page(). reset() on sign-out.'],
+              ['Flutter', 'track(), screen(), identify(), alias(), captureException(), reset()', 'No group() yet: track the $group event as shown above.']
+            ]}
+          />
+          <P>
+            Feature flags, experiments, surveys and session replay have their own pages in the sidebar.
+          </P>
+        </Section>
+      </div>
     );
   }
 
