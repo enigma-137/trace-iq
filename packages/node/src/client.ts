@@ -1,4 +1,11 @@
-import { createRequestMiddleware, getRequestContext, MiddlewareOptions } from './middleware';
+import {
+  createRequestMiddleware,
+  getRequestContext,
+  getTraceHeaders,
+  installFetchTracePropagation,
+  MiddlewareOptions,
+  TracePropagationTargets
+} from './middleware';
 
 export interface TraceIQNodeOptions {
   /** Your project ID (from Settings). */
@@ -30,6 +37,16 @@ export interface TraceIQNodeOptions {
    * Inside traceiq.middleware() each line is tagged with the request's ids. Default false.
    */
   captureConsole?: boolean;
+  /**
+   * Add a W3C `traceparent` header to global fetch() calls made while handling a
+   * request in traceiq.middleware(), so downstream services using the middleware
+   * join the same trace and nest under it in the Requests waterfall. Off by default.
+   * `true` sends it on every call; prefer a list of your own services' URLs (strings
+   * match by substring, or RegExps) so third-party APIs don't receive trace ids.
+   * Calls to TraceIQ itself are never touched. For other HTTP clients, use
+   * traceiq.traceHeaders().
+   */
+  propagateTraceHeaders?: TracePropagationTargets | false;
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
@@ -90,7 +107,7 @@ const DEFAULTS = {
  *   await traceiq.shutdown(); // flush before the process exits
  */
 export class TraceIQ {
-  private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl' | 'captureConsole'>> &
+  private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl' | 'captureConsole' | 'propagateTraceHeaders'>> &
     Pick<TraceIQNodeOptions, 'onError' | 'fetchImpl'>;
   private queue: QueuedEvent[] = [];
   private logQueue: Array<Record<string, unknown>> = [];
@@ -126,6 +143,7 @@ export class TraceIQ {
     }
 
     if (options.captureConsole) this.installConsoleCapture();
+    if (options.propagateTraceHeaders) installFetchTracePropagation(options.propagateTraceHeaders, this.options.endpoint);
   }
 
   private installConsoleCapture(): void {
@@ -165,6 +183,16 @@ export class TraceIQ {
    */
   middleware(options: MiddlewareOptions = {}) {
     return createRequestMiddleware(this, options);
+  }
+
+  /**
+   * `{ traceparent }` for outgoing calls made while handling a request, so the
+   * downstream service joins this trace; `{}` outside a request.
+   *
+   *   await axios.post(url, body, { headers: traceiq.traceHeaders() });
+   */
+  traceHeaders(): Record<string, string> {
+    return getTraceHeaders();
   }
 
   /** Track a server-side event. */

@@ -1331,6 +1331,13 @@ app.use(traceiq.middleware({
           propagation off.
         </P>
         <P>
+          <strong>Service to service.</strong> To follow a request into the services your backend calls, send the
+          same header on outgoing calls. In <Mono>traceiq-node</Mono>, set{' '}
+          <Mono>{"propagateTraceHeaders: ['http://orders.internal']"}</Mono> to add it to <Mono>fetch()</Mono> calls
+          made while handling a request, or pass <Mono>traceiq.traceHeaders()</Mono> to any other client. Each
+          downstream service that runs the middleware then nests under the request that called it.
+        </P>
+        <P>
           WebSocket messages (multiplayer, live updates) aren&apos;t HTTP requests, so they never show up here. Record
           them with <Mono>traceiq.track()</Mono> or <Mono>traceiq.log()</Mono>; both appear in Logs.
         </P>
