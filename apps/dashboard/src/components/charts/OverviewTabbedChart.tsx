@@ -13,10 +13,12 @@ export interface TabbedChartPoint {
 
 interface OverviewTabbedChartProps {
   data: TabbedChartPoint[];
+  /** Window the chart covers, e.g. "7-day" or "24-hour". */
+  windowLabel?: string;
   className?: string;
 }
 
-export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbedChartProps) {
+export function OverviewTabbedChart({ data = [], windowLabel = '14-day', className = '' }: OverviewTabbedChartProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'events' | 'api' | 'errors'>('all');
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
@@ -74,7 +76,7 @@ export function OverviewTabbedChart({ data = [], className = '' }: OverviewTabbe
             </div>
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Observability & Ingestion Trends</h3>
-              <p className="text-xs text-neutral-500 dark:text-zinc-400">14-day stream volume and activity breakdown</p>
+              <p className="text-xs text-neutral-500 dark:text-zinc-400">{windowLabel} stream volume and activity breakdown</p>
             </div>
           </div>
 

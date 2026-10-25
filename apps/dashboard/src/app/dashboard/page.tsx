@@ -89,8 +89,22 @@ interface AlertsSummaryOverview {
   healthy: number;
 }
 
+type OverviewRange = '24h' | '7d' | '30d';
+
+const OVERVIEW_RANGES: Array<{ value: OverviewRange; label: string; long: string; adjective: string; days: number }> = [
+  { value: '24h', label: '24h', long: '24 hours', adjective: '24-hour', days: 1 },
+  { value: '7d', label: '7 days', long: '7 days', adjective: '7-day', days: 7 },
+  { value: '30d', label: '30 days', long: '30 days', adjective: '30-day', days: 30 }
+];
+
+function parseRange(value: string | undefined): OverviewRange {
+  return OVERVIEW_RANGES.some((range) => range.value === value) ? (value as OverviewRange) : '7d';
+}
+
 interface OverviewResponse {
   project: { id: string; name: string; organizationName: string } | null;
+  /** Window the API applied. Older APIs omit it and use fixed 14/30-day windows. */
+  range?: OverviewRange;
   totals: { events: number; events24h: number; events1h: number; users: number; sessions: number };
   lastEventAt: string | null;
   revenue: { total: number; previous: number; transactions: number };
@@ -127,23 +141,30 @@ export default async function DashboardPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const projectId = firstParam(searchParams.projectId);
+  const range = parseRange(firstParam(searchParams.range));
   const { user, token } = await requireDashboardSession('/dashboard');
   const activeOrganizationId = cookies().get('traceiq_active_org')?.value;
-  const overviewPath = withParams('/v1/dashboard/overview', { projectId, organizationId: activeOrganizationId });
+  const overviewPath = withParams('/v1/dashboard/overview', { projectId, organizationId: activeOrganizationId, range });
   const { data: overview, error } = await dashboardGet<OverviewResponse>(overviewPath, token);
 
   if (!projectId && overview?.project?.id) {
-    redirect(`/dashboard?projectId=${encodeURIComponent(overview.project.id)}`);
+    redirect(withParams('/dashboard', { projectId: overview.project.id, range: searchParams.range ? range : undefined }));
   }
+
+  // Label cards with the window the API actually applied; an API that predates
+  // ranges keeps its old fixed windows, so its labels stay as they were.
+  const appliedRange = OVERVIEW_RANGES.find((option) => option.value === overview?.range);
+  const windowLabel = appliedRange?.long ?? '30 days';
+  const rangeDays = appliedRange?.days ?? 14;
 
   const canonicalProjectId = overview?.project?.id ?? projectId;
   // Fallbacks for older APIs that omit these fields; fetched together, not in turn.
   const needsReferrers = Boolean(canonicalProjectId) && (overview?.topReferrers ?? []).length === 0;
   const needsObservability = Boolean(canonicalProjectId) && (overview?.observabilitySeries ?? []).length === 0;
   const [dashboardReferrers, observabilitySeries] = await Promise.all([
-    needsReferrers ? loadReferrers(canonicalProjectId!, token) : Promise.resolve(overview?.topReferrers ?? []),
+    needsReferrers ? loadReferrers(canonicalProjectId!, token, appliedRange?.days ?? 30) : Promise.resolve(overview?.topReferrers ?? []),
     needsObservability
-      ? loadObservabilitySeries(canonicalProjectId!, token, overview?.sparkline ?? [])
+      ? loadObservabilitySeries(canonicalProjectId!, token, overview?.sparkline ?? [], rangeDays)
       : Promise.resolve(overview?.observabilitySeries ?? [])
   ]);
 
@@ -154,7 +175,7 @@ export default async function DashboardPage({
   // Tabbed chart data points
   const tabbedPoints = observabilitySeries.map((point) => ({
     ...point,
-    bucket: dailyBucketLabel(point.bucket)
+    bucket: appliedRange?.value === '24h' ? hourlyBucketLabel(point.bucket) : dailyBucketLabel(point.bucket)
   }));
 
   // Sparkline data arrays for KPI cards - purely from API response without hardcoded numbers
@@ -193,7 +214,7 @@ export default async function DashboardPage({
         ) : null}
 
         {/* Lightweight Onboarding Setup Reminder (disappears after first event is received) */}
-        {overview?.project && (!overview.totals.events || overview.totals.events === 0) ? (
+        {overview?.project && !overview.lastEventAt ? (
           <PageBanner
             variant="accent"
             badge="Setup Required"
@@ -215,16 +236,39 @@ export default async function DashboardPage({
         {/* Highlighted Insight Banner: Today's Story */}
         {overview?.project ? <TodayStoryCard projectId={canonicalProjectId} /> : null}
 
+        {overview?.project ? (
+          <nav aria-label="Time range" className="flex items-center justify-end gap-2">
+            <span className="text-xs text-neutral-500 dark:text-slate-400">Showing</span>
+            <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-slate-800 dark:bg-slate-950">
+              {OVERVIEW_RANGES.map((option) => (
+                <Link
+                  key={option.value}
+                  href={withParams('/dashboard', { projectId: canonicalProjectId ?? undefined, range: option.value })}
+                  aria-current={option.value === range ? 'page' : undefined}
+                  prefetch={false}
+                  className={
+                    option.value === range
+                      ? 'rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-950'
+                      : 'rounded-md px-3 py-1 text-xs font-medium text-neutral-600 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                  }
+                >
+                  {option.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+        ) : null}
+
         {/* 5 KPI Metric Cards (Dynamic values only, '-' or 0 fallback) */}
         <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <OverviewMetricCard
             icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
-            title="Total Events"
+            title={appliedRange ? `Events (${appliedRange.label})` : 'Total Events'}
             value={overview?.totals.events ?? 0}
             delta={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
             deltaTone={activityTone === 'red' ? 'red' : 'green'}
             deltaDirection={activityTone === 'red' ? 'down' : 'up'}
-            deltaSubtext={overview?.totals.events24h !== undefined && overview.totals.events24h > 0 ? `${overview.totals.events24h.toLocaleString()} last 24h` : undefined}
+            deltaSubtext={appliedRange?.value !== '24h' && overview?.totals.events24h ? `${overview.totals.events24h.toLocaleString()} last 24h` : undefined}
             color="blue"
             sparklineData={sparkValues}
           />
@@ -279,7 +323,7 @@ export default async function DashboardPage({
         {/* Row 1: Observability Tabbed Trends Chart & Allocation */}
         <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.65fr_1fr]">
           <div className="flex min-w-0 flex-col gap-4">
-            <OverviewTabbedChart data={tabbedPoints} />
+            <OverviewTabbedChart data={tabbedPoints} windowLabel={appliedRange?.adjective ?? '14-day'} />
             <RecentLogsPanel projectId={canonicalProjectId} />
           </div>
 
@@ -299,7 +343,7 @@ export default async function DashboardPage({
                 </Link>
               </div>
               <div className="mt-3">
-                <TopEventsList events={overview?.topEvents ?? []} />
+                <TopEventsList events={overview?.topEvents ?? []} windowLabel={windowLabel} />
               </div>
             </div>
           </div>
@@ -344,6 +388,7 @@ export default async function DashboardPage({
               }
             }
             totalRequests={overview?.apiTelemetry?.totalRequests ?? 0}
+            windowLabel={appliedRange?.value ?? '14d'}
           />
         </section>
 
@@ -376,7 +421,7 @@ export default async function DashboardPage({
           <div className={cardClass}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
               <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Devices (30 days)
+                Devices ({windowLabel})
               </p>
             </div>
             <div className="mt-3">
@@ -392,7 +437,7 @@ export default async function DashboardPage({
           <div className={cardClass}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
               <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Locations (30 days)
+                Locations ({windowLabel})
               </p>
             </div>
             <div className="mt-3">
@@ -417,7 +462,7 @@ export default async function DashboardPage({
           <div className={cardClass}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
               <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Referrers (30 days)
+                Referrers ({windowLabel})
               </p>
             </div>
             <div className="mt-3">
@@ -452,8 +497,8 @@ export default async function DashboardPage({
   );
 }
 
-async function loadReferrers(projectId: string, token: string | null) {
-  const referrerParams = new URLSearchParams({ days: '30', projectId });
+async function loadReferrers(projectId: string, token: string | null, days: number) {
+  const referrerParams = new URLSearchParams({ days: String(days), projectId });
   const referrerPath = `/v1/dashboard/web?${referrerParams.toString()}`;
   const { data: webReferrers } = await dashboardGet<WebReferrersResponse>(referrerPath, token);
   return webReferrers?.referrers ?? [];
@@ -462,13 +507,14 @@ async function loadReferrers(projectId: string, token: string | null) {
 async function loadObservabilitySeries(
   projectId: string,
   token: string | null,
-  sparkline: Array<{ bucket: string; total: number }>
+  sparkline: Array<{ bucket: string; total: number }>,
+  days: number
 ) {
   const trendPath = (event: string) => {
     const params = new URLSearchParams({
       event,
-      interval: 'day',
-      days: '14',
+      interval: days === 1 ? 'hour' : 'day',
+      days: String(days),
       projectId
     });
     return `/v1/dashboard/insights/trends?${params.toString()}`;
@@ -547,6 +593,13 @@ function dailyBucketLabel(bucket: string): string {
   const date = new Date(bucket);
   if (Number.isNaN(date.getTime())) return bucket;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function hourlyBucketLabel(bucket: string): string {
+  if (!bucket) return '';
+  const date = new Date(bucket);
+  if (Number.isNaN(date.getTime())) return bucket;
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', timeZone: 'UTC' });
 }
 
 function lastEventAge(iso: string): string {
