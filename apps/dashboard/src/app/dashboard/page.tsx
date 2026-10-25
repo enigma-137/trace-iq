@@ -91,10 +91,10 @@ interface AlertsSummaryOverview {
 
 type OverviewRange = '24h' | '7d' | '30d';
 
-const OVERVIEW_RANGES: Array<{ value: OverviewRange; label: string; long: string; days: number }> = [
-  { value: '24h', label: '24h', long: '24 hours', days: 1 },
-  { value: '7d', label: '7 days', long: '7 days', days: 7 },
-  { value: '30d', label: '30 days', long: '30 days', days: 30 }
+const OVERVIEW_RANGES: Array<{ value: OverviewRange; label: string; long: string; adjective: string; days: number }> = [
+  { value: '24h', label: '24h', long: '24 hours', adjective: '24-hour', days: 1 },
+  { value: '7d', label: '7 days', long: '7 days', adjective: '7-day', days: 7 },
+  { value: '30d', label: '30 days', long: '30 days', adjective: '30-day', days: 30 }
 ];
 
 function parseRange(value: string | undefined): OverviewRange {
@@ -268,7 +268,7 @@ export default async function DashboardPage({
             delta={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
             deltaTone={activityTone === 'red' ? 'red' : 'green'}
             deltaDirection={activityTone === 'red' ? 'down' : 'up'}
-            deltaSubtext={overview?.totals.events24h !== undefined && overview.totals.events24h > 0 ? `${overview.totals.events24h.toLocaleString()} last 24h` : undefined}
+            deltaSubtext={appliedRange?.value !== '24h' && overview?.totals.events24h ? `${overview.totals.events24h.toLocaleString()} last 24h` : undefined}
             color="blue"
             sparklineData={sparkValues}
           />
@@ -323,7 +323,7 @@ export default async function DashboardPage({
         {/* Row 1: Observability Tabbed Trends Chart & Allocation */}
         <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.65fr_1fr]">
           <div className="flex min-w-0 flex-col gap-4">
-            <OverviewTabbedChart data={tabbedPoints} />
+            <OverviewTabbedChart data={tabbedPoints} windowLabel={appliedRange?.adjective ?? '14-day'} />
             <RecentLogsPanel projectId={canonicalProjectId} />
           </div>
 
