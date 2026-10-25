@@ -31,6 +31,19 @@ export interface TraceIQInitOptions {
         includePageRequests?: boolean;
       };
   /**
+   * Send a W3C `traceparent` header on captured API calls so a `traceiq-node`
+   * backend records its side of the request in the same trace, nested under the
+   * browser request in the Requests waterfall. Only applies when
+   * `autoCaptureRequests` is on.
+   *
+   * By default the header goes to same-origin requests only: on a cross-origin
+   * request it triggers a CORS preflight, and the request fails unless that
+   * server allows the `traceparent` header. List other origins your API allows it
+   * on (strings match by substring, e.g. `['https://api.example.com']`), or pass
+   * `false` to never send it.
+   */
+  propagateTraceHeaders?: boolean | Array<string | RegExp>;
+  /**
    * Forward console output to TraceIQ Logs (service "web-console"). `true` captures
    * log/info/warn/error; pass `{ levels }` to choose. Off by default.
    */
@@ -45,6 +58,14 @@ export interface TraceIQInitOptions {
    * it to come back online instead of spending retries. Defaults to 3; 0 disables.
    */
   maxRetries?: number;
+  /**
+   * Save events whose delivery is delayed (offline, or a failed first attempt) to
+   * `localStorage`, and resend them on the next page load if the page closes first.
+   * Only delayed events are saved, never every event. Up to 100 events, kept for
+   * 24 hours. Saved events include their properties, so set `false` if those may
+   * hold data you don't want at rest in the browser. Defaults to true.
+   */
+  persistUndeliveredEvents?: boolean;
   debug?: boolean;
 }
 

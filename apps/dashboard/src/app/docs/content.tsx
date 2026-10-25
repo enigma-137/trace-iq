@@ -402,6 +402,8 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
             ['autoCaptureExceptions', 'true', 'Capture uncaught errors and unhandled promise rejections.'],
             ['autoCaptureRageClicks', 'true', 'Detect rage clicks (3+ rapid clicks in one spot).'],
             ['maxRetries', '3', 'Retries after a network error, 429 or 5xx, with exponential backoff. Sends wait while the browser is offline.'],
+            ['persistUndeliveredEvents', 'true', 'Keep delayed events (offline or failed first attempt) in localStorage and resend them on the next page load. Up to 100 events for 24 hours.'],
+            ['propagateTraceHeaders', 'same-origin', 'Send a W3C traceparent on captured API calls so backend requests join the trace. Pass allowed cross-origin URLs, or false.'],
             ['debug', 'false', 'Log SDK warnings to the console.']
           ]}
         />
@@ -1318,6 +1320,15 @@ app.use(traceiq.middleware({
           5 ms endpoint can easily show 300–700 ms from a browser on another continent. API performance shows server
           timings by default whenever your backend sends any; switch to <em>Browser</em> to see what users actually
           wait for. The Requests explorer has the same filter.
+        </P>
+        <P>
+          <strong>Browser to backend traces.</strong> Captured browser calls carry a W3C <Mono>traceparent</Mono>{' '}
+          header, so when the backend uses <Mono>traceiq.middleware()</Mono> its record joins the same trace and nests
+          under the browser request in the Requests waterfall. The header is sent to same-origin requests only: on a
+          cross-origin request it triggers a CORS preflight, which fails unless your API allows the{' '}
+          <Mono>traceparent</Mono> header. Once it does, list it, e.g.{' '}
+          <Mono>{"propagateTraceHeaders: ['https://api.example.com']"}</Mono>, or pass <Mono>false</Mono> to turn
+          propagation off.
         </P>
         <P>
           WebSocket messages (multiplayer, live updates) aren&apos;t HTTP requests, so they never show up here. Record

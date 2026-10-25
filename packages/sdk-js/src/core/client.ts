@@ -20,6 +20,16 @@ const DEFAULT_MAX_RETRIES = 3;
 const MAX_RETRY_DELAY_MS = 30_000;
 // Sends parked while the browser is offline; beyond this, new ones are dropped.
 const MAX_OFFLINE_WAITERS = 100;
+const PENDING_EVENTS_KEY_PREFIX = 'traceiq.pendingEvents.';
+const MAX_PENDING_EVENTS = 100;
+const MAX_PENDING_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** An event whose delivery was delayed, saved so a later page load can resend it. */
+interface PendingEvent {
+  id: string;
+  savedAt: number;
+  payload: Record<string, unknown>;
+}
 
 export class BrowserTraceIQClient implements TraceIQClient {
   private options?: TraceIQInitOptions;
@@ -90,6 +100,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.anonymousId = this.loadOrCreateId('localStorage', ANONYMOUS_ID_STORAGE_KEY, 'anon');
     this.sessionId = this.loadOrCreateId('sessionStorage', SESSION_ID_STORAGE_KEY, 'sess');
     this.debug(`[TraceIQ] SDK initialized (endpoint: ${this.options.endpoint})`);
+    this.resendPendingEvents();
 
     if (options.replay?.enabled === true || options.enableReplay === true) {
       this.replayRecorder = new ReplayRecorder(
@@ -374,15 +385,27 @@ export class BrowserTraceIQClient implements TraceIQClient {
         return originalFetch.call(window, input as RequestInfo, init);
       }
 
+      let trace: TraceContext | undefined;
+      if (self.shouldPropagateTrace(url) && self.requestHeader(input, init, 'traceparent') === null) {
+        try {
+          const headers = new Headers(init?.headers ?? (typeof input === 'object' && 'headers' in input ? input.headers : undefined));
+          trace = newTraceContext();
+          headers.set('traceparent', traceparent(trace));
+          init = { ...init, headers };
+        } catch {
+          trace = undefined; // Never let instrumentation break the request.
+        }
+      }
+
       const start = self.nowMs();
       return originalFetch.call(window, input as RequestInfo, init).then(
         (response: Response) => {
-          self.recordRequest(method, url, response.status, self.nowMs() - start, response);
+          self.recordRequest(method, url, response.status, self.nowMs() - start, response, undefined, trace);
           return response;
         },
         (error: unknown) => {
           // Network error / abort — record as status 0 so it still shows as a failure.
-          self.recordRequest(method, url, 0, self.nowMs() - start);
+          self.recordRequest(method, url, 0, self.nowMs() - start, undefined, undefined, trace);
           throw error;
         }
       );
@@ -397,7 +420,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
     const self = this;
     const originalOpen = Xhr.prototype.open;
     const originalSend = Xhr.prototype.send;
-    type Tracked = XMLHttpRequest & { __traceiq?: { method: string; url: string } };
+    const originalSetRequestHeader = Xhr.prototype.setRequestHeader;
+    type Tracked = XMLHttpRequest & { __traceiq?: { method: string; url: string; hasTraceparent?: boolean } };
 
     Xhr.prototype.open = function (this: Tracked, method: string, url: string | URL, ...rest: unknown[]) {
       try {
@@ -408,17 +432,41 @@ export class BrowserTraceIQClient implements TraceIQClient {
       return (originalOpen as (...args: unknown[]) => void).call(this, method, url, ...rest);
     } as typeof Xhr.prototype.open;
 
+    if (typeof originalSetRequestHeader === 'function') {
+      // Remember an app-supplied traceparent: a second one would be comma-joined into an invalid header.
+      Xhr.prototype.setRequestHeader = function (this: Tracked, name: string, value: string) {
+        if (this.__traceiq && String(name).toLowerCase() === 'traceparent') this.__traceiq.hasTraceparent = true;
+        return originalSetRequestHeader.call(this, name, value);
+      };
+    }
+
     Xhr.prototype.send = function (this: Tracked, body?: Document | XMLHttpRequestBodyInit | null) {
       const tracked = this.__traceiq;
       if (tracked && self.shouldCaptureRequest(tracked.url)) {
+        let trace: TraceContext | undefined;
+        if (!tracked.hasTraceparent && typeof originalSetRequestHeader === 'function' && self.shouldPropagateTrace(tracked.url)) {
+          try {
+            const context = newTraceContext();
+            originalSetRequestHeader.call(this, 'traceparent', traceparent(context));
+            trace = context;
+          } catch {
+            // Never let instrumentation break the request.
+          }
+        }
         const start = self.nowMs();
         let recorded = false;
         const finish = () => {
           if (recorded) return;
           recorded = true;
           try {
-            self.recordRequest(tracked.method, tracked.url, this.status || 0, self.nowMs() - start, undefined, (name) =>
-              this.getResponseHeader(name)
+            self.recordRequest(
+              tracked.method,
+              tracked.url,
+              this.status || 0,
+              self.nowMs() - start,
+              undefined,
+              (name) => this.getResponseHeader(name),
+              trace
             );
           } catch {
             // Never let instrumentation break the request.
@@ -473,7 +521,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
     status: number,
     durationMs: number,
     response?: Response,
-    getHeader: (name: string) => string | null = (name) => this.responseHeader(response, name)
+    getHeader: (name: string) => string | null = (name) => this.responseHeader(response, name),
+    trace?: TraceContext
   ): void {
     // A response that is an HTML document is a page load (Remix/Turbo/htmx-style
     // navigation, a prefetch, an SPA fallback), not an API call.
@@ -496,6 +545,11 @@ export class BrowserTraceIQClient implements TraceIQClient {
     // browser-side record links to the server-side record of the same request.
     const requestId = safeHeader(getHeader, 'x-request-id');
     if (requestId && /^[A-Za-z0-9._:/+=-]{1,128}$/.test(requestId)) properties.requestId = requestId;
+    // The backend records this span as its parent, nesting it under this request.
+    if (trace) {
+      properties.traceId = trace.traceId;
+      properties.spanId = trace.spanId;
+    }
     const rawSize = safeHeader(getHeader, 'content-length');
     const size = Number(rawSize);
     if (rawSize !== null && Number.isFinite(size) && size >= 0) {
@@ -540,6 +594,20 @@ export class BrowserTraceIQClient implements TraceIQClient {
     if (config.includePageRequests) return true;
     if (header && (header('rsc') !== null || header('next-router-prefetch') !== null)) return false;
     return !isFrameworkOrAssetUrl(url, this.getLocation()?.origin);
+  }
+
+  // Same-origin requests by default; cross-origin only when listed, because the
+  // header makes the browser send a CORS preflight the server must allow.
+  private shouldPropagateTrace(url: string): boolean {
+    const option = this.options?.propagateTraceHeaders;
+    if (option === false) return false;
+    const origin = this.getLocation()?.origin;
+    try {
+      if (origin && new URL(url, origin).origin === origin) return true;
+    } catch {
+      return false;
+    }
+    return Array.isArray(option) && option.some((pattern) => matchesUrl(pattern, url));
   }
 
   private requestHeader(input: RequestInfo | URL, init: RequestInit | undefined, name: string): string | null {
@@ -1016,29 +1084,126 @@ export class BrowserTraceIQClient implements TraceIQClient {
     };
 
     this.debug(`[TraceIQ] Sending event ${eventName} to ${endpoint}`);
+    const accepted = await this.sendPayload(payload);
+    // Replay flow eligibility is evaluated only after TraceIQ accepted the
+    // event, allowing the API to prove the session entered a selected
+    // funnel instead of trusting an SDK-supplied funnel identifier.
+    if (accepted) this.replayRecorder?.eventAccepted(eventName);
+  }
+
+  /**
+   * Delivers one event payload. If delivery is delayed (offline, or the first
+   * attempt failed) the event is saved to localStorage so a later page load can
+   * resend it should this page close first; it is removed once TraceIQ accepts or
+   * permanently rejects it. Returns whether TraceIQ accepted the event.
+   */
+  private async sendPayload(payload: Record<string, unknown>, pendingId = this.generateId()): Promise<boolean> {
+    const options = this.options;
+    if (!options) return false;
+    let saved = false;
+    const save = () => {
+      if (options.persistUndeliveredEvents !== false) {
+        saved = this.savePendingEvent({ id: pendingId, savedAt: Date.now(), payload });
+      }
+    };
 
     try {
-      const response = await this.deliver(endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-traceiq-write-key': options.writeKey
+      const response = await this.deliver(
+        this.eventEndpoint(options.endpoint ?? DEFAULT_ENDPOINT),
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-traceiq-write-key': options.writeKey
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
         },
-        body: JSON.stringify(payload),
-        keepalive: true
-      });
-
+        save
+      );
+      // A retryable status after the last retry stays saved for the next page load.
+      if (saved && !isRetryableStatus(response.status)) this.removePendingEvent(pendingId);
       if (!response.ok) {
         this.debug(`[TraceIQ] Event rejected: HTTP ${response.status}`);
-      } else {
-        this.debug(`[TraceIQ] Event accepted: ${response.status}`);
-        // Replay flow eligibility is evaluated only after TraceIQ accepted the
-        // event, allowing the API to prove the session entered a selected
-        // funnel instead of trusting an SDK-supplied funnel identifier.
-        this.replayRecorder?.eventAccepted(eventName);
+        return false;
       }
+      this.debug(`[TraceIQ] Event accepted: ${response.status}`);
+      return true;
     } catch (error) {
       this.debug('[TraceIQ] Event delivery failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Resends events a previous page saved but could not deliver. They are claimed
+   * (removed from storage) first so another open tab doesn't send them too; any
+   * that fail again are saved again by sendPayload().
+   */
+  private resendPendingEvents(): void {
+    if (this.options?.persistUndeliveredEvents === false) return;
+    const pending = this.readPendingEvents();
+    if (pending.length === 0) return;
+    this.writePendingEvents([]);
+    this.debug(`[TraceIQ] Resending ${pending.length} undelivered event(s) from an earlier page.`);
+    for (const entry of pending) void this.sendPayload(entry.payload, entry.id);
+  }
+
+  private pendingEventsKey(): string | undefined {
+    return this.options ? `${PENDING_EVENTS_KEY_PREFIX}${this.options.projectId}` : undefined;
+  }
+
+  private readPendingEvents(): PendingEvent[] {
+    const key = this.pendingEventsKey();
+    const raw = key ? this.safeStorageGet(key) : null;
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const cutoff = Date.now() - MAX_PENDING_AGE_MS;
+      return parsed.filter(
+        (entry): entry is PendingEvent =>
+          typeof entry === 'object' && entry !== null &&
+          typeof entry.id === 'string' && typeof entry.savedAt === 'number' && entry.savedAt >= cutoff &&
+          typeof entry.payload === 'object' && entry.payload !== null
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /** Returns false when storage is unavailable or full. */
+  private writePendingEvents(entries: PendingEvent[]): boolean {
+    const key = this.pendingEventsKey();
+    const storage = this.getStorage('localStorage');
+    if (!key || !storage) return false;
+    try {
+      if (entries.length === 0) storage.removeItem(key);
+      else storage.setItem(key, JSON.stringify(entries));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private savePendingEvent(entry: PendingEvent): boolean {
+    const entries = this.readPendingEvents().filter((existing) => existing.id !== entry.id);
+    entries.push(entry);
+    // Bounded; the oldest go first.
+    return this.writePendingEvents(entries.slice(-MAX_PENDING_EVENTS));
+  }
+
+  private removePendingEvent(id: string): void {
+    const entries = this.readPendingEvents();
+    const remaining = entries.filter((entry) => entry.id !== id);
+    if (remaining.length !== entries.length) this.writePendingEvents(remaining);
+  }
+
+  private safeStorageGet(key: string): string | null {
+    try {
+      return this.getStorage('localStorage')?.getItem(key) ?? null;
+    } catch {
+      return null;
     }
   }
 
@@ -1049,24 +1214,42 @@ export class BrowserTraceIQClient implements TraceIQClient {
    * The server assigns event ids, so a retry after a lost response can duplicate an
    * event; like the server SDKs, delivery prefers that over dropping it.
    */
-  private async deliver(url: string, init: RequestInit): Promise<Response> {
+  private async deliver(url: string, init: RequestInit, onDelayed?: () => void): Promise<Response> {
     const maxRetries = Math.max(0, this.options?.maxRetries ?? DEFAULT_MAX_RETRIES);
+    // Called once, the first time this send has to wait (offline, or before a retry).
+    let delayed = false;
+    const markDelayed = () => {
+      if (delayed) return;
+      delayed = true;
+      onDelayed?.();
+    };
     for (let attempt = 0; ; attempt += 1) {
+      if (this.isOffline()) markDelayed();
       await this.waitUntilOnline();
       let response: Response | undefined;
       try {
         response = await fetch(url, init);
       } catch (error) {
-        if (attempt >= maxRetries) throw error;
+        if (attempt >= maxRetries) {
+          markDelayed();
+          throw error;
+        }
       }
-      if (response && (!isRetryableStatus(response.status) || attempt >= maxRetries)) return response;
+      if (response && (!isRetryableStatus(response.status) || attempt >= maxRetries)) {
+        if (isRetryableStatus(response.status)) markDelayed();
+        return response;
+      }
+      markDelayed();
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs(attempt + 1, response)));
     }
   }
 
+  private isOffline(): boolean {
+    return typeof window !== 'undefined' && this.getNavigator()?.onLine === false;
+  }
+
   private async waitUntilOnline(): Promise<void> {
-    const navigator = this.getNavigator();
-    if (typeof window === 'undefined' || navigator?.onLine !== false) return;
+    if (!this.isOffline()) return;
     if (this.offlineWaiters >= MAX_OFFLINE_WAITERS) throw new Error('TraceIQ: offline send queue is full.');
     this.offlineWaiters += 1;
     try {
@@ -1295,6 +1478,31 @@ type RequestCaptureConfig = Exclude<NonNullable<TraceIQInitOptions['autoCaptureR
 
 function matchesUrl(pattern: string | RegExp, url: string): boolean {
   return typeof pattern === 'string' ? url.includes(pattern) : pattern.test(url);
+}
+
+interface TraceContext {
+  traceId: string;
+  spanId: string;
+}
+
+function newTraceContext(): TraceContext {
+  return { traceId: randomHex(16), spanId: randomHex(8) };
+}
+
+function traceparent(trace: TraceContext): string {
+  return `00-${trace.traceId}-${trace.spanId}-01`;
+}
+
+function randomHex(bytes: number): string {
+  const buffer = new Uint8Array(bytes);
+  const crypto = (globalThis as { crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array } }).crypto;
+  if (typeof crypto?.getRandomValues === 'function') {
+    crypto.getRandomValues(buffer);
+  } else {
+    for (let i = 0; i < bytes; i += 1) buffer[i] = Math.floor(Math.random() * 256);
+  }
+  const hex = Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return /^0+$/.test(hex) ? randomHex(bytes) : hex; // all-zero ids are invalid in W3C trace context
 }
 
 function isRetryableStatus(status: number): boolean {
