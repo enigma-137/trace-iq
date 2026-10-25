@@ -1305,6 +1305,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
             traits: this.groupContext.traits ?? {}
           }
         : undefined,
+      release: this.options?.release || undefined,
       sdk: {
         name: 'traceiq-sdk-js',
         version: '0.3.0'

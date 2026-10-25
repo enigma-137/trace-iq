@@ -33,6 +33,11 @@ export interface TraceIQNodeOptions {
   /** Environment stamped on log() entries. Defaults to NODE_ENV, then "production". */
   environment?: string;
   /**
+   * The version of your service that is running (a version number or git SHA), sent with every event
+   * so errors show which release they first and last appeared in. Defaults to TRACEIQ_RELEASE.
+   */
+  release?: string;
+  /**
    * Forward console.log/info/warn/error to TraceIQ Logs (the console still prints).
    * Inside traceiq.middleware() each line is tagged with the request's ids. Default false.
    */
@@ -115,8 +120,8 @@ const DEFAULTS = {
  *   await traceiq.shutdown(); // flush before the process exits
  */
 export class TraceIQ {
-  private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl' | 'captureConsole' | 'propagateTraceHeaders'>> &
-    Pick<TraceIQNodeOptions, 'onError' | 'fetchImpl'>;
+  private readonly options: Required<Omit<TraceIQNodeOptions, 'onError' | 'fetchImpl' | 'captureConsole' | 'propagateTraceHeaders' | 'release'>> &
+    Pick<TraceIQNodeOptions, 'onError' | 'fetchImpl' | 'release'>;
   private queue: QueuedEvent[] = [];
   private logQueue: Array<Record<string, unknown>> = [];
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -138,7 +143,8 @@ export class TraceIQ {
       onError: options.onError,
       fetchImpl: options.fetchImpl,
       serviceName: options.serviceName ?? 'server',
-      environment: options.environment ?? process.env.NODE_ENV ?? 'production'
+      environment: options.environment ?? process.env.NODE_ENV ?? 'production',
+      release: options.release || process.env.TRACEIQ_RELEASE || undefined
     };
 
     if (this.options.flushIntervalMs > 0) {
@@ -314,6 +320,9 @@ export class TraceIQ {
   }
 
   private enqueue(event: QueuedEvent): void {
+    if (this.options.release && event.context?.release === undefined) {
+      event.context = { ...event.context, release: this.options.release };
+    }
     this.queue.push(event);
     if (this.queue.length >= this.options.flushAt) {
       void this.flush();

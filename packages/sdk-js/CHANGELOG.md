@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **`release` option.** Set your app version or build in `initialize({ release })`; it is sent as `context.release` on every event, and Error tracking shows the release each error was first and last seen in.
+
 ## 0.3.0
 
 - **Trace propagation.** With `autoCaptureRequests` on, captured `fetch` and XHR calls carry a W3C `traceparent` header, and the `$api_request` event records the same `traceId` and `spanId`. A `traceiq-node` backend then nests its request under the browser's in the Requests waterfall. Same-origin only by default; list other origins with `propagateTraceHeaders`, or pass `false` to turn it off.

@@ -21,6 +21,12 @@ const MESSAGE_SQL = `COALESCE(NULLIF(e.properties->>'message', ''), '(no message
  * fingerprinting existed, a hash of type + message (how they were grouped then).
  */
 const ISSUE_ID_SQL = `COALESCE(NULLIF(e.properties->>'$fingerprint', ''), md5(${TYPE_SQL} || E'\n' || ${MESSAGE_SQL}))`;
+/**
+ * The release an event came from: `context.release` (the SDKs' `release`
+ * option), `properties.release` (set by hand), else the mobile app version.
+ * NULL when none is known.
+ */
+const RELEASE_SQL = `COALESCE(NULLIF(e.context->>'release', ''), NULLIF(e.properties->>'release', ''), NULLIF(e.device_info->>'appVersion', ''))`;
 
 export type ErrorIssue = {
   id: string;
@@ -31,6 +37,9 @@ export type ErrorIssue = {
   users: number;
   firstSeen: string;
   lastSeen: string;
+  /** Release of the earliest / latest occurrence in the window, when known. */
+  firstRelease: string | null;
+  lastRelease: string | null;
   status: IssueStatus;
   assigneeUserId: string | null;
   resolvedAt: string | null;
@@ -50,6 +59,7 @@ export type ErrorSample = {
   actor: string | null;
   externalId: string | null;
   url?: string | null;
+  release?: string | null;
   occurredAt: string;
 };
 
@@ -73,23 +83,31 @@ export class ErrorsService {
    * Issues seen in the last `days`, with their workflow status. Regressed issues
    * sort first, then most recently seen. `status` defaults to `all`.
    */
-  async listIssues(user: DashboardUser, daysParam?: string, projectId?: string, statusParam?: string) {
+  async listIssues(
+    user: DashboardUser,
+    daysParam?: string,
+    projectId?: string,
+    statusParam?: string,
+    releaseParam?: string
+  ) {
     const project = await this.projects.resolveActiveProject(user, projectId);
     const days = this.clampDays(daysParam);
     const status = this.statusFilter(statusParam);
+    const release = typeof releaseParam === 'string' && releaseParam.trim() ? releaseParam.trim().slice(0, 200) : null;
     const emptyCounts = { all: 0, open: 0, regressed: 0, resolved: 0, ignored: 0 };
 
     if (!project) {
-      return { project: null, issues: [] as ErrorIssue[], days, status, counts: emptyCounts };
+      return { project: null, issues: [] as ErrorIssue[], days, status, release, releases: [] as string[], counts: emptyCounts };
     }
 
-    const values = [project.id, EXCEPTION_EVENT, days];
+    // $4 is the release filter (NULL = all releases); listing adds the status as $5.
+    const values = [project.id, EXCEPTION_EVENT, days, release];
     const issuesCte = this.issuesCte();
 
     const listed = await this.database.query<IssueRow>(
       `${issuesCte}
         SELECT * FROM issues
-        WHERE $4::text = 'all' OR status = $4::text OR ($4::text = 'open' AND status = 'regressed')
+        WHERE $5::text = 'all' OR status = $5::text OR ($5::text = 'open' AND status = 'regressed')
         ORDER BY (status = 'regressed') DESC, "lastSeen" DESC
         LIMIT 100`,
       [...values, status]
@@ -99,6 +117,19 @@ export class ErrorsService {
       `${issuesCte}
         SELECT status, count(*)::int AS total FROM issues GROUP BY status`,
       values
+    );
+
+    // Releases with errors in the window, newest first, for the release filter.
+    const releaseRows = await this.database.query<{ release: string }>(
+      `SELECT ${RELEASE_SQL} AS release
+       FROM events e
+       WHERE e.project_id = $1 AND e.event_name = $2
+         AND e.occurred_at >= now() - make_interval(days => $3::int)
+         AND ${RELEASE_SQL} IS NOT NULL
+       GROUP BY 1
+       ORDER BY max(e.occurred_at) DESC
+       LIMIT 50`,
+      [project.id, EXCEPTION_EVENT, days]
     );
     const counts = { ...emptyCounts };
     for (const row of counted.rows) {
@@ -119,7 +150,8 @@ export class ErrorsService {
             FROM events e
             WHERE e.project_id = $1 AND e.event_name = $2
               AND e.occurred_at >= now() - make_interval(days => $3::int)
-              AND ${ISSUE_ID_SQL} = ANY($4::text[])
+              AND ($4::text IS NULL OR ${RELEASE_SQL} = $4::text)
+              AND ${ISSUE_ID_SQL} = ANY($5::text[])
             GROUP BY 1, 2
           `,
           [...values, ids]
@@ -139,12 +171,12 @@ export class ErrorsService {
       return { ...row, sparkline: buckets.map((day) => dayMap.get(day) ?? 0) };
     });
 
-    return { project, issues, days, status, counts };
+    return { project, issues, days, status, release, releases: releaseRows.rows.map((row) => row.release), counts };
   }
 
   /**
-   * One row per issue seen in the window ($1 project, $2 event name, $3 days),
-   * joined with its stored workflow state.
+   * One row per issue seen in the window ($1 project, $2 event name, $3 days,
+   * $4 release or NULL for all), joined with its stored workflow state.
    */
   private issuesCte(): string {
     return `
@@ -157,10 +189,13 @@ export class ErrorsService {
           count(DISTINCT e.session_id)::int AS sessions,
           count(DISTINCT COALESCE(e.user_id::text, e.anonymous_id))::int AS users,
           min(e.occurred_at) AS "firstSeen",
-          max(e.occurred_at) AS "lastSeen"
+          max(e.occurred_at) AS "lastSeen",
+          (array_agg(${RELEASE_SQL} ORDER BY e.occurred_at ASC) FILTER (WHERE ${RELEASE_SQL} IS NOT NULL))[1] AS "firstRelease",
+          (array_agg(${RELEASE_SQL} ORDER BY e.occurred_at DESC) FILTER (WHERE ${RELEASE_SQL} IS NOT NULL))[1] AS "lastRelease"
         FROM events e
         WHERE e.project_id = $1 AND e.event_name = $2
           AND e.occurred_at >= now() - make_interval(days => $3::int)
+          AND ($4::text IS NULL OR ${RELEASE_SQL} = $4::text)
         GROUP BY 1
       ),
       issues AS (
@@ -226,14 +261,31 @@ export class ErrorsService {
       users: number;
       firstSeen: string;
       lastSeen: string;
+      firstRelease: string | null;
+      lastRelease: string | null;
     }>(
       `SELECT count(*)::int AS occurrences,
         count(DISTINCT e.session_id)::int AS sessions,
         count(DISTINCT COALESCE(e.user_id::text, e.anonymous_id))::int AS users,
-        min(e.occurred_at) AS "firstSeen", max(e.occurred_at) AS "lastSeen"
+        min(e.occurred_at) AS "firstSeen", max(e.occurred_at) AS "lastSeen",
+        (array_agg(${RELEASE_SQL} ORDER BY e.occurred_at ASC) FILTER (WHERE ${RELEASE_SQL} IS NOT NULL))[1] AS "firstRelease",
+        (array_agg(${RELEASE_SQL} ORDER BY e.occurred_at DESC) FILTER (WHERE ${RELEASE_SQL} IS NOT NULL))[1] AS "lastRelease"
        FROM events e WHERE ${filter}`,
       filterValues
     );
+
+    // For a regression: the release of the first occurrence after it was resolved.
+    let regressedInRelease: string | null = null;
+    const lastSeenAt = totals.rows[0]?.lastSeen ?? null;
+    if (state?.status === 'resolved' && state.resolved_at && lastSeenAt && new Date(lastSeenAt) > new Date(state.resolved_at)) {
+      const regressed = await this.database.query<{ release: string | null }>(
+        `SELECT ${RELEASE_SQL} AS release FROM events e
+         WHERE ${filter} AND e.occurred_at > $${filterValues.length + 1}::timestamptz
+         ORDER BY e.occurred_at ASC LIMIT 1`,
+        [...filterValues, state.resolved_at]
+      );
+      regressedInRelease = regressed.rows[0]?.release ?? null;
+    }
 
     const samples = await this.database.query<ErrorSample>(
       `SELECT
@@ -247,6 +299,7 @@ export class ErrorsService {
         COALESCE(e.user_id::text, e.anonymous_id) AS actor,
         u.external_id AS "externalId",
         COALESCE(e.properties->>'pathname', e.properties->>'$current_url', e.properties->>'url') AS url,
+        ${RELEASE_SQL} AS release,
         e.occurred_at AS "occurredAt"
        FROM events e
        LEFT JOIN users u ON u.id = e.user_id
@@ -280,7 +333,7 @@ export class ErrorsService {
     const browsers = await this.breakdown(filter, filterValues, "e.device_info->>'browser'");
     const operatingSystems = await this.breakdown(filter, filterValues, "e.device_info->>'os'");
     const pages = await this.breakdown(filter, filterValues, "COALESCE(NULLIF(e.properties->>'pathname', ''), NULLIF(e.properties->>'$current_url', ''), NULLIF(e.properties->>'url', ''), '/')");
-    const releases = await this.breakdown(filter, filterValues, "COALESCE(NULLIF(e.properties->>'release', ''), NULLIF(e.device_info->>'appVersion', ''), 'v1.0.0')");
+    const releases = await this.breakdown(filter, filterValues, RELEASE_SQL);
 
     return {
       project,
@@ -290,10 +343,11 @@ export class ErrorsService {
         message: latest?.message ?? params.message ?? '(no message)',
         status: this.effectiveStatus(state, totals.rows[0]?.lastSeen ?? null),
         assigneeUserId: state?.assignee_user_id ?? null,
-        resolvedAt: state?.resolved_at ?? null
+        resolvedAt: state?.resolved_at ?? null,
+        regressedInRelease
       },
       days,
-      totals: totals.rows[0] ?? { occurrences: 0, sessions: 0, users: 0, firstSeen: '', lastSeen: '' },
+      totals: totals.rows[0] ?? { occurrences: 0, sessions: 0, users: 0, firstSeen: '', lastSeen: '', firstRelease: null, lastRelease: null },
       samples: samples.rows,
       timeline,
       browsers,

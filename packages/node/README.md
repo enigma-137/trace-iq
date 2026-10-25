@@ -54,6 +54,7 @@ await traceiq.shutdown();
 | Option | Default | Notes |
 | --- | --- | --- |
 | `endpoint` | `http://localhost:4000` | TraceIQ API base URL. |
+| `release` | `TRACEIQ_RELEASE` env | Your deploy's version or git SHA, sent with every event so Error tracking can show the release each error was seen in. |
 | `flushAt` | `20` | Flush once this many events are queued. |
 | `flushIntervalMs` | `10000` | Timer flush; `0` disables it. |
 | `maxRetries` | `3` | Network retries per batch (exponential backoff + jitter). |

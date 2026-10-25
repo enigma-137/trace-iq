@@ -38,7 +38,7 @@ describe('ErrorsService.listIssues', () => {
     expect(list.text).toContain(`NULLIF(e.properties->>'$fingerprint', '')`);
     expect(list.text).toContain('md5(');
     expect(list.text).toContain(`WHEN ei.status = 'resolved' AND agg."lastSeen" > ei.resolved_at THEN 'regressed'`);
-    expect(list.values).toEqual(['proj_1', '$exception', 14, 'open']);
+    expect(list.values).toEqual(['proj_1', '$exception', 14, null, 'open']);
     expect(result.issues[0]).toMatchObject({ id: 'fp_1', status: 'regressed', sparkline: expect.any(Array) });
     // Open includes regressed issues; all counts every issue.
     expect(result.counts).toEqual({ all: 6, open: 3, regressed: 1, resolved: 3, ignored: 0 });
@@ -57,6 +57,7 @@ describe('ErrorsService.getIssue', () => {
       if (/FROM error_issues/.test(text)) return rows([{ status: 'resolved', assignee_user_id: 'user_2', resolved_at: '2026-10-10T00:00:00Z' }]);
       if (/ORDER BY e.occurred_at DESC LIMIT 1/.test(text)) return rows([{ id: 'fp_1', type: 'TypeError', message: 'boom' }]);
       if (/count\(\*\)::int AS occurrences/.test(text)) return rows([{ occurrences: 2, sessions: 1, users: 1, firstSeen: '2026-10-01T00:00:00Z', lastSeen: '2026-10-15T00:00:00Z' }]);
+      if (/occurred_at > \$5::timestamptz/.test(text)) return rows([{ release: '2.1.0' }]);
       return rows([]);
     });
 
@@ -68,8 +69,11 @@ describe('ErrorsService.getIssue', () => {
       message: 'boom',
       status: 'regressed',
       assigneeUserId: 'user_2',
-      resolvedAt: '2026-10-10T00:00:00Z'
+      resolvedAt: '2026-10-10T00:00:00Z',
+      regressedInRelease: '2.1.0'
     });
+    const [regressed] = db.queryCalls(/occurred_at > \$5::timestamptz/);
+    expect(regressed.values).toEqual(['proj_1', '$exception', 'fp_1', 14, '2026-10-10T00:00:00Z']);
     const [identity] = db.queryCalls(/ORDER BY e.occurred_at DESC LIMIT 1/);
     expect(identity.values).toEqual(['proj_1', '$exception', 'fp_1', 14]);
   });
@@ -137,5 +141,47 @@ describe('ErrorsService.updateIssue', () => {
     await expect(updateService(null).service.updateIssue(user, 'fp_1', { status: 'closed' })).rejects.toBeInstanceOf(BadRequestException);
     await expect(updateService(null).service.updateIssue(user, 'fp_1', {})).rejects.toBeInstanceOf(BadRequestException);
     await expect(updateService(null, { exists: false }).service.updateIssue(user, 'fp_x', { status: 'ignored' })).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('error releases', () => {
+  it('reads the release from context, then properties, then the app version', async () => {
+    const { db, service } = makeService(() => rows([]));
+    await service.listIssues(user, '14');
+    const [list] = db.queryCalls(/FROM issues\s+WHERE/);
+    expect(list.text).toContain(
+      `COALESCE(NULLIF(e.context->>'release', ''), NULLIF(e.properties->>'release', ''), NULLIF(e.device_info->>'appVersion', ''))`
+    );
+    expect(list.text).toContain('AS "firstRelease"');
+    expect(list.text).toContain('AS "lastRelease"');
+  });
+
+  it('filters issues and their sparklines by release and lists releases newest first', async () => {
+    const { db, service } = makeService((text) => {
+      if (/ORDER BY max\(e.occurred_at\) DESC/.test(text)) return rows([{ release: '2.1.0' }, { release: '2.0.0' }]);
+      if (/FROM issues\s+WHERE/.test(text)) {
+        return rows([{ id: 'fp_1', type: 'TypeError', message: 'x', occurrences: 1, sessions: 1, users: 1, firstSeen: '2026-10-01', lastSeen: '2026-10-17', firstRelease: '2.1.0', lastRelease: '2.1.0', status: 'open', assigneeUserId: null, resolvedAt: null }]);
+      }
+      return rows([]);
+    });
+
+    const result = await service.listIssues(user, '14', undefined, 'all', ' 2.1.0 ');
+
+    expect(result.release).toBe('2.1.0');
+    expect(result.releases).toEqual(['2.1.0', '2.0.0']);
+    expect(result.issues[0]).toMatchObject({ firstRelease: '2.1.0', lastRelease: '2.1.0' });
+    const [list] = db.queryCalls(/FROM issues\s+WHERE/);
+    expect(list.values).toEqual(['proj_1', '$exception', 14, '2.1.0', 'all']);
+    const [daily] = db.queryCalls(/= ANY\(\$5::text\[\]\)/);
+    expect(daily.values).toEqual(['proj_1', '$exception', 14, '2.1.0', ['fp_1']]);
+  });
+
+  it('no longer invents a v1.0.0 release for events without one', async () => {
+    const { db, service } = makeService((text) => {
+      if (/ORDER BY e.occurred_at DESC LIMIT 1/.test(text)) return rows([{ id: 'fp_1', type: 'TypeError', message: 'boom' }]);
+      return rows([]);
+    });
+    await service.getIssue(user, { id: 'fp_1' });
+    expect(db.calls.map((call) => call.text).join('\n')).not.toContain('v1.0.0');
   });
 });

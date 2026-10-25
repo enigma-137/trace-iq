@@ -74,3 +74,32 @@ describe('alias()', () => {
     expect(aliases()).toHaveLength(0);
   });
 });
+
+describe('release', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { onLine: true });
+    vi.stubGlobal('window', {
+      localStorage: memoryStorage(),
+      sessionStorage: memoryStorage(),
+      location: { origin: 'https://app.example.test', href: 'https://app.example.test/', pathname: '/', search: '' },
+      addEventListener: () => undefined
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('sends the configured release in every event context', async () => {
+    const sent: Array<Record<string, any>> = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)));
+      return { ok: true, status: 202, headers: new Headers() };
+    }));
+    const client = new BrowserTraceIQClient();
+    client.initialize({
+      projectId: 'proj_1', writeKey: 'wk', endpoint: 'https://api.example.test', release: '2.4.0',
+      autoTrackPageViews: false, autoCaptureExceptions: false, autoCaptureRageClicks: false, autoCaptureWebVitals: false
+    });
+    client.track('checkout_started');
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0].context.release).toBe('2.4.0');
+  });
+});

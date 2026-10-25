@@ -18,7 +18,7 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
-  Globe
+  Tag
 } from 'lucide-react';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -42,6 +42,8 @@ export interface ErrorIssueItem {
   users: number;
   firstSeen: string;
   lastSeen: string;
+  firstRelease?: string | null;
+  lastRelease?: string | null;
   sparkline: number[];
 }
 
@@ -56,12 +58,30 @@ export interface ErrorSampleItem {
   actor: string | null;
   externalId: string | null;
   url?: string | null;
+  release?: string | null;
   occurredAt: string;
 }
 
 export interface IssueDetailData {
-  issue: { id: string | null; type: string; message: string; status: IssueStatus; assigneeUserId: string | null; resolvedAt: string | null };
-  totals: { occurrences: number; sessions: number; users: number; firstSeen: string; lastSeen: string };
+  issue: {
+    id: string | null;
+    type: string;
+    message: string;
+    status: IssueStatus;
+    assigneeUserId: string | null;
+    resolvedAt: string | null;
+    /** Release of the first occurrence after the issue was resolved, when it regressed. */
+    regressedInRelease?: string | null;
+  };
+  totals: {
+    occurrences: number;
+    sessions: number;
+    users: number;
+    firstSeen: string;
+    lastSeen: string;
+    firstRelease?: string | null;
+    lastRelease?: string | null;
+  };
   samples: ErrorSampleItem[];
   timeline?: Array<{ day: string; count: number }>;
   browsers: Array<{ name: string; total: number }>;
@@ -77,6 +97,10 @@ interface Props {
   statusFilter: IssueStatusFilter;
   counts: IssueCounts;
   days: string;
+  /** Release the list is filtered to, if any. */
+  release?: string;
+  /** Recent releases seen on errors in the window, newest first. */
+  releases: string[];
   userEmail?: string | null;
   currentUserId?: string | null;
 }
@@ -166,6 +190,8 @@ export function ErrorTrackingClientView({
   statusFilter,
   counts,
   days,
+  release,
+  releases,
   currentUserId
 }: Props) {
   const router = useRouter();
@@ -173,7 +199,6 @@ export function ErrorTrackingClientView({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
-  const [environment, setEnvironment] = useState<string>('All environments');
   const [activeTab, setActiveTab] = useState<'overview' | 'stack' | 'occurrences' | 'replay'>('overview');
   const [copied, setCopied] = useState(false);
   // Workflow state returned by the last PATCH, so the buttons update without waiting on router.refresh().
@@ -221,6 +246,10 @@ export function ErrorTrackingClientView({
 
   const activeDetail = initialDetail;
   const detailMatches = Boolean(activeIssue && activeDetail?.issue.id === activeIssue.id);
+  const firstRelease = (detailMatches ? activeDetail?.totals.firstRelease : null) ?? activeIssue?.firstRelease ?? null;
+  const lastRelease = (detailMatches ? activeDetail?.totals.lastRelease : null) ?? activeIssue?.lastRelease ?? null;
+  const regressedInRelease = detailMatches ? activeDetail?.issue.regressedInRelease ?? null : null;
+  const detailOccurrences = activeDetail?.totals.occurrences ?? 0;
   const saved = activeIssue ? savedState[activeIssue.id] : undefined;
   const activeStatus: IssueStatus = saved?.status ?? (detailMatches ? activeDetail?.issue.status : activeIssue?.status) ?? 'open';
   const activeAssignee = (saved ? saved.assigneeUserId : detailMatches ? activeDetail?.issue.assigneeUserId : activeIssue?.assigneeUserId) ?? null;
@@ -324,18 +353,20 @@ export function ErrorTrackingClientView({
             </select>
           </div>
 
-          {/* Environment Selector */}
+          {/* Release Selector */}
           <div className="flex items-center rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-            <Globe className="mr-1.5 h-3.5 w-3.5 text-neutral-500 dark:text-slate-400" />
+            <Tag className="mr-1.5 h-3.5 w-3.5 text-neutral-500 dark:text-slate-400" />
             <select
-              value={environment}
-              onChange={(e) => setEnvironment(e.target.value)}
-              className="bg-transparent font-medium focus:outline-none"
+              aria-label="Release"
+              value={release ?? ''}
+              onChange={(e) => navigate({ release: e.target.value || null, issue: null })}
+              className="max-w-[180px] bg-transparent font-medium focus:outline-none"
             >
-              <option value="All environments">All environments</option>
-              <option value="production">Production</option>
-              <option value="staging">Staging</option>
-              <option value="development">Development</option>
+              <option value="">All releases</option>
+              {release && !releases.includes(release) ? <option value={release}>{release}</option> : null}
+              {releases.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
 
@@ -548,6 +579,14 @@ export function ErrorTrackingClientView({
                         <div className="flex items-center gap-1.5">
                           <p className="truncate text-xs font-bold text-neutral-900 dark:text-white">{issue.type}</p>
                           <StatusBadge status={issue.status} />
+                          {issue.lastRelease ? (
+                            <span
+                              className="shrink-0 rounded border border-neutral-200 px-1 py-px font-mono text-[10px] text-neutral-500 dark:border-slate-700 dark:text-slate-400"
+                              title="Latest release this error was seen in"
+                            >
+                              {issue.lastRelease}
+                            </span>
+                          ) : null}
                         </div>
                         <p className="truncate font-mono text-[11px] text-neutral-500 dark:text-slate-400">{issue.message}</p>
                       </div>
@@ -705,6 +744,28 @@ export function ErrorTrackingClientView({
                       <p className="mt-0.5 text-xs font-semibold text-neutral-800 dark:text-slate-200">{activeIssue.sessions.toLocaleString()}</p>
                     </div>
                   </div>
+                  {firstRelease || lastRelease || regressedInRelease ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      {firstRelease ? (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-slate-500">First seen in</p>
+                          <p className="mt-0.5 truncate font-mono text-xs font-semibold text-neutral-800 dark:text-slate-200">{firstRelease}</p>
+                        </div>
+                      ) : null}
+                      {lastRelease ? (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-slate-500">Last seen in</p>
+                          <p className="mt-0.5 truncate font-mono text-xs font-semibold text-neutral-800 dark:text-slate-200">{lastRelease}</p>
+                        </div>
+                      ) : null}
+                      {regressedInRelease ? (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400">Regressed in</p>
+                          <p className="mt-0.5 truncate font-mono text-xs font-semibold text-rose-700 dark:text-rose-300">{regressedInRelease}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Interactive Occurrences Over Time Timeline */}
@@ -986,32 +1047,9 @@ export function ErrorTrackingClientView({
               </div>
 
               {/* Affected Pages & Release Versions */}
-              <div className="mt-5 border-t border-neutral-200 pt-4 dark:border-slate-800">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Affected pages</h4>
-                <div className="mt-2.5 space-y-2">
-                  {(activeDetail?.pages && activeDetail.pages.length > 0
-                    ? activeDetail.pages
-                    : [
-                      { name: '/', total: 4 },
-                      { name: '/dashboard', total: 2 },
-                      { name: '/settings', total: 2 },
-                      { name: '/onboarding', total: 1 }
-                    ]
-                  ).map((p) => {
-                    const pct = Math.min(100, p.total * 20);
-                    return (
-                      <div key={p.name} className="space-y-1">
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className="truncate text-neutral-700 dark:text-slate-300">{p.name}</span>
-                          <span className="font-sans font-bold text-neutral-900 dark:text-white">{pct}%</span>
-                        </div>
-                        <div className="h-1.5 w-full rounded-full bg-neutral-100 dark:bg-slate-800">
-                          <div className="h-full rounded-full bg-blue-600 dark:bg-blue-500" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="mt-5 grid grid-cols-1 gap-5 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-slate-800">
+                <ShareList title="Affected pages" rows={activeDetail?.pages} total={detailOccurrences} empty="No page data" barClass="bg-blue-600 dark:bg-blue-500" />
+                <ShareList title="Releases" rows={activeDetail?.releases} total={detailOccurrences} empty="No release data. Set release in your SDK." barClass="bg-orange-500 dark:bg-orange-400" />
               </div>
             </div>
 
@@ -1085,6 +1123,48 @@ export function ErrorTrackingClientView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Share of an issue's occurrences per value (page, release), as labelled bars. */
+function ShareList({
+  title,
+  rows,
+  total,
+  empty,
+  barClass
+}: {
+  title: string;
+  rows?: Array<{ name: string; total: number }>;
+  total: number;
+  empty: string;
+  barClass: string;
+}) {
+  const denominator = total || rows?.reduce((sum, row) => sum + row.total, 0) || 1;
+  return (
+    <div>
+      <h4 className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-slate-400">{title}</h4>
+      <div className="mt-2.5 space-y-2">
+        {rows && rows.length > 0 ? (
+          rows.map((row) => {
+            const pct = Math.min(100, Math.round((row.total / denominator) * 100));
+            return (
+              <div key={row.name} className="space-y-1">
+                <div className="flex justify-between gap-3 font-mono text-xs">
+                  <span className="truncate text-neutral-700 dark:text-slate-300">{row.name}</span>
+                  <span className="font-sans font-bold text-neutral-900 dark:text-white">{pct}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-neutral-100 dark:bg-slate-800">
+                  <div className={`h-full rounded-full ${barClass}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <p className="text-xs text-neutral-400">{empty}</p>
+        )}
+      </div>
     </div>
   );
 }

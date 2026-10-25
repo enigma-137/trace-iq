@@ -15,6 +15,7 @@ interface IssuesResponse {
   days: number;
   issues: ErrorIssueItem[];
   counts?: IssueCounts;
+  releases?: string[];
 }
 
 const STATUS_FILTERS: IssueStatusFilter[] = ['open', 'resolved', 'ignored', 'all'];
@@ -33,12 +34,15 @@ export default async function ErrorsPage({
   const days = firstParam(searchParams.days) ?? '14';
   const statusParam = firstParam(searchParams.status) as IssueStatusFilter | undefined;
   const status: IssueStatusFilter = statusParam && STATUS_FILTERS.includes(statusParam) ? statusParam : 'open';
+  const release = firstParam(searchParams.release)?.trim() || undefined;
   // `type` + `message` come from older links (e.g. the overview's top errors).
   const selId = firstParam(searchParams.issue);
   const selType = firstParam(searchParams.type);
   const selMessage = firstParam(searchParams.message);
 
-  const { data, error } = await dashboardGet<IssuesResponse>(`/v1/dashboard/errors?days=${days}&status=${status}`, token);
+  const listQuery = new URLSearchParams({ days, status });
+  if (release) listQuery.set('release', release);
+  const { data, error } = await dashboardGet<IssuesResponse>(`/v1/dashboard/errors?${listQuery.toString()}`, token);
   const issues = data?.issues ?? [];
 
   let detail: IssueDetailData | null = null;
@@ -69,6 +73,8 @@ export default async function ErrorsPage({
         statusFilter={status}
         counts={data?.counts ?? EMPTY_COUNTS}
         days={days}
+        release={release}
+        releases={data?.releases ?? []}
         userEmail={user.email ?? undefined}
         currentUserId={user.id}
       />
