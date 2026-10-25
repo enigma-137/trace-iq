@@ -88,14 +88,14 @@ export const SDK_INTEGRATIONS: SdkIntegration[] = [
     shikiLang: 'ts',
     install: 'npm install traceiq-node',
     docsUrl: '/docs?page=node',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/packages/node',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/packages/node',
     icon: SdkIcons.Node,
     code: `import { TraceIQ } from 'traceiq-node';
 
 const traceiq = new TraceIQ({
   projectId: 'YOUR_PROJECT_ID',
   writeKey: process.env.TRACEIQ_WRITE_KEY!,
-  endpoint: 'https://api.traceiq.dev',
+  endpoint: 'https://api.traceiq.run',
 });
 
 // Identify user and associate traits
@@ -119,14 +119,14 @@ await traceiq.shutdown();`,
     shikiLang: 'ts',
     install: 'npm install traceiq-sdk-js',
     docsUrl: '/docs?page=javascript',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/packages/sdk-js',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/packages/sdk-js',
     icon: SdkIcons.JavaScript,
     code: `import { traceiq } from 'traceiq-sdk-js';
 
 traceiq.initialize({
   projectId: 'YOUR_PROJECT_ID',
   writeKey: 'YOUR_PROJECT_WRITE_KEY',
-  endpoint: 'https://api.traceiq.dev',
+  endpoint: 'https://api.traceiq.run',
 });
 
 // Identify user session
@@ -147,14 +147,14 @@ traceiq.track('user_signed_up', {
     shikiLang: 'ts',
     install: 'npm install traceiq-react-native',
     docsUrl: '/docs?page=react-native',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/packages/react-native',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/packages/react-native',
     icon: SdkIcons.React,
     code: `import { traceiq } from 'traceiq-react-native';
 
 traceiq.initialize({
   projectId: 'YOUR_PROJECT_ID',
   writeKey: 'YOUR_PROJECT_WRITE_KEY',
-  endpoint: 'https://api.traceiq.dev',
+  endpoint: 'https://api.traceiq.run',
   appVersion: '1.0.0',
 });
 
@@ -173,14 +173,14 @@ traceiq.capture({
     shikiLang: 'python',
     install: 'pip install traceiq-py',
     docsUrl: '/docs?page=python',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/sdks/python',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/sdks/python',
     icon: SdkIcons.Python,
     code: `from traceiq import Client
 
 traceiq = Client(
     project_id="YOUR_PROJECT_ID",
     write_key="YOUR_PROJECT_WRITE_KEY",
-    endpoint="https://api.traceiq.dev",
+    endpoint="https://api.traceiq.run",
 )
 
 traceiq.capture(
@@ -200,14 +200,14 @@ traceiq.shutdown()`,
     shikiLang: 'php',
     install: 'composer require traceiq/traceiq-php',
     docsUrl: '/docs?page=php',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq',
     icon: SdkIcons.PHP,
     code: `use TraceIQ\\Client;
 
 $traceiq = new Client(
     projectId: "YOUR_PROJECT_ID",
     writeKey: "YOUR_PROJECT_WRITE_KEY",
-    endpoint: "https://api.traceiq.dev",
+    endpoint: "https://api.traceiq.run",
 );
 
 $traceiq->capture(
@@ -227,14 +227,14 @@ $traceiq->shutdown();`,
     shikiLang: 'dart',
     install: 'flutter pub add traceiq_flutter',
     docsUrl: '/docs?page=flutter',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/packages/sdk-flutter',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/packages/sdk-flutter',
     icon: SdkIcons.Flutter,
-    code: `import 'package:traceiq_flutter/traceiq.dart';
+    code: `import 'package:traceiq_flutter/traceiq_flutter.dart';
 
 await TraceIQ.initialize(
   projectId: 'YOUR_PROJECT_ID',
   apiKey: 'YOUR_PROJECT_WRITE_KEY',
-  apiUrl: 'https://api.traceiq.dev',
+  apiUrl: 'https://api.traceiq.run',
 );
 
 await TraceIQ.identify('user_123', traits: {'plan': 'pro'});
@@ -252,7 +252,7 @@ await TraceIQ.track('user_signed_up', properties: {
     shikiLang: 'rust',
     install: 'cargo add traceiq',
     docsUrl: '/docs?page=rust',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/sdks/rust',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/sdks/rust',
     icon: SdkIcons.Rust,
     code: `use traceiq::Client;
 use serde_json::json;
@@ -279,14 +279,14 @@ traceiq.shutdown();`,
     shikiLang: 'swift',
     install: 'swift package add traceiq',
     docsUrl: '/docs?page=swift',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/sdks/swift',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/sdks/swift',
     icon: SdkIcons.Swift,
     code: `import TraceIQ
 
 let traceiq = TraceIQ(config: .init(
     projectId: "YOUR_PROJECT_ID",
     writeKey: "YOUR_PROJECT_WRITE_KEY",
-    endpoint: "https://api.traceiq.dev"
+    endpoint: "https://api.traceiq.run"
 ))
 
 traceiq.identify(userId: "user_123", traits: ["plan": "pro"])
@@ -305,7 +305,7 @@ traceiq.capture(
     shikiLang: 'kotlin',
     install: 'implementation("run.traceiq:traceiq:0.1.0")',
     docsUrl: '/docs?page=kotlin',
-    repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/sdks/kotlin',
+    repositoryUrl: 'https://github.com/enigma-137/trace-iq/tree/main/sdks/kotlin',
     icon: SdkIcons.Kotlin,
     code: `import com.traceiq.TraceIQ
 import com.traceiq.TraceIQConfig
@@ -313,7 +313,7 @@ import com.traceiq.TraceIQConfig
 val traceiq = TraceIQ(TraceIQConfig(
     projectId = "YOUR_PROJECT_ID",
     writeKey = "YOUR_PROJECT_WRITE_KEY",
-    endpoint = "https://api.traceiq.dev",
+    endpoint = "https://api.traceiq.run",
 ))
 
 traceiq.identify("user_123", traits = mapOf("plan" to "pro"))
@@ -330,10 +330,10 @@ traceiq.capture(
     badge: 'Direct HTTP Ingestion',
     language: 'Bash',
     shikiLang: 'bash',
-    install: 'curl -X POST https://api.traceiq.dev/v1/events',
+    install: 'curl -X POST https://api.traceiq.run/v1/events',
     docsUrl: '/docs?page=ingestion',
     icon: SdkIcons.Rest,
-    code: `curl -X POST https://api.traceiq.dev/v1/events \\
+    code: `curl -X POST https://api.traceiq.run/v1/events \\
   -H "Content-Type: application/json" \\
   -H "x-traceiq-write-key: YOUR_PROJECT_WRITE_KEY" \\
   -d '{

@@ -37,7 +37,7 @@ export TRACEIQ_API_KEY=tiq_pat_your_token_here
 Optional:
 
 ```bash
-export TRACEIQ_API_URL=https://api.traceiq.dev
+export TRACEIQ_API_URL=https://api.traceiq.run
 ```
 
 If you are running the API locally, you can leave `TRACEIQ_API_URL` unset and use the default:
@@ -64,7 +64,7 @@ Add the following to your Claude Desktop MCP configuration:
       "args": ["-y", "traceiq-mcp-server"],
       "env": {
         "TRACEIQ_API_KEY": "tiq_pat_your_token_here",
-        "TRACEIQ_API_URL": "https://api.traceiq.dev"
+        "TRACEIQ_API_URL": "https://api.traceiq.run"
       }
     }
   }
