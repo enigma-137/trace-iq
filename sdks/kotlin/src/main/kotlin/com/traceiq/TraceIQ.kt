@@ -233,7 +233,9 @@ class TraceIQ(private val config: TraceIQConfig) {
         }
     }
 
-    private fun nowIso(): String = isoFormat.format(Date())
+    // SimpleDateFormat isn't thread-safe and callers capture from any thread; java.time
+    // would avoid the lock but needs Android API 26.
+    private fun nowIso(): String = synchronized(isoFormat) { isoFormat.format(Date()) }
 
     private fun handleError(error: Throwable) {
         if (config.debug) println("[traceiq] ${error.message}")

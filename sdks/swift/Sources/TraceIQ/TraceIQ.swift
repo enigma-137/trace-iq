@@ -65,9 +65,14 @@ public final class TraceIQ {
         return formatter
     }()
 
-    public init(config: TraceIQConfig) {
+    public convenience init(config: TraceIQConfig) {
+        self.init(config: config, sessionConfiguration: .default)
+    }
+
+    /// Tests inject a configuration whose `protocolClasses` stub the network.
+    init(config: TraceIQConfig, sessionConfiguration: URLSessionConfiguration) {
         self.config = config
-        let sessionConfig = URLSessionConfiguration.default
+        let sessionConfig = sessionConfiguration
         sessionConfig.timeoutIntervalForRequest = config.timeout
         self.session = URLSession(configuration: sessionConfig)
         startTimer()
