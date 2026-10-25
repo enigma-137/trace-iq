@@ -1,16 +1,17 @@
 import { BlogPostLayout } from '@/components/BlogPostLayout'
 
-export const metadata = {
+export const post = {
   title: 'Why we moved TraceIQ toward truly self-hosted analytics',
-  description: 'How local auth, one-command startup and deployment ownership changed TraceIQ self-hosting.'
+  description: 'What changed when we removed mandatory hosted authentication, made local mode one-command, and treated operational ownership as a product feature.',
+  lede: 'Self-hosting is not complete when the database is yours but the application still depends on somebody else’s identity service. We rebuilt that boundary.',
+  date: '2026-08-27',
+  readTime: '7 min read',
+  tag: 'Engineering'
 }
 
-<BlogPostLayout
-  title="Why we moved TraceIQ toward truly self-hosted analytics"
-  description="Self-hosting is not complete when the database is yours but the application still depends on somebody else’s identity service. We rebuilt that boundary."
-  date="August 27, 2026"
-  readTime="7 min read"
->
+export const metadata = { title: post.title, description: post.description }
+
+<BlogPostLayout {...post}>
 
 ## Self-hosting has to include the front door
 

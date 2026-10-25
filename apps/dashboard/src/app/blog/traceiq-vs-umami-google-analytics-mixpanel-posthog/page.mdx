@@ -1,18 +1,17 @@
 import { BlogPostLayout } from '@/components/BlogPostLayout'
 
-export const metadata = {
-title: 'TraceIQ vs Umami, Google Analytics, Mixpanel and PostHog',
-description:
-'A practical comparison of TraceIQ, Umami, Google Analytics, Mixpanel and PostHog—and the kinds of teams each one makes sense for.'
+export const post = {
+  title: 'TraceIQ vs Umami, Google Analytics, Mixpanel and PostHog',
+  description: 'A practical, honest guide to choosing the analytics product that matches your team, infrastructure and questions.',
+  lede: 'Five analytics tools, five very different ideas of what analytics should be. Here is where each one fits—and where TraceIQ is trying to fit among them.',
+  date: '2026-08-27',
+  readTime: '10 min read',
+  tag: 'Comparison'
 }
 
-<BlogPostLayout
-title="TraceIQ vs Umami, Google Analytics, Mixpanel and PostHog"
-description="Five analytics tools, five very different ideas of what analytics should be. Here is where each one fits—and where TraceIQ is trying to fit among them."
-date="August 27, 2026"
-readTime="10 min read"
+export const metadata = { title: post.title, description: post.description }
 
->
+<BlogPostLayout {...post}>
 
 Analytics tools are surprisingly getting too difficult to compare.
 
