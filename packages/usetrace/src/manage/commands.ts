@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   colors,
@@ -49,6 +50,8 @@ export const MANAGE_COMMANDS = new Set([
   'errors',
   'status',
   'open',
+  'sourcemaps',
+  'sourcemap',
   'keys',
   'help'
 ]);
@@ -153,6 +156,8 @@ export async function runManageCommand(command: string, rawArgs: string[], deps:
         return await status(context);
       case 'open':
         return await open(context);
+      case 'sourcemaps':
+        return await sourcemaps(context);
       case 'keys':
         deps.out(commandHelp('keys'));
         process.exitCode = 1;
@@ -172,6 +177,7 @@ export async function runManageCommand(command: string, rawArgs: string[], deps:
 function normalizeCommand(command: string): string {
   if (command === 'project') return 'projects';
   if (command === 'log') return 'logs';
+  if (command === 'sourcemap') return 'sourcemaps';
   return command;
 }
 
@@ -698,6 +704,154 @@ async function open({ args, ctx, deps }: CommandContext) {
   } catch {
     logWarning('Could not open a browser. Visit the URL above.');
   }
+}
+
+// ─── Source maps ────────────────────────────────────────────────────────────
+
+const SOURCE_MAP_FILE = /\.(?:m|c)?js\.map$/;
+const SKIPPED_DIRS = new Set(['node_modules', '.git']);
+const UPLOAD_CONCURRENCY = 4;
+
+async function sourcemaps(context: CommandContext) {
+  const sub = context.args.positionals[0];
+  if (sub === 'upload') return sourcemapsUpload(context);
+  if (sub === 'list' || sub === 'ls') return sourcemapsList(context);
+  context.deps.out(commandHelp('sourcemaps'));
+  process.exitCode = 1;
+}
+
+async function sourcemapsUpload({ args, ctx, client, deps }: CommandContext) {
+  const release = flagString(args.flags, 'release') ?? deps.env.TRACEIQ_RELEASE?.trim();
+  if (!release) {
+    throw new CliError('A release is required.', 'Pass --release <version> (the same value as the SDK `release` option) or set TRACEIQ_RELEASE.');
+  }
+  const dir = path.resolve(deps.cwd, flagString(args.flags, 'dir') ?? args.positionals[1] ?? 'dist');
+  const dryRun = flagBool(args.flags, 'dry-run');
+
+  const files = await findSourceMaps(dir);
+  if (files.length === 0) {
+    throw new CliError(
+      `No source maps (*.js.map) found in ${dir}.`,
+      'Turn on source maps in your bundler (e.g. Vite build.sourcemap, webpack devtool: "source-map"), build, then run this again.'
+    );
+  }
+
+  // Each map belongs to the file next to it: dist/assets/index.js.map → assets/index.js.
+  const entries = files.map((absolute) => ({
+    absolute,
+    file: path.relative(dir, absolute).split(path.sep).join('/').replace(/\.map$/, '')
+  }));
+
+  if (dryRun) {
+    deps.out();
+    deps.out(`  ${colors.bold(`${entries.length} source maps`)} ${colors.dim(`would be uploaded for release ${release}`)}`);
+    for (const entry of entries) deps.out(`  ${symbols.bullet} ${entry.file}`);
+    deps.out();
+    return;
+  }
+
+  if (!ctx.projectId) {
+    throw new CliError('No project selected.', 'Pass --project <id>, set TRACEIQ_PROJECT_ID, or run `traceiq projects use`.');
+  }
+
+  const api = client();
+  let uploaded = 0;
+  let bytes = 0;
+  const failures: Array<{ file: string; message: string }> = [];
+  const queue = [...entries];
+
+  async function worker() {
+    for (let entry = queue.shift(); entry; entry = queue.shift()) {
+      try {
+        const content = await fs.readFile(entry.absolute);
+        await api.uploadSourceMap(release as string, entry.file, content);
+        uploaded += 1;
+        bytes += content.length;
+      } catch (error) {
+        // A rejected token fails every file the same way; stop instead of repeating it.
+        if (error instanceof CliError && /token/i.test(error.message)) throw error;
+        failures.push({ file: entry.file, message: error instanceof Error ? error.message : String(error) });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, entries.length) }, () => worker()));
+
+  for (const failure of failures) logError(`${failure.file}: ${failure.message}`);
+  if (uploaded > 0) {
+    logSuccess(`Uploaded ${uploaded} source map${uploaded === 1 ? '' : 's'} (${formatBytes(bytes)}) for release ${colors.bold(release)}`);
+  }
+
+  if (flagBool(args.flags, 'delete-after') && failures.length === 0) {
+    await Promise.all(entries.map((entry) => fs.rm(entry.absolute, { force: true })));
+    logInfo(`Deleted ${entries.length} local .map file${entries.length === 1 ? '' : 's'} so they are not deployed.`);
+  }
+
+  if (failures.length > 0) {
+    process.exitCode = 1;
+  } else {
+    logInfo(`Errors from release ${release} will now show original file names and lines.`);
+  }
+}
+
+async function sourcemapsList({ args, client, deps }: CommandContext) {
+  const release = flagString(args.flags, 'release');
+  const response = await client().listSourceMaps(release);
+
+  if (flagBool(args.flags, 'json')) {
+    deps.out(JSON.stringify(release ? response.maps ?? [] : response.releases ?? []));
+    return;
+  }
+
+  deps.out();
+  if (release) {
+    const maps = response.maps ?? [];
+    if (maps.length === 0) {
+      logWarning(`No source maps for release ${release} in ${response.project.name}.`);
+      return;
+    }
+    deps.out(`  ${colors.bold(`${maps.length} source maps`)} ${colors.dim(`for release ${release} in ${response.project.name}`)}`);
+    deps.out();
+    renderTable(
+      ['FILE', 'SIZE', 'UPLOADED'],
+      maps.map((m) => [m.file, formatBytes(m.sizeBytes), formatRelative(m.updatedAt, deps.now())])
+    ).forEach((line) => deps.out(`  ${line}`));
+  } else {
+    const releases = response.releases ?? [];
+    if (releases.length === 0) {
+      logInfo(`No source maps uploaded to ${response.project.name} yet. Run \`traceiq sourcemaps upload --release <version>\`.`);
+      return;
+    }
+    renderTable(
+      ['RELEASE', 'MAPS', 'SIZE', 'UPLOADED'],
+      releases.map((r) => [r.release, String(r.maps), formatBytes(r.sizeBytes), formatRelative(r.updatedAt, deps.now())])
+    ).forEach((line) => deps.out(`  ${line}`));
+  }
+  deps.out();
+}
+
+async function findSourceMaps(dir: string): Promise<string[]> {
+  let entries: import('node:fs').Dirent[];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    throw new CliError(`Cannot read ${dir}.`, 'Pass the build output folder with --dir.');
+  }
+  const found: string[] = [];
+  for (const entry of entries) {
+    const absolute = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIPPED_DIRS.has(entry.name)) found.push(...(await findSourceMaps(absolute)));
+    } else if (entry.isFile() && SOURCE_MAP_FILE.test(entry.name)) {
+      found.push(absolute);
+    }
+  }
+  return found.sort();
+}
+
+function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function openUrl(url: string): Promise<void> {

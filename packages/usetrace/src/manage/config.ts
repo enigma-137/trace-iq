@@ -76,7 +76,7 @@ export function resolveContext(
     tokenSource = 'config';
   }
 
-  const projectId = flags.project || config.projectId;
+  const projectId = flags.project || env.TRACEIQ_PROJECT_ID?.trim() || config.projectId;
 
   return {
     apiUrl,

@@ -7,7 +7,7 @@ export interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
-const BOOLEAN_FLAGS = new Set(['follow', 'f', 'json', 'help', 'h', 'yes', 'print', 'dry-run', 'no-open']);
+const BOOLEAN_FLAGS = new Set(['follow', 'f', 'json', 'help', 'h', 'yes', 'print', 'dry-run', 'no-open', 'delete-after']);
 
 const ALIASES: Record<string, string> = {
   f: 'follow',

@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { maskToken } from './config.js';
 
 export class CliError extends Error {
@@ -83,6 +84,19 @@ export interface SetupResponse {
   project: { id: string; organizationId: string; name: string; slug: string } | null;
 }
 
+export interface SourceMapRelease {
+  release: string;
+  maps: number;
+  sizeBytes: number;
+  updatedAt: string;
+}
+
+export interface SourceMapFile {
+  file: string;
+  sizeBytes: number;
+  updatedAt: string;
+}
+
 export type FetchLike = typeof fetch;
 
 export interface ApiClientOptions {
@@ -138,7 +152,35 @@ export class TraceIQApiClient {
     return this.get('/health', {}, false);
   }
 
-  private async get<T>(pathname: string, query: Query = {}, authenticated = true): Promise<T> {
+  /** Uploads one map, gzipped. `file` is the minified file's path relative to the build output. */
+  uploadSourceMap(release: string, file: string, content: Buffer): Promise<{ release: string; map: SourceMapFile }> {
+    return this.request('PUT', '/v1/sourcemaps', { projectId: this.options.projectId, release, file }, {
+      // Node's fetch sends a Buffer as-is; the DOM typings just don't list it as BodyInit.
+      body: gzipSync(content) as unknown as BodyInit,
+      headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' }
+    });
+  }
+
+  listSourceMaps(release?: string): Promise<{
+    project: { id: string; name: string };
+    release?: string;
+    releases?: SourceMapRelease[];
+    maps?: SourceMapFile[];
+  }> {
+    return this.get('/v1/sourcemaps', { projectId: this.options.projectId, release });
+  }
+
+  private get<T>(pathname: string, query: Query = {}, authenticated = true): Promise<T> {
+    return this.request('GET', pathname, query, { authenticated });
+  }
+
+  private async request<T>(
+    method: 'GET' | 'PUT',
+    pathname: string,
+    query: Query = {},
+    init: { authenticated?: boolean; body?: BodyInit; headers?: Record<string, string> } = {}
+  ): Promise<T> {
+    const authenticated = init.authenticated ?? true;
     if (authenticated && !this.options.token) {
       throw new CliError('Not logged in.', 'Run `traceiq login` or set TRACEIQ_TOKEN.');
     }
@@ -149,13 +191,13 @@ export class TraceIQApiClient {
       if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
     }
 
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = { Accept: 'application/json', ...init.headers };
     if (authenticated && this.options.token) headers.Authorization = `Bearer ${this.options.token}`;
     if (this.options.projectId) headers['x-traceiq-project-id'] = this.options.projectId;
 
     let response: Response;
     try {
-      response = await this.fetchImpl(url.toString(), { headers });
+      response = await this.fetchImpl(url.toString(), { method, headers, body: init.body });
     } catch (error) {
       throw new CliError(
         `Could not reach the TraceIQ API at ${this.options.apiUrl}.`,

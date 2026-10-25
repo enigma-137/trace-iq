@@ -22,6 +22,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AiModule } from './modules/ai/ai.module';
 import { MfaModule } from './modules/mfa/mfa.module';
 import { ErrorsModule } from './modules/errors/errors.module';
+import { SourceMapsModule } from './modules/sourcemaps/sourcemaps.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { ExperimentsModule } from './modules/experiments/experiments.module';
@@ -67,6 +68,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     AiModule,
     MfaModule,
     ErrorsModule,
+    SourceMapsModule,
     AchievementsModule,
     InsightsModule,
     BillingModule,

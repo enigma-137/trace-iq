@@ -60,6 +60,12 @@ export interface ErrorSampleItem {
   url?: string | null;
   release?: string | null;
   occurredAt: string;
+  /** Present when the release's uploaded source maps matched frames in this stack. */
+  symbolicated?: {
+    stack: string;
+    mappedFrames: number;
+    context: { file: string; line: number; lines: Array<{ line: number; code: string }> } | null;
+  } | null;
 }
 
 export interface IssueDetailData {
@@ -201,6 +207,7 @@ export function ErrorTrackingClientView({
   const [severityFilter, setSeverityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
   const [activeTab, setActiveTab] = useState<'overview' | 'stack' | 'occurrences' | 'replay'>('overview');
   const [copied, setCopied] = useState(false);
+  const [showMinifiedStack, setShowMinifiedStack] = useState(false);
   // Workflow state returned by the last PATCH, so the buttons update without waiting on router.refresh().
   const [savedState, setSavedState] = useState<Record<string, { status: IssueStatus; assigneeUserId: string | null }>>({});
 
@@ -250,6 +257,9 @@ export function ErrorTrackingClientView({
   const lastRelease = (detailMatches ? activeDetail?.totals.lastRelease : null) ?? activeIssue?.lastRelease ?? null;
   const regressedInRelease = detailMatches ? activeDetail?.issue.regressedInRelease ?? null : null;
   const detailOccurrences = activeDetail?.totals.occurrences ?? 0;
+  const latestSample = activeDetail?.samples[0];
+  const latestSymbolicated = latestSample?.symbolicated ?? null;
+  const shownStack = (latestSymbolicated && !showMinifiedStack ? latestSymbolicated.stack : latestSample?.stack) ?? '';
   const saved = activeIssue ? savedState[activeIssue.id] : undefined;
   const activeStatus: IssueStatus = saved?.status ?? (detailMatches ? activeDetail?.issue.status : activeIssue?.status) ?? 'open';
   const activeAssignee = (saved ? saved.assigneeUserId : detailMatches ? activeDetail?.issue.assigneeUserId : activeIssue?.assigneeUserId) ?? null;
@@ -855,17 +865,62 @@ export function ErrorTrackingClientView({
                   {/* Stack Trace Tab */}
                   {activeTab === 'stack' && (
                     <div>
-                      {activeDetail?.samples[0]?.stack ? (
-                        <div className="relative">
-                          <pre className="max-h-80 overflow-auto rounded-md border border-neutral-200 bg-neutral-900 p-4 font-mono text-xs leading-relaxed text-neutral-100 dark:border-slate-800 dark:bg-slate-950">
-                            <code>{activeDetail.samples[0].stack}</code>
-                          </pre>
-                          <button
-                            onClick={() => handleCopy(activeDetail.samples[0].stack || '')}
-                            className="absolute right-3 top-3 rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-[10px] font-medium text-neutral-300 hover:bg-neutral-700"
-                          >
-                            Copy Stack
-                          </button>
+                      {latestSample?.stack ? (
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                            {latestSymbolicated ? (
+                              <>
+                                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                                  Mapped {latestSymbolicated.mappedFrames} frame{latestSymbolicated.mappedFrames === 1 ? '' : 's'} with source maps
+                                  {latestSample.release ? ` for ${latestSample.release}` : ''}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowMinifiedStack((value) => !value)}
+                                  className="rounded border border-neutral-300 px-2 py-0.5 font-medium text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                  {showMinifiedStack ? 'Show original' : 'Show minified'}
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-neutral-500 dark:text-slate-400">
+                                {latestSample.release
+                                  ? `No source maps matched release ${latestSample.release}. Upload them with traceiq sourcemaps upload.`
+                                  : 'Set release in your SDK and upload source maps to see original file names and lines.'}
+                              </span>
+                            )}
+                          </div>
+
+                          {latestSymbolicated?.context && !showMinifiedStack ? (
+                            <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-slate-800">
+                              <p className="border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 font-mono text-[11px] text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                                {latestSymbolicated.context.file}:{latestSymbolicated.context.line}
+                              </p>
+                              <pre className="overflow-x-auto bg-white py-2 font-mono text-xs leading-relaxed dark:bg-slate-950">
+                                {latestSymbolicated.context.lines.map((row) => (
+                                  <div
+                                    key={row.line}
+                                    className={`flex px-3 ${row.line === latestSymbolicated.context?.line ? 'bg-rose-50 text-rose-900 dark:bg-rose-950/40 dark:text-rose-200' : 'text-neutral-700 dark:text-slate-300'}`}
+                                  >
+                                    <span className="mr-4 w-8 shrink-0 select-none text-right text-neutral-400 dark:text-slate-600">{row.line}</span>
+                                    <code className="whitespace-pre">{row.code}</code>
+                                  </div>
+                                ))}
+                              </pre>
+                            </div>
+                          ) : null}
+
+                          <div className="relative">
+                            <pre className="max-h-80 overflow-auto rounded-md border border-neutral-200 bg-neutral-900 p-4 font-mono text-xs leading-relaxed text-neutral-100 dark:border-slate-800 dark:bg-slate-950">
+                              <code>{shownStack}</code>
+                            </pre>
+                            <button
+                              onClick={() => handleCopy(shownStack)}
+                              className="absolute right-3 top-3 rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-[10px] font-medium text-neutral-300 hover:bg-neutral-700"
+                            >
+                              Copy Stack
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="rounded-md border border-neutral-200 bg-neutral-50 py-8 text-center text-xs text-neutral-500 dark:border-slate-800 dark:bg-slate-950">
