@@ -7,13 +7,15 @@ in batches on a background thread.
 
 ## Install
 
-Publish to your Maven repo (or copy the source). Gradle:
+Gradle, from Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("com.traceiq:traceiq:0.1.0")
+    implementation("run.traceiq:traceiq:0.1.0")
 }
 ```
+
+The Kotlin package is `com.traceiq`.
 
 ## Quickstart
 
