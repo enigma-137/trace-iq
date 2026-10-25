@@ -62,6 +62,7 @@ traceiq.initialize({
       'Call `initialize()` with your project id and write key (both safe to expose in the browser).',
       '`endpoint` points at the TraceIQ API — change it if you self-host.',
       'Identify users with `traceiq.identify({ userId, traits })` before tracking.',
+      'Call `identify()` and, for account-based apps, `traceiq.group({ organizationId, traits: { name } })` on every app load once the signed-in user is known (the SDK keeps them in memory only). Groups feed the Groups page.',
       'Optional: `autoTrackPageViews`, `autoCaptureExceptions`, `autoCaptureRageClicks`.'
     ],
     featureSnippets: {
