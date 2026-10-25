@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "traceiq-py"
-version = "0.1.0" 
+version = "0.2.0" 
 description = "TraceIQ server-side SDK for Python — capture backend events with trustworthy properties."
 readme = "README.md"
 requires-python = ">=3.8"

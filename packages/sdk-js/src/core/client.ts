@@ -1307,7 +1307,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
         : undefined,
       sdk: {
         name: 'traceiq-sdk-js',
-        version: '0.1.0'
+        version: '0.3.0'
       },
       timezone: this.getTimezone()
     };

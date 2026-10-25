@@ -1,6 +1,6 @@
 [package]
 name = "traceiq"
-version = "0.1.0"
+version = "0.2.0"
 description = "TraceIQ server-side SDK for Rust — capture backend events with trustworthy properties."
 edition = "2021"
 license = "MIT"
