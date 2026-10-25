@@ -296,7 +296,7 @@ let traceiq = TraceIQ(config: .init(
     id: 'kotlin',
     label: 'Kotlin',
     blurb: 'JVM servers and Android (API 21+), no third-party dependencies',
-    install: 'Gradle → implementation("com.traceiq:traceiq:0.1.0")',
+    install: 'Gradle → implementation("run.traceiq:traceiq:0.1.0")',
     init: `import com.traceiq.TraceIQ
 import com.traceiq.TraceIQConfig
 

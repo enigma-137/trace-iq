@@ -1,0 +1,48 @@
+name: Release Kotlin SDK
+
+# Push a tag like `kotlin-v0.2.0` to publish sdks/kotlin to Maven Central as
+# run.traceiq:traceiq. Needs the four secrets in the `maven-central` environment;
+# see RELEASING.md.
+on:
+  push:
+    tags: ["kotlin-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: maven-central
+    defaults:
+      run:
+        working-directory: sdks/kotlin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+      # The SDK has no Gradle wrapper, so pin the Gradle version here.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: Check the tag matches the package version
+        run: |
+          tag="${GITHUB_REF_NAME#kotlin-v}"
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version \"$version\" in build.gradle.kts."
+            exit 1
+          fi
+      - name: Test
+        run: gradle build --no-daemon
+      - name: Publish
+        run: gradle publishAndReleaseToMavenCentral --no-daemon --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}

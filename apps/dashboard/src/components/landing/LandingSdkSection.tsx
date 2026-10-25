@@ -303,7 +303,7 @@ traceiq.capture(
     badge: 'Kotlin (Android/JVM)',
     language: 'Kotlin',
     shikiLang: 'kotlin',
-    install: 'implementation("com.traceiq:traceiq:0.1.0")',
+    install: 'implementation("run.traceiq:traceiq:0.1.0")',
     docsUrl: '/docs?page=kotlin',
     repositoryUrl: 'https://github.com/trace-iq/trace-iq/tree/main/sdks/kotlin',
     icon: SdkIcons.Kotlin,

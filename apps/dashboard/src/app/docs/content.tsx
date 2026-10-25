@@ -708,7 +708,7 @@ traceiq.capture("transfer_started", userId: "user_123", properties: ["amount": 5
     return (
       <Section id="kotlin" title="Kotlin / Android SDK">
         <P>
-          <Mono>com.traceiq:traceiq</Mono> for JVM servers and Android (API 21+). No third-party dependencies.
+          <Mono>run.traceiq:traceiq</Mono> for JVM servers and Android (API 21+). No third-party dependencies.
           On Android, add the <Mono>INTERNET</Mono> permission.
         </P>
         <Code lang="kotlin">{`import com.traceiq.TraceIQ

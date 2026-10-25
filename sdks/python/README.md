@@ -7,8 +7,10 @@ blocks on the network.
 ## Install
 
 ```bash
-pip install traceiq
+pip install traceiq-py
 ```
+
+The package installs as `traceiq-py` and imports as `traceiq`.
 
 ## Quickstart
 
