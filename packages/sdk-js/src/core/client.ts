@@ -374,15 +374,27 @@ export class BrowserTraceIQClient implements TraceIQClient {
         return originalFetch.call(window, input as RequestInfo, init);
       }
 
+      let trace: TraceContext | undefined;
+      if (self.shouldPropagateTrace(url) && self.requestHeader(input, init, 'traceparent') === null) {
+        try {
+          const headers = new Headers(init?.headers ?? (typeof input === 'object' && 'headers' in input ? input.headers : undefined));
+          trace = newTraceContext();
+          headers.set('traceparent', traceparent(trace));
+          init = { ...init, headers };
+        } catch {
+          trace = undefined; // Never let instrumentation break the request.
+        }
+      }
+
       const start = self.nowMs();
       return originalFetch.call(window, input as RequestInfo, init).then(
         (response: Response) => {
-          self.recordRequest(method, url, response.status, self.nowMs() - start, response);
+          self.recordRequest(method, url, response.status, self.nowMs() - start, response, undefined, trace);
           return response;
         },
         (error: unknown) => {
           // Network error / abort — record as status 0 so it still shows as a failure.
-          self.recordRequest(method, url, 0, self.nowMs() - start);
+          self.recordRequest(method, url, 0, self.nowMs() - start, undefined, undefined, trace);
           throw error;
         }
       );
@@ -397,7 +409,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
     const self = this;
     const originalOpen = Xhr.prototype.open;
     const originalSend = Xhr.prototype.send;
-    type Tracked = XMLHttpRequest & { __traceiq?: { method: string; url: string } };
+    const originalSetRequestHeader = Xhr.prototype.setRequestHeader;
+    type Tracked = XMLHttpRequest & { __traceiq?: { method: string; url: string; hasTraceparent?: boolean } };
 
     Xhr.prototype.open = function (this: Tracked, method: string, url: string | URL, ...rest: unknown[]) {
       try {
@@ -408,17 +421,41 @@ export class BrowserTraceIQClient implements TraceIQClient {
       return (originalOpen as (...args: unknown[]) => void).call(this, method, url, ...rest);
     } as typeof Xhr.prototype.open;
 
+    if (typeof originalSetRequestHeader === 'function') {
+      // Remember an app-supplied traceparent: a second one would be comma-joined into an invalid header.
+      Xhr.prototype.setRequestHeader = function (this: Tracked, name: string, value: string) {
+        if (this.__traceiq && String(name).toLowerCase() === 'traceparent') this.__traceiq.hasTraceparent = true;
+        return originalSetRequestHeader.call(this, name, value);
+      };
+    }
+
     Xhr.prototype.send = function (this: Tracked, body?: Document | XMLHttpRequestBodyInit | null) {
       const tracked = this.__traceiq;
       if (tracked && self.shouldCaptureRequest(tracked.url)) {
+        let trace: TraceContext | undefined;
+        if (!tracked.hasTraceparent && typeof originalSetRequestHeader === 'function' && self.shouldPropagateTrace(tracked.url)) {
+          try {
+            const context = newTraceContext();
+            originalSetRequestHeader.call(this, 'traceparent', traceparent(context));
+            trace = context;
+          } catch {
+            // Never let instrumentation break the request.
+          }
+        }
         const start = self.nowMs();
         let recorded = false;
         const finish = () => {
           if (recorded) return;
           recorded = true;
           try {
-            self.recordRequest(tracked.method, tracked.url, this.status || 0, self.nowMs() - start, undefined, (name) =>
-              this.getResponseHeader(name)
+            self.recordRequest(
+              tracked.method,
+              tracked.url,
+              this.status || 0,
+              self.nowMs() - start,
+              undefined,
+              (name) => this.getResponseHeader(name),
+              trace
             );
           } catch {
             // Never let instrumentation break the request.
@@ -473,7 +510,8 @@ export class BrowserTraceIQClient implements TraceIQClient {
     status: number,
     durationMs: number,
     response?: Response,
-    getHeader: (name: string) => string | null = (name) => this.responseHeader(response, name)
+    getHeader: (name: string) => string | null = (name) => this.responseHeader(response, name),
+    trace?: TraceContext
   ): void {
     // A response that is an HTML document is a page load (Remix/Turbo/htmx-style
     // navigation, a prefetch, an SPA fallback), not an API call.
@@ -496,6 +534,11 @@ export class BrowserTraceIQClient implements TraceIQClient {
     // browser-side record links to the server-side record of the same request.
     const requestId = safeHeader(getHeader, 'x-request-id');
     if (requestId && /^[A-Za-z0-9._:/+=-]{1,128}$/.test(requestId)) properties.requestId = requestId;
+    // The backend records this span as its parent, nesting it under this request.
+    if (trace) {
+      properties.traceId = trace.traceId;
+      properties.spanId = trace.spanId;
+    }
     const rawSize = safeHeader(getHeader, 'content-length');
     const size = Number(rawSize);
     if (rawSize !== null && Number.isFinite(size) && size >= 0) {
@@ -540,6 +583,20 @@ export class BrowserTraceIQClient implements TraceIQClient {
     if (config.includePageRequests) return true;
     if (header && (header('rsc') !== null || header('next-router-prefetch') !== null)) return false;
     return !isFrameworkOrAssetUrl(url, this.getLocation()?.origin);
+  }
+
+  // Same-origin requests by default; cross-origin only when listed, because the
+  // header makes the browser send a CORS preflight the server must allow.
+  private shouldPropagateTrace(url: string): boolean {
+    const option = this.options?.propagateTraceHeaders;
+    if (option === false) return false;
+    const origin = this.getLocation()?.origin;
+    try {
+      if (origin && new URL(url, origin).origin === origin) return true;
+    } catch {
+      return false;
+    }
+    return Array.isArray(option) && option.some((pattern) => matchesUrl(pattern, url));
   }
 
   private requestHeader(input: RequestInfo | URL, init: RequestInit | undefined, name: string): string | null {
@@ -1295,6 +1352,31 @@ type RequestCaptureConfig = Exclude<NonNullable<TraceIQInitOptions['autoCaptureR
 
 function matchesUrl(pattern: string | RegExp, url: string): boolean {
   return typeof pattern === 'string' ? url.includes(pattern) : pattern.test(url);
+}
+
+interface TraceContext {
+  traceId: string;
+  spanId: string;
+}
+
+function newTraceContext(): TraceContext {
+  return { traceId: randomHex(16), spanId: randomHex(8) };
+}
+
+function traceparent(trace: TraceContext): string {
+  return `00-${trace.traceId}-${trace.spanId}-01`;
+}
+
+function randomHex(bytes: number): string {
+  const buffer = new Uint8Array(bytes);
+  const crypto = (globalThis as { crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array } }).crypto;
+  if (typeof crypto?.getRandomValues === 'function') {
+    crypto.getRandomValues(buffer);
+  } else {
+    for (let i = 0; i < bytes; i += 1) buffer[i] = Math.floor(Math.random() * 256);
+  }
+  const hex = Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return /^0+$/.test(hex) ? randomHex(bytes) : hex; // all-zero ids are invalid in W3C trace context
 }
 
 function isRetryableStatus(status: number): boolean {

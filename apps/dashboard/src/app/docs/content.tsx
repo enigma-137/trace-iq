@@ -1320,6 +1320,15 @@ app.use(traceiq.middleware({
           wait for. The Requests explorer has the same filter.
         </P>
         <P>
+          <strong>Browser to backend traces.</strong> Captured browser calls carry a W3C <Mono>traceparent</Mono>{' '}
+          header, so when the backend uses <Mono>traceiq.middleware()</Mono> its record joins the same trace and nests
+          under the browser request in the Requests waterfall. The header is sent to same-origin requests only: on a
+          cross-origin request it triggers a CORS preflight, which fails unless your API allows the{' '}
+          <Mono>traceparent</Mono> header. Once it does, list it, e.g.{' '}
+          <Mono>{"propagateTraceHeaders: ['https://api.example.com']"}</Mono>, or pass <Mono>false</Mono> to turn
+          propagation off.
+        </P>
+        <P>
           WebSocket messages (multiplayer, live updates) aren&apos;t HTTP requests, so they never show up here. Record
           them with <Mono>traceiq.track()</Mono> or <Mono>traceiq.log()</Mono>; both appear in Logs.
         </P>

@@ -128,6 +128,28 @@ describe('request middleware', () => {
     });
   });
 
+  it('continues a browser traceparent, nesting the server span under the browser span', async () => {
+    const fetchImpl = fetchReturning(202);
+    const traceiq = client(fetchImpl);
+    const { res } = fakeResponse();
+    const traceId = '0af7651916cd43dd8448eb211c80319c';
+    const browserSpanId = 'b7ad6b7169203331';
+
+    traceiq.middleware()(
+      { method: 'GET', originalUrl: '/v1/profile', headers: { traceparent: `00-${traceId}-${browserSpanId}-01` } },
+      res as never,
+      () => {}
+    );
+    res.emit('finish');
+    await traceiq.flush();
+
+    const [request] = sentBody(fetchImpl).body.batch;
+    expect(request.properties.traceId).toBe(traceId);
+    expect(request.properties.parentSpanId).toBe(browserSpanId);
+    expect(request.properties.spanId).toMatch(/^[0-9a-f]{16}$/);
+    expect(request.properties.spanId).not.toBe(browserSpanId);
+  });
+
   it('skips HTML page responses by default', async () => {
     const fetchImpl = fetchReturning(202);
     const traceiq = client(fetchImpl);

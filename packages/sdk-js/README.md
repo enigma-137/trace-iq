@@ -84,6 +84,7 @@ The `initialize()` call accepts:
 - `projectId`: your TraceIQ project ID
 - `writeKey`: your public SDK write key
 - `endpoint`: the TraceIQ API base URL
+- `propagateTraceHeaders`: with `autoCaptureRequests`, captured API calls carry a W3C `traceparent` header so a `traceiq-node` backend joins the same trace. Same-origin only by default, because cross-origin it needs the API's CORS config to allow `traceparent`; pass a list of allowed origins (e.g. `['https://api.example.com']`), or `false` to turn it off.
 - `maxRetries`: retries after a network error, HTTP 429 or 5xx, with exponential backoff (default `3`; `0` disables). While the browser is offline, sends wait for it to reconnect.
 - `debug`: enable console logging for troubleshooting
 
