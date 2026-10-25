@@ -10,6 +10,7 @@ export type AiLanguageId =
   | 'rust'
   | 'php'
   | 'react-native'
+  | 'flutter'
   | 'swift'
   | 'kotlin'
   | 'mcp'
@@ -262,10 +263,50 @@ traceiq.initialize({
     ]
   },
   {
+    id: 'flutter',
+    label: 'Flutter',
+    blurb: 'Screens, events, errors and sessions on iOS, Android, web and desktop',
+    install: 'flutter pub add traceiq_flutter',
+    init: `import 'package:traceiq_flutter/traceiq_flutter.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await TraceIQ.initialize(
+    projectId: 'YOUR_PROJECT_ID',
+    apiKey: 'YOUR_WRITE_KEY',
+    apiUrl: '__API_BASE_URL__',
+  );
+  runApp(const MyApp());
+}`,
+    steps: [
+      'Add the SDK with `flutter pub add traceiq_flutter`.',
+      'Call `TraceIQ.initialize()` in `main()` before `runApp`, passing `apiUrl` (it defaults to localhost).',
+      'Add `TraceIQNavigatorObserver()` to `navigatorObservers` so screens are tracked automatically.',
+      'Track events with `TraceIQ.track(...)` and call `TraceIQ.identify(userId)` after login.'
+    ],
+    featureSnippets: {
+      'event-tracking': `await TraceIQ.track('transfer_started', properties: {
+  'amount': 5000,
+  'currency': 'NGN',
+});`,
+      'user-identity': `await TraceIQ.identify('user_123', traits: {'kyc_tier': 2, 'email': 'a@b.com'});`,
+      'feature-flags': `await TraceIQ.loadFeatureFlags();
+if (TraceIQ.isFeatureEnabled('new-checkout')) {
+  // show the new flow
+}`
+    },
+    docs: [
+      { label: 'Flutter SDK', href: '/docs?page=flutter' },
+      { label: 'SDK methods', href: '/docs?page=methods' },
+      { label: 'Reserved events', href: '/docs?page=events' }
+    ]
+  },
+  {
     id: 'swift',
     label: 'Swift',
     blurb: 'iOS, macOS, and server-side Swift (Foundation-only)',
-    install: 'Swift Package Manager → https://github.com/traceiq/traceiq-swift',
+    comingSoon: true,
+    install: 'Not published yet: clone the TraceIQ repo and add sdks/swift as a local Swift package',
     init: `import TraceIQ
 
 let traceiq = TraceIQ(config: .init(
@@ -296,7 +337,8 @@ let traceiq = TraceIQ(config: .init(
     id: 'kotlin',
     label: 'Kotlin',
     blurb: 'JVM servers and Android (API 21+), no third-party dependencies',
-    install: 'Gradle → implementation("run.traceiq:traceiq:0.1.0")',
+    comingSoon: true,
+    install: 'Not on Maven Central yet: in a TraceIQ repo clone run `gradle publishToMavenLocal` in sdks/kotlin, add mavenLocal(), then implementation("run.traceiq:traceiq:0.1.0")',
     init: `import com.traceiq.TraceIQ
 import com.traceiq.TraceIQConfig
 

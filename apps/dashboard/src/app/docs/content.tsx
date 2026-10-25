@@ -474,7 +474,13 @@ traceiq.captureException(new Error('Payment failed'), { orderId: 'ord_1' });`}</
             anonymous identity, sessions, an offline queue, batching, retries, lifecycle flushing, navigation
             tracking, and chained Flutter error handlers.
           </P>
-          <P>Install it from pub.dev:</P>
+          <P>
+            Install it from{' '}
+            <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://pub.dev/packages/traceiq_flutter" target="_blank" rel="noreferrer">
+              pub.dev
+            </a>{' '}
+            (currently <Mono>v{SDK_VERSIONS.flutter}</Mono>):
+          </P>
           <Code lang="bash">{`flutter pub add traceiq_flutter`}</Code>
           <Code lang="dart">{`await TraceIQ.initialize(
   projectId: '${projectId}',
@@ -524,7 +530,8 @@ try {
               rel="noreferrer"
             >
               npm (traceiq-node)
-            </a>
+            </a>{' '}
+            (currently <Mono>v{SDK_VERSIONS.node}</Mono>)
           </P>
           <Code lang="bash">{`npm install traceiq-node`}</Code>
           <Code lang="ts">{`import { TraceIQ } from 'traceiq-node';
@@ -620,7 +627,11 @@ const payload = await traceiq.getFeatureFlagPayload('new-billing-flow', userId, 
       <Section id="react-native" title="React Native / Expo SDK">
         <P>
           <Mono>traceiq-react-native</Mono> tracks screens and events with device info, persists the anonymous
-          id across launches, and flushes when the app backgrounds.
+          id across launches, and flushes when the app backgrounds. Published on{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-react-native" target="_blank" rel="noreferrer">
+            npm
+          </a>{' '}
+          (currently <Mono>v{SDK_VERSIONS.reactNative}</Mono>).
         </P>
         <Code lang="bash">{`npm install traceiq-react-native
 # optional, to persist the anonymous id across launches:
@@ -659,6 +670,8 @@ traceiq.capture({ event: 'transfer_started', properties: { amount: 5000, currenc
         <P>
           Package links: <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href={`https://pypi.org/project/traceiq-py/${SDK_VERSIONS.python}/`} target="_blank" rel="noreferrer">PyPI</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://crates.io/crates/traceiq" target="_blank" rel="noreferrer">crates.io</a>,{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://pub.dev/packages/traceiq_flutter" target="_blank" rel="noreferrer">pub.dev (Flutter)</a>,{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-node" target="_blank" rel="noreferrer">npm (Node)</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-sdk-js" target="_blank" rel="noreferrer">npm (JS SDK)</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-react-native" target="_blank" rel="noreferrer">npm (React Native)</a>,{' '}
           <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="https://www.npmjs.com/package/traceiq-mcp-server" target="_blank" rel="noreferrer">npm (MCP server)</a>.
@@ -693,7 +706,12 @@ limits = traceiq.get_feature_flag_payload("payout-limits", "user_123", default={
       <Section id="swift" title="Swift SDK">
         <P>
           <Mono>TraceIQ</Mono> for Apple platforms (iOS 13+, macOS 10.15+) and server-side Swift. Foundation-only.
-          Add it via Swift Package Manager, then:
+        </P>
+        <P>
+          The Swift package is not published yet: Swift Package Manager installs from a repository with{' '}
+          <Mono>Package.swift</Mono> at its root, and it lives in <Mono>sdks/swift</Mono>. Until then, clone the
+          TraceIQ repository and add <Mono>sdks/swift</Mono> as a local package (Xcode: File → Add Package
+          Dependencies → Add Local), then:
         </P>
         <Code lang="swift">{`import TraceIQ
 
@@ -716,6 +734,12 @@ traceiq.capture("transfer_started", userId: "user_123", properties: ["amount": 5
           <Mono>run.traceiq:traceiq</Mono> for JVM servers and Android (API 21+). No third-party dependencies.
           On Android, add the <Mono>INTERNET</Mono> permission.
         </P>
+        <P>
+          It is not on Maven Central yet. Until then, build it into your local Maven repository from a clone of the
+          TraceIQ repository (<Mono>cd sdks/kotlin && gradle publishToMavenLocal</Mono>), then add{' '}
+          <Mono>mavenLocal()</Mono> to your repositories and:
+        </P>
+        <Code lang="kotlin">{`implementation("run.traceiq:traceiq:0.1.0")`}</Code>
         <Code lang="kotlin">{`import com.traceiq.TraceIQ
 import com.traceiq.TraceIQConfig
 
