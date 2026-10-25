@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { toast } from '@/lib/toast';
 import { readApiError } from '@/lib/api-error';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { retryAfterStepUp } from '@/lib/step-up';
 import { ProjectSwitcher } from './ProjectSwitcher';
 
 export interface SetupWizardProps {
@@ -182,12 +183,18 @@ function SetupWizardContent({
         throw new Error('Your dashboard session expired. Please refresh the page.');
       }
 
-      const res = await fetch(`${apiUrl}/v1/setup/write-key/regenerate?projectId=${encodeURIComponent(projectId)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+      const regenerate = (accessToken: string | undefined) =>
+        fetch(`${apiUrl}/v1/setup/write-key/regenerate?projectId=${encodeURIComponent(projectId)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+          }
+        });
+      // Regenerating needs a recent 2FA check; prompt for a code and retry once.
+      const res = await retryAfterStepUp(await regenerate(token), async () => {
+        const { data } = await supabase.auth.getSession();
+        return regenerate(data.session?.access_token);
       });
 
       if (!res.ok) {

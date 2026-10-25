@@ -37,6 +37,7 @@ import {
   primaryButton,
   secondaryButton
 } from './settings/SettingsUI';
+import { retryAfterStepUp } from '@/lib/step-up';
 
 interface SetupResponse {
   hasSetup: boolean;
@@ -325,13 +326,13 @@ export function SetupPanel({
         toast.error('Session expired. Sign in again.', { title: 'Regeneration failed' });
         return;
       }
-      const response = await fetch(
-        `${apiBaseUrl}/v1/setup/write-key/regenerate?projectId=${encodeURIComponent(setup.project.id)}`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const regenerateUrl = `${apiBaseUrl}/v1/setup/write-key/regenerate?projectId=${encodeURIComponent(setup.project.id)}`;
+      const regenerate = (accessToken: string) =>
+        fetch(regenerateUrl, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } });
+      const response = await retryAfterStepUp(await regenerate(token), async () => {
+        const fresh = await getAccessToken();
+        return fresh ? regenerate(fresh) : null;
+      });
       if (!response.ok) {
         toast.error(await readApiError(response), { title: 'Regeneration failed' });
         return;
@@ -413,9 +414,15 @@ export function SetupPanel({
         toast.error('Session expired. Sign in again.', { title: 'Deletion failed' });
         return;
       }
-      const response = await fetch(`${apiBaseUrl}/v1/dashboard/projects/${setup.project.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+      const projectId = setup.project.id;
+      const deleteProject = (accessToken: string) =>
+        fetch(`${apiBaseUrl}/v1/dashboard/projects/${projectId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+      const response = await retryAfterStepUp(await deleteProject(token), async () => {
+        const fresh = await getAccessToken();
+        return fresh ? deleteProject(fresh) : null;
       });
       if (!response.ok) {
         toast.error(await readApiError(response), { title: 'Deletion failed' });

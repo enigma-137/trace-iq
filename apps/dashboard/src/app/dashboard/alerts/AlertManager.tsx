@@ -26,6 +26,7 @@ import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
 import WebhookIcon from '@hugeicons/core-free-icons/WebhookIcon';
+import { retryAfterStepUp } from '@/lib/step-up';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -327,7 +328,13 @@ export function AlertManager({
     return session?.access_token ?? null;
   }
 
+  // Actions that need a recent 2FA check prompt for a code and retry once.
   async function authFetch(path: string, init: RequestInit): Promise<Response | null> {
+    const response = await sendAuthed(path, init);
+    return response ? retryAfterStepUp(response, () => sendAuthed(path, init)) : null;
+  }
+
+  async function sendAuthed(path: string, init: RequestInit): Promise<Response | null> {
     const token = await getToken();
     if (!token) {
       toast.error('Session expired. Please sign in again.');

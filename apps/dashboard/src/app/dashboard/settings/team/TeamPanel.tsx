@@ -7,6 +7,7 @@ import { DashboardDialog } from '../../DashboardDialog';
 import { Skeleton } from '@/components/Skeleton';
 import { useOrganization } from '@/lib/organization';
 import { readApiError } from '@/lib/api-error';
+import { retryAfterStepUp } from '@/lib/step-up';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -85,7 +86,13 @@ export function TeamPanel() {
     return session?.access_token;
   }
 
+  // Actions that need a recent 2FA check prompt for a code and retry once.
   async function authFetch(path: string, init: RequestInit = {}) {
+    const response = await sendAuthed(path, init);
+    return response ? retryAfterStepUp(response, () => sendAuthed(path, init)) : null;
+  }
+
+  async function sendAuthed(path: string, init: RequestInit) {
     const token = await getAccessToken();
     if (!token) {
       setStatus({ tone: 'error', message: 'Your dashboard session expired. Sign in again.' });
