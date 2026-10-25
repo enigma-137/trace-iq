@@ -1,0 +1,196 @@
+/* Terms and Privacy pages (components/LegalPage.tsx). Rendered inside
+   landing-light.module.css's .site, so its tokens apply. Its `.site p` and
+   `.site h1/h2` resets outrank single-class rules, so text margins below use
+   two-class selectors. */
+.header {
+  padding: 40px 24px 36px;
+}
+.header .headingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-top: 28px;
+}
+.headingRow h1 {
+  font-size: clamp(36px, 4.6vw, 60px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+.header .kicker {
+  margin-top: 8px;
+  font: 10px/1.7 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.header .intro {
+  margin-top: 20px;
+  max-width: 760px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+}
+.meta li:first-child {
+  color: var(--orange-ink);
+}
+
+/* Three ruled summary cells, like the landing page's setup strip. */
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-block: 0;
+  padding: 0;
+  list-style: none;
+  border-block: 1px solid var(--line);
+}
+.highlights li {
+  padding: 22px 24px;
+  border-right: 1px solid var(--line);
+}
+.highlights li:last-child {
+  border-right: 0;
+}
+.highlights li h2 {
+  font: 500 11px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+.highlights li p {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.highlights .blue {
+  color: var(--blue);
+}
+.highlights .green {
+  color: var(--green);
+}
+.highlights .orange {
+  color: var(--orange-ink);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 760px);
+  gap: 40px;
+  padding: 44px 24px 64px;
+  margin-bottom: 10px;
+}
+.contents {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+.contents h2 {
+  font: 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.contents ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.contents li {
+  border-bottom: 1px solid var(--line);
+}
+.contents a {
+  display: block;
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  transition: color 150ms;
+}
+.contents a:hover {
+  color: var(--blue);
+}
+
+.body section {
+  scroll-margin-top: 24px;
+}
+.body section:first-child h2 {
+  margin-top: 0;
+}
+.body section + section {
+  margin-top: 8px;
+}
+.body .notice {
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font: 12px/1.7 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--ink);
+}
+.body .callout {
+  margin: 20px 0;
+  padding: 14px 16px;
+  background: var(--orange-paper);
+  border-left: 3px solid var(--orange);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+@media (max-width: 850px) {
+  .highlights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .highlights li {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .highlights li:last-child {
+    border-bottom: 0;
+  }
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding-top: 32px;
+  }
+  .contents {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .header {
+    padding: 32px 16px 28px;
+  }
+  .header .headingRow {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .header .kicker {
+    margin-top: 0;
+  }
+  .highlights li {
+    padding: 18px 16px;
+  }
+  .layout {
+    padding: 28px 16px 48px;
+  }
+}
