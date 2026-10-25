@@ -184,6 +184,24 @@ export class TraceIQReactNative {
     this.enqueue({ eventName: '$identify', properties: { traits: params.traits ?? {} }, timestamp: toIso() });
   }
 
+  /**
+   * Tell TraceIQ that `previousId` and `userId` are the same person, so their
+   * events and profiles can be merged into `userId`. `previousId` defaults to the
+   * current user (or anonymous) ID; identify() already links the anonymous ID.
+   */
+  alias(userId: string, previousId?: string): void {
+    if (!this.options) {
+      this.debug('alias() before initialize(); ignored.');
+      return;
+    }
+    const from = previousId ?? this.userId ?? this.anonymousId;
+    if (!userId || !from || from === userId) {
+      this.debug('alias() needs two different IDs; ignored.');
+      return;
+    }
+    this.enqueue({ eventName: '$alias', userId, properties: { previousId: from }, timestamp: toIso() });
+  }
+
   group(params: GroupParams): void {
     this.enqueue({
       eventName: '$group',
@@ -370,7 +388,7 @@ export class TraceIQReactNative {
   }
 
   private enqueue(event: Omit<QueuedEvent, 'sessionId' | 'generation'>): void {
-    event.userId = this.userId;
+    event.userId ??= this.userId;
     event.anonymousId = this.anonymousId;
     event.deviceInfo = this.deviceInfo;
     this.queue.push({ ...event, sessionId: this.sessionId, generation: this.identityGeneration });

@@ -99,6 +99,22 @@ class TraceIQ(private val config: TraceIQConfig) {
         )
     }
 
+    /**
+     * Tell TraceIQ that [previousId] and [userId] are the same person, so their events
+     * and profiles can be merged into [userId]. Aliasing an ID to itself is ignored.
+     */
+    fun alias(userId: String, previousId: String) {
+        if (userId.isEmpty() || previousId.isEmpty() || userId == previousId) return
+        enqueue(
+            linkedMapOf(
+                "eventName" to "\$alias",
+                "userId" to userId,
+                "properties" to mapOf("previousId" to previousId),
+                "timestamp" to nowIso(),
+            ),
+        )
+    }
+
     @JvmOverloads
     fun group(organizationId: String, userId: String? = null, traits: Map<String, Any?> = emptyMap()) {
         val e = LinkedHashMap<String, Any?>()

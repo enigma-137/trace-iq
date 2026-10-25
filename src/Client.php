@@ -155,6 +155,35 @@ class Client
     }
 
     /**
+     * Tell TraceIQ that `$previousId` and `$userId` are the same person, so their
+     * events and profiles can be merged into `$userId`.
+     *
+     * Emits a `$alias` event with the previous ID in `properties.previousId`.
+     *
+     * @param string $userId The ID to keep.
+     * @param string $previousId The other ID for the same person, e.g. a guest ID.
+     * @param \DateTimeInterface|string|null $timestamp ISO-8601 timestamp; defaults to now.
+     */
+    public function alias(
+        string $userId,
+        string $previousId,
+        \DateTimeInterface|string|null $timestamp = null,
+    ): void {
+        if ($userId === '' || $previousId === '' || $userId === $previousId) {
+            $this->debug('alias() needs two different IDs; ignored.');
+            return;
+        }
+        $this->enqueue([
+            'eventName' => '$alias',
+            'userId' => $userId,
+            'anonymousId' => null,
+            'properties' => ['previousId' => $previousId],
+            'context' => [],
+            'timestamp' => $this->toIso($timestamp),
+        ]);
+    }
+
+    /**
      * Associate a user with an organization / account.
      *
      * Emits a `$group` event.

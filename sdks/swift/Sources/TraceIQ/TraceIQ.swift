@@ -107,6 +107,21 @@ public final class TraceIQ {
         ])
     }
 
+    /// Tell TraceIQ that `previousId` and `userId` are the same person, so their events
+    /// and profiles can be merged into `userId`. Aliasing an ID to itself is ignored.
+    public func alias(userId: String, previousId: String) {
+        guard !userId.isEmpty, !previousId.isEmpty, userId != previousId else {
+            debug("alias() needs two different IDs; ignored.")
+            return
+        }
+        enqueue([
+            "eventName": "$alias",
+            "userId": userId,
+            "properties": ["previousId": previousId],
+            "timestamp": Self.iso(nil)
+        ])
+    }
+
     public func group(organizationId: String, userId: String? = nil, traits: [String: Any] = [:]) {
         var payload: [String: Any] = [
             "eventName": "$group",

@@ -54,6 +54,7 @@ let mut traceiq = Client::builder("YOUR_PROJECT_ID", "YOUR_WRITE_KEY")
 | --- | --- |
 | `capture(event, user_id?, anonymous_id?, properties?, context?, timestamp?)` | Track an event. |
 | `identify(user_id, traits?, timestamp?)` | Create/update a user profile. |
+| `alias(user_id, previous_id, timestamp?)` | Link another ID for the same person (e.g. a guest ID) to `user_id`. |
 | `group(organization_id, user_id?, anonymous_id?, traits?, timestamp?)` | Associate a user with an account. |
 | `log(level, message, user_id?, metadata?)` | Send a structured line to Logs. `level` is `"debug"`, `"info"`, `"warn"`, `"error"` or `"fatal"`. Lines flush with events. |
 | `flush()` | Send everything queued now (blocks). |

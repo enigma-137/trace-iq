@@ -48,6 +48,7 @@ traceiq.reset();
 | `screen(name, properties?)` | Track a screen view (sent as `$page`). |
 | `capture({ event, properties?, timestamp? })` | Track an event. |
 | `identify({ userId, traits? })` | Attach the current user to events. |
+| `alias(userId, previousId?)` | Link another ID for the same person to `userId`. `previousId` defaults to the current ID. |
 | `group({ organizationId, traits? })` | Associate the user with an account. |
 | `reset()` | Clear the user + rotate the anonymous id (on logout). Also clears loaded feature flags. |
 | `log(level, message, attributes?)` | Send a structured line to Logs, tagged with the session and user. `level` is `debug`, `info`, `warn`, `error` or `fatal`; pass `error` to attach an `Error`. |

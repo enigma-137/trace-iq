@@ -44,6 +44,7 @@ await traceiq.shutdown();
 | --- | --- |
 | `capture({ event, userId?, anonymousId?, properties?, context?, timestamp? })` | Track a server event. |
 | `identify({ userId, traits?, timestamp? })` | Create/update a user profile. |
+| `alias({ userId, previousId, timestamp? })` | Link another ID for the same person (e.g. a guest ID) to `userId`. |
 | `group({ organizationId, userId?, anonymousId?, traits?, timestamp? })` | Associate a user with an account. |
 | `flush()` | Send everything queued now (returns a Promise). |
 | `shutdown()` | Flush and stop the timer — call on process exit. |

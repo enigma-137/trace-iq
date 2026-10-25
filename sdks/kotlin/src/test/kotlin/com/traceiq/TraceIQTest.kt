@@ -63,6 +63,19 @@ class TraceIQTest {
     }
 
     @Test
+    fun `alias links the previous ID and ignores an ID aliased to itself`() {
+        Recorder().use { server ->
+            val traceiq = client(server.endpoint)
+            traceiq.alias("user_1", "guest_1")
+            traceiq.alias("user_1", "user_1")
+            traceiq.shutdown()
+            val body = server.requests.single().body
+            assertTrue("\"eventName\":\"\$alias\",\"userId\":\"user_1\",\"properties\":{\"previousId\":\"guest_1\"}" in body, body)
+            assertEquals(1, Regex("\\\$alias").findAll(body).count(), body)
+        }
+    }
+
+    @Test
     fun `strings are JSON-escaped`() {
         Recorder().use { server ->
             val traceiq = client(server.endpoint)

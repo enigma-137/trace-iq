@@ -149,6 +149,22 @@ final class TraceIQClient {
     _flushIfFull();
   }
 
+  Future<void> alias(String userId, {String? previousId}) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) throw ArgumentError.value(userId, 'userId', 'must not be empty');
+    await _mutate(() async {
+      _ensureUsable();
+      if (!_trackingEnabled) return;
+      final from = previousId?.trim() ?? _userId ?? _anonymousId!;
+      if (from.isEmpty || from == cleanUserId) {
+        _debug('alias() needs two different IDs; ignored.');
+        return;
+      }
+      await _addEvent(r'$alias', <String, Object?>{'previousId': from}, userId: cleanUserId);
+    });
+    _flushIfFull();
+  }
+
   Future<void> screen(String name, {Map<String, Object?>? properties}) async {
     final cleanName = name.trim();
     if (cleanName.isEmpty) throw ArgumentError.value(name, 'name', 'must not be empty');
@@ -477,13 +493,13 @@ final class TraceIQClient {
     _flushIfFull();
   }
 
-  Future<void> _addEvent(String name, Map<String, Object?> properties) async {
+  Future<void> _addEvent(String name, Map<String, Object?> properties, {String? userId}) async {
     await _queue.add(TraceIQEvent(
       queueId: _uuid.generate(),
       eventName: name,
       timestamp: _clock.now(),
       anonymousId: _anonymousId!,
-      userId: _userId,
+      userId: userId ?? _userId,
       sessionId: _sessions.id,
       properties: properties,
       context: <String, Object?>{

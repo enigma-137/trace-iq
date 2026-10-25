@@ -61,6 +61,10 @@ the backend can stitch pre-login activity. `reset` clears user ID and traits,
 rotates the anonymous ID, and starts a new session. Already queued events retain
 the identity captured when they occurred; later events cannot inherit it.
 
+`alias(userId, previousId: ...)` links another ID for the same person (for
+example a guest ID) to `userId` with a `$alias` event. `previousId` defaults to
+the current user or anonymous ID.
+
 ## Screen tracking
 
 Track explicitly:

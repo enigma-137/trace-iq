@@ -73,6 +73,14 @@ export interface IdentifyParams {
   timestamp?: string | Date;
 }
 
+export interface AliasParams {
+  /** The ID to keep. */
+  userId: string;
+  /** The other ID for the same person, e.g. a guest or legacy user ID. */
+  previousId: string;
+  timestamp?: string | Date;
+}
+
 export interface GroupParams {
   organizationId: string;
   userId?: string;
@@ -224,6 +232,23 @@ export class TraceIQ {
       eventName: '$identify',
       userId: params.userId,
       properties: { traits: params.traits ?? {} },
+      timestamp: this.toIso(params.timestamp)
+    });
+  }
+
+  /**
+   * Tell TraceIQ that `previousId` and `userId` are the same person, so their
+   * events and profiles can be merged into `userId`.
+   */
+  alias(params: AliasParams): void {
+    if (!params.userId || !params.previousId || params.userId === params.previousId) {
+      this.debug('alias() needs two different IDs; ignored.');
+      return;
+    }
+    this.enqueue({
+      eventName: '$alias',
+      userId: params.userId,
+      properties: { previousId: params.previousId },
       timestamp: this.toIso(params.timestamp)
     });
   }

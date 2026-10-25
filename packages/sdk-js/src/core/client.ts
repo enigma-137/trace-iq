@@ -653,6 +653,19 @@ export class BrowserTraceIQClient implements TraceIQClient {
     });
   }
 
+  alias(userId: string, previousId?: string): void {
+    if (!this.options) {
+      this.debug('TraceIQ has not been initialized.');
+      return;
+    }
+    const from = previousId ?? this.distinctId();
+    if (!userId || !from || from === userId) {
+      this.debug('TraceIQ alias() needs two different IDs.');
+      return;
+    }
+    void this.sendEvent('$alias', { previousId: from }, userId);
+  }
+
   track(eventName: string, properties: Record<string, unknown> = {}): void {
     if (!this.options) {
       this.debug('TraceIQ has not been initialized.');
@@ -1063,7 +1076,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     this.replayRecorder?.stop();
   }
 
-  private async sendEvent(eventName: string, properties: Record<string, unknown>): Promise<void> {
+  private async sendEvent(eventName: string, properties: Record<string, unknown>, userId = this.identity?.userId): Promise<void> {
     const options = this.options;
     if (!options) {
       return;
@@ -1072,7 +1085,7 @@ export class BrowserTraceIQClient implements TraceIQClient {
     const endpoint = this.eventEndpoint(options.endpoint ?? DEFAULT_ENDPOINT);
     const payload = {
       projectId: options.projectId,
-      userId: this.identity?.userId,
+      userId,
       anonymousId: this.anonymousId,
       sessionId: this.sessionId,
       eventName,

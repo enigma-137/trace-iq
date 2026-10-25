@@ -47,6 +47,18 @@ describe('TraceIQ node client', () => {
     expect(body.batch[0].properties).toEqual({ amount: 500 });
   });
 
+  it('sends alias() as a $alias event and ignores an ID aliased to itself', async () => {
+    const fetchImpl = fetchReturning(202);
+    const traceiq = client(fetchImpl);
+    traceiq.alias({ userId: 'user_1', previousId: 'guest_1' });
+    traceiq.alias({ userId: 'user_1', previousId: 'user_1' });
+    await traceiq.shutdown();
+
+    const { body } = sentBody(fetchImpl);
+    expect(body.batch).toHaveLength(1);
+    expect(body.batch[0]).toMatchObject({ eventName: '$alias', userId: 'user_1', properties: { previousId: 'guest_1' } });
+  });
+
   it('flushes automatically once flushAt events are queued', async () => {
     const fetchImpl = fetchReturning(202);
     const traceiq = client(fetchImpl, { flushAt: 2 });

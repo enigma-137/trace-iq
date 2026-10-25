@@ -90,6 +90,23 @@ void main() {
     await client.dispose();
   });
 
+  test('alias links the previous ID, defaulting to the current user or anonymous ID', () async {
+    final transport = FakeTransport();
+    final client = makeClient(transport: transport);
+    await client.initialize();
+    await client.alias('user_a');
+    await client.identify('user_a');
+    await client.alias('user_b');
+    await client.alias('user_c', previousId: 'guest_1');
+    await client.alias('user_b', previousId: 'user_b');
+    await client.flush();
+    final aliases = transport.batches.single.where((e) => e.eventName == r'$alias').toList();
+    expect(aliases.map((e) => e.userId), <String?>['user_a', 'user_b', 'user_c']);
+    expect(aliases.map((e) => e.properties['previousId']), <Object?>[client.anonymousId, 'user_a', 'guest_1']);
+    expect(client.userId, 'user_a', reason: 'alias does not change the current user');
+    await client.dispose();
+  });
+
   test('reset rotates identity and session without leaking old user', () async {
     final transport = FakeTransport();
     final client = makeClient(transport: transport);
