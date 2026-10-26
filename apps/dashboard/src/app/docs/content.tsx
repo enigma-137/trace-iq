@@ -135,9 +135,8 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
     return (
       <div className="space-y-8">
         {/* Docs Hero Header */}
-        <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-blue-500/10 blur-3xl dark:bg-cyan-500/10" />
-          <div className="relative z-10">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 px-3 py-1 font-mono text-xs font-semibold text-blue-600 dark:border-cyan-400/20  dark:text-cyan-300">
 
               TraceIQ Documentation
