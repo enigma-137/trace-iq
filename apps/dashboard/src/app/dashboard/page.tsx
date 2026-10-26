@@ -148,9 +148,22 @@ export default async function DashboardPage({
   const { user, token } = await requireDashboardSession('/dashboard');
   const activeOrganizationId = cookies().get('traceiq_active_org')?.value;
   const overviewPath = withParams('/v1/dashboard/overview', { projectId, organizationId: activeOrganizationId, range });
-  const { data: overview, error } = await dashboardGet<OverviewResponse>(overviewPath, token);
+  let { data: overview, error } = await dashboardGet<OverviewResponse>(overviewPath, token);
 
-  if (!projectId && overview?.project?.id) {
+  // A projectId the user can't open (a stale link or a deleted project): fall back to
+  // their default project, or to the no-project state when they have none.
+  if (projectId && !overview) {
+    const fallback = await dashboardGet<OverviewResponse>(
+      withParams('/v1/dashboard/overview', { organizationId: activeOrganizationId, range }),
+      token
+    );
+    if (fallback.data) {
+      overview = fallback.data;
+      error = null;
+    }
+  }
+
+  if (overview?.project?.id && overview.project.id !== projectId) {
     redirect(withParams('/dashboard', { projectId: overview.project.id, range: searchParams.range ? range : undefined }));
   }
 
@@ -160,7 +173,8 @@ export default async function DashboardPage({
   const windowLabel = appliedRange?.long ?? '30 days';
   const rangeDays = appliedRange?.days ?? 14;
 
-  const canonicalProjectId = overview?.project?.id ?? projectId;
+  const hasNoProject = Boolean(overview) && !overview?.project;
+  const canonicalProjectId = overview?.project?.id ?? (hasNoProject ? undefined : projectId);
   // Fallbacks for older APIs that omit these fields; fetched together, not in turn.
   const needsReferrers = Boolean(canonicalProjectId) && (overview?.topReferrers ?? []).length === 0;
   const needsObservability = Boolean(canonicalProjectId) && (overview?.observabilitySeries ?? []).length === 0;
@@ -205,6 +219,25 @@ export default async function DashboardPage({
           <section className="rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             {error}
           </section>
+        ) : null}
+
+        {hasNoProject ? (
+          <PageBanner
+            variant="accent"
+            badge="Get started"
+            title="Create your first project"
+            description="You don't have a project yet. The setup wizard creates one, gives you the write key for the SDK, and checks that your first event arrives. This overview fills in as soon as it does."
+            illustrationSrc="/dashboards/banner-connect-project.png"
+            illustrationAlt="Connect Project Artwork"
+            primaryAction={{
+              label: 'Open setup wizard →',
+              href: '/dashboard/setup'
+            }}
+            secondaryAction={{
+              label: 'Read the setup guide',
+              href: '/docs?page=quickstart'
+            }}
+          />
         ) : null}
 
         {/* Active Alerts Banner if alerts are firing */}
@@ -483,20 +516,6 @@ export default async function DashboardPage({
           </div>
         </section>
 
-        {!overview?.project ? (
-          <section className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-6 dark:border-slate-700 dark:bg-slate-950/80">
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Finish setup</h2>
-            <p className="mt-1 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
-              Create your project and grab the SDK write key + install snippet to start capturing events.
-            </p>
-            <Link
-              href={withProjectId('/dashboard/settings', canonicalProjectId)}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg bg-neutral-900 px-4 text-sm font-bold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-slate-200"
-            >
-              Configure SDK
-            </Link>
-          </section>
-        ) : null}
       </div>
     </DashboardShell>
   );

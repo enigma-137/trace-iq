@@ -59,15 +59,15 @@ export default async function SetupPage({
               <EmptyState
                 illustrationSrc="/dashboards/connect-app.png"
                 illustrationAlt="Connect your application"
-                title="Select or create a project"
-                description="The Setup Wizard requires an active TraceIQ project. Select a project from your workspace or create a new project to generate your SDK keys and verify incoming telemetry."
+                title="Step 1: create your project"
+                description="A project holds your app's events and gives you the write key the SDK sends them with. Create one, then come back here to install the SDK and check that your first event arrives."
                 primaryAction={{
-                  label: 'Create new project',
+                  label: 'Create your project',
                   href: '/dashboard/settings?newProject=1'
                 }}
                 secondaryAction={{
-                  label: 'Return to dashboard',
-                  href: '/dashboard'
+                  label: 'Read the setup guide',
+                  href: '/docs?page=quickstart'
                 }}
               />
             </div>
