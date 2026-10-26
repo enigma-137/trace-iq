@@ -25,7 +25,9 @@ const ALLOWED_SCOPES = new Set([
   'webhooks:read',
   'webhooks:write',
   'exports:read',
-  'sourcemaps:write'
+  'sourcemaps:write',
+  'synthetic_monitors:read',
+  'synthetic_monitors:write'
 ]);
 
 export interface CreatePersonalAccessTokenRequest {

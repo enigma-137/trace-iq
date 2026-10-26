@@ -73,7 +73,14 @@ const SCOPE_GROUPS: ScopeGroup[] = [
   { key: 'dashboards', label: 'Dashboards', read: 'dashboards:read', write: 'dashboards:write', mcp: false },
   { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: false },
   { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false },
-  { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false }
+  { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false },
+  {
+    key: 'synthetic',
+    label: 'Synthetic monitors',
+    read: 'synthetic_monitors:read',
+    write: 'synthetic_monitors:write',
+    mcp: false
+  }
 ];
 
 const ALL_SCOPES = SCOPE_GROUPS.flatMap((group) => [group.read, group.write].filter(Boolean) as string[]);

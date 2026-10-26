@@ -98,7 +98,7 @@ describe('Ask TraceIQ - Tool Registry & Tenant Security', () => {
     expect(data.matches[0].steps.length).toBeGreaterThan(2);
     expect(data.matches[0].dashboardRoute).toBe('/dashboard/synthetic-monitors/new');
     expect(result.evidence.map((e) => e.url)).toEqual(
-      expect.arrayContaining(['/dashboard/synthetic-monitors/new', '/docs?page=features'])
+      expect.arrayContaining(['/dashboard/synthetic-monitors/new', '/docs?page=synthetic-monitors'])
     );
     expect(result.evidence.every((e) => e.type === 'guide')).toBe(true);
   });
@@ -115,7 +115,7 @@ describe('Ask TraceIQ - Tool Registry & Tenant Security', () => {
   it('links every guide topic to a dashboard route and only to real docs pages', () => {
     const docsPages = new Set([
       'welcome', 'quickstart', 'methods', 'config', 'autocapture', 'self-hosting', 'web-analytics', 'session-replay',
-      'flags', 'alerts', 'dashboards', 'public-sharing', 'api-performance', 'logs', 'webhooks', 'export', 'events',
+      'flags', 'experiments', 'surveys', 'synthetic-monitors', 'alerts', 'dashboards', 'public-sharing', 'api-performance', 'logs', 'webhooks', 'export', 'events',
       'features', 'ingestion', 'cli', 'mcp'
     ]);
     for (const topic of PRODUCT_GUIDE) {

@@ -177,11 +177,21 @@ export function SurveyList({ initialSurveys, projectId, token: initialToken }: S
       {filteredSurveys.length === 0 ? (
         <div className="rounded-xl border border-neutral-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-950">
           <EmptyState
-            title="No surveys found"
+            title={surveys.length === 0 ? 'No surveys yet' : 'No surveys found'}
             description={
-              surveys.length === 0
-                ? "You haven't created any in-app surveys yet. Gather direct CSAT, NPS, or qualitative feedback from your active users."
-                : "No surveys matched your search or status filter."
+              surveys.length === 0 ? (
+                <>
+                  <p>
+                    Surveys ask your users questions inside your app: an NPS score, a rating or an open question. Pick
+                    who sees each one, show it with a few SDK calls, and read the answers here, question by question.
+                  </p>
+                  <Link href="/docs?page=surveys" className="mt-2 inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                    Read the setup guide <span aria-hidden="true">→</span>
+                  </Link>
+                </>
+              ) : (
+                'No surveys matched your search or status filter.'
+              )
             }
             primaryAction={
               surveys.length === 0

@@ -73,7 +73,7 @@ export const PRODUCT_GUIDE: ProductGuideTopic[] = [
       'Shortcut: open a funnel or a session replay and click Convert to Synthetic Monitor to prefill the steps.'
     ],
     route: '/dashboard/synthetic-monitors/new',
-    docs: '/docs?page=features',
+    docs: '/docs?page=synthetic-monitors',
     related: ['alerts', 'funnels', 'session-replay']
   },
   {
@@ -181,7 +181,7 @@ export const PRODUCT_GUIDE: ProductGuideTopic[] = [
     summary: 'Experiments compare variants against a goal metric.',
     steps: ['Go to Experiments and click New Experiment.', 'Choose the variants and the goal event, then launch and watch results.'],
     route: '/dashboard/experiments',
-    docs: '/docs?page=flags',
+    docs: '/docs?page=experiments',
     related: ['feature-flags']
   },
   {
@@ -191,7 +191,7 @@ export const PRODUCT_GUIDE: ProductGuideTopic[] = [
     summary: 'Surveys collect feedback from users inside your app.',
     steps: ['Go to Surveys and click New Survey.', 'Add questions, choose who sees it, then launch and view responses.'],
     route: '/dashboard/surveys/new',
-    docs: '/docs?page=features'
+    docs: '/docs?page=surveys'
   },
   {
     id: 'users-cohorts',

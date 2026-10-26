@@ -17,6 +17,9 @@ export const docsSections = [
   { id: 'web-analytics', label: 'Web analytics', category: 'Features' },
   { id: 'session-replay', label: 'Session Replay', category: 'Features' },
   { id: 'flags', label: 'Feature flags', category: 'Features' },
+  { id: 'experiments', label: 'Experiments', category: 'Features' },
+  { id: 'surveys', label: 'Surveys', category: 'Features' },
+  { id: 'synthetic-monitors', label: 'Synthetic monitors', category: 'Features' },
   { id: 'alerts', label: 'Alerts', category: 'Features' },
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
   { id: 'public-sharing', label: 'Public sharing', category: 'Features' },
@@ -1217,6 +1220,231 @@ payload = data.get("payloads", {}).get("nuwell-new-add-meal")`}</Code>
       </Section>
     );
   }
+  if (id === 'experiments') {
+    return (
+      <Section id="experiments" title="Experiments (A/B tests)">
+        <P>
+          An experiment splits people between two or more variants of something in your app and measures which one
+          gets more of them to do a goal event, such as <Mono>checkout_completed</Mono>. Create experiments under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/experiments">
+            Experiments
+          </a>
+          ; your app asks the SDK which variant to show.
+        </P>
+
+        <P><strong>1. Create the experiment</strong></P>
+        <Bullets
+          items={[
+            ['Name and key', 'The key (for example checkout-cta-color) is what your code passes to the SDK. It cannot change once the experiment exists.'],
+            ['Environment', 'Production, staging or development. Only apps initialized with the same environment get variants; the SDK defaults to production.'],
+            ['Primary success metric', 'The event that counts as a conversion. It must be an event your app already tracks.'],
+            ['Variants and traffic split', 'At least two variants with weights that add up to 100. One is the control, the version you have today.']
+          ]}
+        />
+        <P>
+          New experiments start as drafts. Click <Mono>Start Experiment</Mono> on its page when your code is deployed.
+          Until then, and after it is paused or completed, every person gets the control.
+        </P>
+
+        <P><strong>2. Show the variant in your app</strong></P>
+        <Code lang="ts">{`import { traceiq } from 'traceiq-sdk-js';
+
+const { variantKey, isEligible } = await traceiq.experiments.getVariant('checkout-cta-color');
+
+if (variantKey === 'variant_b') {
+  renderHighContrastButton();
+} else {
+  renderCurrentButton(); // control, or the experiment isn't running
+}`}</Code>
+        <P>
+          Call <Mono>identify()</Mono> first when you know who the person is, so the same person sees the same variant
+          on every device. Assignment is deterministic: TraceIQ hashes the experiment and the person&apos;s id, so
+          asking again always returns the same variant.
+        </P>
+        <P>
+          <Mono>getVariant()</Mono> records an <strong>exposure</strong> for the person the first time it returns a
+          variant. Only exposed people count in the results. If you fetch the variant early but show it later, pass{' '}
+          <Mono>{'{ trackExposure: false }'}</Mono> and call{' '}
+          <Mono>traceiq.experiments.recordExposure(key, variantKey)</Mono> at the moment it is on screen.
+        </P>
+        <P>
+          Experiments are built into the browser SDK. From other platforms, call the HTTP API with your write key:{' '}
+          <Mono>POST /v1/experiments/evaluate</Mono> with <Mono>projectId</Mono>, <Mono>experimentKey</Mono> and{' '}
+          <Mono>distinctId</Mono>, then <Mono>POST /v1/experiments/exposure</Mono> with the returned{' '}
+          <Mono>variantKey</Mono>.
+        </P>
+
+        <P><strong>3. Read the results</strong></P>
+        <Bullets
+          items={[
+            ['Conversion', 'A person converts when they send the goal event after their exposure. Each person counts once.'],
+            ['Uplift', 'How much higher or lower each variant’s conversion rate is than the control’s.'],
+            ['Significance', 'Once both the control and a variant have at least 30 exposed people, TraceIQ runs a two-tailed z-test. Below p = 0.05 the difference is marked significant; until then it shows as collecting or not significant.'],
+            ['Finishing', 'Use Complete & Declare Winner to stop the experiment and record which variant won, then ship that variant to everyone in code.']
+          ]}
+        />
+        <P>
+          Need a plain on/off rollout rather than a comparison? Use{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=flags">
+            feature flags
+          </Link>
+          .
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'surveys') {
+    return (
+      <Section id="surveys" title="Surveys">
+        <P>
+          Surveys ask people questions inside your app: an NPS score after onboarding, a rating after checkout, or an
+          open question about a new feature. Build them under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/surveys">
+            Surveys
+          </a>
+          . The SDK tells your app which surveys a person should see, and your app shows them in its own UI.
+        </P>
+
+        <P><strong>1. Build the survey</strong></P>
+        <Bullets
+          items={[
+            ['Questions', 'Single choice, multiple choice, NPS (0–10), rating (1–5), short text or long text. Mark any question as required.'],
+            ['Environment', 'Production, staging or development; it must match the environment your app initializes the SDK with.'],
+            ['All Users', 'Everyone is eligible.'],
+            ['Matching User Property', 'Only people whose property equals a value, for example plan = pro. TraceIQ compares against the properties you pass, or the person’s identify() traits.'],
+            ['Trigger on Specific Event', 'Only shown when your app asks for surveys right after that event, by passing its name.']
+          ]}
+        />
+        <P>
+          <Mono>Save Draft</Mono> keeps it hidden. <Mono>Publish Survey</Mono> makes it live. A person who answers or
+          dismisses a survey is never offered it again.
+        </P>
+
+        <P><strong>2. Show it in your app</strong></P>
+        <Code lang="ts">{`import { traceiq } from 'traceiq-sdk-js';
+
+// After onboarding finishes, for example
+const [survey] = await traceiq.surveys.getEligibleSurveys({ eventName: 'onboarding_finished' });
+
+if (survey) {
+  openSurveyModal(survey); // render survey.questions with your own components
+  traceiq.surveys.recordImpression(survey.id);
+}
+
+// When the person closes it without answering
+traceiq.surveys.recordDismissal(survey.id);
+
+// When they submit
+await traceiq.surveys.submitResponse(survey.id, [
+  { questionId: 'q_nps', questionType: 'nps', prompt: 'How likely are you to recommend us?', score: 9 },
+  { questionId: 'q_why', questionType: 'long_text', prompt: 'What could be better?', answerText: 'Faster exports' }
+]);`}</Code>
+        <OptionsTable
+          headers={['Question type', 'Answer field', 'Example']}
+          rows={[
+            ['single_choice', 'selectedOptions', "['monthly'] — one option value"],
+            ['multiple_choice', 'selectedOptions', "['exports', 'alerts']"],
+            ['nps', 'score', '0 to 10'],
+            ['rating_scale', 'rating', '1 to 5'],
+            ['short_text, long_text', 'answerText', 'Free text']
+          ]}
+        />
+        <P>
+          Call <Mono>identify()</Mono> before asking for surveys so property targeting can use the person&apos;s traits
+          and their answers are linked to their profile. Surveys are built into the browser SDK; from other platforms
+          use <Mono>POST /v1/surveys/eligible</Mono>, <Mono>/impression</Mono>, <Mono>/dismiss</Mono> and{' '}
+          <Mono>/response</Mono> with your write key.
+        </P>
+
+        <P><strong>3. Read the results</strong></P>
+        <P>
+          Each survey&apos;s page shows impressions, responses and the response rate, a breakdown per question (option
+          counts, the average rating, the NPS score with promoters, passives and detractors) and the latest text
+          answers.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'synthetic-monitors') {
+    return (
+      <Section id="synthetic-monitors" title="Synthetic monitors">
+        <P>
+          A synthetic monitor is a scripted visit to your app that runs on a schedule in a real headless browser
+          (Playwright). It signs up, logs in or checks out like a user would, and tells you which step broke, before a
+          real user finds out. Create monitors under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/synthetic-monitors">
+            Synthetic monitors
+          </a>
+          . No SDK is needed.
+        </P>
+
+        <P><strong>1. Create a monitor</strong></P>
+        <Bullets
+          items={[
+            ['Monitor name and base URL', 'The address the journey starts from, for example https://app.example.com.'],
+            ['Frequency', 'Every 5, 15 or 30 minutes, hourly, every 6 hours, daily, or manual only.'],
+            ['Browser engine', 'Chromium, Firefox or WebKit (Safari).'],
+            ['Viewport', 'Desktop (1280 × 720), Full HD, mobile (390 × 844) or tablet.'],
+            ['Steps', 'The journey, in order. Each step that targets an element uses a CSS selector such as button[type=submit] or [data-testid=signup-btn].']
+          ]}
+        />
+        <OptionsTable
+          headers={['Step', 'Fields', 'What it does']}
+          rows={[
+            ['Navigate', 'URL or path', 'Opens a page, relative to the base URL or as a full address.'],
+            ['Click Element', 'Selector', 'Clicks a button, link or other element.'],
+            ['Fill Input', 'Selector, value', 'Types into an input. Use {{SECRET_NAME}} for credentials.'],
+            ['Wait for Element/Delay', 'Selector or ms', 'Waits for an element to appear, or for a fixed time.'],
+            ['Assert Element Visible', 'Selector', 'Fails the run if the element is not visible.'],
+            ['Assert Text Contains', 'Selector, text', 'Fails the run if the element’s text does not contain the value.'],
+            ['Assert URL Path', 'Text', 'Fails the run if the page URL does not contain the value.'],
+            ['Wait for HTTP Response', 'URL, status', 'Waits for a matching API response (and status code, if set), so the next step sees fresh data.']
+          ]}
+        />
+        <P>
+          <strong>Shortcut:</strong> open a funnel or a session replay and click <Mono>Convert to Synthetic Monitor</Mono>{' '}
+          to start from its steps. Emails and passwords typed in the replay become placeholders.
+        </P>
+
+        <P><strong>2. Run it and read the result</strong></P>
+        <P>
+          Save the monitor and click <Mono>Run Now</Mono> to try it. Every run records pass or fail, how long each step
+          took and which step failed, along with the browser console messages, the network requests the page made (with
+          failures flagged) and a screenshot of the page at the moment of failure. Pause a monitor to stop its schedule without deleting it.
+        </P>
+
+        <P><strong>3. Keep logins secret</strong></P>
+        <P>
+          Store credentials as project secrets and write <Mono>{'{{SYNTHETIC_EMAIL}}'}</Mono> or{' '}
+          <Mono>{'{{SYNTHETIC_PASSWORD}}'}</Mono> in a step instead of the real value. Secrets are encrypted at rest,
+          filled in only while the run executes, and redacted from logs and error messages. Create one with a personal
+          access token (Settings → Personal access tokens) that has the <Mono>synthetic_monitors:write</Mono> scope:
+        </P>
+        <Code lang="bash">{`curl -X POST ${apiBaseUrl}/v1/dashboard/synthetic-secrets \\
+  -H "Authorization: Bearer tiq_pat_..." \\
+  -H "content-type: application/json" \\
+  -d '{ "projectId": "${projectId}", "name": "SYNTHETIC_PASSWORD", "value": "your-test-password" }'`}</Code>
+        <P>Use a dedicated test account, not a real customer&apos;s login.</P>
+
+        <P><strong>4. Run monitors on pull requests</strong></P>
+        <P>
+          The TraceIQ GitHub Action runs chosen monitors against a pull request&apos;s preview deployment instead of the
+          monitor&apos;s base URL, and fails the check if a journey breaks. Your production schedule is not affected.
+        </P>
+        <Code lang="yaml">{`- name: Run TraceIQ synthetic checks
+  uses: enigma-137/trace-iq@main
+  with:
+    api-url: ${apiBaseUrl}
+    api-key: \${{ secrets.TRACEIQ_API_KEY }}   # project write key or tiq_pat_ token
+    project-id: ${projectId}
+    preview-url: \${{ steps.preview.outputs.url }}
+    monitors: 'MONITOR_ID_1,MONITOR_ID_2'   # IDs from each monitor's page URL`}</Code>
+      </Section>
+    );
+  }
+
   if (id === 'alerts') {
     return (
       <Section id="alerts" title="Alerts">
@@ -1859,6 +2087,9 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
             ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
             ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook and/or email recipients or notification groups, with per-recipient delivery status.'],
             ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, property-targeting segments, and JSON payloads (remote config) evaluated by the SDK.'],
+            ['Experiments', 'A/B and multivariate tests: weighted, sticky variant assignment from the SDK, exposure tracking, and per-variant conversion, uplift and significance against a goal event.'],
+            ['Surveys', 'In-app NPS, rating, choice and text questions, targeted to everyone, a user property or an event, with per-question results.'],
+            ['Synthetic monitors', 'Scheduled Playwright journeys that report which step failed, with console logs, network failures and a screenshot; can also run on pull-request previews.'],
             ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
             ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
