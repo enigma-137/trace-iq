@@ -2,6 +2,7 @@
 
 import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingProductOverview } from "@/components/landing/LandingProductOverview";
+import { LandingSignalPath } from "@/components/landing/LandingSignalPath";
 import { LandingSiteChrome } from "@/components/landing/LandingSiteChrome";
 import styles from "./landing-light.module.css";
 
@@ -25,6 +26,7 @@ export default function Page() {
     <LandingSiteChrome>
       <LandingHero />
       <LandingProductOverview />
+      <LandingSignalPath />
       <section
         className={`${styles.frame} ${styles.setup}`}
         aria-label="Get started with TraceIQ"
