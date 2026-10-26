@@ -272,7 +272,18 @@ export function InsightsLibraryView({
             description={
               search || selectedType !== 'all'
                 ? 'Try adjusting your search keywords or clearing the category filter.'
-                : 'Create your first insight to analyze event trends, KPIs, conversion funnels, and retention cohorts.'
+                : (
+                  <>
+                    <p>
+                      An insight is a saved chart of your events: how often something happens, how many people do it, or the
+                      sum or average of a value like order amount, over time. Save the ones you check often and pin them to a
+                      dashboard.
+                    </p>
+                    <Link href="/docs?page=insights" className="mt-2 inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                      Read the setup guide <span aria-hidden="true">→</span>
+                    </Link>
+                  </>
+                )
             }
             primaryAction={{
               label: 'Create insight',

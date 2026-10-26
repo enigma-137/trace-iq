@@ -111,7 +111,10 @@ export default async function RetentionPage({
             </h2>
             <p className="text-sm leading-relaxed text-neutral-600 dark:text-slate-400">
               Retention measures how effectively your product transforms first-time visitors into repeat, habitual users week over week.
-              A curve that levels off into a flat plateau indicates enduring product value and strong retention, while a continuous drop toward zero highlights early onboarding friction.
+              A curve that levels off into a flat plateau indicates enduring product value and strong retention, while a continuous drop toward zero highlights early onboarding friction.{' '}
+              <Link href="/docs?page=retention" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                How retention is measured →
+              </Link>
             </p>
           </div>
 

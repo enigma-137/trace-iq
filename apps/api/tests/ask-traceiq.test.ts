@@ -115,7 +115,7 @@ describe('Ask TraceIQ - Tool Registry & Tenant Security', () => {
   it('links every guide topic to a dashboard route and only to real docs pages', () => {
     const docsPages = new Set([
       'welcome', 'quickstart', 'methods', 'config', 'autocapture', 'self-hosting', 'web-analytics', 'session-replay',
-      'flags', 'experiments', 'surveys', 'synthetic-monitors', 'alerts', 'dashboards', 'public-sharing', 'api-performance', 'logs', 'webhooks', 'export', 'events',
+      'insights', 'funnels', 'retention', 'cohorts', 'achievements', 'flags', 'experiments', 'surveys', 'synthetic-monitors', 'alerts', 'dashboards', 'public-sharing', 'api-performance', 'logs', 'webhooks', 'export', 'events',
       'features', 'ingestion', 'cli', 'mcp'
     ]);
     for (const topic of PRODUCT_GUIDE) {

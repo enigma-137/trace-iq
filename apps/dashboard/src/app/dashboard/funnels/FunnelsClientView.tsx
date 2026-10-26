@@ -437,8 +437,11 @@ export function FunnelsClientView({ funnels, resultsMap, eventNames }: FunnelsCl
                     Track your first user conversion funnel
                   </h3>
                   <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-neutral-500 dark:text-slate-400">
-                    Funnels help you visualize user drop-offs step-by-step. Discover which pages or actions are causing friction, optimize conversion, and watch user retention grow.
+                    A funnel counts how many people complete a series of events in order, like viewing a product, starting checkout and paying, and shows the step where the rest give up. Click any step to see exactly who reached it or dropped off.
                   </p>
+                  <Link href="/docs?page=funnels" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                    Read the setup guide <span aria-hidden="true">→</span>
+                  </Link>
                   <div className="mt-5">
                     <button
                       type="button"

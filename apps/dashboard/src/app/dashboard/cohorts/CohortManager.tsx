@@ -255,8 +255,11 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
               No saved cohorts yet
             </h4>
             <p className="mx-auto mt-1.5 max-w-lg text-sm text-neutral-500 dark:text-slate-400">
-              Cohorts let you group users by traits like country, subscription plan, device type, or custom event metadata so you can see how specific segments perform across Retention and Insights.
+              A cohort is a saved set of filters, like Pro plan users in Nigeria on mobile, that describes a group of your users. Save it once, then open Retention for just that group in one click.
             </p>
+            <Link href="/docs?page=cohorts" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+              Read the setup guide <span aria-hidden="true">→</span>
+            </Link>
 
             <div className="mt-6 flex justify-center">
               <button

@@ -103,21 +103,21 @@ export const PRODUCT_GUIDE: ProductGuideTopic[] = [
       'Click a step to see the users who reached it or dropped off.'
     ],
     route: '/dashboard/funnels',
-    docs: '/docs?page=features',
+    docs: '/docs?page=funnels',
     related: ['synthetic-monitors']
   },
   {
     id: 'insights',
     title: 'Create an insight (chart)',
     keywords: ['insight', 'chart', 'graph', 'trend', 'breakdown', 'report'],
-    summary: 'Insights chart event counts, unique users, sums or averages over time, with filters and breakdowns.',
+    summary: 'Insights chart event counts, unique users, sums or averages over time, with an optional breakdown by property.',
     steps: [
       'Go to Insights and click New insight.',
-      'Pick the event and measure, then add filters or a breakdown by property.',
-      'Choose the date range and chart type, then save. You can add it to a dashboard.'
+      'Pick the insight type, the event and the measure, then optionally a breakdown by property.',
+      'Choose the date range, interval and chart type, then save. You can add it to a dashboard.'
     ],
     route: '/dashboard/insights/new',
-    docs: '/docs?page=features',
+    docs: '/docs?page=insights',
     related: ['dashboards']
   },
   {
@@ -197,11 +197,11 @@ export const PRODUCT_GUIDE: ProductGuideTopic[] = [
     id: 'users-cohorts',
     title: 'Look up users and create cohorts',
     keywords: ['user', 'users', 'profile', 'identify', 'cohort', 'segment', 'group of users'],
-    summary: 'Users shows each person\'s profile and timeline; cohorts save groups of users defined by what they did.',
+    summary: 'Users shows each person\'s profile and timeline; cohorts are saved sets of filters (country, device, plan or any event property) that describe a group of users.',
     steps: [
       'Call identify in the SDK so events link to a user.',
       'Open Users to search people and see their event timeline.',
-      'Open Cohorts to save a group (for example, signed up but never purchased) and reuse it as a filter.'
+      'Open Cohorts to save a set of filters (for example, plan is pro and country is Nigeria), then open Retention for that group in one click.'
     ],
     route: '/dashboard/users',
     docs: '/docs?page=methods'
@@ -211,9 +211,13 @@ export const PRODUCT_GUIDE: ProductGuideTopic[] = [
     title: 'Measure retention',
     keywords: ['retention', 'churn', 'come back', 'sticky', 'returning'],
     summary: 'Retention shows, for each weekly cohort, how many users came back in later weeks.',
-    steps: ['Open Retention and pick the start and return events.', 'Read across a row to see how a cohort returns week by week.'],
+    steps: [
+      'Open Retention. Each row is the people whose first event was in that week; W1, W2, ... show the share who sent any event again in later weeks.',
+      'Pick 8, 12 or 26 weeks, and use Filter / Segment or a saved cohort to look at one group.',
+      'Read across a row to see how a cohort returns week by week.'
+    ],
     route: '/dashboard/retention',
-    docs: '/docs?page=features'
+    docs: '/docs?page=retention'
   },
   {
     id: 'web-analytics',
