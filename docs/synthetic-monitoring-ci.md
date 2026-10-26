@@ -1,140 +1,155 @@
 # Running TraceIQ Synthetic Monitors in CI
 
-Run existing deterministic Synthetic Monitors against Pull Request preview deployments before code is merged into production.
+Run your existing synthetic monitors against a pull request's preview deployment, and fail the check if a journey breaks, before the change reaches production.
 
 ---
 
-## Architecture Overview
+## How it works
 
 ```text
-GitHub Pull Request
+Pull request opened or updated
        ↓
-Preview Deployment (Vercel / Netlify / Cloudflare / Custom Staging)
+Preview deployment (Vercel / Netlify / Cloudflare / your own staging)
        ↓
-TraceIQ GitHub Action (`action.yml`)
+CI job calls POST /v1/synthetic/ci-runs with the preview URL
        ↓
-TraceIQ API (`POST /v1/synthetic/ci-runs`)
+TraceIQ runs each monitor's steps against the preview URL instead of its base URL
        ↓
-Playwright Worker (with temporary Base URL Override)
+CI job polls GET /v1/synthetic/ci-runs/{runGroupId} until the group passes or fails
        ↓
-Pass / Fail Result
-       ↓
-GitHub Step Summary & Workflow Check
+The job exits 0 (passed) or 1 (failed / timed out), so the PR check goes green or red
 ```
 
----
-
-## 1. Create a Synthetic Monitor
-
-In your TraceIQ Dashboard:
-1. Navigate to **Synthetic Monitors**.
-2. Click **New Monitor** or convert an existing Funnel.
-3. Configure your journey steps (e.g., *Navigate*, *Click*, *Fill*, *Assert URL*, *Assert Text*).
-4. Save the monitor. Note its **Monitor ID** (e.g. `sym_01H...` or UUID).
-
-The monitor's production `baseUrl` (e.g. `https://app.example.com`) is stored permanently. In CI, TraceIQ temporarily substitutes this base URL with your dynamic pull-request preview URL without altering production monitoring schedules or alerts.
+The monitor's own base URL and schedule are not changed.
 
 ---
 
-## 2. Obtain Authentication Credentials
+## 1. Create the monitors
 
-Generate an API credential with write permissions to your project:
-- **Project API Write Key**: Found in **Settings → API Keys** (`project_write_keys`), or
-- **Personal Access Token (PAT)**: Found in **Settings → Access Tokens** (prefixed with `tiq_pat_...`).
+In the TraceIQ dashboard:
 
-Add this secret to your GitHub Repository:
-- GitHub Repo → **Settings → Secrets and variables → Actions → New repository secret**
-- Name: `TRACEIQ_API_KEY`
+1. Open **Synthetic monitors** and create a monitor, or open a funnel or session replay and click **Convert to Synthetic Monitor**.
+2. Add the journey steps (Navigate, Click, Fill, Assert…) and save.
+3. Click **Run Now** once to check it passes against production.
+4. Copy the monitor's ID from its page URL. IDs start with `sym_`.
+
+Use paths (for example `/signup`) in Navigate steps rather than full URLs, so the same steps work against the preview host.
 
 ---
 
-## 3. Configure the GitHub Action
+## 2. Create a credential
 
-Add a GitHub Actions workflow to `.github/workflows/synthetic.yml`:
+The CI endpoint accepts either:
+
+- your project's **write key** (Settings), or
+- a **personal access token** (`tiq_pat_...`, Settings → Personal access tokens) from a member of the project's organization.
+
+Add it to your repository as a secret: GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**, named `TRACEIQ_API_KEY`. Add your project ID as a repository variable named `TRACEIQ_PROJECT_ID`.
+
+---
+
+## 3. Add the workflow
+
+Create `.github/workflows/traceiq-synthetic.yml`:
 
 ```yaml
-name: TraceIQ Synthetic Pre-Merge Check
+name: TraceIQ synthetic checks
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  synthetic-validation:
-    name: Validate PR on Preview Deployment
+  synthetic:
+    name: Synthetic checks on preview
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write # Optional: allows step summary and PR annotation
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      # Example: Await or retrieve your deployment preview URL
-      # (e.g., from Vercel action, Netlify action, or Cloudflare Pages)
-      - name: Get Preview URL
+      # Replace with however your deploy tool exposes the preview URL.
+      - name: Get preview URL
         id: preview
-        run: |
-          # Replace with your deployment tool's output variable
-          echo "url=https://preview-pr-${{ github.event.pull_request.number }}.example.com" >> $GITHUB_OUTPUT
+        run: echo "url=https://pr-${{ github.event.pull_request.number }}.preview.example.com" >> "$GITHUB_OUTPUT"
 
-      # Run TraceIQ Synthetic Monitors
-      - name: Run TraceIQ Synthetic Check
-        uses: traceiq/synthetic-check@v1
-        with:
-          api-url: 'https://api.traceiq.run' # or your self-hosted TraceIQ API endpoint
-          api-key: ${{ secrets.TRACEIQ_API_KEY }}
-          project-id: ${{ vars.TRACEIQ_PROJECT_ID }}
-          preview-url: ${{ steps.preview.outputs.url }}
-          monitors: 'sym_signup_flow,sym_checkout_flow'
-          timeout: '600' # 10 minutes max
-          polling-interval: '5' # poll every 5s
+      - name: Run TraceIQ synthetic monitors
+        env:
+          TRACEIQ_API_URL: https://api.traceiq.run # or your self-hosted API URL
+          TRACEIQ_API_KEY: ${{ secrets.TRACEIQ_API_KEY }}
+          TRACEIQ_PROJECT_ID: ${{ vars.TRACEIQ_PROJECT_ID }}
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          MONITOR_IDS: '["sym_signup_monitor_id", "sym_checkout_monitor_id"]'
+        run: |
+          body=$(jq -n \
+            --arg projectId "$TRACEIQ_PROJECT_ID" \
+            --arg baseUrl "$PREVIEW_URL" \
+            --argjson monitorIds "$MONITOR_IDS" \
+            --arg key "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            '{projectId: $projectId, monitorIds: $monitorIds, baseUrl: $baseUrl, environment: "preview", idempotencyKey: $key}')
+
+          group=$(curl -fsS -X POST "$TRACEIQ_API_URL/v1/synthetic/ci-runs" \
+            -H "x-traceiq-api-key: $TRACEIQ_API_KEY" \
+            -H "content-type: application/json" \
+            -d "$body" | jq -r .runGroupId)
+
+          for attempt in $(seq 1 120); do
+            result=$(curl -fsS "$TRACEIQ_API_URL/v1/synthetic/ci-runs/$group?projectId=$TRACEIQ_PROJECT_ID" \
+              -H "x-traceiq-api-key: $TRACEIQ_API_KEY")
+            status=$(echo "$result" | jq -r .group.status)
+            echo "TraceIQ run group $group: $status"
+            case "$status" in
+              passed) exit 0 ;;
+              failed|timed_out)
+                echo "$result" | jq -r '.runs[] | "\(.monitorId): \(.status)"'
+                exit 1 ;;
+            esac
+            sleep 5
+          done
+
+          echo "Gave up waiting for TraceIQ after 10 minutes."
+          exit 1
 ```
 
----
-
-## 4. GitHub Action Inputs & Outputs
-
-### Inputs
-
-| Input | Description | Required | Default |
-|---|---|---|---|
-| `api-key` | TraceIQ Project Write Key or PAT | **Yes** | — |
-| `project-id` | TraceIQ Project UUID / ID | **Yes** | — |
-| `preview-url` | Target preview deployment URL | **Yes** | — |
-| `monitors` | Comma-separated list of Synthetic Monitor IDs | **Yes** | — |
-| `api-url` | TraceIQ API base URL | No | `https://api.traceiq.run` |
-| `timeout` | Max duration to wait in seconds | No | `600` |
-| `polling-interval` | Interval between polling requests (seconds) | No | `5` |
-| `environment` | Target environment label | No | `preview` |
-
-### Outputs
-
-| Output | Description |
-|---|---|
-| `run-group-id` | TraceIQ CI Run Group ID |
-| `status` | `passed`, `failed`, or `timed_out` |
-| `passed-monitors` | Number of passing monitors |
-| `total-monitors` | Total number of monitors executed |
-| `summary` | Formatted Markdown summary of run results |
+`jq` and `curl` are preinstalled on GitHub's Ubuntu runners.
 
 ---
 
-## 5. Security & SSRF Protection
+## 4. API reference
 
-- **Tenant Scoping**: API keys are strictly verified against `projectId`. CI runs cannot trigger monitors from other projects.
-- **SSRF Hardening**: Dynamic preview URLs undergo strict hostname & IP resolution checks. Localhost, IPv4 private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local metadata (`169.254.169.254`), and IPv6 loopbacks are strictly blocked.
-- **Secret Redaction**: Environment variables and decrypted secrets are scrubbed from console logs and step error messages.
-- **Idempotent Retries**: CI runs derive an idempotency key from `repository`, `commit_sha`, and workflow run ID to prevent duplicate executions upon GitHub workflow retries.
+### `POST /v1/synthetic/ci-runs`
+
+Authenticate with `x-traceiq-api-key: <key>`, `x-traceiq-write-key: <key>` or `Authorization: Bearer <key>`.
+
+| Field | Required | Description |
+|---|---|---|
+| `projectId` | Yes | The project the monitors belong to. |
+| `monitorIds` | Yes | Array of monitor IDs (`sym_...`) to run. |
+| `baseUrl` | Yes | The preview URL to run the steps against. Must be publicly reachable. |
+| `environment` | No | A label for the runs, for example `preview`. |
+| `git` | No | `{ provider, repository, commitSha, branch, pullRequest }`, stored with the run group. |
+| `idempotencyKey` | No | Reusing a key returns the existing run group instead of starting a new one, so a retried job doesn't run the monitors twice. |
+
+Response: `{ runGroupId, status, totalMonitors, runs: [{ monitorId, monitorName, runId }] }`.
+
+### `GET /v1/synthetic/ci-runs/{runGroupId}?projectId=...`
+
+Same authentication. Response: `{ group, runs }`, where `group.status` is `queued`, `running`, `passed`, `failed` or `timed_out`, and `group.passedMonitors` / `group.failedMonitors` count the results. Poll until the status is `passed`, `failed` or `timed_out`.
 
 ---
 
-## 6. Required GitHub Branch Checks
+## 5. Security
 
-To prevent merging broken pull requests:
-1. In GitHub, navigate to **Settings → Branches → Branch protection rules**.
-2. Edit your rule for `main` / `master`.
-3. Check **Require status checks to pass before merging**.
-4. Search for and select **Validate PR on Preview Deployment** (or the name of your synthetic job).
-5. Save changes.
+- **Project scoping**: keys are checked against `projectId`; a CI run can't trigger another project's monitors.
+- **Private addresses are blocked**: preview URLs that resolve to localhost, private IPv4 ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local or cloud metadata addresses (`169.254.169.254`) and IPv6 loopback are rejected.
+- **Secrets stay secret**: `{{SECRET}}` values used in steps are filled in at run time and redacted from console logs and error messages.
+
+---
+
+## 6. Require the check before merging
+
+1. In GitHub, open **Settings → Branches → Branch protection rules** and edit the rule for your main branch.
+2. Turn on **Require status checks to pass before merging**.
+3. Select **Synthetic checks on preview** (the job name above) and save.
+
+---
+
+## About the TraceIQ GitHub Action
+
+This repository also contains a GitHub Action (`action.yml`, source in `packages/github-action`) that wraps the same two API calls and writes a step summary. Its compiled `packages/github-action/dist/index.js` isn't committed or published yet, so `uses: enigma-137/trace-iq@...` won't run until it is released. Until then, use the workflow above.

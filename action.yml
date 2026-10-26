@@ -19,13 +19,13 @@ inputs:
     description: 'Comma-separated list of Synthetic Monitor IDs to execute (e.g. "sym_signup,sym_checkout")'
     required: true
   api-url:
-    description: 'TraceIQ API base URL (defaults to https://api.traceiq.ai)'
+    description: 'TraceIQ API base URL (defaults to https://api.traceiq.run)'
     required: false
-    default: 'https://api.traceiq.ai'
+    default: 'https://api.traceiq.run'
   app-url:
-    description: 'TraceIQ Dashboard URL for diagnostic links (defaults to https://app.traceiq.ai)'
+    description: 'TraceIQ Dashboard URL for diagnostic links (defaults to https://traceiq.run)'
     required: false
-    default: 'https://app.traceiq.ai'
+    default: 'https://traceiq.run'
   environment:
     description: 'Target deployment environment tag (e.g. "preview", "staging")'
     required: false
