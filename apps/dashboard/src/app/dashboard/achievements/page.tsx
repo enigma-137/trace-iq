@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { AchievementsBoard } from './AchievementsBoard';
@@ -18,7 +19,10 @@ export default async function AchievementsPage() {
     <DashboardShell active="achievements" title="Achievements" userEmail={user.email}>
       <p className="mb-6 max-w-2xl text-sm text-neutral-500 dark:text-slate-400">
         Milestones your workspace earns as it tracks real usage — first events, volume, and growth. Progress updates live and
-        unlocks are automatic.
+        unlocks are automatic.{' '}
+        <Link href="/docs?page=achievements" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+          How achievements work →
+        </Link>
       </p>
 
       {error ? (

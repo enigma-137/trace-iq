@@ -16,7 +16,14 @@ export const docsSections = [
   ...sdkDocsSections,
   { id: 'web-analytics', label: 'Web analytics', category: 'Features' },
   { id: 'session-replay', label: 'Session Replay', category: 'Features' },
+  { id: 'insights', label: 'Insights', category: 'Features' },
+  { id: 'funnels', label: 'Funnels', category: 'Features' },
+  { id: 'retention', label: 'Retention', category: 'Features' },
+  { id: 'cohorts', label: 'Cohorts', category: 'Features' },
   { id: 'flags', label: 'Feature flags', category: 'Features' },
+  { id: 'experiments', label: 'Experiments', category: 'Features' },
+  { id: 'surveys', label: 'Surveys', category: 'Features' },
+  { id: 'synthetic-monitors', label: 'Synthetic monitors', category: 'Features' },
   { id: 'alerts', label: 'Alerts', category: 'Features' },
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
   { id: 'public-sharing', label: 'Public sharing', category: 'Features' },
@@ -25,6 +32,7 @@ export const docsSections = [
   { id: 'logs', label: 'Logs', category: 'Features' },
   { id: 'webhooks', label: 'Webhooks', category: 'Features' },
   { id: 'export', label: 'Data export', category: 'Features' },
+  { id: 'achievements', label: 'Achievements', category: 'Features' },
   { id: 'events', label: 'Reserved events', category: 'Features' },
   { id: 'features', label: 'Feature guide', category: 'Features' },
   { id: 'ingestion', label: 'Server-side ingestion', category: 'Reference' },
@@ -1217,6 +1225,444 @@ payload = data.get("payloads", {}).get("nuwell-new-add-meal")`}</Code>
       </Section>
     );
   }
+  if (id === 'insights') {
+    return (
+      <Section id="insights" title="Insights">
+        <P>
+          An insight is a saved chart: how often an event happens, how many people do it, or the sum or average of one of
+          its numbers, over a date range. Build them under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/insights">
+            Insights
+          </a>{' '}
+          and pin the ones you check often to a{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=dashboards">
+            dashboard
+          </Link>
+          .
+        </P>
+
+        <P><strong>Build an insight</strong></P>
+        <Bullets
+          items={[
+            ['Type', 'Trend over time, KPI (one big number), funnel, retention, event breakdown, web traffic, errors, API latency or a data table.'],
+            ['Event', 'Any event your app sends, or * for all events.'],
+            ['Measure', 'Total events, unique users, or the sum or average of a numeric property such as amount.'],
+            ['Breakdown by', 'Split the chart by a property, for example plan or country, to compare groups side by side.'],
+            ['Date range and interval', 'Last 24 hours up to the last 90 days, grouped hourly, daily or weekly.'],
+            ['Compare with previous period', 'Shows the same range just before it, so you can see whether things went up or down.']
+          ]}
+        />
+        <P>
+          Pick a chart style (line, area, bar, donut, KPI or table), then <Mono>Save insight</Mono>. Saved insights
+          appear in the Insights library, where you can search them, filter by type and see which dashboards use them.{' '}
+          <Mono>+ Add to dashboard</Mono> saves the insight and puts it on a dashboard in one step.
+        </P>
+        <P>
+          Insights only chart events your app already sends. If an event is missing from the list, check the{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=quickstart">
+            quickstart
+          </Link>{' '}
+          and send it with <Mono>traceiq.track()</Mono>.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'funnels') {
+    return (
+      <Section id="funnels" title="Funnels">
+        <P>
+          A funnel shows how many people get through a series of steps in order, such as viewing a product, starting
+          checkout and paying, and where the rest give up. Create funnels under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/funnels">
+            Funnels
+          </a>
+          .
+        </P>
+
+        <P><strong>1. Create a funnel</strong></P>
+        <P>
+          Click <Mono>Create Your First Funnel</Mono> (or start from one of the templates), give it a name, and add each
+          step as an event name, in the order people should do them. Event names are case-sensitive and must match what
+          your app sends.
+        </P>
+
+        <P><strong>2. How people are counted</strong></P>
+        <Bullets
+          items={[
+            ['Step 1', 'Everyone who did the first event in the chosen range (7, 30 or 90 days).'],
+            ['Later steps', 'People who did that event at the same time as or after they reached the previous step. Other events in between don’t matter.'],
+            ['People', 'Each person counts once per step, by their user ID, or their anonymous ID before they are identified. Call identify() so a visit before and after sign-in counts as one person.'],
+            ['Drop-off', 'The people who reached a step but not the next one.']
+          ]}
+        />
+
+        <P><strong>3. Dig into the result</strong></P>
+        <Bullets
+          items={[
+            ['Who reached or dropped', 'Click a step’s bar to list the people who reached it, or its dropped count to list who fell off, with links to their timelines.'],
+            ['Debug', 'If a step shows zero, Debug lists how many raw events with that exact name exist and every event name the project has received, so you can spot a typo or a missing track() call.'],
+            ['Convert to Synthetic Monitor', 'Turns the funnel’s steps into a scheduled browser check of the same journey.'],
+            ['Add to dashboard', 'Puts the funnel on a dashboard next to your other charts.']
+          ]}
+        />
+      </Section>
+    );
+  }
+
+  if (id === 'retention') {
+    return (
+      <Section id="retention" title="Retention">
+        <P>
+          Retention answers &ldquo;do people come back?&rdquo;. Open{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/retention">
+            Retention
+          </a>
+          ; there is nothing to set up. It works from the events your app already sends.
+        </P>
+
+        <P><strong>How the grid works</strong></P>
+        <Bullets
+          items={[
+            ['Rows', 'Each row is a weekly cohort: the people whose first event in your project happened that week (weeks start on Monday, UTC).'],
+            ['W0', 'The week they arrived, always 100%.'],
+            ['W1, W2, …', 'The share of that cohort who sent any event again 1, 2, … weeks later.'],
+            ['Average row', 'The average return rate for each week across all cohorts.'],
+            ['Range', 'Show the last 8, 12 or 26 weeks of cohorts.']
+          ]}
+        />
+        <P>
+          Read across a row to see one cohort fade over time; read down a column to see whether newer cohorts come back
+          more than older ones. A curve that flattens out means people who stay, stay. One that keeps falling toward
+          zero points at a problem early in their first weeks.
+        </P>
+
+        <P><strong>Filter to a segment</strong></P>
+        <P>
+          Use <Mono>Filter / Segment</Mono> to only count events that match conditions such as{' '}
+          <Mono>country is Nigeria</Mono> or <Mono>plan is pro</Mono>, or load a saved{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=cohorts">
+            cohort
+          </Link>
+          . People are counted by user ID, or anonymous ID before they are identified, so call <Mono>identify()</Mono>{' '}
+          to follow the same person across devices.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'cohorts') {
+    return (
+      <Section id="cohorts" title="Cohorts">
+        <P>
+          A cohort is a saved set of filters that describes a group of your users, such as &ldquo;Pro plan users in
+          Nigeria on mobile&rdquo;. Save it once under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/cohorts">
+            Cohorts
+          </a>{' '}
+          and reuse it instead of re-entering the same filters.
+        </P>
+
+        <P><strong>Create a cohort</strong></P>
+        <P>
+          Give it a name and add one or more conditions. A person&apos;s events must match <strong>all</strong>{' '}
+          conditions to count.
+        </P>
+        <OptionsTable
+          headers={['Part', 'Options', 'Notes']}
+          rows={[
+            ['Built-in field', 'country, region, city, device_type, os, browser, platform', 'Recorded by TraceIQ for every event.'],
+            ['Property field', 'Any event property', 'Type its name, for example plan or amount. It matches the property on the event.'],
+            ['Operator', 'is, is not, contains, is set, is not set', '“is set” matches when the field has any value.'],
+            ['Value', 'Text', 'Not needed for “is set” and “is not set”.']
+          ]}
+        />
+
+        <P><strong>Use a cohort</strong></P>
+        <P>
+          Click <Mono>Retention</Mono> on a cohort to open the retention grid filtered to it, or pick it from{' '}
+          <Mono>Filter / Segment</Mono> on the Retention page. Properties you pass with <Mono>track()</Mono> and{' '}
+          <Mono>identify()</Mono> are what make fields like plan available, so send the traits you want to segment by.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'achievements') {
+    return (
+      <Section id="achievements" title="Achievements">
+        <P>
+          Achievements are milestones your workspace unlocks as it uses TraceIQ: your first events, growing numbers of
+          identified users, building funnels and dashboards, and staying with us over time. See them under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/achievements">
+            Achievements
+          </a>
+          . There is nothing to set up; they unlock on their own.
+        </P>
+        <Bullets
+          items={[
+            ['Workspace', 'Projects created in your organization, from 1 up to 100.'],
+            ['Data', 'Events received by the current project, from 100 up to 10 million.'],
+            ['People', 'Users identified in the current project, from 1 up to 10,000.'],
+            ['Craft', 'Feature flags, alerts, webhooks, funnels, dashboards and cohorts you create.'],
+            ['Loyalty', 'How long your organization has used TraceIQ, from one month to two years.']
+          ]}
+        />
+        <P>
+          Locked achievements show your progress, for example <Mono>7,032 / 10,000 events</Mono>. Event and user
+          milestones are checked as events arrive (within about five minutes); the rest are checked when you open the
+          page. Members of your organization get an email when a new one unlocks. Open an unlocked achievement to see
+          when it was earned and download a share card image.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'experiments') {
+    return (
+      <Section id="experiments" title="Experiments (A/B tests)">
+        <P>
+          An experiment splits people between two or more variants of something in your app and measures which one
+          gets more of them to do a goal event, such as <Mono>checkout_completed</Mono>. Create experiments under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/experiments">
+            Experiments
+          </a>
+          ; your app asks the SDK which variant to show.
+        </P>
+
+        <P><strong>1. Create the experiment</strong></P>
+        <Bullets
+          items={[
+            ['Name and key', 'The key (for example checkout-cta-color) is what your code passes to the SDK. It cannot change once the experiment exists.'],
+            ['Environment', 'Production, staging or development. Only apps initialized with the same environment get variants; the SDK defaults to production.'],
+            ['Primary success metric', 'The event that counts as a conversion. It must be an event your app already tracks.'],
+            ['Variants and traffic split', 'At least two variants with weights that add up to 100. One is the control, the version you have today.']
+          ]}
+        />
+        <P>
+          New experiments start as drafts. Click <Mono>Start Experiment</Mono> on its page when your code is deployed.
+          Until then, and after it is paused or completed, every person gets the control.
+        </P>
+
+        <P><strong>2. Show the variant in your app</strong></P>
+        <Code lang="ts">{`import { traceiq } from 'traceiq-sdk-js';
+
+const { variantKey, isEligible } = await traceiq.experiments.getVariant('checkout-cta-color');
+
+if (variantKey === 'variant_b') {
+  renderHighContrastButton();
+} else {
+  renderCurrentButton(); // control, or the experiment isn't running
+}`}</Code>
+        <P>
+          Call <Mono>identify()</Mono> first when you know who the person is, so the same person sees the same variant
+          on every device. Assignment is deterministic: TraceIQ hashes the experiment and the person&apos;s id, so
+          asking again always returns the same variant.
+        </P>
+        <P>
+          <Mono>getVariant()</Mono> records an <strong>exposure</strong> for the person the first time it returns a
+          variant. Only exposed people count in the results. If you fetch the variant early but show it later, pass{' '}
+          <Mono>{'{ trackExposure: false }'}</Mono> and call{' '}
+          <Mono>traceiq.experiments.recordExposure(key, variantKey)</Mono> at the moment it is on screen.
+        </P>
+        <P>
+          Experiments are built into the browser SDK. From other platforms, call the HTTP API with your write key:{' '}
+          <Mono>POST /v1/experiments/evaluate</Mono> with <Mono>projectId</Mono>, <Mono>experimentKey</Mono> and{' '}
+          <Mono>distinctId</Mono>, then <Mono>POST /v1/experiments/exposure</Mono> with the returned{' '}
+          <Mono>variantKey</Mono>.
+        </P>
+
+        <P><strong>3. Read the results</strong></P>
+        <Bullets
+          items={[
+            ['Conversion', 'A person converts when they send the goal event after their exposure. Each person counts once.'],
+            ['Uplift', 'How much higher or lower each variant’s conversion rate is than the control’s.'],
+            ['Significance', 'Once both the control and a variant have at least 30 exposed people, TraceIQ runs a two-tailed z-test. Below p = 0.05 the difference is marked significant; until then it shows as collecting or not significant.'],
+            ['Finishing', 'Use Complete & Declare Winner to stop the experiment and record which variant won, then ship that variant to everyone in code.']
+          ]}
+        />
+        <P>
+          Need a plain on/off rollout rather than a comparison? Use{' '}
+          <Link className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/docs?page=flags">
+            feature flags
+          </Link>
+          .
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'surveys') {
+    return (
+      <Section id="surveys" title="Surveys">
+        <P>
+          Surveys ask people questions inside your app: an NPS score after onboarding, a rating after checkout, or an
+          open question about a new feature. Build them under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/surveys">
+            Surveys
+          </a>
+          . The SDK tells your app which surveys a person should see, and your app shows them in its own UI.
+        </P>
+
+        <P><strong>1. Build the survey</strong></P>
+        <Bullets
+          items={[
+            ['Questions', 'Single choice, multiple choice, NPS (0–10), rating (1–5), short text or long text. Mark any question as required.'],
+            ['Environment', 'Production, staging or development; it must match the environment your app initializes the SDK with.'],
+            ['All Users', 'Everyone is eligible.'],
+            ['Matching User Property', 'Only people whose property equals a value, for example plan = pro. TraceIQ compares against the properties you pass, or the person’s identify() traits.'],
+            ['Trigger on Specific Event', 'Only shown when your app asks for surveys right after that event, by passing its name.']
+          ]}
+        />
+        <P>
+          <Mono>Save Draft</Mono> keeps it hidden. <Mono>Publish Survey</Mono> makes it live. A person who answers or
+          dismisses a survey is never offered it again.
+        </P>
+
+        <P><strong>2. Show it in your app</strong></P>
+        <Code lang="ts">{`import { traceiq } from 'traceiq-sdk-js';
+
+// After onboarding finishes, for example
+const [survey] = await traceiq.surveys.getEligibleSurveys({ eventName: 'onboarding_finished' });
+
+if (survey) {
+  openSurveyModal(survey); // render survey.questions with your own components
+  traceiq.surveys.recordImpression(survey.id);
+}
+
+// When the person closes it without answering
+traceiq.surveys.recordDismissal(survey.id);
+
+// When they submit
+await traceiq.surveys.submitResponse(survey.id, [
+  { questionId: 'q_nps', questionType: 'nps', prompt: 'How likely are you to recommend us?', score: 9 },
+  { questionId: 'q_why', questionType: 'long_text', prompt: 'What could be better?', answerText: 'Faster exports' }
+]);`}</Code>
+        <OptionsTable
+          headers={['Question type', 'Answer field', 'Example']}
+          rows={[
+            ['single_choice', 'selectedOptions', "['monthly'] — one option value"],
+            ['multiple_choice', 'selectedOptions', "['exports', 'alerts']"],
+            ['nps', 'score', '0 to 10'],
+            ['rating_scale', 'rating', '1 to 5'],
+            ['short_text, long_text', 'answerText', 'Free text']
+          ]}
+        />
+        <P>
+          Call <Mono>identify()</Mono> before asking for surveys so property targeting can use the person&apos;s traits
+          and their answers are linked to their profile. Surveys are built into the browser SDK; from other platforms
+          use <Mono>POST /v1/surveys/eligible</Mono>, <Mono>/impression</Mono>, <Mono>/dismiss</Mono> and{' '}
+          <Mono>/response</Mono> with your write key.
+        </P>
+
+        <P><strong>3. Read the results</strong></P>
+        <P>
+          Each survey&apos;s page shows impressions, responses and the response rate, a breakdown per question (option
+          counts, the average rating, the NPS score with promoters, passives and detractors) and the latest text
+          answers.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'synthetic-monitors') {
+    return (
+      <Section id="synthetic-monitors" title="Synthetic monitors">
+        <P>
+          A synthetic monitor is a scripted visit to your app that runs on a schedule in a real headless browser
+          (Playwright). It signs up, logs in or checks out like a user would, and tells you which step broke, before a
+          real user finds out. Create monitors under{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/synthetic-monitors">
+            Synthetic monitors
+          </a>
+          . No SDK is needed.
+        </P>
+
+        <P><strong>1. Create a monitor</strong></P>
+        <Bullets
+          items={[
+            ['Monitor name and base URL', 'The address the journey starts from, for example https://app.example.com.'],
+            ['Frequency', 'Every 5, 15 or 30 minutes, hourly, every 6 hours, daily, or manual only.'],
+            ['Browser engine', 'Chromium, Firefox or WebKit (Safari).'],
+            ['Viewport', 'Desktop (1280 × 720), Full HD, mobile (390 × 844) or tablet.'],
+            ['Steps', 'The journey, in order. Each step that targets an element uses a CSS selector such as button[type=submit] or [data-testid=signup-btn].']
+          ]}
+        />
+        <OptionsTable
+          headers={['Step', 'Fields', 'What it does']}
+          rows={[
+            ['Navigate', 'URL or path', 'Opens a page, relative to the base URL or as a full address.'],
+            ['Click Element', 'Selector', 'Clicks a button, link or other element.'],
+            ['Fill Input', 'Selector, value', 'Types into an input. Use {{SECRET_NAME}} for credentials.'],
+            ['Wait for Element/Delay', 'Selector or ms', 'Waits for an element to appear, or for a fixed time.'],
+            ['Assert Element Visible', 'Selector', 'Fails the run if the element is not visible.'],
+            ['Assert Text Contains', 'Selector, text', 'Fails the run if the element’s text does not contain the value.'],
+            ['Assert URL Path', 'Text', 'Fails the run if the page URL does not contain the value.'],
+            ['Wait for HTTP Response', 'URL, status', 'Waits for a matching API response (and status code, if set), so the next step sees fresh data.']
+          ]}
+        />
+        <P>
+          <strong>Shortcut:</strong> open a funnel or a session replay and click <Mono>Convert to Synthetic Monitor</Mono>{' '}
+          to start from its steps. Emails and passwords typed in the replay become placeholders.
+        </P>
+
+        <P><strong>2. Run it and read the result</strong></P>
+        <P>
+          Save the monitor and click <Mono>Run Now</Mono> to try it. Every run records pass or fail, how long each step
+          took and which step failed, along with the browser console messages, the network requests the page made (with
+          failures flagged) and a screenshot of the page at the moment of failure. Pause a monitor to stop its schedule without deleting it.
+        </P>
+
+        <P><strong>3. Keep logins secret</strong></P>
+        <P>
+          Store credentials as project secrets and write <Mono>{'{{SYNTHETIC_EMAIL}}'}</Mono> or{' '}
+          <Mono>{'{{SYNTHETIC_PASSWORD}}'}</Mono> in a step instead of the real value. Secrets are encrypted at rest,
+          filled in only while the run executes, and redacted from logs and error messages. Create one with a personal
+          access token (Settings → Personal access tokens) that has the <Mono>synthetic_monitors:write</Mono> scope:
+        </P>
+        <Code lang="bash">{`curl -X POST ${apiBaseUrl}/v1/dashboard/synthetic-secrets \\
+  -H "Authorization: Bearer tiq_pat_..." \\
+  -H "content-type: application/json" \\
+  -d '{ "projectId": "${projectId}", "name": "SYNTHETIC_PASSWORD", "value": "your-test-password" }'`}</Code>
+        <P>Use a dedicated test account, not a real customer&apos;s login.</P>
+
+        <P><strong>4. Run monitors on pull requests</strong></P>
+        <P>
+          Run chosen monitors against a pull request&apos;s preview deployment instead of their base URL, and fail the
+          check if a journey breaks. Your production schedule is not affected. Add this step to a GitHub Actions job
+          that runs after your preview deploys, with a project write key or <Mono>tiq_pat_</Mono> token saved as the{' '}
+          <Mono>TRACEIQ_API_KEY</Mono> secret:
+        </P>
+        <Code lang="yaml">{`- name: Run TraceIQ synthetic monitors
+  env:
+    TRACEIQ_API_URL: ${apiBaseUrl}
+    TRACEIQ_API_KEY: \${{ secrets.TRACEIQ_API_KEY }}
+    TRACEIQ_PROJECT_ID: ${projectId}
+    PREVIEW_URL: \${{ steps.preview.outputs.url }}   # your preview deployment's URL
+    MONITOR_IDS: '["sym_...", "sym_..."]'          # IDs from each monitor's page URL
+  run: |
+    body=$(jq -n --arg p "$TRACEIQ_PROJECT_ID" --arg u "$PREVIEW_URL" --argjson m "$MONITOR_IDS" \\
+      --arg k "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \\
+      '{projectId: $p, monitorIds: $m, baseUrl: $u, environment: "preview", idempotencyKey: $k}')
+    group=$(curl -fsS -X POST "$TRACEIQ_API_URL/v1/synthetic/ci-runs" \\
+      -H "x-traceiq-api-key: $TRACEIQ_API_KEY" -H "content-type: application/json" \\
+      -d "$body" | jq -r .runGroupId)
+    for attempt in $(seq 1 120); do
+      status=$(curl -fsS "$TRACEIQ_API_URL/v1/synthetic/ci-runs/$group?projectId=$TRACEIQ_PROJECT_ID" \\
+        -H "x-traceiq-api-key: $TRACEIQ_API_KEY" | jq -r .group.status)
+      echo "TraceIQ: $status"
+      case "$status" in passed) exit 0 ;; failed|timed_out) exit 1 ;; esac
+      sleep 5
+    done
+    exit 1`}</Code>
+        <P>
+          The preview URL must be publicly reachable; private and internal addresses are rejected. Mark the job as a
+          required status check in your branch protection rules to block merging when a journey fails.
+        </P>
+      </Section>
+    );
+  }
+
   if (id === 'alerts') {
     return (
       <Section id="alerts" title="Alerts">
@@ -1848,10 +2294,10 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
       <Section id="features" title="Feature guide">
         <Bullets
           items={[
-            ['Insights', 'Event counts, unique users, sums, averages, and conversion funnels over customizable date ranges.'],
+            ['Insights', 'Saved charts of event counts, unique users, or sums and averages of a property, with breakdowns, period comparison and nine insight types.'],
             ['Funnels', 'Ordered-event conversion with per-step drop-off; click a step to see who reached it or dropped off.'],
-            ['Retention', 'Weekly cohort × week-offset grid — of the people who did something in a week, how many came back in later weeks. The core "is it sticky?" view.'],
-            ['Cohorts', 'Saved groups of users defined by the events they did (or didn’t) do, reusable as filters across the product.'],
+            ['Retention', 'Weekly cohort × week-offset grid — of the people who first showed up in a week, how many came back in later weeks. The core "is it sticky?" view.'],
+            ['Cohorts', 'Saved, named sets of filters (country, device, plan or any event property) you can apply to Retention in one click.'],
             ['Users', 'Identified people and their chronological timelines, device, and location.'],
             ['Web analytics', 'Visitors, sessions, bounce rate, top paths, sources, devices, geography, active hours, and frustrating pages.'],
             ['Session Replay', 'Consent-aware, sanitized rrweb session reconstruction with project sampling, separate retention, and isolated playback.'],
@@ -1859,8 +2305,12 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
             ['API performance', 'Per-endpoint latency (p95), error rate, and traffic from $api_request events — slowest, most error-prone, and busiest routes.'],
             ['Alerts', 'Watch a metric on a rolling window and fire when it crosses a threshold or drops/spikes vs. the previous period; firings can POST to a webhook and/or email recipients or notification groups, with per-recipient delivery status.'],
             ['Feature flags', 'Deterministic percentage rollouts, per-user overrides, property-targeting segments, and JSON payloads (remote config) evaluated by the SDK.'],
+            ['Experiments', 'A/B and multivariate tests: weighted, sticky variant assignment from the SDK, exposure tracking, and per-variant conversion, uplift and significance against a goal event.'],
+            ['Surveys', 'In-app NPS, rating, choice and text questions, targeted to everyone, a user property or an event, with per-question results.'],
+            ['Synthetic monitors', 'Scheduled Playwright journeys that report which step failed, with console logs, network failures and a screenshot; can also run on pull-request previews.'],
             ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
+            ['Achievements', 'Milestones that unlock automatically as your workspace grows, with progress and downloadable share cards.'],
             ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
             ['Identity stitching', 'When an anonymous visitor later identifies, their earlier anonymous events are merged onto the user automatically — one person everywhere.'],
             ['Segmentation', 'Most views accept filters (os, device, country, region, city, and event properties) so you can slice any metric to a segment.']

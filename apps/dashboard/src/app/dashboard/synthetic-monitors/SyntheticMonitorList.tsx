@@ -164,8 +164,13 @@ export function SyntheticMonitorList({
           <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500 dark:text-slate-400">
             {search
               ? 'Try adjusting your search query or filter criteria.'
-              : 'Create automated Playwright checks to continuously test your critical user flows around the clock.'}
+              : 'A synthetic monitor is a scripted visit to your app, like signing up or checking out, that runs on a schedule in a real browser. When a step breaks, you see which one, with console errors, network requests and a screenshot.'}
           </p>
+          {!search && (
+            <Link href="/docs?page=synthetic-monitors" className="mt-2 inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300 text-sm">
+              Read the setup guide <span aria-hidden="true">→</span>
+            </Link>
+          )}
           {!search && (
             <div className="mt-6">
               <Link

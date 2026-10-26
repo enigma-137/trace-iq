@@ -54,8 +54,8 @@ export function parseInputs(env: Record<string, string | undefined>): ActionInpu
     throw new Error('TraceIQ Action error: "monitors" must contain at least one monitor ID.');
   }
 
-  const apiUrl = (env['INPUT_API-URL'] || env['INPUT_API_URL'] || 'https://api.traceiq.ai').replace(/\/$/, '');
-  const appUrl = (env['INPUT_APP-URL'] || env['INPUT_APP_URL'] || 'https://app.traceiq.ai').replace(/\/$/, '');
+  const apiUrl = (env['INPUT_API-URL'] || env['INPUT_API_URL'] || 'https://api.traceiq.run').replace(/\/$/, '');
+  const appUrl = (env['INPUT_APP-URL'] || env['INPUT_APP_URL'] || 'https://traceiq.run').replace(/\/$/, '');
   const environment = env['INPUT_ENVIRONMENT'] || 'preview';
   const timeoutSeconds = parseInt(env['INPUT_TIMEOUT-SECONDS'] || env['INPUT_TIMEOUT_SECONDS'] || '600', 10);
   const pollIntervalSeconds = parseInt(env['INPUT_POLL-INTERVAL-SECONDS'] || env['INPUT_POLL_INTERVAL_SECONDS'] || '5', 10);
@@ -235,7 +235,7 @@ export async function runSyntheticAction(
   const group = detail.group;
   const runs = detail.runs || [];
 
-  const summary = formatMarkdownSummary(detail, inputs.appUrl || 'https://app.traceiq.ai');
+  const summary = formatMarkdownSummary(detail, inputs.appUrl || 'https://traceiq.run');
   if (deps.setSummary) {
     await deps.setSummary(summary);
   }

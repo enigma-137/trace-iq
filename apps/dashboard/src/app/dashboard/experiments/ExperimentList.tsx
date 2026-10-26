@@ -192,11 +192,22 @@ export function ExperimentList({ initialExperiments, projectId, token: initialTo
       {filteredExperiments.length === 0 ? (
         <div className="rounded-xl border border-neutral-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-950">
           <EmptyState
-            title="No experiments found"
+            title={experiments.length === 0 ? 'No experiments yet' : 'No experiments found'}
             description={
-              experiments.length === 0
-                ? "You haven't created any A/B tests or multivariate experiments yet. Launch one to scientifically test UI changes and increase conversions."
-                : "No experiments matched your current status or search filter."
+              experiments.length === 0 ? (
+                <>
+                  <p>
+                    An experiment shows different versions of a page or feature to different people and measures which
+                    one gets more of them to a goal event, like a completed checkout. Your app asks the SDK which
+                    version to show, and TraceIQ reports the conversion rate, uplift and significance per variant.
+                  </p>
+                  <Link href="/docs?page=experiments" className="mt-2 inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
+                    Read the setup guide <span aria-hidden="true">→</span>
+                  </Link>
+                </>
+              ) : (
+                'No experiments matched your current status or search filter.'
+              )
             }
             primaryAction={
               experiments.length === 0

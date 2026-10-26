@@ -25,7 +25,7 @@ describe('TraceIQ GitHub Action - Input Parsing & Git Context', () => {
     expect(inputs.monitors).toEqual(['sym_signup', 'sym_checkout', 'sym_login']);
     expect(inputs.timeoutSeconds).toBe(300);
     expect(inputs.pollIntervalSeconds).toBe(2);
-    expect(inputs.apiUrl).toBe('https://api.traceiq.ai');
+    expect(inputs.apiUrl).toBe('https://api.traceiq.run');
   });
 
   it('throws descriptive error if required inputs are missing', () => {
