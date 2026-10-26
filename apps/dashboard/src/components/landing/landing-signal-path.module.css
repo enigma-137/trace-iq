@@ -223,6 +223,13 @@
   letter-spacing: -0.045em;
   line-height: 1.08;
 }
+.source {
+  margin-top: 10px;
+  font: 10px/1.5 var(--mono);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #ffffff80;
+}
 .problemGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

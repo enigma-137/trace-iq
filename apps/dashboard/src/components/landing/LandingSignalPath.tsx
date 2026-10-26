@@ -20,24 +20,31 @@ const pathNodes: PathNode[] = [
   { label: "Insight", timing: "+1.3 s", col: 10, row: 3 },
 ];
 
+// Real figures from one production app tracked on TraceIQ (30 days to Oct 26, 2026).
+const PROBLEM_SOURCE = "One production app on TraceIQ \u00b7 last 30 days";
+
 const problems = [
   {
-    value: "5",
-    title: "Tools per bug",
-    text: "Analytics, logs, traces, errors, support inbox.",
+    value: "791,668",
+    title: "Events captured",
+    text: "Every tap, request and error, already on record.",
   },
   {
-    value: "0",
-    title: "Links between them",
-    text: "The click and the stack trace never meet.",
+    value: "9,642",
+    title: "Failed requests",
+    text: "1.35% of 712,518 API calls. Each one is a user who hit a wall.",
     accent: true,
   },
   {
-    value: "1",
-    title: "User report",
-    text: "Too often, that is how the bug gets found.",
+    value: "4.8 s",
+    title: "p95 latency",
+    text: "The median is 465 ms. Users feel the slow tail, not the average.",
   },
-  { value: "∞", title: "Log lines", text: "Plenty of data. No story." },
+  {
+    value: "8,073",
+    title: "Sessions",
+    text: "Across 2,345 identified profiles, each one a story to follow.",
+  },
 ];
 
 // Deterministic PRNG so the server and client render the same texture.
@@ -291,6 +298,7 @@ export function LandingSignalPath() {
         <span className={styles.index}>03 / The problem</span>
         <span className={styles.tag}>The problem</span>
         <h2 id="problem-heading">Bugs don&rsquo;t announce themselves.</h2>
+        <p className={styles.source}>{PROBLEM_SOURCE}</p>
 
         <div className={styles.problemGrid}>
           {problems.map((item) => (
