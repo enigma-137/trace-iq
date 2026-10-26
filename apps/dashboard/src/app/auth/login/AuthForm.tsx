@@ -24,7 +24,7 @@ export function AuthForm() {
   const pendingInvite = useMemo(() => peekPendingInvite(), []);
   const effectiveNext = pendingInvite ? `/invite/${encodeURIComponent(pendingInvite)}` : nextPath;
   const missingConfig = searchParams.get('missingConfig') === '1';
-  const [mode, setMode] = useState<AuthMode>('signin');
+  const [mode, setMode] = useState<AuthMode>(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
   const [stage, setStage] = useState<AuthStage>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -156,55 +156,110 @@
 }
 .hero {
   position: relative;
-  min-height: 610px;
-  aspect-ratio: 2 / 1;
   isolation: isolate;
-  background: var(--sky);
+  /* Matches the sky at the top of the signal-field image, so copy and image meet without an edge. */
+  background: #cdeafd;
+}
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 24px 0;
+  position: relative;
+  z-index: 2;
+}
+.heroCopy .heroEyebrow {
+  font: 600 12px/1.4 var(--mono);
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.heroCopy h1 {
+  max-width: 1000px;
+  margin-top: 18px;
+  font-size: clamp(44px, 5.4vw, 72px);
+  line-height: 1.14;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+.heroCopy h1 span {
+  color: var(--paper);
+  background: var(--blue);
+  padding: 0 12px 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.heroCopy .heroLead {
+  max-width: 680px;
+  margin-top: 34px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: #2f3b39;
+}
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+}
+.site .heroSecondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 22px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 650;
+  transition: background 150ms;
+}
+.site .heroSecondary:hover {
+  background: var(--white-soft);
+}
+.heroCopy .heroNote {
+  margin-top: 14px;
+  font: 12px/1.6 var(--mono);
+  letter-spacing: -0.2px;
+  color: #2f3b39;
+}
+.heroFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 820px;
+  margin: 30px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.site .heroFeatures a {
+  display: inline-flex;
+  padding: 6px 11px;
+  border: 1px solid #9cc4e4;
+  background: var(--paper);
+  font: 500 11px/1.3 var(--mono);
+  letter-spacing: 0.2px;
+  color: var(--ink);
+  transition:
+    border-color 150ms,
+    color 150ms;
+}
+.site .heroFeatures a:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+/* Shows the lower three-quarters of the 2:1 image (the field), cropping the plain sky at its top. */
+.heroVisual {
+  position: relative;
+  aspect-ratio: 8 / 3;
+  margin-top: 8px;
 }
 .heroImage {
   object-fit: cover;
   object-position: center bottom;
-  z-index: -1;
-}
-.heroCopy {
-  text-align: center;
-  padding: 56px 20px 0;
-  position: relative;
-  z-index: 2;
-}
-.heroCopy h1 {
-  font-size: clamp(48px, 5.5vw, 76px);
-  line-height: 1.06;
-  font-weight: 800;
-  letter-spacing: -0.065em;
-}
-.heroCopy h1 span {
-  display: inline-block;
-  color: var(--paper);
-  background: var(--blue);
-  padding: 0 12px 7px;
-  margin-top: 5px;
-}
-.heroCopy p {
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.6;
-  margin-block: 22px 19px;
-  letter-spacing: -0.25px;
-}
-.heroMarginalia {
-  position: absolute;
-  inset: 42px 24px auto;
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
-  font: 10px/1.6 var(--mono);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-.heroMarginalia > span:last-child {
-  text-align: right;
 }
 .signalLabels {
   position: absolute;
@@ -220,17 +275,18 @@
   letter-spacing: 0.5px;
   transform: translate(-50%, -100%);
 }
+/* Marker positions in the full image, remapped to the cropped band: y = (y_full - 25%) / 75%. */
 .signalLabels span:nth-child(1) {
   left: 21.4%;
-  top: 73.4%;
+  top: 64.5%;
 }
 .signalLabels span:nth-child(2) {
   left: 53.5%;
-  top: 57.4%;
+  top: 43.2%;
 }
 .signalLabels span:nth-child(3) {
   left: 89.1%;
-  top: 50.2%;
+  top: 33.6%;
 }
 .heroIndex {
   position: absolute;
@@ -786,26 +842,9 @@
   align-items: center;
   white-space: nowrap;
 }
-@media (min-width: 1360px) {
-  .hero {
-    min-height: 640px;
-  }
-}
 @media (max-width: 1150px) {
   .frame {
     width: calc(100% - 40px);
-  }
-  .hero {
-    min-height: 570px;
-  }
-  .heroCopy {
-    padding-top: 58px;
-  }
-  .heroCopy h1 {
-    font-size: 65px;
-  }
-  .heroMarginalia {
-    font-size: 8px;
   }
   .productGrid {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.8fr);
@@ -860,32 +899,11 @@
   }
 }
 @media (max-width: 850px) {
-  .hero {
-    min-height: 550px;
-  }
-  .heroImage {
-    object-fit: cover;
-  }
   .heroCopy {
-    padding-top: 60px;
+    padding-top: 52px;
   }
-  .heroCopy h1 {
-    font-size: 60px;
-  }
-  .heroMarginalia {
-    inset: 18px 18px auto;
-  }
-  .heroMarginalia > span:last-child {
-    display: none;
-  }
-  .heroMarginalia > span:first-child br {
-    display: none;
-  }
-  .signalLabels span:nth-child(1) {
-    left: 12%;
-  }
-  .signalLabels span:nth-child(3) {
-    left: 94%;
+  .heroCopy .heroLead {
+    font-size: 16px;
   }
   .product {
     padding-top: 40px;
@@ -979,6 +997,51 @@
   }
 }
 @media (max-width: 600px) {
+  .heroCopy {
+    padding: 44px 16px 0;
+  }
+  .heroCopy .heroEyebrow {
+    font-size: 10px;
+    letter-spacing: 1.6px;
+  }
+  .heroCopy h1 {
+    font-size: clamp(34px, 9.5vw, 44px);
+    line-height: 1.18;
+  }
+  .heroCopy h1 span {
+    padding: 0 6px 3px;
+  }
+  .heroCopy .heroLead {
+    margin-top: 20px;
+    font-size: 15px;
+  }
+  .heroActions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .site .heroActions > a {
+    justify-content: center;
+  }
+  .heroFeatures {
+    margin-top: 24px;
+    gap: 6px;
+  }
+  /* Taller band so the field stays legible; the full image height shows and its sides crop. */
+  .heroVisual {
+    aspect-ratio: auto;
+    height: 200px;
+  }
+  .heroImage {
+    object-position: 52% bottom;
+  }
+  .signalLabels span:first-child,
+  .signalLabels span:last-child {
+    display: none;
+  }
+  .signalLabels span:nth-child(2) {
+    left: 54%;
+    top: 57.4%;
+  }
   .frame {
     width: calc(100% - 24px);
   }
@@ -1003,42 +1066,6 @@
   }
   .menuButton {
     display: inline-flex;
-  }
-  .hero {
-    min-height: 550px;
-    aspect-ratio: auto;
-  }
-  .heroImage {
-    object-fit: cover;
-    object-position: 52% bottom;
-  }
-  .heroCopy {
-    padding: 70px 12px 0;
-  }
-  .heroCopy h1 {
-    font-size: clamp(35px, 9vw, 52px);
-    letter-spacing: -0.065em;
-  }
-  .heroCopy h1 span {
-    padding: 0 5px 5px;
-  }
-  .heroCopy p {
-    font-size: 10px;
-    line-height: 1.7;
-    max-width: 280px;
-    margin: 20px auto 18px;
-  }
-  .heroMarginalia {
-    font-size: 8px;
-    letter-spacing: 0.4px;
-  }
-  .signalLabels span:first-child,
-  .signalLabels span:last-child {
-    display: none;
-  }
-  .signalLabels span:nth-child(2) {
-    left: 56%;
-    top: 57.5%;
   }
   .heroIndex {
     left: 10px;
