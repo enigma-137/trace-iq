@@ -1,0 +1,415 @@
+/* Signal path + problem bands. Colours come from the .site tokens in landing-light.module.css. */
+.index {
+  position: absolute;
+  top: 15px;
+  left: 22px;
+  padding: 4px 7px;
+  font: 9px/1.5 var(--mono);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--paper);
+}
+
+/* ---------- Signal path ---------- */
+.path {
+  position: relative;
+  padding: 72px 24px 24px;
+  border-top: 1px solid var(--line);
+}
+.pathHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+.pathHeader h2 {
+  font-size: clamp(36px, 4vw, 53px);
+  font-weight: 750;
+  line-height: 1.03;
+  letter-spacing: -0.055em;
+}
+.pathHeader h2 span {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0 10px 4px;
+  background: var(--orange-paper);
+  color: var(--orange-ink);
+}
+.pathHeader p {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.diagram {
+  --cols: 12;
+  --rows: 5;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  aspect-ratio: 12 / 5;
+  border: 1px solid var(--line);
+  background-color: var(--panel);
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+  overflow: hidden;
+  isolation: isolate;
+}
+.node {
+  grid-column: var(--col) / span 2;
+  grid-row: var(--row);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  z-index: 1;
+}
+.lead {
+  position: relative;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.5px),
+    var(--node-rule) 50%,
+    transparent calc(50% + 0.5px)
+  );
+}
+.lead small {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font: 9px/1 var(--mono);
+  color: var(--node-ink);
+  letter-spacing: 0.3px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 10px;
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--node-ink);
+  white-space: nowrap;
+}
+.chip i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--node-ink);
+}
+.node {
+  --node-ink: var(--ink);
+  --node-rule: #9fb3c8;
+}
+.node[data-tone="blue"] {
+  --node-ink: var(--blue);
+  --node-rule: var(--blue);
+  background: var(--sky);
+}
+.node[data-tone="orange"] {
+  --node-ink: var(--orange-ink);
+  --node-rule: var(--orange);
+  background: var(--orange-paper);
+}
+.counter {
+  grid-column: 10 / span 3;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  padding-right: 14px;
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.counter b {
+  font-weight: 500;
+  color: var(--ink);
+  text-transform: none;
+}
+.field {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 40%;
+  z-index: 0;
+  shape-rendering: crispEdges;
+}
+.px_orange {
+  fill: var(--orange);
+}
+.px_blue {
+  fill: var(--blue);
+}
+.px_green {
+  fill: var(--green);
+}
+.px_ink {
+  fill: var(--ink);
+}
+.caption {
+  margin-top: 10px;
+  font: 9px/1.5 var(--mono);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chip i {
+    animation: nodePulse 3.6s steps(1, end) infinite;
+    animation-delay: calc(var(--step) * 0.6s);
+  }
+}
+@keyframes nodePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  15% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* ---------- Problem ---------- */
+.problem {
+  position: relative;
+  padding: 80px 24px 24px;
+  background-color: var(--ink);
+  background-image: radial-gradient(#ffffff14 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.problem .index {
+  background: var(--ink);
+  color: #ffffff80;
+}
+.tag,
+.tagPlain {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.tag {
+  padding: 5px 8px;
+  border: 1px solid #ffffff26;
+  background: var(--ink);
+}
+.tag::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  background: var(--orange);
+}
+.tagPlain {
+  color: var(--orange);
+}
+.problem h2 {
+  margin-top: 14px;
+  font-size: clamp(30px, 3.4vw, 44px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+.source {
+  margin-top: 10px;
+  font: 10px/1.5 var(--mono);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #ffffff80;
+}
+.problemGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 32px;
+  border: 1px solid #ffffff1f;
+  background: var(--ink);
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 26px 20px;
+  border-bottom: 1px solid #ffffff1f;
+}
+.stat:nth-child(odd) {
+  border-right: 1px solid #ffffff1f;
+}
+.statValue {
+  flex: none;
+  min-width: 64px;
+  padding: 10px 12px;
+  border: 1px solid #ffffff14;
+  background: #ffffff0a;
+  font: 400 30px/1 var(--mono);
+  text-align: center;
+  letter-spacing: -1px;
+}
+.statValue[data-accent] {
+  color: var(--orange);
+}
+.stat h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.stat p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ffffff8c;
+}
+.answer {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 320px;
+  overflow: hidden;
+}
+.answerCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 32px 28px;
+}
+.answerCopy h3 {
+  max-width: 420px;
+  font-size: clamp(26px, 2.8vw, 36px);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+.answerCopy h3 span {
+  color: var(--orange);
+}
+.answer .answerCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 18px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 150ms ease;
+}
+.answer .answerCta:hover {
+  background: var(--white-soft);
+}
+.isoField {
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+  overflow: visible;
+  border-left: 1px solid #ffffff1f;
+}
+.isoGrid {
+  fill: none;
+  stroke: #ffffff12;
+  stroke-width: 1;
+}
+.cube_outline,
+.cube_chain {
+  stroke: #ffffff4d;
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.cube_outline .cubeTop,
+.cube_chain .cubeTop {
+  fill: #232b29;
+}
+.cube_outline .cubeLeft,
+.cube_chain .cubeLeft {
+  fill: #141b19;
+}
+.cube_outline .cubeRight,
+.cube_chain .cubeRight {
+  fill: #1b2321;
+}
+.cube_chain {
+  stroke: #ffffff59;
+}
+.cube_accent {
+  stroke: #ffb27a;
+  stroke-width: 0.75;
+}
+.cube_accent .cubeTop {
+  fill: var(--orange);
+}
+.cube_accent .cubeLeft {
+  fill: var(--orange-ink);
+}
+.cube_accent .cubeRight {
+  fill: #d4621c;
+}
+
+@media (max-width: 850px) {
+  .pathHeader {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  .answer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .isoField {
+    border-left: 0;
+    border-top: 1px solid #ffffff1f;
+  }
+}
+
+/* On narrow screens the diagram becomes a vertical timeline with the texture underneath. */
+@media (max-width: 700px) {
+  .path {
+    padding-inline: 16px;
+  }
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: auto;
+    padding-bottom: 96px;
+    background-size: 48px 48px;
+  }
+  .node {
+    grid-template-columns: 72px minmax(0, 1fr);
+    min-height: 48px;
+    border-bottom: 1px solid var(--line);
+  }
+  .node:not([data-tone]) {
+    background: var(--paper);
+  }
+  .counter {
+    order: -1;
+    align-self: stretch;
+    justify-self: auto;
+    padding: 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .field {
+    height: 96px;
+  }
+  .problem {
+    padding-inline: 16px;
+  }
+  .problemGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stat:nth-child(odd) {
+    border-right: 0;
+  }
+}
