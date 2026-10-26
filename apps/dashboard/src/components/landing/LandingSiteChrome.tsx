@@ -34,9 +34,9 @@ export function LandingSiteChrome({ children }: { children: ReactNode }) {
           </nav>
           <a
             className={`${styles.button} ${styles.headerCta}`}
-            href="/auth/login"
+            href="/auth/login?mode=signup"
           >
-            Explore TraceIQ <ArrowRight size={14} aria-hidden="true" />
+            Get started free <ArrowRight size={14} aria-hidden="true" />
           </a>
           <button
             className={styles.menuButton}
@@ -82,9 +82,9 @@ export function LandingSiteChrome({ children }: { children: ReactNode }) {
             <h2>Make complexity legible.</h2>
             <a
               className={`${styles.button} ${styles.whiteButton}`}
-              href="/auth/login"
+              href="/auth/login?mode=signup"
             >
-              Explore TraceIQ <ArrowRight size={16} aria-hidden="true" />
+              Get started free <ArrowRight size={16} aria-hidden="true" />
             </a>
           </div>
           <div className={styles.footerMiddle}>
