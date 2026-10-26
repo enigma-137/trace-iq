@@ -3,218 +3,155 @@ import { ArrowRight } from "lucide-react";
 import landing from "@/app/landing-light.module.css";
 import styles from "./landing-signal-path.module.css";
 
-type PathNode = {
-  label: string;
-  timing: string;
-  col: number;
-  row: number;
-  tone?: "blue" | "orange";
-};
-
-// Grid positions are 1-based columns/rows of a 12 x 4 diagram.
-const pathNodes: PathNode[] = [
-  { label: "Click", timing: "0 ms", col: 2, row: 2, tone: "blue" },
-  { label: "Request", timing: "+38 ms", col: 4, row: 1 },
-  { label: "Trace", timing: "+412 ms", col: 6, row: 3, tone: "blue" },
-  { label: "Error", timing: "+1.2 s", col: 8, row: 2, tone: "orange" },
-  { label: "Insight", timing: "+1.3 s", col: 10, row: 3 },
-];
-
-// Real figures from one production app tracked on TraceIQ (30 days to Oct 26, 2026).
-const PROBLEM_SOURCE = "One production app on TraceIQ \u00b7 last 30 days";
-
-const problems = [
+const beats = [
   {
-    value: "791,668",
-    title: "Events captured",
-    text: "Every tap, request and error, already on record.",
+    title: "Capture",
+    text: "The SDK records the tap with its session, user and screen.",
   },
   {
-    value: "9,642",
-    title: "Failed requests",
-    text: "1.35% of 712,518 API calls. Each one is a user who hit a wall.",
-    accent: true,
+    title: "Correlate",
+    text: "Trace context rides along every request that tap sets off.",
   },
   {
-    value: "4.8 s",
-    title: "p95 latency",
-    text: "The median is 465 ms. Users feel the slow tail, not the average.",
-  },
-  {
-    value: "8,073",
-    title: "Sessions",
-    text: "Across 2,345 identified profiles, each one a story to follow.",
+    title: "Explain",
+    text: "The error lands on the same timeline, next to everything that led to it.",
   },
 ];
 
-// Deterministic PRNG so the server and client render the same texture.
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+// Journey nodes in the 600 x 120 coordinate space of the curve above the waterfall.
+const journey = [
+  { label: "Tap", x: 40, y: 78 },
+  { label: "Request", x: 170, y: 42 },
+  { label: "Trace", x: 300, y: 70 },
+  { label: "Error", x: 430, y: 36, error: true },
+  { label: "Insight", x: 560, y: 60 },
+];
+
+// Catmull-Rom through the nodes, emitted as cubic Béziers.
+function smoothPath(points: { x: number; y: number }[]) {
+  let d = `M${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x} ${p2.y}`;
+  }
+  return d;
 }
 
-const FIELD_COLS = 180;
-const FIELD_ROWS = 26;
-const CELL = 6;
+const journeyPath = smoothPath(journey);
 
-type Pixel = {
-  x: number;
-  y: number;
-  fill: "blue" | "orange" | "green" | "ink";
-};
+// Spans as start/width percentages of a 1.4 s window.
+const spans = [
+  { name: "tap checkout_pay", start: 0, width: 3, depth: 0 },
+  { name: "POST /api/payments", start: 3, width: 82, depth: 0 },
+  { name: "db.query orders", start: 8, width: 22, depth: 1 },
+  { name: "stripe.charge", start: 32, width: 50, depth: 1 },
+  { name: "PaymentDeclined", start: 82, width: 3, depth: 2, error: true },
+  { name: "render ErrorBanner", start: 86, width: 10, depth: 0 },
+];
+const ERROR_AT = 83.5;
 
-// A dithered mound of pixels: dense and orange at the centre, scattering into blue at the edges.
-function buildSignalField(): Pixel[] {
-  const random = mulberry32(137);
-  const pixels: Pixel[] = [];
-  for (let col = 0; col < FIELD_COLS; col++) {
-    const u = col / (FIELD_COLS - 1);
-    const mound = Math.exp(-(((u - 0.5) / 0.24) ** 2));
-    for (let row = 0; row < FIELD_ROWS; row++) {
-      const height = row / FIELD_ROWS; // 0 at the bottom
-      const density = mound * 1.15 - height;
-      const roll = random();
-      if (roll > density + 0.08) continue;
-      if (row < 3 && Math.abs(u - 0.5) < 0.16) {
-        pixels.push({
-          x: col * CELL,
-          y: (FIELD_ROWS - 1 - row) * CELL,
-          fill: "orange",
-        });
-        continue;
-      }
-      // Leave a one-pixel gutter on alternate cells away from the core for a checkerboard dither.
-      if (density < 0.45 && (col + row) % 2 === 1) continue;
-      const pick = random();
-      const fill =
-        density > 0.55
-          ? pick < 0.92
-            ? "orange"
-            : "ink"
-          : pick < 0.7
-            ? "blue"
-            : pick < 0.94
-              ? "green"
-              : "ink";
-      pixels.push({ x: col * CELL, y: (FIELD_ROWS - 1 - row) * CELL, fill });
+const HALFTONE_COLS = 64;
+const HALFTONE_ROWS = 7;
+const HALFTONE_CELL = 10;
+
+type Dot = { cx: number; cy: number; r: number; hot: boolean };
+
+// Halftone strip: dots swell toward the bottom edge and around the moment of the error.
+function buildHalftone(): Dot[] {
+  const dots: Dot[] = [];
+  const errorU = ERROR_AT / 100;
+  for (let col = 0; col < HALFTONE_COLS; col++) {
+    const u = (col + 0.5) / HALFTONE_COLS;
+    const swell = Math.exp(-(((u - errorU) / 0.12) ** 2));
+    for (let row = 0; row < HALFTONE_ROWS; row++) {
+      const depth = (row + 1) / HALFTONE_ROWS; // 1 at the bottom
+      const intensity = depth * (0.35 + 0.65 * swell);
+      const r = 4.4 * intensity;
+      if (r < 0.7) continue;
+      dots.push({
+        cx: col * HALFTONE_CELL + HALFTONE_CELL / 2,
+        cy: row * HALFTONE_CELL + HALFTONE_CELL / 2,
+        r: Number(r.toFixed(2)),
+        hot: swell > 0.45 && depth > 0.4,
+      });
     }
   }
-  return pixels;
+  return dots;
 }
 
-const signalField = buildSignalField();
+const halftone = buildHalftone();
 
-const ISO_COS = Math.cos(Math.PI / 6);
-const ISO_SIN = 0.5;
+// Real figures from one production app tracked on TraceIQ (30 days to Oct 26, 2026).
+const PROBLEM_SOURCE = "One production app on TraceIQ · last 30 days";
 
-function iso(
-  x: number,
-  y: number,
-  z: number,
-  unit: number,
-  originX: number,
-  originY: number,
-) {
-  return [
-    originX + (x - y) * ISO_COS * unit,
-    originY + (x + y) * ISO_SIN * unit - z * unit,
-  ] as const;
-}
-
-function polygon(points: ReadonlyArray<readonly [number, number]>) {
-  return points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-}
-
-type Cube = {
-  x: number;
-  y: number;
-  size: number;
-  tone: "outline" | "accent" | "chain";
-};
-
-// Corner cubes, chains of small "spans" feeding the centre, and one highlighted event.
-const cubes: Cube[] = [
-  { x: 0, y: 0, size: 2, tone: "outline" },
-  { x: 8, y: 0, size: 2, tone: "outline" },
-  { x: 0, y: 8, size: 2, tone: "outline" },
-  { x: 8, y: 8, size: 2, tone: "outline" },
-  ...[2.6, 3.2, 3.8].map((x) => ({
-    x,
-    y: 1,
-    size: 0.5,
-    tone: "chain" as const,
-  })),
-  ...[2.6, 3.2, 3.8].map((y) => ({
-    x: 1,
-    y,
-    size: 0.5,
-    tone: "chain" as const,
-  })),
-  ...[6.2, 6.8, 7.4].map((x) => ({
-    x,
-    y: 9,
-    size: 0.5,
-    tone: "chain" as const,
-  })),
-  ...[6.2, 6.8, 7.4].map((y) => ({
-    x: 9,
-    y,
-    size: 0.5,
-    tone: "chain" as const,
-  })),
-  { x: 4.5, y: 4.5, size: 1.2, tone: "accent" },
+const supportingStats = [
+  { value: "791,668", label: "Events captured" },
+  { value: "4.8 s", label: "p95 latency", note: "Median 465 ms" },
+  { value: "8,073", label: "Sessions", note: "2,345 identified profiles" },
 ];
 
-function IsoField() {
-  const unit = 22;
-  const width = 480;
-  const height = 330;
-  const ox = width / 2;
-  const oy = 70;
-  const gridLines: string[] = [];
-  for (let i = -4; i <= 14; i++) {
-    const [ax, ay] = iso(i, -4, 0, unit, ox, oy);
-    const [bx, by] = iso(i, 14, 0, unit, ox, oy);
-    const [cx, cy] = iso(-4, i, 0, unit, ox, oy);
-    const [dx, dy] = iso(14, i, 0, unit, ox, oy);
-    gridLines.push(
-      `M${ax.toFixed(1)} ${ay.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}`,
-    );
-    gridLines.push(
-      `M${cx.toFixed(1)} ${cy.toFixed(1)}L${dx.toFixed(1)} ${dy.toFixed(1)}`,
-    );
-  }
-  // Paint back to front so nearer cubes overlap farther ones.
-  const ordered = [...cubes].sort((a, b) => a.x + a.y - (b.x + b.y));
+function Radar() {
+  const rings = [44, 88, 132, 176, 220];
+  // A few events sitting on the rings; the blue one is the request that failed.
+  const blips = [
+    { ring: 1, angle: 210 },
+    { ring: 2, angle: 320 },
+    { ring: 3, angle: 140 },
+    { ring: 3, angle: 20 },
+    { ring: 4, angle: 250 },
+    { ring: 4, angle: 95 },
+  ];
+  const target = { ring: 2, angle: 48 };
+  const at = (ring: number, angle: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return {
+      x: 240 + rings[ring] * Math.cos(rad),
+      y: 240 + rings[ring] * Math.sin(rad),
+    };
+  };
+  const hit = at(target.ring, target.angle);
 
   return (
-    <svg
-      className={styles.isoField}
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMid meet"
-      aria-hidden="true"
-    >
-      <path d={gridLines.join("")} className={styles.isoGrid} />
-      {ordered.map((cube, index) => {
-        const { x, y, size: s } = cube;
-        const p = (dx: number, dy: number, dz: number) =>
-          iso(x + dx, y + dy, dz, unit, ox, oy);
-        const top = [p(0, 0, s), p(s, 0, s), p(s, s, s), p(0, s, s)];
-        const left = [p(0, s, 0), p(s, s, 0), p(s, s, s), p(0, s, s)];
-        const right = [p(s, 0, 0), p(s, s, 0), p(s, s, s), p(s, 0, s)];
+    <svg className={styles.radar} viewBox="0 0 480 480" aria-hidden="true">
+      {rings.map((r) => (
+        <circle key={r} cx="240" cy="240" r={r} className={styles.ring} />
+      ))}
+      <path d="M240 10V470M10 240H470" className={styles.axis} />
+      <path
+        d={`M240 240L${(240 + 220 * Math.cos(-0.5)).toFixed(1)} ${(240 + 220 * Math.sin(-0.5)).toFixed(1)}A220 220 0 0 1 460 240Z`}
+        className={styles.sweep}
+      />
+      {blips.map((blip) => {
+        const p = at(blip.ring, blip.angle);
         return (
-          <g key={index} className={styles[`cube_${cube.tone}`]}>
-            <polygon points={polygon(left)} className={styles.cubeLeft} />
-            <polygon points={polygon(right)} className={styles.cubeRight} />
-            <polygon points={polygon(top)} className={styles.cubeTop} />
-          </g>
+          <circle
+            key={`${blip.ring}-${blip.angle}`}
+            cx={p.x.toFixed(1)}
+            cy={p.y.toFixed(1)}
+            r="5"
+            className={styles.blip}
+          />
         );
       })}
+      <circle
+        cx={hit.x.toFixed(1)}
+        cy={hit.y.toFixed(1)}
+        r="22"
+        className={styles.hitHalo}
+      />
+      <circle
+        cx={hit.x.toFixed(1)}
+        cy={hit.y.toFixed(1)}
+        r="9"
+        className={styles.hit}
+      />
     </svg>
   );
 }
@@ -226,106 +163,158 @@ export function LandingSignalPath() {
         className={`${landing.frame} ${styles.path}`}
         aria-labelledby="signal-path-heading"
       >
-        <div className={styles.pathHeader}>
-          <span className={styles.index}>02 / Signal path</span>
-          <h2 id="signal-path-heading">
-            One click.
-            <br />
-            <span>One timeline.</span>
-          </h2>
-          <p>
-            Every event TraceIQ captures carries its context forward, so a tap
-            in the UI, the request it fired and the error it hit land on the
-            same thread.
-          </p>
-        </div>
+        <div className={styles.pathLayout}>
+          <div className={styles.pathIntro}>
+            <h2 id="signal-path-heading">
+              One tap.
+              <br />
+              <span>One timeline.</span>
+            </h2>
+            <ol className={styles.beats}>
+              {beats.map((beat, index) => (
+                <li key={beat.title}>
+                  <span className={styles.beatDot} aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h3>{beat.title}</h3>
+                    <p>{beat.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
 
-        <div
-          className={styles.diagram}
-          role="img"
-          aria-label="An event travelling from a click, to a request, a trace, an error and an insight"
-        >
-          {pathNodes.map((node, index) => (
-            <div
-              key={node.label}
-              className={styles.node}
-              data-tone={node.tone}
-              style={
-                {
-                  "--col": node.col,
-                  "--row": node.row,
-                  "--step": index,
-                } as CSSProperties
-              }
-            >
-              <span className={styles.lead} aria-hidden="true">
-                <small>{node.timing}</small>
+          <figure className={styles.traceCard}>
+            <div className={styles.traceHead}>
+              <span>
+                <i aria-hidden="true" /> Checkout failed
               </span>
-              <span className={styles.chip}>
-                <i aria-hidden="true" />
-                {node.label}
+              <span>session s_7f9c2e6a</span>
+            </div>
+
+            <div className={styles.journey}>
+              <svg
+                viewBox="0 0 600 120"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path d={journeyPath} className={styles.journeyLine} />
+              </svg>
+              {journey.map((node, index) => (
+                <span
+                  key={node.label}
+                  className={styles.journeyNode}
+                  data-error={node.error || undefined}
+                  style={
+                    {
+                      "--x": `${(node.x / 600) * 100}%`,
+                      "--y": `${(node.y / 120) * 100}%`,
+                      "--step": index,
+                    } as CSSProperties
+                  }
+                >
+                  <b aria-hidden="true" />
+                  <small>{node.label}</small>
+                </span>
+              ))}
+            </div>
+
+            <div
+              className={styles.waterfall}
+              style={{ "--error-at": ERROR_AT / 100 } as CSSProperties}
+            >
+              {spans.map((span) => (
+                <div key={span.name} className={styles.span}>
+                  <span
+                    className={styles.spanName}
+                    style={{ "--depth": span.depth } as CSSProperties}
+                  >
+                    {span.name}
+                  </span>
+                  <span className={styles.spanTrack}>
+                    <span
+                      className={styles.spanBar}
+                      data-error={span.error || undefined}
+                      style={
+                        {
+                          left: `${span.start}%`,
+                          width: `${span.width}%`,
+                        } as CSSProperties
+                      }
+                    />
+                  </span>
+                </div>
+              ))}
+              <span className={styles.cursor} aria-hidden="true">
+                <small>+1.2 s</small>
               </span>
             </div>
-          ))}
-          <span className={styles.counter} aria-hidden="true">
-            Session <b>s_7f9c2e6a</b>
-          </span>
-          <svg
-            className={styles.field}
-            viewBox={`0 0 ${FIELD_COLS * CELL} ${FIELD_ROWS * CELL}`}
-            preserveAspectRatio="xMidYMax slice"
-            aria-hidden="true"
-          >
-            {signalField.map((pixel) => (
-              <rect
-                key={`${pixel.x}-${pixel.y}`}
-                x={pixel.x}
-                y={pixel.y}
-                width={CELL - 1}
-                height={CELL - 1}
-                className={styles[`px_${pixel.fill}`]}
-              />
-            ))}
-          </svg>
+
+            <svg
+              className={styles.halftone}
+              viewBox={`0 0 ${HALFTONE_COLS * HALFTONE_CELL} ${HALFTONE_ROWS * HALFTONE_CELL}`}
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              {halftone.map((dot) => (
+                <circle
+                  key={`${dot.cx}-${dot.cy}`}
+                  cx={dot.cx}
+                  cy={dot.cy}
+                  r={dot.r}
+                  className={dot.hot ? styles.dotHot : styles.dot}
+                />
+              ))}
+            </svg>
+            <figcaption>Illustrative trace</figcaption>
+          </figure>
         </div>
-        <p className={styles.caption}>Illustrative timings</p>
       </section>
 
       <section
         className={`${landing.frame} ${styles.problem}`}
         aria-labelledby="problem-heading"
       >
-        <span className={styles.index}>03 / The problem</span>
-        <span className={styles.tag}>The problem</span>
-        <h2 id="problem-heading">Bugs don&rsquo;t announce themselves.</h2>
-        <p className={styles.source}>{PROBLEM_SOURCE}</p>
+        <Radar />
+        <div className={styles.problemInner}>
+          <span className={styles.tag}>The problem</span>
+          <h2 id="problem-heading">Bugs don&rsquo;t announce themselves.</h2>
+          <p className={styles.source}>{PROBLEM_SOURCE}</p>
 
-        <div className={styles.problemGrid}>
-          {problems.map((item) => (
-            <div key={item.title} className={styles.stat}>
-              <span
-                className={styles.statValue}
-                data-accent={item.accent || undefined}
-              >
-                {item.value}
-              </span>
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
+          <div className={styles.headline}>
+            <strong>9,642</strong>
+            <div>
+              <p className={styles.headlineLabel}>failed requests</p>
+              <p>
+                1.35% of 712,518 API calls. Each one is a user who hit a wall
+                and probably didn&rsquo;t tell you.
+              </p>
+            </div>
+          </div>
+
+          <dl className={styles.ruler}>
+            {supportingStats.map((stat) => (
+              <div key={stat.label}>
+                <dt>{stat.label}</dt>
+                <dd>
+                  {stat.value}
+                  {stat.note ? <small>{stat.note}</small> : null}
+                </dd>
               </div>
-            </div>
-          ))}
-          <div className={styles.answer}>
-            <div className={styles.answerCopy}>
-              <span className={styles.tagPlain}>With TraceIQ</span>
+            ))}
+          </dl>
+
+          <div className={styles.cta}>
+            <div>
+              <span className={styles.ctaKicker}>With TraceIQ</span>
               <h3>
-                From the click to the failing line, <span>on one screen.</span>
+                From the tap to the failing line, <span>on one screen.</span>
               </h3>
-              <a className={styles.answerCta} href="/auth/login">
-                Start tracing <ArrowRight size={16} aria-hidden="true" />
-              </a>
             </div>
-            <IsoField />
+            <a className={styles.ctaButton} href="/auth/login">
+              Start tracing <ArrowRight size={16} aria-hidden="true" />
+            </a>
           </div>
         </div>
       </section>
