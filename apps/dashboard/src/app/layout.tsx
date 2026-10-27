@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { DM_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { PendingInviteRestorer } from '@/components/PendingInviteRestorer';
+import { SignedInToast } from '@/components/SignedInToast';
 import { TraceIQToastProvider } from '@/components/TraceIQToastProvider';
 
 const dmSans = DM_Sans({
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <TraceIQToastProvider>
           {children}
           <PendingInviteRestorer />
+          <SignedInToast />
         </TraceIQToastProvider>
       </body>
     </html>
