@@ -101,8 +101,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAuthRoute && user) {
-    const isResetPasswordRoute = pathname === '/auth/reset-password';
-    if (!isResetPasswordRoute) {
+    // Signed-in people still pass through these: connecting GitHub/GitLab from Settings
+    // returns to the callback, and a failed connection lands on the error page.
+    const staysOnAuthRoute = ['/auth/reset-password', '/auth/callback', '/auth/auth-code-error'].includes(pathname);
+    if (!staysOnAuthRoute) {
       const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       const needsStepUp = !aalError && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
 
