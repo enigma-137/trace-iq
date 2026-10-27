@@ -33,10 +33,23 @@ export function AuthForm() {
     missingConfig ? { tone: 'error', message: 'Supabase env vars are missing.' } : null
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<'github' | 'gitlab' | null>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [pendingSuccessMessage, setPendingSuccessMessage] = useState('Signed in successfully.');
   const mfaSubmissionGuard = useRef(createOtpSubmissionGuard()).current;
+
+  // Coming Back from GitHub/GitLab restores this page from the back-forward cache
+  // with the buttons still disabled; re-enable them.
+  useEffect(() => {
+    function handlePageShow(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      setIsSubmitting(false);
+      setOauthProvider(null);
+    }
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
   const mfaInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = useMemo(() => {
@@ -262,24 +275,27 @@ export function AuthForm() {
     }
 
     setIsSubmitting(true);
+    setOauthProvider(provider);
     setStatus(null);
     try {
+      // `provider` lets the callback announce the sign-in once it has actually completed.
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(effectiveNext)}`
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(effectiveNext)}&provider=${provider}`
         }
       });
 
       if (error) {
         await reportAuthFailure(error, `${providerName} sign-in failed`, `Could not continue with ${providerName}. Please try again.`);
-        return;
+        setIsSubmitting(false);
+        setOauthProvider(null);
       }
-      toast.success(`Opening ${providerName} to continue sign-in…`, { title: 'Redirecting' });
+      // On success the browser is already leaving for the provider; keep the buttons disabled.
     } catch (error) {
       await reportAuthFailure(error, `${providerName} sign-in failed`, `Could not continue with ${providerName}. Please try again.`);
-    } finally {
       setIsSubmitting(false);
+      setOauthProvider(null);
     }
   }
 
@@ -477,7 +493,7 @@ export function AuthForm() {
                   onClick={() => void handleOAuth('github')}
                 >
                   <GitHubIcon className="size-[18px] shrink-0 text-neutral-900 dark:text-white" />
-                  GitHub
+                  {oauthProvider === 'github' ? 'Opening GitHub…' : 'GitHub'}
                 </button>
 
                 <button
@@ -487,7 +503,7 @@ export function AuthForm() {
                   onClick={() => void handleOAuth('gitlab')}
                 >
                   <GitLabIcon className="size-[18px] shrink-0" />
-                  GitLab
+                  {oauthProvider === 'gitlab' ? 'Opening GitLab…' : 'GitLab'}
                 </button>
               </div>
 

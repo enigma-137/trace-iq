@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { safeRedirectPath } from '@/lib/utils';
+import { SIGNED_IN_COOKIE } from '@/lib/signed-in';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
@@ -40,7 +41,14 @@ export async function GET(request: NextRequest) {
       if (needsStepUp) {
         return NextResponse.redirect(`${origin}/auth/login?next=${encodeURIComponent(next)}`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+      // Sign-in with GitHub/GitLab finished: leave a short-lived marker so the next page can
+      // say so. A cookie, not a query param, because the overview redirects and drops params.
+      const provider = searchParams.get('provider');
+      if (provider === 'github' || provider === 'gitlab') {
+        response.cookies.set(SIGNED_IN_COOKIE, provider, { path: '/', maxAge: 60, sameSite: 'lax' });
+      }
+      return response;
     } catch {
       return failed();
     }
