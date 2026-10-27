@@ -63,12 +63,14 @@ export function SetupPanel({
   organizationId,
   projectId,
   newProject = false,
-  children
+  children,
+  dangerZoneContent
 }: {
   organizationId?: string | null;
   projectId?: string | null;
   newProject?: boolean;
   children?: React.ReactNode;
+  dangerZoneContent?: React.ReactNode;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -118,6 +120,15 @@ export function SetupPanel({
   if (organizationId) queryParams.set('organizationId', organizationId);
   if (projectId) queryParams.set('projectId', projectId);
   const setupQuery = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  const lifecycleDangerZone = dangerZoneContent ? (
+    <SettingsSection
+      id="danger"
+      title="Danger zone"
+      description="Irreversible actions for your organization and account."
+    >
+      {dangerZoneContent}
+    </SettingsSection>
+  ) : null;
 
   useEffect(() => {
     void loadSetup();
@@ -510,36 +521,42 @@ export function SetupPanel({
           <SetupSkeleton />
         ) : !hasProject ? (
           organizationRole === 'member' ? (
-            <SettingsCard
-              icon={Folder01Icon}
-              title="No projects yet"
-              description="This organization has no projects yet. Ask an owner or admin to set up the first project."
-            />
+            <>
+              <SettingsCard
+                icon={Folder01Icon}
+                title="No projects yet"
+                description="This organization has no projects yet. Ask an owner or admin to set up the first project."
+              />
+              {lifecycleDangerZone}
+            </>
           ) : (
-            <SettingsSection
-              id="workspace"
-              title="Create your tracking workspace"
-              description="Create an organization, a project, and the initial write key for event ingestion."
-            >
-              <SettingsCard>
-                <form
-                  className="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
-                  onSubmit={handleBootstrapSubmit}
-                >
-                  <label className={fieldLabelClass}>
-                    Organization name
-                    <input className={inputClass} value={bootstrapOrgName} onChange={(e) => setBootstrapOrgName(e.target.value)} required />
-                  </label>
-                  <label className={fieldLabelClass}>
-                    Project name
-                    <input className={inputClass} value={bootstrapProjectName} onChange={(e) => setBootstrapProjectName(e.target.value)} required />
-                  </label>
-                  <button className={primaryButton} type="submit" disabled={isBootstrapping}>
-                    {isBootstrapping ? 'Creating…' : 'Create workspace'}
-                  </button>
-                </form>
-              </SettingsCard>
-            </SettingsSection>
+            <>
+              <SettingsSection
+                id="workspace"
+                title="Create your tracking workspace"
+                description="Create an organization, a project, and the initial write key for event ingestion."
+              >
+                <SettingsCard>
+                  <form
+                    className="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+                    onSubmit={handleBootstrapSubmit}
+                  >
+                    <label className={fieldLabelClass}>
+                      Organization name
+                      <input className={inputClass} value={bootstrapOrgName} onChange={(e) => setBootstrapOrgName(e.target.value)} required />
+                    </label>
+                    <label className={fieldLabelClass}>
+                      Project name
+                      <input className={inputClass} value={bootstrapProjectName} onChange={(e) => setBootstrapProjectName(e.target.value)} required />
+                    </label>
+                    <button className={primaryButton} type="submit" disabled={isBootstrapping}>
+                      {isBootstrapping ? 'Creating…' : 'Create workspace'}
+                    </button>
+                  </form>
+                </SettingsCard>
+              </SettingsSection>
+              {lifecycleDangerZone}
+            </>
           )
         ) : (
           <>
@@ -758,7 +775,7 @@ export function SetupPanel({
             {children}
 
             {/* DANGER ZONE */}
-            <SettingsSection id="danger" title="Danger zone" description="Irreversible actions for this project.">
+            <SettingsSection id="danger" title="Danger zone" description="Irreversible actions for this project, organization, and account.">
               <SettingsCard tone="danger">
                 <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                   <div className="flex min-w-0 items-start gap-3">
@@ -785,6 +802,7 @@ export function SetupPanel({
                   </button>
                 </div>
               </SettingsCard>
+              {dangerZoneContent}
             </SettingsSection>
           </>
         )}
@@ -856,6 +874,14 @@ export function SetupPanel({
               <li>Write keys will be revoked and ingestion will cease immediately.</li>
             </ul>
           </div>
+
+          <p className="text-sm text-neutral-600 dark:text-slate-300">
+            Want to keep a copy first?{' '}
+            <Link href={`/dashboard/export${projectQuery}`} className="font-medium text-neutral-900 underline underline-offset-4 dark:text-white">
+              Export this project&apos;s data
+            </Link>
+            .
+          </p>
 
           <div className="space-y-3 pt-1">
             <label className="block">

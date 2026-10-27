@@ -30,7 +30,16 @@ export default async function SettingsPage({
       organizationId={organizationId}
     >
       <SettingsTabs />
-      <SetupPanel organizationId={organizationId} projectId={projectId} newProject={newProject}>
+      <SetupPanel
+        organizationId={organizationId}
+        projectId={projectId}
+        newProject={newProject}
+        dangerZoneContent={
+          process.env.NEXT_PUBLIC_AUTH_MODE !== 'local'
+            ? <AccountLifecyclePanel exportHref={`/dashboard/export${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`} />
+            : null
+        }
+      >
         <SettingsSection id="security" title="Security" description="Protect how you sign in to TraceIQ.">
           <TwoFactorPanel />
           <PasswordSettingsPanel userEmail={user.email} />
@@ -38,7 +47,6 @@ export default async function SettingsPage({
         </SettingsSection>
         <PersonalAccessTokensPanel />
       </SetupPanel>
-      {process.env.NEXT_PUBLIC_AUTH_MODE !== 'local' ? <AccountLifecyclePanel /> : null}
     </DashboardShell>
   );
 }
