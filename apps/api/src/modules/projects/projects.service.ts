@@ -40,6 +40,10 @@ export class ProjectsService {
         JOIN organizations o ON o.id = om.organization_id
         JOIN projects p ON p.organization_id = o.id
         WHERE om.user_id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM account_lifecycle_requests r
+            WHERE r.target_type = 'organization' AND r.target_id = o.id AND r.status = 'pending'
+          )
         ORDER BY o.created_at ASC, p.created_at ASC
       `,
       [user.id]
@@ -80,6 +84,10 @@ export class ProjectsService {
         WHERE om.user_id = $1
           AND ($2::text IS NULL OR p.id = $2)
           AND ($3::text IS NULL OR o.id = $3)
+          AND NOT EXISTS (
+            SELECT 1 FROM account_lifecycle_requests r
+            WHERE r.target_type = 'organization' AND r.target_id = o.id AND r.status = 'pending'
+          )
         ORDER BY (p.id = $4) DESC NULLS LAST, o.created_at ASC, p.created_at ASC
         LIMIT 1
       `,

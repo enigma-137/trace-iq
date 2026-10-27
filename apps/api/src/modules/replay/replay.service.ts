@@ -578,6 +578,58 @@ export class ReplayService {
 
   deleteForProject(projectId: string) { return this.deleteMatching('project_id=$1', [projectId], 'project_deleted'); }
   deleteForOrganization(organizationId: string) { return this.deleteMatching('organization_id=$1', [organizationId], 'organization_deleted'); }
+
+  async exportForOrganization(organizationId: string, maxBytes: number) {
+    const replays = await this.database.query<{ id: string; recording_format: string; recording_version: string }>(
+      `
+        SELECT id, recording_format, recording_version
+        FROM session_replays
+        WHERE organization_id = $1 AND deleted_at IS NULL
+        ORDER BY created_at, id
+      `,
+      [organizationId]
+    );
+    const exported: Array<{
+      replayId: string;
+      format: string;
+      version: string;
+      chunks: Array<{ sequence: number; contentEncoding: 'gzip'; contentBase64: string }>;
+    }> = [];
+    let bytesUsed = 0;
+
+    for (const replay of replays.rows) {
+      const chunks = await this.database.query<{ sequence: number; storage_key: string }>(
+        `
+          SELECT sequence, storage_key
+          FROM replay_chunks
+          WHERE replay_id = $1 AND deleted_at IS NULL
+          ORDER BY sequence
+        `,
+        [replay.id]
+      );
+      const exportedChunks: Array<{ sequence: number; contentEncoding: 'gzip'; contentBase64: string }> = [];
+      for (const chunk of chunks.rows) {
+        const content = await this.storage.get(chunk.storage_key);
+        const contentBase64 = content.toString('base64');
+        bytesUsed += Buffer.byteLength(contentBase64);
+        if (bytesUsed > maxBytes) {
+          throw new ConflictException(
+            'This organization export exceeds the 10 MB limit because of session replay data. Export smaller projects separately or contact support.'
+          );
+        }
+        exportedChunks.push({ sequence: chunk.sequence, contentEncoding: 'gzip', contentBase64 });
+      }
+      exported.push({
+        replayId: replay.id,
+        format: replay.recording_format,
+        version: replay.recording_version,
+        chunks: exportedChunks
+      });
+    }
+
+    return exported;
+  }
+
   deleteForSubject(projectId: string, userId?: string, anonymousId?: string) {
     if (!userId && !anonymousId) throw new BadRequestException('A userId or anonymousId is required.');
     return this.deleteMatching('project_id=$1 AND ($2::text IS NULL OR user_id=$2) AND ($3::text IS NULL OR anonymous_id=$3)', [projectId, userId ?? null, anonymousId ?? null], 'data_subject_request');

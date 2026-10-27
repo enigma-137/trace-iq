@@ -704,6 +704,17 @@ export class EventsService {
     const cacheKey = `${projectId}:${keyHash}`;
     const cached = this.writeKeyCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
+      const scheduled = await this.database.query(
+        `
+          SELECT 1 FROM account_lifecycle_requests
+          WHERE target_type = 'organization' AND target_id = $1 AND status = 'pending'
+          LIMIT 1
+        `,
+        [cached.record.organization_id]
+      );
+      if (scheduled.rows.length) {
+        throw new UnauthorizedException('This organization is scheduled for deletion and no longer accepts events.');
+      }
       return cached.record;
     }
 
@@ -717,6 +728,10 @@ export class EventsService {
         WHERE pwk.key_hash = $1
           AND pwk.project_id = $2
           AND pwk.revoked_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM account_lifecycle_requests r
+            WHERE r.target_type = 'organization' AND r.target_id = p.organization_id AND r.status = 'pending'
+          )
         LIMIT 1
       `,
       [keyHash, projectId]

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 
@@ -57,7 +57,10 @@ export class AuthService {
    * Pass `fresh: true` where the response shows the account's live MFA factors,
    * so enrolment screens never read a cached factor list.
    */
-  async getDashboardUser(authorizationHeader?: string, options: { fresh?: boolean } = {}): Promise<DashboardUser> {
+  async getDashboardUser(
+    authorizationHeader?: string,
+    options: { fresh?: boolean; allowPendingDeletion?: boolean } = {}
+  ): Promise<DashboardUser> {
     if (this.isLocalAuthMode()) {
       await this.ensureLocalWorkspace();
       return {
@@ -72,7 +75,9 @@ export class AuthService {
     const token = this.getBearerToken(authorizationHeader);
 
     if (token.startsWith('tiq_pat_')) {
-      return this.validatePersonalAccessToken(token);
+      const user = await this.validatePersonalAccessToken(token);
+      if (!options.allowPendingDeletion) await this.assertAccountNotPendingDeletion(user.id);
+      return user;
     }
 
     const user = await this.getSupabaseUser(token, options.fresh === true);
@@ -81,13 +86,71 @@ export class AuthService {
       throw new UnauthorizedException('Supabase session is missing a user ID.');
     }
 
-    return {
+    const dashboardUser: DashboardUser = {
       id: user.id,
       email: user.email,
       authMethod: 'supabase',
       amr: this.decodeAmr(token),
       factors: user.factors
     };
+    if (!options.allowPendingDeletion) await this.assertAccountNotPendingDeletion(dashboardUser.id);
+    return dashboardUser;
+  }
+
+  async deleteSupabaseUser(userId: string): Promise<void> {
+    this.assertAccountDeletionAvailable();
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new ServiceUnavailableException('Supabase account deletion is not configured.');
+    }
+
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`
+      }
+    });
+
+    if (!response.ok && response.status !== 404) {
+      const detail = await response.text();
+      throw new ServiceUnavailableException(
+        `Supabase could not delete the account (HTTP ${response.status}): ${detail.slice(0, 200)}`
+      );
+    }
+    for (const [token, entry] of this.supabaseUserCache) {
+      if (entry.user.id === userId) this.supabaseUserCache.delete(token);
+    }
+  }
+
+  assertAccountDeletionAvailable(): void {
+    if (this.isLocalAuthMode()) {
+      throw new ForbiddenException('Account deletion requires an external authentication provider.');
+    }
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new ServiceUnavailableException('Supabase account deletion is not configured.');
+    }
+  }
+
+  private async assertAccountNotPendingDeletion(userId: string): Promise<void> {
+    const pending = await this.database.query(
+      `
+        SELECT 1
+        FROM account_lifecycle_requests
+        WHERE target_type = 'account' AND target_id = $1 AND status = 'pending'
+        LIMIT 1
+      `,
+      [userId]
+    );
+    if (pending.rows.length > 0) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_DELETION_PENDING',
+        message: 'This account is scheduled for deletion. Cancel the request in account settings to continue.'
+      });
+    }
   }
 
   /**
@@ -154,6 +217,10 @@ export class AuthService {
         FROM organization_members om
         JOIN organizations o ON o.id = om.organization_id
         WHERE om.user_id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM account_lifecycle_requests r
+            WHERE r.target_type = 'organization' AND r.target_id = o.id AND r.status = 'pending'
+          )
         ORDER BY o.created_at ASC
         LIMIT 1;
       `,
@@ -447,5 +514,3 @@ export class AuthService {
     };
   }
 }
-
-

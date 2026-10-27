@@ -6,6 +6,7 @@ import { PersonalAccessTokensPanel } from './PersonalAccessTokensPanel';
 import { SettingsSection } from './SettingsUI';
 import { SettingsTabs } from './SettingsTabs';
 import { TwoFactorPanel } from './TwoFactorPanel';
+import { AccountLifecyclePanel } from './AccountLifecyclePanel';
 import { requireDashboardSession } from '@/lib/dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,7 @@ export default async function SettingsPage({
         </SettingsSection>
         <PersonalAccessTokensPanel />
       </SetupPanel>
+      {process.env.NEXT_PUBLIC_AUTH_MODE !== 'local' ? <AccountLifecyclePanel /> : null}
     </DashboardShell>
   );
 }
