@@ -1,6 +1,6 @@
 {
   "name": "traceiq-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -17,7 +17,8 @@
   "files": [
     "bin",
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

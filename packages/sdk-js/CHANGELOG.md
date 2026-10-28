@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - **`release` option.** Set your app version or build in `initialize({ release })`; it is sent as `context.release` on every event, and Error tracking shows the release each error was first and last seen in.
 

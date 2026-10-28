@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - **`release` option** (defaults to the `TRACEIQ_RELEASE` environment variable) is sent as `context.release` on every event, so Error tracking can show which release each error was seen in. A per-event `context.release` wins.
 
