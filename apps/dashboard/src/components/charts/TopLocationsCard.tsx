@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getCountryFlag } from '@/lib/country-codes';
+import { CountryFlag } from '@/components/icons/CountryFlag';
 
 export interface LocationItem {
   name: string;
@@ -14,8 +14,6 @@ interface TopLocationsCardProps {
   cities: LocationItem[];
   className?: string;
 }
-
-export { getCountryFlag };
 
 function formatVolume(val: number): string {
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
@@ -77,13 +75,12 @@ export function TopLocationsCard({ countries = [], cities = [], className = '' }
           ) : (
             <div className="space-y-3">
               {countries.slice(0, 6).map((item) => {
-                const flag = getCountryFlag(item.name);
                 const relativePct = Math.max(8, Math.min(100, (item.total / maxCountry) * 100));
                 return (
                   <div key={item.name} className="group flex flex-col gap-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-2 font-medium text-neutral-800 dark:text-slate-200">
-                        <span className="text-sm leading-none">{flag}</span>
+                        <CountryFlag country={item.name} />
                         <span className="capitalize">{item.name}</span>
                       </span>
                       <span className="font-mono text-neutral-500 dark:text-slate-400">

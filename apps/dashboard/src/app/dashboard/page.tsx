@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
@@ -27,6 +28,8 @@ import { RecentLogsPanel } from './RecentLogsPanel';
 import { alpha2ToName } from '@/lib/country-codes';
 import { OverviewGeographyGlobe } from './OverviewGeographyGlobe';
 import { PageBanner } from '@/components/PageBanner';
+import { BrandIcon } from '@/components/icons/BrandIcon';
+import { CountryFlag } from '@/components/icons/CountryFlag';
 
 export const dynamic = 'force-dynamic';
 
@@ -487,7 +490,8 @@ export default async function DashboardPage({
                   <CompactRanking
                     items={(overview?.topCountries ?? []).map((country) => ({
                       label: alpha2ToName(country.name.toUpperCase()) ?? country.name,
-                      value: country.total
+                      value: country.total,
+                      icon: <CountryFlag country={country.name} />
                     }))}
                   />
                 </>
@@ -508,6 +512,7 @@ export default async function DashboardPage({
                 items={dashboardReferrers.map((referrer) => ({
                   label: referrer.domain,
                   value: referrer.views,
+                  icon: <BrandIcon label={referrer.domain} />,
                   secondary: `${referrer.visitors.toLocaleString()} visitors`
                 }))}
                 emptyLabel="No page referrers yet."
@@ -578,7 +583,7 @@ function CompactRanking({
   items,
   emptyLabel = 'No data yet.'
 }: {
-  items: Array<{ label: string; value: number; secondary?: string }>;
+  items: Array<{ label: string; value: number; secondary?: string; icon?: ReactNode }>;
   emptyLabel?: string;
 }) {
   if (items.length === 0) {
@@ -592,7 +597,10 @@ function CompactRanking({
       {items.slice(0, 5).map((item) => (
         <li key={item.label} className="py-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="truncate font-medium text-neutral-700 dark:text-slate-200">{item.label}</span>
+            <span className="flex min-w-0 items-center gap-2 font-medium text-neutral-700 dark:text-slate-200">
+              {item.icon}
+              <span className="truncate">{item.label}</span>
+            </span>
             <div className="flex items-center gap-2">
               {item.secondary ? (
                 <span className="text-[11px] text-neutral-400 dark:text-slate-500">{item.secondary}</span>

@@ -33,6 +33,8 @@ import { DashboardDialog } from '../DashboardDialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import { BrandIcon } from '@/components/icons/BrandIcon';
+import { CountryFlag } from '@/components/icons/CountryFlag';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -821,7 +823,8 @@ export function ReplaysWorkspace({
                               <p className="font-medium text-neutral-800 dark:text-slate-200">
                                 {replay.deviceType || (isMobile ? 'Mobile' : 'Desktop')}
                               </p>
-                              <p className="text-[10px] text-neutral-400 dark:text-slate-500">
+                              <p className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-slate-500">
+                                <BrandIcon label={replay.browser || 'Chrome'} size={11} />
                                 {replay.browser || 'Chrome'}
                               </p>
                             </div>
@@ -830,7 +833,14 @@ export function ReplaysWorkspace({
 
                         {/* Location */}
                         <td className="px-3 py-3 whitespace-nowrap text-neutral-600 dark:text-slate-400">
-                          {replay.country || '—'}
+                          {replay.country ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <CountryFlag country={replay.country} />
+                              {replay.country}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
                         </td>
 
                         {/* Size */}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
@@ -16,8 +16,18 @@ import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
 import { compactNumber, formatEventName } from '@/lib/metrics';
 import { formatDuration } from '@/lib/requests';
-import { DEMO_RANGES, buildOverview, buildRequests, halfOverHalf, seededRandom, type DemoOverview as Overview } from '@/lib/demo-data';
+import {
+  DEMO_RANGES,
+  buildOverview,
+  buildRequests,
+  halfOverHalf,
+  seededRandom,
+  type DemoBreakdownRow,
+  type DemoOverview as Overview
+} from '@/lib/demo-data';
 import { MethodBadge, StatusBadge } from '../dashboard/requests/RequestBadges';
+import { BrandIcon } from '@/components/icons/BrandIcon';
+import { CountryFlag } from '@/components/icons/CountryFlag';
 import { useDemo, useDemoCompany } from './DemoContext';
 
 const cardClass =
@@ -127,28 +137,43 @@ export function DemoOverview() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className={cardClass}>
-          <p className={`${cardTitleClass} border-b border-neutral-100 pb-3 dark:border-slate-800/70`}>Devices</p>
-          <div className="mt-3">
-            <DonutChart items={overview.devices} centerValue={compactNumber(overview.totals.visitors)} centerLabel="visitors" />
-          </div>
-        </div>
-        <div className={cardClass}>
-          <p className={`${cardTitleClass} border-b border-neutral-100 pb-3 dark:border-slate-800/70`}>Browsers</p>
-          <div className="mt-3">
-            <DonutChart items={overview.browsers} centerValue={String(overview.browsers.length)} centerLabel="browsers" />
-          </div>
-        </div>
-        <div className={cardClass}>
-          <p className={`${cardTitleClass} border-b border-neutral-100 pb-3 dark:border-slate-800/70`}>Countries</p>
+          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Visitor locations</p>
+          <p className="text-xs text-neutral-500 dark:text-slate-400">Geographic distribution</p>
           <BarRanking
             items={overview.countries.map((country) => ({
-              label: `${flag(country.code)} ${country.name}`,
-              value: country.visitors
+              label: country.name,
+              value: country.visitors,
+              icon: <CountryFlag country={country.code} />
             }))}
             total={overview.totals.visitors}
           />
+        </div>
+        <div className={cardClass}>
+          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Devices</p>
+          <p className="text-xs text-neutral-500 dark:text-slate-400">Device breakdown</p>
+          <div className="mt-3">
+            <DonutChart
+              items={overview.devices.map((row) => ({ label: row.label, value: row.visitors }))}
+              centerValue={compactNumber(overview.totals.visitors)}
+              centerLabel="visitors"
+            />
+          </div>
+          <BreakdownTable rows={overview.devices} heading="Device type" />
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className={cardClass}>
+          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Browsers</p>
+          <p className="text-xs text-neutral-500 dark:text-slate-400">Browser breakdown</p>
+          <BreakdownTable rows={overview.browsers} heading="Browser" />
+        </div>
+        <div className={cardClass}>
+          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Operating systems</p>
+          <p className="text-xs text-neutral-500 dark:text-slate-400">OS breakdown</p>
+          <BreakdownTable rows={overview.operatingSystems} heading="Operating system" />
         </div>
       </section>
 
@@ -186,10 +211,6 @@ function deltaProps(change: number) {
     deltaTone: change >= 0 ? ('green' as const) : ('red' as const),
     deltaDirection: change >= 0 ? ('up' as const) : ('down' as const)
   };
-}
-
-function flag(code: string): string {
-  return String.fromCodePoint(...[...code.toUpperCase()].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65));
 }
 
 /** A visitor count and event feed that tick while the page is open, so the demo feels live. */
@@ -237,7 +258,7 @@ function LiveNowPanel({ overview, seed }: { overview: Overview; seed: string }) 
       <ul className="mt-4 space-y-2">
         {feed.map((item) => (
           <li key={item.key} className="flex items-center gap-2 text-xs">
-            <span aria-hidden="true">{flag(item.country)}</span>
+            <CountryFlag country={item.country} />
             <span className="min-w-0 flex-1 truncate">
               <span className="font-medium text-neutral-800 dark:text-slate-200">{formatEventName(item.event)}</span>
               <span className="text-neutral-400 dark:text-slate-500"> on </span>
@@ -261,9 +282,12 @@ function AiReferrals({ overview }: { overview: Overview }) {
         <p className="text-[11px] text-neutral-500 dark:text-slate-400">AI referrals</p>
       </div>
       {ai.map((source) => (
-        <div key={source.name} className="text-xs">
-          <p className="font-semibold text-neutral-800 dark:text-slate-200">{source.name}</p>
-          <p className="text-neutral-500 dark:text-slate-400">{source.visitors.toLocaleString()} visitors</p>
+        <div key={source.name} className="flex items-center gap-2 text-xs">
+          <BrandIcon label={source.name} domain={source.domain} size={18} />
+          <div>
+            <p className="font-semibold text-neutral-800 dark:text-slate-200">{source.name}</p>
+            <p className="text-neutral-500 dark:text-slate-400">{source.visitors.toLocaleString()} visitors</p>
+          </div>
         </div>
       ))}
       <p className="ml-auto hidden max-w-xs text-[11px] text-neutral-400 dark:text-slate-500 md:block">
@@ -273,19 +297,23 @@ function AiReferrals({ overview }: { overview: Overview }) {
   );
 }
 
-type SourceTab = 'sources' | 'utm_source' | 'utm_campaign';
+type SourceTab = 'sources' | 'referrers' | 'utm_source' | 'utm_campaign';
 
 function TrafficSources({ overview }: { overview: Overview }) {
   const [tab, setTab] = useState<SourceTab>('sources');
-  const rows =
+  const rows: Array<{ name: string; domain?: string | null; visitors: number; views: number }> =
     tab === 'sources'
-      ? overview.sources.map((s) => ({ name: s.name, visitors: s.visitors, views: s.views }))
-      : tab === 'utm_source'
-        ? overview.utmSources
-        : overview.utmCampaigns;
+      ? overview.sources
+      : tab === 'referrers'
+        ? overview.referrers.map((referrer) => ({ name: referrer.domain, domain: referrer.domain, visitors: referrer.visitors, views: referrer.views }))
+        : tab === 'utm_source'
+          ? overview.utmSources
+          : overview.utmCampaigns;
+  const withIcons = tab === 'sources' || tab === 'referrers';
   const total = Math.max(1, rows.reduce((sum, row) => sum + row.visitors, 0));
   const tabs: Array<{ value: SourceTab; label: string; count: number }> = [
     { value: 'sources', label: 'Sources', count: overview.sources.length },
+    { value: 'referrers', label: 'Referrers', count: overview.referrers.length },
     { value: 'utm_source', label: 'UTM sources', count: overview.utmSources.length },
     { value: 'utm_campaign', label: 'UTM campaigns', count: overview.utmCampaigns.length }
   ];
@@ -332,11 +360,16 @@ function TrafficSources({ overview }: { overview: Overview }) {
                     style={{ width: `${Math.max(2, share)}%` }}
                     aria-hidden="true"
                   />
-                  <span className="relative font-medium text-neutral-800 dark:text-slate-200">{row.name}</span>
+                  <span className="relative flex min-w-0 items-center gap-2 font-medium text-neutral-800 dark:text-slate-200">
+                    {withIcons ? <BrandIcon label={row.name} domain={row.domain} /> : null}
+                    <span className="truncate">{row.name}</span>
+                  </span>
                 </td>
                 <td className="py-2 text-right tabular-nums text-neutral-700 dark:text-slate-300">{row.visitors.toLocaleString()}</td>
                 <td className="py-2 text-right tabular-nums text-neutral-500 dark:text-slate-400">{row.views.toLocaleString()}</td>
-                <td className="py-2 text-right tabular-nums text-neutral-500 dark:text-slate-400">{share.toFixed(1)}%</td>
+                <td className="py-2 text-right">
+                  <SharePill share={share} />
+                </td>
               </tr>
             );
           })}
@@ -393,14 +426,19 @@ function TopPages({ overview }: { overview: Overview }) {
   );
 }
 
-function BarRanking({ items, total }: { items: Array<{ label: string; value: number }>; total: number }) {
+function BarRanking({ items, total }: { items: Array<{ label: string; value: number; icon?: ReactNode }>; total: number }) {
   return (
     <ul className="mt-2 divide-y divide-neutral-100 dark:divide-slate-800/60">
-      {items.slice(0, 7).map((item) => (
+      {items.slice(0, 10).map((item) => (
         <li key={item.label} className="py-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="truncate font-medium text-neutral-700 dark:text-slate-200">{item.label}</span>
-            <span className="font-mono text-neutral-500 dark:text-slate-400">{((item.value / Math.max(1, total)) * 100).toFixed(1)}%</span>
+            <span className="flex min-w-0 items-center gap-2 font-medium text-neutral-700 dark:text-slate-200">
+              {item.icon}
+              <span className="truncate">{item.label}</span>
+            </span>
+            <span className="font-mono text-neutral-500 dark:text-slate-400">
+              {compactNumber(item.value)} · {((item.value / Math.max(1, total)) * 100).toFixed(1)}%
+            </span>
           </div>
           <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
             <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (item.value / Math.max(1, items[0]?.value ?? 1)) * 100)}%` }} />
@@ -408,5 +446,49 @@ function BarRanking({ items, total }: { items: Array<{ label: string; value: num
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Share of the total, highlighted like Databuddy's: top rows stand out. */
+function SharePill({ share }: { share: number }) {
+  const tone =
+    share >= 30
+      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+      : share >= 10
+        ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
+        : 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300';
+  return <span className={`inline-flex min-w-[46px] justify-center rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums ${tone}`}>{share.toFixed(1)}%</span>;
+}
+
+function BreakdownTable({ rows, heading }: { rows: DemoBreakdownRow[]; heading: string }) {
+  const total = Math.max(1, rows.reduce((sum, row) => sum + row.visitors, 0));
+  return (
+    <table className="mt-3 w-full text-xs">
+      <thead>
+        <tr className="text-left text-[11px] text-neutral-400 dark:text-slate-500">
+          <th className="py-2 font-medium">{heading}</th>
+          <th className="py-2 text-right font-medium">Visitors</th>
+          <th className="py-2 text-right font-medium">Pageviews</th>
+          <th className="py-2 text-right font-medium">Share</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-neutral-100 dark:divide-slate-800/60">
+        {rows.map((row) => (
+          <tr key={row.label}>
+            <td className="py-2 pr-2">
+              <span className="flex min-w-0 items-center gap-2 font-medium text-neutral-800 dark:text-slate-200">
+                <BrandIcon label={row.label} />
+                <span className="truncate">{row.label}</span>
+              </span>
+            </td>
+            <td className="py-2 text-right tabular-nums text-neutral-700 dark:text-slate-300">{compactNumber(row.visitors)}</td>
+            <td className="py-2 text-right tabular-nums text-neutral-500 dark:text-slate-400">{compactNumber(row.views)}</td>
+            <td className="py-2 text-right">
+              <SharePill share={(row.visitors / total) * 100} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
