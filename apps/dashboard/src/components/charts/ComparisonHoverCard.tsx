@@ -84,14 +84,24 @@ function Period({ label, value, range }: { label: string; value: string; range: 
 /** "Sep 29 – Oct 29" for the window ending at `end` (exclusive) and the one before it. */
 export function comparisonRanges(end: Date, days: number): { previousLabel: string; currentLabel: string } {
   const day = 86_400_000;
-  const fmt = (date: Date) =>
-    days <= 1
-      ? date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', timeZone: 'UTC' })
-      : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const fmt = rangeDateFormatter(days);
   const currentStart = new Date(end.getTime() - days * day);
   const previousStart = new Date(end.getTime() - 2 * days * day);
   return {
     previousLabel: `${fmt(previousStart)} – ${fmt(currentStart)}`,
     currentLabel: `${fmt(currentStart)} – ${fmt(end)}`
   };
+}
+
+/** Labels for an all-time count compared with its value when the window started. */
+export function snapshotLabels(end: Date, days: number): { previousLabel: string; currentLabel: string } {
+  const start = new Date(end.getTime() - days * 86_400_000);
+  return { previousLabel: `As of ${rangeDateFormatter(days)(start)}`, currentLabel: 'Now' };
+}
+
+function rangeDateFormatter(days: number) {
+  return (date: Date) =>
+    days <= 1
+      ? date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', timeZone: 'UTC' })
+      : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
