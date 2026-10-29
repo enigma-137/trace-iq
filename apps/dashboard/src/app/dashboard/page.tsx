@@ -154,7 +154,7 @@ interface TrendResponse {
 }
 
 const cardClass =
-  'relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950';
+  'relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 export default async function DashboardPage({
   searchParams
@@ -222,6 +222,19 @@ export default async function DashboardPage({
     current === undefined || previous === undefined || !ranges
       ? undefined
       : { previous: format(previous), current: format(current), ...(options.labels ?? ranges), change: percentChange(current, previous), invert: options.invert };
+  // The card's headline delta: % change against the previous window, colored by
+  // whether that direction is good. Undefined when the API sent no previous value.
+  const changeDelta = (current: number | undefined, previous: number | undefined, invert = false) => {
+    if (current === undefined || previous === undefined || !ranges) return undefined;
+    const change = percentChange(current, previous);
+    if (change === null) return undefined;
+    const rounded = Math.round(change);
+    return {
+      delta: signedPercent(change) === 'flat' ? '0%' : signedPercent(change),
+      deltaTone: rounded === 0 ? ('neutral' as const) : (invert ? rounded < 0 : rounded > 0) ? ('green' as const) : ('red' as const),
+      deltaDirection: rounded < 0 ? ('down' as const) : ('up' as const)
+    };
+  };
   const ms = (value: number) => (value > 0 ? `${value.toLocaleString()} ms` : '–');
   const pct = (value: number) => `${value}%`;
   const count = (value: number) => value.toLocaleString();
@@ -363,9 +376,16 @@ export default async function DashboardPage({
             icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
             title="P95 Latency"
             value={overview?.apiTelemetry?.p95 !== undefined && overview.apiTelemetry.p95 > 0 ? `${overview.apiTelemetry.p95.toLocaleString()} ms` : '-'}
-            delta={overview?.apiTelemetry?.p50 ? `Median ${overview.apiTelemetry.p50.toLocaleString()} ms` : undefined}
-            deltaTone="neutral"
-            deltaDirection="up"
+            {...(changeDelta(overview?.apiTelemetry?.p95, previousTotals?.p95, true) ?? {
+              delta: overview?.apiTelemetry?.p50 ? `Median ${overview.apiTelemetry.p50.toLocaleString()} ms` : undefined,
+              deltaTone: 'neutral' as const,
+              deltaDirection: 'up' as const
+            })}
+            deltaSubtext={
+              changeDelta(overview?.apiTelemetry?.p95, previousTotals?.p95) && overview?.apiTelemetry?.p50
+                ? `median ${overview.apiTelemetry.p50.toLocaleString()} ms`
+                : undefined
+            }
             color="emerald"
             sparklineData={latencySparkline}
             comparison={compare(overview?.apiTelemetry?.p95, previousTotals?.p95, ms, { invert: true })}
@@ -375,10 +395,18 @@ export default async function DashboardPage({
             icon={<HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.8} />}
             title="Failure Rate"
             value={overview?.apiTelemetry?.errorRate !== undefined ? `${overview.apiTelemetry.errorRate}%` : '0%'}
-            delta={failedRequests !== undefined ? `${failedRequests.toLocaleString()} failed` : undefined}
-            deltaTone={failedRequests ? 'red' : 'neutral'}
-            deltaDirection={failedRequests ? 'up' : undefined}
-            deltaSubtext={failedRequests !== undefined ? `${serverErrors.toLocaleString()} server errors (5xx)` : undefined}
+            {...(changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, true) ?? {
+              delta: failedRequests !== undefined ? `${failedRequests.toLocaleString()} failed` : undefined,
+              deltaTone: failedRequests ? ('red' as const) : ('neutral' as const),
+              deltaDirection: failedRequests ? ('up' as const) : undefined
+            })}
+            deltaSubtext={
+              failedRequests === undefined
+                ? undefined
+                : changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate)
+                  ? `${failedRequests.toLocaleString()} failed · ${serverErrors.toLocaleString()} 5xx`
+                  : `${serverErrors.toLocaleString()} server errors (5xx)`
+            }
             color="rose"
             sparklineData={failedSparkline}
             comparison={compare(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, pct, { invert: true })}
@@ -388,10 +416,18 @@ export default async function DashboardPage({
             icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}
             title="Identified Profiles"
             value={overview?.totals.users ?? 0}
-            delta={overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : undefined}
-            deltaTone="blue"
-            deltaDirection="up"
-            deltaSubtext={overview?.totals.sessions ? 'active sessions' : undefined}
+            {...(changeDelta(overview?.totals.users, previousTotals?.users) ?? {
+              delta: overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : undefined,
+              deltaTone: 'blue' as const,
+              deltaDirection: 'up' as const
+            })}
+            deltaSubtext={
+              overview?.totals.sessions
+                ? changeDelta(overview?.totals.users, previousTotals?.users)
+                  ? `${overview.totals.sessions.toLocaleString()} sessions`
+                  : 'active sessions'
+                : undefined
+            }
             color="purple"
             sparklineData={usersSparkline}
             comparison={
@@ -406,9 +442,12 @@ export default async function DashboardPage({
             icon={<HugeiconsIcon icon={DashboardSpeed01Icon} size={16} strokeWidth={1.8} />}
             title="API Requests"
             value={overview?.apiTelemetry?.totalRequests ?? (overview?.totals.events24h ?? 0)}
-            delta={overview?.totals.events1h ? `${overview.totals.events1h.toLocaleString()} in 1h` : undefined}
-            deltaTone="neutral"
-            deltaDirection="up"
+            {...(changeDelta(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests) ?? {
+              delta: overview?.totals.events1h ? `${overview.totals.events1h.toLocaleString()} in 1h` : undefined,
+              deltaTone: 'neutral' as const,
+              deltaDirection: 'up' as const
+            })}
+            deltaSubtext={changeDelta(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests) ? `vs previous ${appliedRange?.long ?? ''}` : undefined}
             color="cyan"
             sparklineData={apiSparkline}
             comparison={compare(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests, count)}

@@ -92,7 +92,7 @@ export function RecentLogsPanel({ projectId, className = '' }: { projectId?: str
 
   return (
     <section
-      className={`rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-xs dark:border-slate-800 dark:bg-slate-950 ${className}`}
+      className={`rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}
       aria-label="Recent logs"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-2.5 dark:border-slate-800/70">

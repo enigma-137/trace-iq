@@ -106,7 +106,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   }
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-neutral-200/85 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] transition hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-none dark:hover:border-slate-700 sm:p-6">
+    <section className="relative overflow-hidden rounded-2xl border border-neutral-200/85 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] transition hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-700 sm:p-6">
       {/* Top right actions: Dismiss & Refresh */}
       <div className="absolute right-4 top-4 flex items-center gap-1.5 z-10">
         <button

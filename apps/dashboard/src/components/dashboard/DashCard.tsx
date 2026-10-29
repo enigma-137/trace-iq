@@ -7,8 +7,14 @@ import type { ReactNode } from 'react';
  * shadow, a KPI strip, and a segmented date-range control. Server-safe.
  */
 
+/**
+ * Dark-mode card surface: a grey panel lifted off the near-black page, with a
+ * faint top highlight. Shared so every analytics card reads the same.
+ */
+export const darkCardSurface = 'dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+
 export const cardShell =
-  'overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-slate-800 dark:bg-slate-900/40 dark:shadow-none';
+  `overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] ${darkCardSurface}`;
 
 export function DashCard({
   title,

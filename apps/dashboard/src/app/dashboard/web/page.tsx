@@ -14,6 +14,7 @@ import { TrafficTimingCard } from '@/components/charts/TrafficTimingCard';
 import { DashCard, KpiStrip, RangeTabs, percentChange, secondaryButtonSm } from '@/components/dashboard/DashCard';
 import { comparisonRanges, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
 import { WebFilterBar, WebGoals } from './WebAnalyticsControls';
+import { ExpandableList } from '@/components/dashboard/ExpandableList';
 
 export const dynamic = 'force-dynamic';
 
@@ -298,8 +299,9 @@ export default async function WebAnalyticsPage({
                 })}
               </dl>
               {vitalPages.length > 0 ? (
-                <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
-                  {vitalPages.map((page) => (
+                <ExpandableList
+                  className="divide-y divide-neutral-100 dark:divide-slate-800"
+                  items={vitalPages.map((page) => (
                     <li key={`${page.path}:${page.metric}`} className="grid grid-cols-[minmax(0,1fr)_56px_88px_64px] items-center gap-3 px-4 py-2 text-xs">
                       <span className="truncate font-mono text-neutral-800 dark:text-slate-200">{page.path}</span>
                       <span className="font-medium text-neutral-500 dark:text-slate-400">{page.metric}</span>
@@ -307,7 +309,7 @@ export default async function WebAnalyticsPage({
                       <span className={`text-right tabular-nums ${page.poor > 0 ? 'text-red-600 dark:text-red-400' : 'text-neutral-400 dark:text-slate-500'}`}>{page.poor} poor</span>
                     </li>
                   ))}
-                </ul>
+                />
               ) : null}
             </>
           )}

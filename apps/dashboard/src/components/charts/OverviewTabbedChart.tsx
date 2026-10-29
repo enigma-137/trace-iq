@@ -114,7 +114,7 @@ export function OverviewTabbedChart({ data = [], windowLabel = '14-day', classNa
 
   return (
     <div
-      className={`flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-xs dark:border-white/[0.09] dark:bg-[#09090b] dark:shadow-none ${className}`}
+      className={`flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}
     >
       <div>
         {/* Header with Title and Tabs */}

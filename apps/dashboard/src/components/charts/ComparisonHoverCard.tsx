@@ -50,18 +50,18 @@ export function ComparisonCard({ title, icon, comparison }: { title: string; ico
   const tone = good === null ? 'text-neutral-500 dark:text-slate-400' : good ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400';
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white text-left shadow-xl dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2.5 dark:border-slate-800">
+    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white text-left shadow-xl dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2.5 dark:border-slate-700">
         {icon ? (
-          <span className="flex size-6 items-center justify-center rounded-md bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300">{icon}</span>
+          <span className="flex size-6 items-center justify-center rounded-md bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">{icon}</span>
         ) : null}
         <p className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</p>
       </div>
-      <dl className="grid grid-cols-2 divide-x divide-neutral-100 dark:divide-slate-800">
+      <dl className="grid grid-cols-2 divide-x divide-neutral-100 dark:divide-slate-700">
         <Period label="Previous" value={comparison.previous} range={comparison.previousLabel} />
         <Period label="Current" value={comparison.current} range={comparison.currentLabel} />
       </dl>
-      <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-950/60">
+      <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900/60">
         <span className="text-neutral-500 dark:text-slate-400">Change</span>
         <span className={`font-semibold tabular-nums ${tone}`}>
           {rounded === null ? 'n/a' : `${rounded > 0 ? '↗ +' : rounded < 0 ? '↘ ' : ''}${rounded}%`}
