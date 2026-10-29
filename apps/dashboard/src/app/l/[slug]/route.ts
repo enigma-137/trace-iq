@@ -4,8 +4,16 @@ export const dynamic = 'force-dynamic';
 
 const apiBaseUrl = process.env.TRACEIQ_API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-// Visitor headers the API needs to record the click (device, country, referrer).
-const FORWARDED_HEADERS = ['user-agent', 'x-forwarded-for', 'x-real-ip', 'accept-language', 'cf-ipcountry'];
+// Visitor headers the API needs to record the click (device, location, referrer). Vercel's
+// geo headers describe the visitor, so the API uses them instead of looking up an IP.
+const FORWARDED_HEADERS = [
+  'user-agent',
+  'accept-language',
+  'cf-ipcountry',
+  'x-vercel-ip-country',
+  'x-vercel-ip-country-region',
+  'x-vercel-ip-city'
+];
 
 /** Short-link redirect: asks the API where /l/<slug> goes, then sends the visitor there. */
 export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
@@ -16,6 +24,10 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
   }
   const referrer = request.headers.get('referer');
   if (referrer) headers['x-traceiq-referrer'] = referrer;
+  // The API is reached through its own proxy, which replaces X-Forwarded-For with this
+  // server's address, so the visitor's IP travels in a header that proxy leaves alone.
+  const visitorIp = clientIp(request);
+  if (visitorIp) headers['x-traceiq-client-ip'] = visitorIp;
 
   let status = 502;
   try {
@@ -42,6 +54,11 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     status: status === 404 || status === 410 ? status : 502,
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }
   });
+}
+
+function clientIp(request: NextRequest): string | undefined {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return request.ip ?? (forwarded || request.headers.get('x-real-ip')?.trim() || undefined);
 }
 
 function errorPage(status: number) {
