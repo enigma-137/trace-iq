@@ -3,17 +3,6 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import styles from "@/app/landing-light.module.css";
 
-const features = [
-  { label: "Product analytics", href: "/docs?page=insights" },
-  { label: "Session replay", href: "/docs?page=session-replay" },
-  { label: "Error tracking", href: "/docs?page=source-maps" },
-  { label: "API performance", href: "/docs?page=api-performance" },
-  { label: "Logs", href: "/docs?page=logs" },
-  { label: "Feature flags", href: "/docs?page=flags" },
-  { label: "Experiments", href: "/docs?page=experiments" },
-  { label: "Surveys", href: "/docs?page=surveys" },
-  { label: "Synthetic monitors", href: "/docs?page=synthetic-monitors" },
-];
 
 export function LandingHero() {
   return (
@@ -45,13 +34,6 @@ export function LandingHero() {
         <p className={styles.heroNote}>
           Free up to 50,000 events a month, or self-host with no limits.
         </p>
-        <ul className={styles.heroFeatures} aria-label="What TraceIQ does">
-          {features.map((feature) => (
-            <li key={feature.label}>
-              <Link href={feature.href}>{feature.label}</Link>
-            </li>
-          ))}
-        </ul>
       </div>
 
       <div className={styles.heroVisual}>
