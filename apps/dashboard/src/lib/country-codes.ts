@@ -456,50 +456,34 @@ export function countryName(code: string): string {
   return code;
 }
 
-const COMMON_COUNTRY_FLAGS: Record<string, string> = {
-  nigeria: '🇳🇬',
-  'united states': '🇺🇸',
-  usa: '🇺🇸',
-  ghana: '🇬🇭',
-  india: '🇮🇳',
-  brazil: '🇧🇷',
-  'united kingdom': '🇬🇧',
-  uk: '🇬🇧',
-  canada: '🇨🇦',
-  germany: '🇩🇪',
-  france: '🇫🇷',
-  kenya: '🇰🇪',
-  'south africa': '🇿🇦',
-  australia: '🇦🇺',
-  netherlands: '🇳🇱',
-  singapore: '🇸🇬',
-  japan: '🇯🇵',
-  china: '🇨🇳'
+const NAME_TO_ALPHA2: Record<string, string> = Object.fromEntries(
+  Object.entries(ALPHA2_TO_NAME).map(([code, name]) => [name.toLowerCase(), code])
+);
+
+const COUNTRY_NAME_ALIASES: Record<string, string> = {
+  usa: 'US',
+  'united states of america': 'US',
+  us: 'US',
+  uk: 'GB',
+  'great britain': 'GB',
+  england: 'GB',
+  russia: 'RU',
+  'south korea': 'KR',
+  korea: 'KR',
+  vietnam: 'VN',
+  iran: 'IR'
 };
 
-export function getCountryFlag(name?: string | null): string {
-  if (!name) return '🌐';
-  const clean = name.trim().toLowerCase();
-  if (COMMON_COUNTRY_FLAGS[clean]) return COMMON_COUNTRY_FLAGS[clean];
-
-  if (clean.length === 2 && /^[a-z]{2}$/.test(clean)) {
-    const codePoints = clean
-      .toUpperCase()
-      .split('')
-      .map((char) => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
+/** ISO alpha-2 code for a code, numeric code or country name; null when unknown. */
+export function countryCode(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const clean = value.trim();
+  const alias = COUNTRY_NAME_ALIASES[clean.toLowerCase()];
+  if (alias) return alias;
+  if (/^[a-z]{2}$/i.test(clean)) {
+    const upper = clean.toUpperCase();
+    return ALPHA2_TO_NAME[upper] ? upper : null;
   }
-
-  for (const [code, cName] of Object.entries(ALPHA2_TO_NAME)) {
-    if (cName.toLowerCase() === clean) {
-      const codePoints = code
-        .toUpperCase()
-        .split('')
-        .map((char) => 127397 + char.charCodeAt(0));
-      return String.fromCodePoint(...codePoints);
-    }
-  }
-
-  return '🌐';
+  if (/^\d{1,3}$/.test(clean)) return numericToAlpha2(clean) ?? null;
+  return NAME_TO_ALPHA2[clean.toLowerCase()] ?? null;
 }
-

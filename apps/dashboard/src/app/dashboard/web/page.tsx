@@ -5,6 +5,7 @@ import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { TrendChart } from '@/components/charts/TrendChart';
+import { BrandIcon } from '@/components/icons/BrandIcon';
 import { RankedList } from '@/components/charts/RankedList';
 import { ActiveHoursHeatmap } from '@/components/charts/ActiveHoursHeatmap';
 import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/charts/SvgNodeFlowGraph';
@@ -220,7 +221,7 @@ export default async function WebAnalyticsPage({
             title="Referrers"
             description="Ranked by page views; no referrer counts as Direct"
           >
-            <RankedList items={(data?.referrers ?? []).map((r) => ({ label: r.domain, total: r.views }))} emptyLabel="No referrers yet." />
+            <RankedList items={(data?.referrers ?? []).map((r) => ({ label: r.domain, total: r.views, icon: <BrandIcon label={r.domain} /> }))} emptyLabel="No referrers yet." />
           </DashCard>
         </div>
 
@@ -233,13 +234,13 @@ export default async function WebAnalyticsPage({
 
         <div className="grid gap-5 md:grid-cols-3">
           <DashCard title="Devices">
-            <RankedList items={(data?.devices ?? []).map((d) => ({ label: d.name, total: d.total }))} emptyLabel="No device data yet." />
+            <RankedList items={(data?.devices ?? []).map((d) => ({ label: d.name, total: d.total, icon: <BrandIcon label={d.name} /> }))} emptyLabel="No device data yet." />
           </DashCard>
           <DashCard title="Browsers">
-            <RankedList items={(data?.browsers ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No browser data yet." />
+            <RankedList items={(data?.browsers ?? []).map((item) => ({ label: item.name, total: item.total, icon: <BrandIcon label={item.name} /> }))} emptyLabel="No browser data yet." />
           </DashCard>
           <DashCard title="Operating systems">
-            <RankedList items={(data?.operatingSystems ?? []).map((item) => ({ label: item.name, total: item.total }))} emptyLabel="No OS data yet." />
+            <RankedList items={(data?.operatingSystems ?? []).map((item) => ({ label: item.name, total: item.total, icon: <BrandIcon label={item.name} /> }))} emptyLabel="No OS data yet." />
           </DashCard>
         </div>
 

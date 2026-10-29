@@ -540,6 +540,12 @@ export function halfOverHalf(values: number[]): number {
 
 // ── Overview ──
 
+export interface DemoBreakdownRow {
+  label: string;
+  visitors: number;
+  views: number;
+}
+
 export interface DemoOverview {
   series: DemoSeriesPoint[];
   totals: { pageviews: number; visitors: number; sessions: number; apiCalls: number; errors: number };
@@ -554,28 +560,45 @@ export interface DemoOverview {
   latencySeries: Array<{ bucket: string; p50: number; p90: number; p99: number }>;
   statusBreakdown: { ok200: number; rateLimit429: number; error500: number; other: number };
   topEvents: Array<{ eventName: string; total: number }>;
-  devices: Array<{ label: string; value: number }>;
-  browsers: Array<{ label: string; value: number }>;
+  devices: DemoBreakdownRow[];
+  browsers: DemoBreakdownRow[];
+  operatingSystems: DemoBreakdownRow[];
   countries: Array<{ code: string; name: string; visitors: number }>;
-  sources: Array<{ name: string; kind: 'direct' | 'search' | 'social' | 'referral' | 'ai'; visitors: number; views: number }>;
+  sources: Array<{ name: string; domain: string | null; kind: 'direct' | 'search' | 'social' | 'referral' | 'ai'; visitors: number; views: number }>;
+  /** Individual referring sites, for the Referrers tab. */
+  referrers: Array<{ domain: string; visitors: number; views: number }>;
   utmSources: Array<{ name: string; visitors: number; views: number }>;
   utmCampaigns: Array<{ name: string; visitors: number; views: number }>;
   pages: Array<{ path: string; visitors: number; views: number; avgSeconds: number }>;
 }
 
-const SOURCE_SHARES: Array<{ name: string; kind: DemoOverview['sources'][number]['kind']; share: number }> = [
-  { name: 'Direct', kind: 'direct', share: 0.46 },
-  { name: 'Google', kind: 'search', share: 0.19 },
-  { name: 'X (Twitter)', kind: 'social', share: 0.1 },
-  { name: 'LinkedIn', kind: 'social', share: 0.06 },
-  { name: 'Hacker News', kind: 'referral', share: 0.05 },
-  { name: 'GitHub', kind: 'referral', share: 0.035 },
-  { name: 'Reddit', kind: 'social', share: 0.03 },
-  { name: 'ChatGPT', kind: 'ai', share: 0.022 },
-  { name: 'Perplexity', kind: 'ai', share: 0.012 },
-  { name: 'Bing', kind: 'search', share: 0.011 },
-  { name: 'Claude', kind: 'ai', share: 0.008 },
-  { name: 'DuckDuckGo', kind: 'search', share: 0.006 }
+const SOURCE_SHARES: Array<{ name: string; domain: string | null; kind: DemoOverview['sources'][number]['kind']; share: number }> = [
+  { name: 'Direct', domain: null, kind: 'direct', share: 0.46 },
+  { name: 'Google', domain: 'google.com', kind: 'search', share: 0.19 },
+  { name: 'X (Twitter)', domain: 'x.com', kind: 'social', share: 0.1 },
+  { name: 'LinkedIn', domain: 'linkedin.com', kind: 'social', share: 0.06 },
+  { name: 'Hacker News', domain: 'news.ycombinator.com', kind: 'referral', share: 0.05 },
+  { name: 'GitHub', domain: 'github.com', kind: 'referral', share: 0.035 },
+  { name: 'Reddit', domain: 'reddit.com', kind: 'social', share: 0.03 },
+  { name: 'ChatGPT', domain: 'chatgpt.com', kind: 'ai', share: 0.022 },
+  { name: 'Perplexity', domain: 'perplexity.ai', kind: 'ai', share: 0.012 },
+  { name: 'Bing', domain: 'bing.com', kind: 'search', share: 0.011 },
+  { name: 'Claude', domain: 'claude.ai', kind: 'ai', share: 0.008 },
+  { name: 'DuckDuckGo', domain: 'duckduckgo.com', kind: 'search', share: 0.006 }
+];
+
+// Sites without a bundled logo, so the Referrers tab shows fetched favicons too.
+const REFERRER_SHARES: Array<{ domain: string; share: number }> = [
+  { domain: 'news.ycombinator.com', share: 0.05 },
+  { domain: 't.co', share: 0.045 },
+  { domain: 'producthunt.com', share: 0.02 },
+  { domain: 'dev.to', share: 0.012 },
+  { domain: 'medium.com', share: 0.01 },
+  { domain: 'indiehackers.com', share: 0.008 },
+  { domain: 'stripe.com', share: 0.006 },
+  { domain: 'vercel.com', share: 0.005 },
+  { domain: 'notion.so', share: 0.004 },
+  { domain: 'figma.com', share: 0.003 }
 ];
 
 const COUNTRY_SHARES: Array<{ code: string; name: string; share: number }> = [
@@ -661,28 +684,51 @@ export function buildOverview(company: DemoCompany, range: DemoRange, now: Date)
   const bounceSeries = series.map(() => Math.round((bounceRate + (rand() - 0.5) * 12) * 10) / 10);
 
   const mobileShare = company.category === 'media' || company.category === 'ecommerce' ? 0.58 : 0.34;
-  const devices = [
-    { label: 'Desktop', value: Math.round(totals.visitors * (1 - mobileShare - 0.05)) },
-    { label: 'Mobile', value: Math.round(totals.visitors * mobileShare) },
-    { label: 'Tablet', value: Math.round(totals.visitors * 0.05) }
-  ];
-  const browsers = spread(
-    [
-      { label: 'Chrome', share: 0.62 },
-      { label: 'Safari', share: 0.22 },
-      { label: 'Firefox', share: 0.06 },
-      { label: 'Edge', share: 0.07 },
-      { label: 'Other', share: 0.03 }
-    ],
-    totals.visitors,
-    rand
-  ).map(({ label, value }) => ({ label, value }));
+  const breakdown = (rows: Array<{ label: string; share: number }>): DemoBreakdownRow[] =>
+    spread(rows, totals.visitors, rand).map(({ label, value }) => ({
+      label,
+      visitors: value,
+      views: Math.round(value * (totals.pageviews / Math.max(1, totals.visitors)) * (0.85 + rand() * 0.3))
+    }));
+  const desktop = 1 - mobileShare - 0.05;
+  const devices = breakdown([
+    { label: 'Desktop', share: desktop },
+    { label: 'Mobile', share: mobileShare },
+    { label: 'Tablet', share: 0.05 }
+  ]);
+  const browsers = breakdown([
+    { label: 'Chrome', share: desktop * 0.66 },
+    { label: 'Mobile Safari', share: mobileShare * 0.5 },
+    { label: 'Mobile Chrome', share: mobileShare * 0.38 },
+    { label: 'Safari', share: desktop * 0.14 },
+    { label: 'Edge', share: desktop * 0.1 },
+    { label: 'Firefox', share: desktop * 0.07 },
+    { label: 'Samsung Internet', share: mobileShare * 0.08 },
+    { label: 'Opera', share: desktop * 0.02 },
+    { label: 'Brave', share: desktop * 0.01 }
+  ]);
+  const operatingSystems = breakdown([
+    { label: 'macOS', share: desktop * 0.46 },
+    { label: 'Windows', share: desktop * 0.42 },
+    { label: 'iOS', share: mobileShare * 0.55 + 0.04 },
+    { label: 'Android', share: mobileShare * 0.45 + 0.01 },
+    { label: 'Linux', share: desktop * 0.07 },
+    { label: 'Ubuntu', share: desktop * 0.03 },
+    { label: 'Chrome OS', share: desktop * 0.02 }
+  ]);
 
   const countries = spread(COUNTRY_SHARES, totals.visitors, rand).map(({ code, name, value }) => ({ code, name, visitors: value }));
 
-  const sources = spread(SOURCE_SHARES, totals.visitors, rand).map(({ name, kind, value }) => ({
+  const sources = spread(SOURCE_SHARES, totals.visitors, rand).map(({ name, domain, kind, value }) => ({
     name,
+    domain,
     kind,
+    visitors: value,
+    views: Math.round(value * (1.3 + rand() * 0.6))
+  }));
+
+  const referrers = spread(REFERRER_SHARES, totals.visitors, rand).map(({ domain, value }) => ({
+    domain,
     visitors: value,
     views: Math.round(value * (1.3 + rand() * 0.6))
   }));
@@ -733,8 +779,10 @@ export function buildOverview(company: DemoCompany, range: DemoRange, now: Date)
     topEvents,
     devices,
     browsers,
+    operatingSystems,
     countries,
     sources,
+    referrers,
     utmSources,
     utmCampaigns,
     pages

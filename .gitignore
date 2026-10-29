@@ -35,3 +35,6 @@ __pycache__/
 
 # Local tool data
 .codebase-memory/
+
+# Copied from country-flag-icons by apps/dashboard/scripts/copy-flags.mjs
+apps/dashboard/public/flags/

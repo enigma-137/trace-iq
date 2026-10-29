@@ -24,6 +24,7 @@ import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurr
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
+import { BrandIcon } from '@/components/icons/BrandIcon';
 import { EmptyState } from '@/components/EmptyState';
 
 export type IssueStatus = 'open' | 'regressed' | 'resolved' | 'ignored';
@@ -1056,7 +1057,7 @@ export function ErrorTrackingClientView({
                         return (
                           <div key={b.name} className="space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className="font-medium text-neutral-700 dark:text-slate-300">{b.name}</span>
+                              <span className="flex items-center gap-1.5 font-medium text-neutral-700 dark:text-slate-300"><BrandIcon label={b.name} size={14} />{b.name}</span>
                               <span className="font-bold text-neutral-900 dark:text-white">{pct}%</span>
                             </div>
                             <div className="h-1.5 w-full rounded-full bg-neutral-100 dark:bg-slate-800">
@@ -1085,7 +1086,7 @@ export function ErrorTrackingClientView({
                         return (
                           <div key={os.name} className="space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className="font-medium text-neutral-700 dark:text-slate-300">{os.name}</span>
+                              <span className="flex items-center gap-1.5 font-medium text-neutral-700 dark:text-slate-300"><BrandIcon label={os.name} size={14} />{os.name}</span>
                               <span className="font-bold text-neutral-900 dark:text-white">{pct}%</span>
                             </div>
                             <div className="h-1.5 w-full rounded-full bg-neutral-100 dark:bg-slate-800">

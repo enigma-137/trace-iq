@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react';
 import { formatEventName } from '@/lib/metrics';
 
 interface RankedItem {
   label: string;
   total: number;
+  /** Shown before the label, e.g. a flag or brand logo. */
+  icon?: ReactNode;
 }
 
 interface RankedListProps {
@@ -27,10 +30,11 @@ export function RankedList({ items, emptyLabel = 'No data yet.', mono = false }:
         <li key={item.label} className="grid gap-1">
           <div className="flex items-baseline justify-between gap-3">
             <span
-              className={`truncate text-sm text-neutral-800 dark:text-neutral-200 ${mono ? 'font-mono' : ''}`}
+              className={`flex min-w-0 items-center gap-2 text-sm text-neutral-800 dark:text-neutral-200 ${mono ? 'font-mono' : ''}`}
               title={item.label}
             >
-              {formatEventName(item.label)}
+              {item.icon}
+              <span className="truncate">{formatEventName(item.label)}</span>
             </span>
             <span className="text-sm tabular-nums text-neutral-500 dark:text-neutral-400">{item.total.toLocaleString()}</span>
           </div>
