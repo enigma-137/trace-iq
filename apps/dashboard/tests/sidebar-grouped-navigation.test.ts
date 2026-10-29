@@ -86,13 +86,13 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
     });
   });
 
-  it('Product group includes Feature flags, Experiments, Surveys, Achievements', () => {
+  it('Product group includes Feature flags, Experiments, Surveys, Short links, Achievements', () => {
     const prod = navGroups.find((g) => g.key === 'product');
     expect(prod).toBeDefined();
     expect(prod?.label).toBe('Product');
 
     const keys = prod?.items.map((i) => i.key);
-    expect(keys).toEqual(['flags', 'experiments', 'surveys', 'achievements']);
+    expect(keys).toEqual(['flags', 'experiments', 'surveys', 'links', 'achievements']);
   });
 
   it('Integrations group renders Webhooks and Export', () => {
@@ -112,8 +112,8 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
   });
 
   it('navItems and allNavItems contain all grouped and standalone items without omissions', () => {
-    expect(navItems).toHaveLength(23);
-    expect(allNavItems).toHaveLength(25);
+    expect(navItems).toHaveLength(24);
+    expect(allNavItems).toHaveLength(26);
   });
 
   it('findGroupForActiveItem maps active child keys to their parent group', () => {

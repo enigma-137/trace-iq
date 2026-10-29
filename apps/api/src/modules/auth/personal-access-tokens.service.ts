@@ -8,6 +8,8 @@ const ALLOWED_SCOPES = new Set([
   'projects:read',
   'flags:read',
   'flags:write',
+  'links:read',
+  'links:write',
   'analytics:read',
   'analytics:write',
   'insights:read',

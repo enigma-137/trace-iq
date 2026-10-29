@@ -69,6 +69,7 @@ const SCOPE_GROUPS: ScopeGroup[] = [
   { key: 'errors', label: 'Errors', read: 'errors:read', write: 'errors:write', mcp: true },
   { key: 'flags', label: 'Feature flags', read: 'flags:read', write: 'flags:write', mcp: true },
   { key: 'alerts', label: 'Alerts', read: 'alerts:read', write: 'alerts:write', mcp: true },
+  { key: 'links', label: 'Short links', read: 'links:read', write: 'links:write', mcp: true },
   { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: false },
   { key: 'dashboards', label: 'Dashboards', read: 'dashboards:read', write: 'dashboards:write', mcp: false },
   { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: false },
@@ -93,10 +94,11 @@ const MCP_READ_SCOPES = [
   'users:read',
   'errors:read',
   'flags:read',
-  'alerts:read'
+  'alerts:read',
+  'links:read'
 ];
 
-const MCP_WRITE_SCOPES = ['funnels:write', 'flags:write', 'alerts:write'];
+const MCP_WRITE_SCOPES = ['funnels:write', 'flags:write', 'alerts:write', 'links:write'];
 
 const presets = [
   {
