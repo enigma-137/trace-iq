@@ -32,7 +32,7 @@ import { CountryFlag } from '@/components/icons/CountryFlag';
 import { useDemo, useDemoCompany } from './DemoContext';
 
 const cardClass =
-  'relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:p-5';
+  'relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-5';
 const cardTitleClass = 'text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400';
 
 export function DemoOverview() {
@@ -307,7 +307,7 @@ function AiReferrals({ overview }: { overview: Overview }) {
   const ai = overview.sources.filter((source) => source.kind === 'ai');
   const total = ai.reduce((sum, source) => sum + source.visitors, 0);
   return (
-    <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+    <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div>
         <p className="text-xl font-semibold tabular-nums text-neutral-900 dark:text-white">{total.toLocaleString()}</p>
         <p className="text-[11px] text-neutral-500 dark:text-slate-400">AI referrals</p>

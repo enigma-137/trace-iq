@@ -115,7 +115,7 @@ function MetricCardBody({
 
   return (
     <div
-      className={`group relative flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 shadow-xs transition hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 sm:p-5 ${className}`}
+      className={`group relative flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 shadow-xs transition hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-700 sm:p-5 ${className}`}
     >
       <div>
         {/* Card Header: Clean Icon (no background fill) + Title */}

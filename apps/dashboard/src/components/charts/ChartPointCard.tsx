@@ -41,12 +41,12 @@ export function ChartPointCard({ title, rows, pinned, onClose, links = [], ancho
     <div
       role={pinned ? 'dialog' : 'tooltip'}
       aria-label={pinned ? `Details for ${title}` : undefined}
-      className={`absolute top-2 z-20 w-56 max-w-[calc(100%-8px)] rounded-lg border border-neutral-200 bg-white/95 text-xs shadow-xl backdrop-blur dark:border-slate-700 dark:bg-slate-900/95 ${
+      className={`absolute top-2 z-20 w-56 max-w-[calc(100%-8px)] rounded-lg border border-neutral-200 bg-white/95 text-xs shadow-xl backdrop-blur dark:border-slate-700 dark:bg-slate-800/95 ${
         pinned ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
       style={style}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2 dark:border-slate-800">
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2 dark:border-slate-700">
         <p className="font-semibold text-neutral-900 dark:text-white">{title}</p>
         {pinned ? (
           <button
@@ -70,7 +70,7 @@ export function ChartPointCard({ title, rows, pinned, onClose, links = [], ancho
         ))}
       </ul>
       {pinned ? (
-        <div className="border-t border-neutral-100 px-3 py-2 dark:border-slate-800">
+        <div className="border-t border-neutral-100 px-3 py-2 dark:border-slate-700">
           {rows.some((row) => row.change !== undefined) ? (
             <p className="text-[10px] text-neutral-400 dark:text-slate-500">Change is against the previous point.</p>
           ) : null}
@@ -85,7 +85,7 @@ export function ChartPointCard({ title, rows, pinned, onClose, links = [], ancho
           ) : null}
         </div>
       ) : (
-        <p className="border-t border-neutral-100 px-3 py-1.5 text-[10px] text-neutral-400 dark:border-slate-800 dark:text-slate-500">Click to pin</p>
+        <p className="border-t border-neutral-100 px-3 py-1.5 text-[10px] text-neutral-400 dark:border-slate-700 dark:text-slate-500">Click to pin</p>
       )}
     </div>
   );
