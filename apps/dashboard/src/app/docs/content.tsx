@@ -30,6 +30,7 @@ export const docsSections = [
   { id: 'api-performance', label: 'API performance', category: 'Features' },
   { id: 'source-maps', label: 'Source maps', category: 'Features' },
   { id: 'logs', label: 'Logs', category: 'Features' },
+  { id: 'links', label: 'Short links', category: 'Features' },
   { id: 'webhooks', label: 'Webhooks', category: 'Features' },
   { id: 'export', label: 'Data export', category: 'Features' },
   { id: 'achievements', label: 'Achievements', category: 'Features' },
@@ -2145,6 +2146,58 @@ await traceiq.shutdown(); // flushes events and logs`}</Code>
         </P>
         <Code lang="bash">{`traceiq logs --level error --since 24h
 traceiq logs --search checkout --follow`}</Code>
+      </Section>
+    );
+  }
+
+  if (id === 'links') {
+    return (
+      <Section id="links" title="Short links">
+        <P>
+          Short links redirect from <Mono>/l/&lt;slug&gt;</Mono> to any URL and record each click as a{' '}
+          <Mono>$link_click</Mono> event in your project. Create them on the{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/links">
+            Short links
+          </a>{' '}
+          page, or from an MCP client with <Mono>create_link</Mono>.
+        </P>
+        <P><strong>What a click records</strong></P>
+        <Bullets
+          items={[
+            ['Properties', 'linkId, slug, title, destination, referrerHost, and any utm_* tags set on the link.'],
+            ['Device', 'browser, os and deviceType, read from the user agent.'],
+            ['Location', 'country, region and city. The IP address itself is not stored for link clicks.'],
+            ['Identity', 'An anonymous id that is stable for one visitor and one day, so you can count unique clickers without cookies.']
+          ]}
+        />
+        <P>
+          Clicks count toward your monthly event quota. Link-preview bots (Slack, X, Facebook and similar) and repeat clicks from the same
+          visitor within 10 seconds are redirected but not recorded. If your quota is used up, links keep redirecting; only the
+          tracking stops.
+        </P>
+        <P><strong>UTM tags</strong></P>
+        <P>
+          UTM tags set on a link are added to the destination when someone clicks, unless the destination URL already sets that tag.
+        </P>
+        <P><strong>Follow a click to a conversion</strong></P>
+        <P>
+          A click is recorded before the visitor reaches your site, so it isn&rsquo;t yet joined to that person&rsquo;s later events.
+          To see which link drove signups, set UTM tags on the link and break your signup or purchase event down by{' '}
+          <Mono>utm_campaign</Mono> or <Mono>utm_source</Mono>.
+        </P>
+        <P><strong>Archive, expire and delete</strong></P>
+        <Bullets
+          items={[
+            ['Archive', 'The link stops redirecting and shows a not-found page. Restore it any time.'],
+            ['Expiry', 'After the date you set, the link shows an expired page.'],
+            ['Delete', 'Removes the link and frees the slug. Past $link_click events stay in your project.']
+          ]}
+        />
+        <P><strong>Self-hosting</strong></P>
+        <P>
+          Links are served by the dashboard at <Mono>/l/&lt;slug&gt;</Mono>. Short URLs shown in the dashboard use{' '}
+          <Mono>SHORT_LINK_BASE_URL</Mono>, falling back to <Mono>DASHBOARD_URL</Mono>, on the API.
+        </P>
       </Section>
     );
   }

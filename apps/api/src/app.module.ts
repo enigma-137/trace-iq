@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ProxyAwareThrottlerGuard } from './common/throttler.guard';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -10,6 +11,7 @@ import { FunnelsModule } from './modules/funnels/funnels.module';
 import { CohortsModule } from './modules/cohorts/cohorts.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
+import { LinksModule } from './modules/links/links.module';
 import { FlagsModule } from './modules/flags/flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ExportModule } from './modules/export/export.module';
@@ -38,7 +40,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
 
 @Module({
   imports: [
-    // Baseline per-IP request cap; individual controllers override with @Throttle.
+    // Baseline per-client request cap (see ProxyAwareThrottlerGuard); individual controllers override with @Throttle.
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -57,6 +59,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     DashboardsModule,
     AlertsModule,
     FlagsModule,
+    LinksModule,
     ExperimentsModule,
     SurveysModule,
     SyntheticMonitoringModule,
@@ -83,7 +86,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard
+      useClass: ProxyAwareThrottlerGuard
     },
     {
       provide: APP_INTERCEPTOR,

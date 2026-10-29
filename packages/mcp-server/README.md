@@ -148,6 +148,14 @@ Read-only tokens cannot perform mutations.
 
 ---
 
+## Short Links
+
+- `list_links`
+- `get_link_stats`
+- `create_link`
+
+---
+
 ## AI Intelligence Tools
 
 These tools combine multiple TraceIQ endpoints to answer higher-level product questions.
