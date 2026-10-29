@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { ChartPointCard, pointChange, useChartPointer } from './ChartPointCard';
 
 interface TrendPoint {
   bucket: string;
@@ -40,7 +41,9 @@ const compactFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximum
 
 export function TrendChart({ buckets, series, interval, format = 'number', legendTotals = false }: TrendChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [hover, setHover] = useState<number | null>(null);
+  const pointer = useChartPointer(buckets.length);
+  const hover = pointer.active;
+  const [anchor, setAnchor] = useState<{ x: number; width: number } | null>(null);
 
   const fmt = (value: number) =>
     format === 'compact' ? compactFmt.format(value) : Math.round(value).toLocaleString('en-US');
@@ -54,6 +57,21 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
   const xFor = (index: number) => PAD.left + (index / stepCount) * plotWidth;
   const yFor = (value: number) => PAD.top + plotHeight - (value / maxY) * plotHeight;
 
+  // Where the active point sits on screen, relative to the chart wrapper. The SVG
+  // keeps its aspect ratio (and may scroll), so map through its screen transform.
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    const wrapper = pointer.containerRef.current;
+    const matrix = svg?.getScreenCTM();
+    if (hover === null || !svg || !wrapper || !matrix) {
+      setAnchor(null);
+      return;
+    }
+    const point = new DOMPoint(PAD.left + (hover / Math.max(buckets.length - 1, 1)) * (WIDTH - PAD.left - PAD.right), PAD.top).matrixTransform(matrix);
+    const rect = wrapper.getBoundingClientRect();
+    setAnchor({ x: point.x - rect.left, width: rect.width });
+  }, [hover, buckets.length, pointer.containerRef]);
+
   const gridValues = [0, maxY / 2, maxY];
   const labelIndexes = pickLabelIndexes(buckets.length);
   const total = series.reduce((sum, s) => sum + s.points.reduce((inner, p) => inner + Number(p.value ?? p.total ?? 0), 0), 0);
@@ -66,31 +84,37 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
     );
   }
 
-  function handleMove(event: React.MouseEvent<SVGSVGElement>) {
+  function indexAt(event: React.MouseEvent<SVGSVGElement>) {
     const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const xInSvg = ((event.clientX - rect.left) / rect.width) * WIDTH;
-    let index = Math.round(((xInSvg - PAD.left) / plotWidth) * stepCount);
-    index = Math.max(0, Math.min(buckets.length - 1, index));
-    setHover(index);
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !matrix) return null;
+    const xInSvg = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()).x;
+    const index = Math.round(((xInSvg - PAD.left) / plotWidth) * stepCount);
+    return Math.max(0, Math.min(buckets.length - 1, index));
   }
 
-  // Tooltip geometry (kept inside the plot bounds).
-  const tipWidth = 148;
-  const tipHeight = 22 + series.length * 16;
+  const value = (point: TrendPoint | undefined) => Number(point?.value ?? point?.total ?? 0);
 
   return (
-    <div className="w-full">
+    <div
+      ref={pointer.containerRef}
+      className="relative w-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      tabIndex={0}
+      role="group"
+      aria-label="Trend chart. Use the arrow keys to move between points and Enter to pin one."
+      onKeyDown={pointer.onKeyDown}
+      onBlur={pointer.onBlur}
+    >
       <div className="overflow-x-auto">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="h-64 w-full min-w-[560px]"
+          className="h-64 w-full min-w-[560px] cursor-crosshair"
           role="img"
           aria-label="Event trend chart"
-          onMouseMove={handleMove}
-          onMouseLeave={() => setHover(null)}
+          onMouseMove={(event) => pointer.setHover(indexAt(event))}
+          onMouseLeave={() => pointer.setHover(null)}
+          onClick={(event) => pointer.togglePin(indexAt(event))}
         >
           <defs>
             {series.map((s, seriesIndex) => {
@@ -171,42 +195,26 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                 );
               })}
 
-              {(() => {
-                const anchorX = xFor(hover);
-                const boxX = Math.min(Math.max(anchorX + 10, PAD.left), WIDTH - PAD.right - tipWidth);
-                const boxY = PAD.top;
-                return (
-                  <g>
-                    <rect
-                      x={boxX}
-                      y={boxY}
-                      width={tipWidth}
-                      height={tipHeight}
-                      rx={6}
-                      className="fill-white stroke-neutral-200 dark:fill-slate-950 dark:stroke-slate-700"
-                      strokeWidth={1}
-                    />
-                    <text x={boxX + 10} y={boxY + 15} className="fill-neutral-500 text-[10px] dark:fill-slate-400">
-                      {formatBucket(buckets[hover], interval, true)}
-                    </text>
-                    {series.map((s, seriesIndex) => (
-                      <text
-                        key={s.key}
-                        x={boxX + 10}
-                        y={boxY + 32 + seriesIndex * 16}
-                        className="fill-neutral-900 text-[11px] dark:fill-white"
-                      >
-                        <tspan className="fill-neutral-500 dark:fill-slate-400">{truncate(s.key)}: </tspan>
-                        {fmt(Number(s.points[hover].value ?? s.points[hover].total ?? 0))}
-                      </text>
-                    ))}
-                  </g>
-                );
-              })()}
             </g>
           ) : null}
         </svg>
       </div>
+
+      {hover !== null && anchor ? (
+        <ChartPointCard
+          title={formatBucket(buckets[hover], interval, true)}
+          rows={series.map((s, seriesIndex) => ({
+            label: s.key,
+            color: SERIES_STYLES[seriesIndex % SERIES_STYLES.length].color,
+            value: fmt(value(s.points[hover])),
+            change: pointChange(value(s.points[hover]), hover > 0 ? value(s.points[hover - 1]) : undefined)
+          }))}
+          pinned={pointer.pinned !== null}
+          onClose={pointer.unpin}
+          anchorX={anchor.x}
+          containerWidth={anchor.width}
+        />
+      ) : null}
 
       {series.length > 1 || legendTotals ? (
         <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
@@ -227,10 +235,6 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
       ) : null}
     </div>
   );
-}
-
-function truncate(value: string, max = 16): string {
-  return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
 
 function pickLabelIndexes(count: number): number[] {

@@ -476,12 +476,16 @@ export interface DemoSeriesPoint {
  * Visitors per bucket: a slow upward trend, weekday/diurnal seasonality, noise,
  * and one launch-day spike so the charts have a story to tell.
  */
-export function buildSeries(company: DemoCompany, range: DemoRange, now: Date): DemoSeriesPoint[] {
+export function buildSeries(company: DemoCompany, range: DemoRange, now: Date, period: 'current' | 'previous' = 'current'): DemoSeriesPoint[] {
   const info = rangeInfo(range);
   const profile = DEMO_CATEGORIES[company.category];
-  const rand = seededRandom(seedFor(company, `series:${range}`));
+  const previous = period === 'previous';
+  const rand = seededRandom(seedFor(company, `series:${range}${previous ? ':previous' : ''}`));
   const stepMs = info.hourly ? 3_600_000 : 86_400_000;
-  const end = info.hourly ? floorToHour(now) : floorToDay(now);
+  // The previous window ends where the current one starts, at a lower level so the
+  // growth story continues across the comparison.
+  const end = new Date((info.hourly ? floorToHour(now) : floorToDay(now)).getTime() - (previous ? info.buckets * stepMs : 0));
+  const level = previous ? 0.68 : 1;
   const spikeAt = Math.floor(info.buckets * (0.2 + rand() * 0.25));
   const points: DemoSeriesPoint[] = [];
 
@@ -493,7 +497,7 @@ export function buildSeries(company: DemoCompany, range: DemoRange, now: Date): 
     const distance = i - spikeAt;
     const spike = distance >= 0 && distance < 4 ? [3.4, 1.9, 1.35, 1.1][distance] : 1;
     const base = info.hourly ? profile.dailyVisitors / 16 : profile.dailyVisitors;
-    const visitors = Math.max(1, Math.round(base * trend * seasonal * noise * spike));
+    const visitors = Math.max(1, Math.round(base * level * trend * seasonal * noise * spike));
     const sessions = Math.round(visitors * (1.12 + rand() * 0.12));
     const pageviews = Math.round(sessions * (1.35 + rand() * 0.35));
     const apiCalls = Math.round(pageviews * (2.6 + rand() * 0.8));
@@ -552,6 +556,8 @@ export interface DemoOverview {
   bounceRate: number;
   bounceSeries: number[];
   avgSessionSec: number;
+  /** The window before this one, for the comparison cards. */
+  previous: { pageviews: number; visitors: number; sessions: number; bounceRate: number; avgSessionSec: number; p95: number };
   p50: number;
   p90: number;
   p95: number;
@@ -763,12 +769,26 @@ export function buildOverview(company: DemoCompany, range: DemoRange, now: Date)
     })
     .sort((a, b) => b.views - a.views);
 
+  const avgSessionSec = Math.round(70 + rand() * 160);
+  // Its own stream, so adding the comparison didn't change any current-period number.
+  const previousRand = seededRandom(seedFor(company, `overview:${range}:previous`));
+  const previousSeries = buildSeries(company, range, now, 'previous');
+  const previous = {
+    pageviews: sum(previousSeries, 'pageviews'),
+    visitors: sum(previousSeries, 'visitors'),
+    sessions: sum(previousSeries, 'sessions'),
+    bounceRate: Math.round((bounceRate + (previousRand() - 0.4) * 8) * 10) / 10,
+    avgSessionSec: Math.round(avgSessionSec * (0.75 + previousRand() * 0.35)),
+    p95: Math.round(p95 * (0.85 + previousRand() * 0.35))
+  };
+
   return {
     series,
     totals,
     bounceRate,
     bounceSeries,
-    avgSessionSec: Math.round(70 + rand() * 160),
+    avgSessionSec,
+    previous,
     p50,
     p90,
     p95,

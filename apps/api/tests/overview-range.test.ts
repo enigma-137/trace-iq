@@ -71,6 +71,25 @@ describe('overview time range', () => {
   });
 });
 
+describe('overview period comparison', () => {
+  it('counts the window before the selected range in the same scan', async () => {
+    const { db, service } = setup((sql) =>
+      sql.includes('AS total_events')
+        ? rows([{ total_events: 120, previous_events: 80, events_24h: 20, events_1h: 2, total_users: 9, total_sessions: 30, previous_sessions: 24, last_event_at: null }])
+        : undefined
+    );
+
+    const result = await service.getOverview(user, undefined, undefined, '7d');
+
+    const totals = db.queryCalls('AS total_events')[0].text;
+    expect(totals).toContain("occurred_at >= now() - interval '7 days' * 2");
+    expect(totals).toContain("count(*) FILTER (WHERE occurred_at < now() - interval '7 days')::int AS previous_events");
+    expect(totals).toContain("started_at >= now() - interval '7 days' * 2 AND started_at < now() - interval '7 days'");
+    expect(result.totals.events).toBe(120);
+    expect(result.previousTotals).toEqual({ events: 80, sessions: 24 });
+  });
+});
+
 describe('overview cache', () => {
   it('reuses one computation per project and range for a minute, and still checks access each time', async () => {
     vi.useFakeTimers();

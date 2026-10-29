@@ -1,6 +1,7 @@
 'use client';
 
 import React, { ReactNode } from 'react';
+import { ComparisonHoverCard, type MetricComparison } from './ComparisonHoverCard';
 
 export interface OverviewMetricCardProps {
   icon?: ReactNode;
@@ -14,6 +15,10 @@ export interface OverviewMetricCardProps {
   sparklineData?: number[];
   color?: 'blue' | 'emerald' | 'rose' | 'purple' | 'cyan';
   className?: string;
+  /** Previous vs. current period, shown in a card on hover or focus. */
+  comparison?: MetricComparison;
+  /** Which edge the comparison card lines up with. */
+  comparisonAlign?: 'left' | 'right';
 }
 
 const COLOR_MAP = {
@@ -55,8 +60,47 @@ export function OverviewMetricCard({
   deltaSubtext,
   sparklineData = [],
   color = 'blue',
-  className = ''
+  className = '',
+  comparison,
+  comparisonAlign
 }: OverviewMetricCardProps) {
+  const card = (
+    <MetricCardBody
+      icon={icon}
+      title={title}
+      value={value}
+      suffix={suffix}
+      delta={delta}
+      deltaTone={deltaTone}
+      deltaDirection={deltaDirection}
+      deltaSubtext={deltaSubtext}
+      sparklineData={sparklineData}
+      color={color}
+      className={`${className} ${comparison ? 'h-full cursor-default group-focus-visible/compare:ring-2 group-focus-visible/compare:ring-blue-500' : ''}`}
+    />
+  );
+  return comparison ? (
+    <ComparisonHoverCard title={title} icon={icon} comparison={comparison} align={comparisonAlign}>
+      {card}
+    </ComparisonHoverCard>
+  ) : (
+    card
+  );
+}
+
+function MetricCardBody({
+  icon,
+  title,
+  value,
+  suffix,
+  delta,
+  deltaTone = 'green',
+  deltaDirection = 'up',
+  deltaSubtext,
+  sparklineData = [],
+  color = 'blue',
+  className = ''
+}: Omit<OverviewMetricCardProps, 'comparison' | 'comparisonAlign'>) {
   const theme = COLOR_MAP[color];
   const deltaColor =
     deltaTone === 'green'

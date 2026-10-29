@@ -171,6 +171,8 @@ export interface OverviewResponse {
     users: number;
     sessions: number;
   };
+  /** The same counts for the window before `range`, for period-over-period comparison. */
+  previousTotals: { events: number; sessions: number };
   // When the last event was received — drives the availability/freshness readout.
   lastEventAt: string | null;
   // GTV = sum of the numeric `amount` property across events (last 30d vs the 30d before).
@@ -271,6 +273,7 @@ export class AnalyticsService {
         project: null,
         range,
         totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0 },
+        previousTotals: { events: 0, sessions: 0 },
         lastEventAt: null,
         revenue: { total: 0, previous: 0, transactions: 0 },
         topEvents: [],
@@ -318,6 +321,8 @@ export class AnalyticsService {
       events_1h: number;
       total_users: number;
       total_sessions: number;
+      previous_events: number;
+      previous_sessions: number;
       last_event_at: string | null;
     }>(
       `
@@ -327,14 +332,20 @@ export class AnalyticsService {
           counts.events_1h,
           (SELECT count(*) FROM users WHERE project_id = $1)::int AS total_users,
           (SELECT count(*) FROM sessions WHERE project_id = $1 AND started_at >= ${since})::int AS total_sessions,
+          (
+            SELECT count(*) FROM sessions
+            WHERE project_id = $1 AND started_at >= ${since} * 2 AND started_at < ${since}
+          )::int AS previous_sessions,
           (SELECT max(occurred_at) FROM events WHERE project_id = $1) AS last_event_at
         FROM (
+          -- The window before this one rides along for the period-over-period comparison.
           SELECT
-            count(*)::int AS total_events,
+            count(*) FILTER (WHERE occurred_at >= ${since})::int AS total_events,
+            count(*) FILTER (WHERE occurred_at < ${since})::int AS previous_events,
             count(*) FILTER (WHERE occurred_at >= now() - interval '24 hours')::int AS events_24h,
             count(*) FILTER (WHERE occurred_at >= now() - interval '1 hour')::int AS events_1h
           FROM events
-          WHERE project_id = $1 AND occurred_at >= ${since}
+          WHERE project_id = $1 AND occurred_at >= ${since} * 2
         ) counts
       `,
       [project.id]
@@ -752,6 +763,10 @@ export class AnalyticsService {
         events1h: totals?.events_1h ?? 0,
         users: totals?.total_users ?? 0,
         sessions: totals?.total_sessions ?? 0
+      },
+      previousTotals: {
+        events: totals?.previous_events ?? 0,
+        sessions: totals?.previous_sessions ?? 0
       },
       lastEventAt: totals?.last_event_at ?? null,
       revenue: {

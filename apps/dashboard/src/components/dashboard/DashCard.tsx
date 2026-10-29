@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ComparisonHoverCard, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
 import type { ReactNode } from 'react';
 
 /**
@@ -54,6 +55,8 @@ export interface Kpi {
   delta?: number | null;
   /** Set when a rising number is bad (e.g. bounce rate, error rate). */
   invertDelta?: boolean;
+  /** Previous vs. current period, shown in a card on hover or focus. */
+  comparison?: MetricComparison;
 }
 
 /** One card split into equal cells, instead of a row of large separate tiles. */
@@ -61,25 +64,40 @@ export function KpiStrip({ items, className = '' }: { items: Kpi[]; className?: 
   const cols =
     items.length >= 5 ? 'lg:grid-cols-5' : items.length === 4 ? 'lg:grid-cols-4' : items.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
   return (
-    <section className={`${cardShell} ${className}`} aria-label="Key metrics">
+    // No overflow-hidden here: the comparison cards open below the strip.
+    <section className={`${cardShell.replace('overflow-hidden ', '')} ${className}`} aria-label="Key metrics">
       <dl className={`grid grid-cols-2 ${cols} [&>div]:border-neutral-100 dark:[&>div]:border-slate-800`}>
         {items.map((item, index) => (
           <div
             key={item.label}
             className={`min-w-0 px-4 py-3.5 ${index > 0 ? 'lg:border-l' : ''} ${index % 2 === 1 ? 'border-l' : ''} ${index >= 2 ? 'border-t lg:border-t-0' : ''}`}
           >
-            <dt className="truncate text-xs font-medium text-neutral-500 dark:text-slate-400">{item.label}</dt>
-            <dd className="mt-1 flex items-baseline gap-2">
-              <span className="truncate text-xl font-semibold tabular-nums tracking-tight text-neutral-900 dark:text-white">{item.value}</span>
-              {item.delta !== undefined && item.delta !== null && Number.isFinite(item.delta) ? (
-                <DeltaBadge value={item.delta} invert={item.invertDelta} />
-              ) : null}
-            </dd>
-            {item.hint ? <dd className="mt-0.5 truncate text-xs text-neutral-500 dark:text-slate-500">{item.hint}</dd> : null}
+            {item.comparison ? (
+              <ComparisonHoverCard title={item.label} comparison={item.comparison} align={index >= items.length - 2 ? 'right' : 'left'}>
+                <KpiCell item={item} />
+              </ComparisonHoverCard>
+            ) : (
+              <KpiCell item={item} />
+            )}
           </div>
         ))}
       </dl>
     </section>
+  );
+}
+
+function KpiCell({ item }: { item: Kpi }) {
+  return (
+    <>
+      <dt className="truncate text-xs font-medium text-neutral-500 dark:text-slate-400">{item.label}</dt>
+      <dd className="mt-1 flex items-baseline gap-2">
+        <span className="truncate text-xl font-semibold tabular-nums tracking-tight text-neutral-900 dark:text-white">{item.value}</span>
+        {item.delta !== undefined && item.delta !== null && Number.isFinite(item.delta) ? (
+          <DeltaBadge value={item.delta} invert={item.invertDelta} />
+        ) : null}
+      </dd>
+      {item.hint ? <dd className="mt-0.5 truncate text-xs text-neutral-500 dark:text-slate-500">{item.hint}</dd> : null}
+    </>
   );
 }
 
