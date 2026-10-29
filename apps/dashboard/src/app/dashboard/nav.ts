@@ -50,6 +50,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Feature flags', href: '/dashboard/flags', key: 'flags' },
       { label: 'Experiments', href: '/dashboard/experiments', key: 'experiments' },
       { label: 'Surveys', href: '/dashboard/surveys', key: 'surveys' },
+      { label: 'Short links', href: '/dashboard/links', key: 'links' },
       { label: 'Achievements', href: '/dashboard/achievements', key: 'achievements' }
     ]
   },

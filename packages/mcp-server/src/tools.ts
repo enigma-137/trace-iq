@@ -807,8 +807,87 @@ export const tools: Tool[] = [
         query: withProject(args.projectId as string)
       });
     }
+  },
+
+  // ---- Short links ----------------------------------------------------------
+
+  {
+    name: 'list_links',
+    title: 'List short links',
+    description:
+      "List the project's short links with their short URL, destination, UTM tags and all-time click count. Each click is also a `$link_click` event (properties: linkId, slug, referrerHost, utm_*) usable in trends and funnels.",
+    requiredScopes: ['links:read'],
+    annotations: { readOnlyHint: true },
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Optional project id.' }
+      },
+      additionalProperties: false
+    },
+    handler: async (args) => {
+      return shapeResponse(
+        await request('GET', '/v1/dashboard/links', { query: withProject(args.projectId as string) }),
+        { maxItems: 100 }
+      );
+    }
+  },
+
+  {
+    name: 'get_link_stats',
+    title: 'Short link clicks',
+    description: 'Daily clicks plus top referrers, countries and device types for one short link.',
+    requiredScopes: ['links:read'],
+    annotations: { readOnlyHint: true },
+    schema: {
+      type: 'object',
+      properties: {
+        linkId: { type: 'string', description: 'The link id (from list_links).' },
+        days: { type: 'integer', default: 30, description: 'Look-back window in days (1-90).' },
+        projectId: { type: 'string', description: 'Optional project id.' }
+      },
+      required: ['linkId'],
+      additionalProperties: false
+    },
+    handler: async (args) => {
+      return request('GET', `/v1/dashboard/links/${encodeURIComponent(args.linkId as string)}`, {
+        query: { ...withProject(args.projectId as string), days: (args.days as number) ?? 30 }
+      });
+    }
+  },
+
+  {
+    name: 'create_link',
+    title: 'Create short link',
+    description:
+      'Create a short link that redirects to a destination URL and records every click as a `$link_click` event. Leave slug empty for a random one. Non-destructive.',
+    requiredScopes: ['links:write'],
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    schema: {
+      type: 'object',
+      properties: {
+        destinationUrl: { type: 'string', description: 'Full http(s) URL people are sent to.' },
+        slug: { type: 'string', description: 'Optional custom slug: 3-64 lowercase letters, numbers, dashes or underscores.' },
+        title: { type: 'string', description: 'Optional label shown in the dashboard.' },
+        utmSource: { type: 'string', description: 'Optional utm_source added to the destination.' },
+        utmMedium: { type: 'string', description: 'Optional utm_medium.' },
+        utmCampaign: { type: 'string', description: 'Optional utm_campaign.' },
+        expiresAt: { type: 'string', description: 'Optional ISO date after which the link stops redirecting.' },
+        projectId: { type: 'string', description: 'Optional project id.' }
+      },
+      required: ['destinationUrl'],
+      additionalProperties: false
+    },
+    handler: async (args) => {
+      const body: JsonObject = { destinationUrl: args.destinationUrl as string };
+      for (const key of ['slug', 'title', 'utmSource', 'utmMedium', 'utmCampaign', 'expiresAt', 'projectId']) {
+        if (args[key] !== undefined) body[key] = args[key] as JsonValue;
+      }
+      return request('POST', '/v1/dashboard/links', { body });
+    }
   }
 ];
+
 
 // ---- Composed-tool helpers -------------------------------------------------
 

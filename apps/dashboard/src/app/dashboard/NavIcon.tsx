@@ -17,6 +17,7 @@ import FunnelIcon from '@hugeicons/core-free-icons/FunnelIcon';
 import Globe02Icon from '@hugeicons/core-free-icons/Globe02Icon';
 import Home01Icon from '@hugeicons/core-free-icons/Home01Icon';
 import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
+import Link04Icon from '@hugeicons/core-free-icons/Link04Icon';
 import Notification02Icon from '@hugeicons/core-free-icons/Notification02Icon';
 import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
 import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
@@ -42,6 +43,7 @@ const ICONS: Record<string, IconSvgElement> = {
   flags: Flag02Icon,
   experiments: FlaskConicalIcon,
   surveys: Comment01Icon,
+  links: Link04Icon,
   'synthetic-monitors': Activity01Icon,
   webhooks: WebhookIcon,
   achievements: ChampionIcon,
