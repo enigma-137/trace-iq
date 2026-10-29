@@ -1915,7 +1915,9 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
             ['find_users_who_failed_checkout', 'Users who dropped at the final funnel step. Requires funnels:read and users:read.'],
             ['toggle_feature_flag', 'Enable or disable a feature flag. Requires flags:write.'],
             ['create_funnel / update_funnel / delete_funnel', 'Manage funnels. Requires funnels:write (delete is destructive).'],
-            ['create_alert / set_alert_enabled / delete_alert', 'Manage alerts. Requires alerts:write (delete is destructive).']
+            ['create_alert / set_alert_enabled / delete_alert', 'Manage alerts. Requires alerts:write (delete is destructive).'],
+            ['list_links / get_link_stats', 'Short links with click counts, and daily clicks with top referrers, countries and devices. Requires links:read.'],
+            ['create_link', 'Create a short link with an optional slug, UTM tags and expiry. Requires links:write.']
           ]}
         />
         <P>
@@ -2193,6 +2195,25 @@ traceiq logs --search checkout --follow`}</Code>
             ['Delete', 'Removes the link and frees the slug. Past $link_click events stay in your project.']
           ]}
         />
+        <P><strong>REST API</strong></P>
+        <P>
+          Manage links with a personal access token that has <Mono>links:read</Mono> or <Mono>links:write</Mono>. Endpoints act on
+          your active project.
+        </P>
+        <Bullets
+          items={[
+            ['GET /v1/dashboard/links', 'List links with click counts and 7-day totals.'],
+            ['GET /v1/dashboard/links/:id?days=30', 'One link with daily clicks, top referrers, countries and devices.'],
+            ['POST /v1/dashboard/links', 'Create a link: destinationUrl, plus optional slug, title, utmSource … utmContent and expiresAt.'],
+            ['PATCH /v1/dashboard/links/:id', 'Change the destination, title, UTM tags or expiry.'],
+            ['POST /v1/dashboard/links/:id/archive · /restore', 'Stop or resume redirecting.'],
+            ['DELETE /v1/dashboard/links/:id', 'Delete the link and free its slug.']
+          ]}
+        />
+        <Code lang="bash">{`curl -X POST ${apiBaseUrl}/v1/dashboard/links \\
+  -H "Authorization: Bearer tiq_pat_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"destinationUrl":"https://example.com/pricing","slug":"launch","utmSource":"twitter","utmCampaign":"launch"}'`}</Code>
         <P><strong>Self-hosting</strong></P>
         <P>
           Links are served by the dashboard at <Mono>/l/&lt;slug&gt;</Mono>. Short URLs shown in the dashboard use{' '}
@@ -2334,7 +2355,8 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
             ['$group', 'Emitted by group().'],
             ['$exception', 'An error occurrence (powers Error tracking).'],
             ['$rageclick', 'A rage click (powers Frustrating pages).'],
-            ['$api_request', 'An API request — method, path, status, durationMs (powers API performance).']
+            ['$api_request', 'An API request — method, path, status, durationMs (powers API performance).'],
+            ['$link_click', 'A short-link click — linkId, slug, referrerHost and the link’s utm_* tags (powers Short links).']
           ]}
         />
       </Section>
@@ -2361,6 +2383,7 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
             ['Surveys', 'In-app NPS, rating, choice and text questions, targeted to everyone, a user property or an event, with per-question results.'],
             ['Synthetic monitors', 'Scheduled Playwright journeys that report which step failed, with console logs, network failures and a screenshot; can also run on pull-request previews.'],
             ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
+            ['Short links', 'Branded /l/<slug> redirects that record each click with referrer, country and device, plus UTM tagging.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
             ['Achievements', 'Milestones that unlock automatically as your workspace grows, with progress and downloadable share cards.'],
             ['Export', 'Download raw events as CSV or JSON for a date range, or via the export API.'],
