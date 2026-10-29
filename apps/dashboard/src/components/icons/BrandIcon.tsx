@@ -6,6 +6,7 @@ import ComputerIcon from '@hugeicons/core-free-icons/ComputerIcon';
 import SmartPhone01Icon from '@hugeicons/core-free-icons/SmartPhone01Icon';
 import Tablet01Icon from '@hugeicons/core-free-icons/Tablet01Icon';
 import Link01Icon from '@hugeicons/core-free-icons/Link01Icon';
+import HelpCircleIcon from '@hugeicons/core-free-icons/HelpCircleIcon';
 import { isDarkHex, letterIcon, resolveIcon } from '@/lib/brand-icons';
 
 const DEVICE_ICONS = { desktop: ComputerIcon, mobile: SmartPhone01Icon, tablet: Tablet01Icon };
@@ -42,10 +43,14 @@ export function BrandIcon({ label, domain, size = 16, className = '' }: BrandIco
     );
   }
 
-  if (icon.kind === 'device' || icon.kind === 'direct') {
+  if (icon.kind === 'device' || icon.kind === 'direct' || icon.kind === 'unknown') {
     return (
       <span className={`${box} text-neutral-500 dark:text-slate-400`} aria-hidden="true">
-        <HugeiconsIcon icon={icon.kind === 'direct' ? Link01Icon : DEVICE_ICONS[icon.device]} size={size} strokeWidth={1.8} />
+        <HugeiconsIcon
+          icon={icon.kind === 'direct' ? Link01Icon : icon.kind === 'unknown' ? HelpCircleIcon : DEVICE_ICONS[icon.device]}
+          size={size}
+          strokeWidth={1.8}
+        />
       </span>
     );
   }

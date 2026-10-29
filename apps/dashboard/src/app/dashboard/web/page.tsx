@@ -12,6 +12,7 @@ import { SvgNodeFlowGraph, ColumnGroup, ConnectionFlow } from '@/components/char
 import { TopLocationsCard } from '@/components/charts/TopLocationsCard';
 import { TrafficTimingCard } from '@/components/charts/TrafficTimingCard';
 import { DashCard, KpiStrip, RangeTabs, percentChange, secondaryButtonSm } from '@/components/dashboard/DashCard';
+import { comparisonRanges, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
 import { WebFilterBar, WebGoals } from './WebAnalyticsControls';
 
 export const dynamic = 'force-dynamic';
@@ -149,6 +150,12 @@ export default async function WebAnalyticsPage({
   const sessionGraph = data?.journey ? buildSessionTransitionGraph(data.journey) : { columns: [], connections: [] };
 
   const rangeText = RANGES.find((range) => range.value === days)?.label ?? `${days}d`;
+  const periods = comparisonRanges(new Date(), Math.max(1, Number(days) || 7));
+  // Previous vs. current for the hover cards; only when the API sent both periods.
+  const compare = (current: number | undefined, previous: number | undefined, format: (value: number) => string, invert = false): MetricComparison | undefined =>
+    current === undefined || previous === undefined
+      ? undefined
+      : { previous: format(previous), current: format(current), ...periods, change: percentChange(current, previous), invert };
   const vitals = data?.webVitals.metrics ?? [];
   const vitalPages = data?.webVitals.pages ?? [];
   const campaigns = data?.campaigns ?? [];
@@ -178,17 +185,39 @@ export default async function WebAnalyticsPage({
 
         <KpiStrip
           items={[
-            { label: 'Visitors', value: formatCompact(cur?.visitors ?? 0), delta: percentChange(cur?.visitors, prev?.visitors), hint: `vs. previous ${rangeText}` },
-            { label: 'Page views', value: formatCompact(cur?.pageviews ?? 0), delta: percentChange(cur?.pageviews, prev?.pageviews) },
-            { label: 'Sessions', value: formatCompact(cur?.sessions ?? 0), delta: percentChange(cur?.sessions, prev?.sessions) },
+            {
+              label: 'Visitors',
+              value: formatCompact(cur?.visitors ?? 0),
+              delta: percentChange(cur?.visitors, prev?.visitors),
+              hint: `vs. previous ${rangeText}`,
+              comparison: compare(cur?.visitors, prev?.visitors, formatCompact)
+            },
+            {
+              label: 'Page views',
+              value: formatCompact(cur?.pageviews ?? 0),
+              delta: percentChange(cur?.pageviews, prev?.pageviews),
+              comparison: compare(cur?.pageviews, prev?.pageviews, formatCompact)
+            },
+            {
+              label: 'Sessions',
+              value: formatCompact(cur?.sessions ?? 0),
+              delta: percentChange(cur?.sessions, prev?.sessions),
+              comparison: compare(cur?.sessions, prev?.sessions, formatCompact)
+            },
             {
               label: 'Bounce rate',
               value: `${Math.round((cur?.bounceRate ?? 0) * 100)}%`,
               delta: percentChange(cur?.bounceRate, prev?.bounceRate),
               invertDelta: true,
-              hint: 'Single-page sessions'
+              hint: 'Single-page sessions',
+              comparison: compare(cur?.bounceRate, prev?.bounceRate, (rate) => `${(rate * 100).toFixed(1)}%`, true)
             },
-            { label: 'Avg. session', value: formatDuration(cur?.avgSessionDuration ?? 0), delta: percentChange(cur?.avgSessionDuration, prev?.avgSessionDuration) }
+            {
+              label: 'Avg. session',
+              value: formatDuration(cur?.avgSessionDuration ?? 0),
+              delta: percentChange(cur?.avgSessionDuration, prev?.avgSessionDuration),
+              comparison: compare(cur?.avgSessionDuration, prev?.avgSessionDuration, formatDuration)
+            }
           ]}
         />
 

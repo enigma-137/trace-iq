@@ -28,6 +28,9 @@ import { RecentLogsPanel } from './RecentLogsPanel';
 import { alpha2ToName } from '@/lib/country-codes';
 import { OverviewGeographyGlobe } from './OverviewGeographyGlobe';
 import { PageBanner } from '@/components/PageBanner';
+import { comparisonRanges, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
+import { percentChange } from '@/components/dashboard/DashCard';
+import { DEFAULT_FILTERS, filtersToSearch } from '@/lib/requests';
 import { BrandIcon } from '@/components/icons/BrandIcon';
 import { CountryFlag } from '@/components/icons/CountryFlag';
 
@@ -112,6 +115,8 @@ interface OverviewResponse {
   /** Window the API applied. Older APIs omit it and use fixed 14/30-day windows. */
   range?: OverviewRange;
   totals: { events: number; events24h: number; events1h: number; users: number; sessions: number };
+  /** Counts for the window before `range`. Older APIs omit it. */
+  previousTotals?: { events: number; sessions: number };
   lastEventAt: string | null;
   revenue: { total: number; previous: number; transactions: number };
   topEvents: Array<{ eventName: string; total: number }>;
@@ -189,13 +194,30 @@ export default async function DashboardPage({
   ]);
 
   const sparkValues = overview?.sparkline.map((point) => point.total) ?? [];
-  const activityDelta = trendLabel(sparkValues);
-  const activityTone = trendTone(sparkValues);
+  // Compare with the previous window when the API reports it; older APIs only
+  // give the sparkline, so fall back to its first-vs-last trend.
+  const previousTotals = appliedRange ? overview?.previousTotals : undefined;
+  const eventsChange = previousTotals ? percentChange(overview?.totals.events, previousTotals.events) : null;
+  const activityDelta = previousTotals ? (eventsChange === null ? undefined : signedPercent(eventsChange)) : trendLabel(sparkValues);
+  const activityTone = previousTotals ? (eventsChange === null || Math.round(eventsChange) === 0 ? 'neutral' : eventsChange > 0 ? 'green' : 'red') : trendTone(sparkValues);
+  const ranges = appliedRange ? comparisonRanges(new Date(), appliedRange.days) : null;
+  const eventsComparison: MetricComparison | undefined =
+    previousTotals && ranges
+      ? {
+          previous: previousTotals.events.toLocaleString(),
+          current: (overview?.totals.events ?? 0).toLocaleString(),
+          ...ranges,
+          change: eventsChange
+        }
+      : undefined;
 
   // Tabbed chart data points
+  const hourly = appliedRange?.value === '24h';
   const tabbedPoints = observabilitySeries.map((point) => ({
     ...point,
-    bucket: appliedRange?.value === '24h' ? hourlyBucketLabel(point.bucket) : dailyBucketLabel(point.bucket)
+    label: pointLabel(point.bucket, hourly),
+    links: canonicalProjectId ? bucketLinks(point.bucket, hourly, canonicalProjectId) : undefined,
+    bucket: hourly ? hourlyBucketLabel(point.bucket) : dailyBucketLabel(point.bucket)
   }));
 
   // Sparkline data arrays for KPI cards - purely from API response without hardcoded numbers
@@ -307,9 +329,16 @@ export default async function DashboardPage({
             title={appliedRange ? `Events (${appliedRange.label})` : 'Total Events'}
             value={overview?.totals.events ?? 0}
             delta={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
-            deltaTone={activityTone === 'red' ? 'red' : 'green'}
+            deltaTone={activityTone === 'red' ? 'red' : activityTone === 'neutral' && previousTotals ? 'neutral' : 'green'}
             deltaDirection={activityTone === 'red' ? 'down' : 'up'}
-            deltaSubtext={appliedRange?.value !== '24h' && overview?.totals.events24h ? `${overview.totals.events24h.toLocaleString()} last 24h` : undefined}
+            deltaSubtext={
+              previousTotals
+                ? `vs previous ${appliedRange?.long ?? ''}`
+                : appliedRange?.value !== '24h' && overview?.totals.events24h
+                  ? `${overview.totals.events24h.toLocaleString()} last 24h`
+                  : undefined
+            }
+            comparison={eventsComparison}
             color="blue"
             sparklineData={sparkValues}
           />
@@ -467,7 +496,7 @@ export default async function DashboardPage({
             </div>
             <div className="mt-3">
               <DonutChart
-                items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total }))}
+                items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total, icon: <BrandIcon label={d.name} size={14} /> }))}
                 centerValue={compactNumber((overview?.topDevices ?? []).reduce((sum, d) => sum + d.total, 0))}
                 centerLabel="events"
                 emptyLabel="No device data yet."
@@ -618,6 +647,31 @@ function CompactRanking({
       ))}
     </ul>
   );
+}
+
+function signedPercent(change: number): string {
+  const rounded = Math.round(change);
+  return rounded === 0 ? 'flat' : `${rounded > 0 ? '+' : ''}${rounded}%`;
+}
+
+function pointLabel(bucket: string, hourly: boolean): string {
+  const date = new Date(bucket);
+  if (Number.isNaN(date.getTime())) return bucket;
+  return hourly
+    ? date.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', timeZone: 'UTC' }) + ' UTC'
+    : date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** The requests recorded in one chart bucket, for the pinned point card. */
+function bucketLinks(bucket: string, hourly: boolean, projectId: string) {
+  const from = new Date(bucket);
+  if (Number.isNaN(from.getTime())) return undefined;
+  const to = new Date(from.getTime() + (hourly ? 3_600_000 : 86_400_000));
+  const search = filtersToSearch({ ...DEFAULT_FILTERS, from: from.toISOString(), to: to.toISOString() }, projectId);
+  return [
+    { label: 'Requests in this period', href: `/dashboard/requests?${search}` },
+    { label: 'Server errors (5xx)', href: `/dashboard/requests?${filtersToSearch({ ...DEFAULT_FILTERS, from: from.toISOString(), to: to.toISOString(), status: '5xx' }, projectId)}` }
+  ];
 }
 
 function dailyBucketLabel(bucket: string): string {

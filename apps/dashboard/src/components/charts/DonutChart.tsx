@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 interface DonutChartProps {
-  items: Array<{ label: string; value: number; color?: string }>;
+  /** `icon` is drawn before the label in the legend, e.g. a brand logo. */
+  items: Array<{ label: string; value: number; color?: string; icon?: ReactNode }>;
   size?: number;
   thickness?: number;
   centerLabel?: string;
@@ -52,6 +53,7 @@ export function DonutChart({
     const segment = {
       label: item.label,
       value: item.value,
+      icon: item.icon,
       dash,
       offset,
       pct,
@@ -139,6 +141,7 @@ export function DonutChart({
                 className={`size-2.5 shrink-0 rounded-sm transition-transform ${isHovered ? 'scale-125' : ''}`}
                 style={{ background: segment.color }}
               />
+              {segment.icon}
               <span
                 className={`min-w-0 flex-1 truncate ${
                   isHovered ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-600 dark:text-slate-300'

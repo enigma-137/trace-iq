@@ -41,6 +41,8 @@ describe('resolveIcon', () => {
   it('uses the favicon of unknown sites and a letter for unknown names', () => {
     expect(resolveIcon('blog.example.org')).toEqual({ kind: 'favicon', domain: 'blog.example.org' });
     expect(resolveIcon('Direct')).toEqual({ kind: 'direct' });
+    expect(resolveIcon('unknown')).toEqual({ kind: 'unknown' });
+    expect(resolveIcon('Other')).toEqual({ kind: 'unknown' });
     expect(resolveIcon('Desktop')).toEqual({ kind: 'device', device: 'desktop' });
     const letter = resolveIcon('newsletter');
     expect(letter).toMatchObject({ kind: 'letter', letter: 'N' });

@@ -20,13 +20,14 @@ import {
   DEMO_RANGES,
   buildOverview,
   buildRequests,
-  halfOverHalf,
   seededRandom,
   type DemoBreakdownRow,
   type DemoOverview as Overview
 } from '@/lib/demo-data';
 import { MethodBadge, StatusBadge } from '../dashboard/requests/RequestBadges';
 import { BrandIcon } from '@/components/icons/BrandIcon';
+import { comparisonRanges, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
+import { percentChange } from '@/components/dashboard/DashCard';
 import { CountryFlag } from '@/components/icons/CountryFlag';
 import { useDemo, useDemoCompany } from './DemoContext';
 
@@ -41,6 +42,10 @@ export function DemoOverview() {
   const overview = useMemo(() => buildOverview(company, range, now), [company, range, now]);
   const recent = useMemo(() => buildRequests(company, range, now).slice(0, 6), [company, range, now]);
 
+  const fullLabel = (bucket: string) =>
+    info.hourly
+      ? `${new Date(bucket).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', timeZone: 'UTC' })} UTC`
+      : new Date(bucket).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   const label = (bucket: string) =>
     info.hourly
       ? new Date(bucket).toLocaleTimeString('en-US', { hour: 'numeric', timeZone: 'UTC' })
@@ -49,7 +54,18 @@ export function DemoOverview() {
   const pageviews = overview.series.map((p) => p.pageviews);
   const visitors = overview.series.map((p) => p.visitors);
   const sessions = overview.series.map((p) => p.sessions);
-  const bounceDelta = halfOverHalf(overview.bounceSeries);
+  const { previous } = overview;
+  const periods = comparisonRanges(now, info.hourly ? 1 : info.buckets);
+  const compare = (current: number, before: number, format: (value: number) => string, invert = false): MetricComparison => ({
+    previous: format(before),
+    current: format(current),
+    ...periods,
+    change: percentChange(current, before),
+    invert
+  });
+  const seconds = (value: number) => `${Math.floor(value / 60)}m ${value % 60}s`;
+  const percent = (value: number) => `${value}%`;
+  const ms = (value: number) => `${value.toLocaleString()} ms`;
 
   return (
     <div className="mx-auto w-full max-w-[1360px] space-y-5 sm:space-y-6">
@@ -58,38 +74,42 @@ export function DemoOverview() {
           icon={<HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.8} />}
           title="Pageviews"
           value={compactNumber(overview.totals.pageviews)}
-          {...deltaProps(halfOverHalf(pageviews))}
-          deltaSubtext={`vs first half of ${info.long}`}
+          {...deltaProps(percentChange(overview.totals.pageviews, previous.pageviews))}
+          deltaSubtext={`vs previous ${info.long}`}
           color="blue"
           sparklineData={pageviews}
+          comparison={compare(overview.totals.pageviews, previous.pageviews, compactNumber)}
         />
         <OverviewMetricCard
           icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}
           title="Visitors"
           value={compactNumber(overview.totals.visitors)}
-          {...deltaProps(halfOverHalf(visitors))}
+          {...deltaProps(percentChange(overview.totals.visitors, previous.visitors))}
           color="purple"
           sparklineData={visitors}
+          comparison={compare(overview.totals.visitors, previous.visitors, compactNumber)}
         />
         <OverviewMetricCard
           icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
           title="Sessions"
           value={compactNumber(overview.totals.sessions)}
-          {...deltaProps(halfOverHalf(sessions))}
-          deltaSubtext={`avg ${Math.floor(overview.avgSessionSec / 60)}m ${overview.avgSessionSec % 60}s`}
+          {...deltaProps(percentChange(overview.totals.sessions, previous.sessions))}
+          deltaSubtext={`avg ${seconds(overview.avgSessionSec)}`}
           color="cyan"
           sparklineData={sessions}
+          comparison={compare(overview.totals.sessions, previous.sessions, compactNumber)}
+          comparisonAlign="right"
         />
         <OverviewMetricCard
           icon={<HugeiconsIcon icon={Cursor01Icon} size={16} strokeWidth={1.8} />}
           title="Bounce rate"
           value={`${overview.bounceRate}%`}
           // A rising bounce rate is the bad direction.
-          delta={`${bounceDelta > 0 ? '+' : ''}${bounceDelta}%`}
-          deltaTone={bounceDelta > 0 ? 'red' : 'green'}
-          deltaDirection={bounceDelta > 0 ? 'up' : 'down'}
+          {...deltaProps(percentChange(overview.bounceRate, previous.bounceRate), true)}
           color="rose"
           sparklineData={overview.bounceSeries}
+          comparison={compare(overview.bounceRate, previous.bounceRate, percent, true)}
+          comparisonAlign="right"
         />
         <OverviewMetricCard
           icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
@@ -100,12 +120,21 @@ export function DemoOverview() {
           deltaSubtext={`${overview.errorRate}% failed`}
           color="emerald"
           sparklineData={overview.latencySeries.map((p) => p.p90)}
+          comparison={compare(overview.p95, previous.p95, ms, true)}
+          comparisonAlign="right"
         />
       </section>
 
       <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.65fr_1fr]">
         <OverviewTabbedChart
-          data={overview.series.map((p) => ({ bucket: label(p.bucket), events: p.pageviews, apiCalls: p.apiCalls, errors: p.errors }))}
+          data={overview.series.map((p) => ({
+            bucket: label(p.bucket),
+            label: fullLabel(p.bucket),
+            events: p.pageviews,
+            apiCalls: p.apiCalls,
+            errors: p.errors,
+            links: [{ label: 'Open the requests explorer', href: '/demo/requests' }]
+          }))}
           windowLabel={info.hourly ? '24-hour' : `${info.buckets}-day`}
         />
         <LiveNowPanel overview={overview} seed={company.name} />
@@ -155,7 +184,7 @@ export function DemoOverview() {
           <p className="text-xs text-neutral-500 dark:text-slate-400">Device breakdown</p>
           <div className="mt-3">
             <DonutChart
-              items={overview.devices.map((row) => ({ label: row.label, value: row.visitors }))}
+              items={overview.devices.map((row) => ({ label: row.label, value: row.visitors, icon: <BrandIcon label={row.label} size={14} /> }))}
               centerValue={compactNumber(overview.totals.visitors)}
               centerLabel="visitors"
             />
@@ -205,11 +234,13 @@ export function DemoOverview() {
   );
 }
 
-function deltaProps(change: number) {
+function deltaProps(change: number | null, invert = false) {
+  const rounded = change === null ? 0 : Math.round(change);
+  const good = invert ? rounded <= 0 : rounded >= 0;
   return {
-    delta: `${change > 0 ? '+' : ''}${change}%`,
-    deltaTone: change >= 0 ? ('green' as const) : ('red' as const),
-    deltaDirection: change >= 0 ? ('up' as const) : ('down' as const)
+    delta: change === null ? 'n/a' : `${rounded > 0 ? '+' : ''}${rounded}%`,
+    deltaTone: rounded === 0 ? ('neutral' as const) : good ? ('green' as const) : ('red' as const),
+    deltaDirection: rounded >= 0 ? ('up' as const) : ('down' as const)
   };
 }
 

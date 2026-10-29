@@ -1,15 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import ChartBarLineIcon from '@hugeicons/core-free-icons/ChartBarLineIcon';
+import { ChartPointCard, pointChange, useChartPointer, type PointCardLink, type PointCardRow } from './ChartPointCard';
 
 export interface TabbedChartPoint {
+  /** Axis label, e.g. "Oct 3" or "2 PM". */
   bucket: string;
+  /** Fuller label for the point card, e.g. "Fri, Oct 3, 2026"; defaults to `bucket`. */
+  label?: string;
   events: number;
   apiCalls: number;
   errors: number;
+  /** Shown on the card once the point is clicked, e.g. the requests in that bucket. */
+  links?: PointCardLink[];
 }
+
+const SERIES = [
+  { key: 'events', label: 'Total events', color: '#3b82f6', tab: 'events' },
+  { key: 'apiCalls', label: 'API requests', color: '#10b981', tab: 'api' },
+  { key: 'errors', label: 'Exceptions', color: '#f43f5e', tab: 'errors', invert: true }
+] as const;
 
 interface OverviewTabbedChartProps {
   data: TabbedChartPoint[];
@@ -20,9 +32,19 @@ interface OverviewTabbedChartProps {
 
 export function OverviewTabbedChart({ data = [], windowLabel = '14-day', className = '' }: OverviewTabbedChartProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'events' | 'api' | 'errors'>('all');
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-
   const points = data;
+  const pointer = useChartPointer(points.length);
+  const [plotWidth, setPlotWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const element = pointer.containerRef.current;
+    if (!element) return;
+    const update = () => setPlotWidth(element.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [pointer.containerRef]);
 
   const maxEvents = Math.max(...points.map((p) => p.events), 10);
   const maxApi = Math.max(...points.map((p) => p.apiCalls), 10);
@@ -61,7 +83,34 @@ export function OverviewTabbedChart({ data = [], windowLabel = '14-day', classNa
     return `${linePath} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
   };
 
-  const currentHover = hoverIdx !== null ? points[hoverIdx] : null;
+  const visibleSeries = SERIES.filter((series) => activeTab === 'all' || activeTab === series.tab);
+  // The errors-only tab gets its own scale so small counts stay readable.
+  const maxFor = (key: (typeof SERIES)[number]['key']) => (key === 'errors' && activeTab === 'errors' ? maxErrors : activeMax);
+
+  // Point positions as fractions of the plot box; the SVG stretches to fill it.
+  const xFraction = (idx: number) => (paddingX + (idx / Math.max(1, points.length - 1)) * chartW) / width;
+  const yFraction = (value: number, max: number) => (paddingY + chartH - (value / Math.max(1, max)) * chartH) / height;
+
+  const indexFromClientX = (clientX: number) => {
+    const element = pointer.containerRef.current;
+    if (!element || points.length === 0) return null;
+    const rect = element.getBoundingClientRect();
+    const svgX = ((clientX - rect.left) / rect.width) * width;
+    const idx = Math.round(((svgX - paddingX) / chartW) * Math.max(1, points.length - 1));
+    return Math.max(0, Math.min(points.length - 1, idx));
+  };
+
+  const active = pointer.active !== null ? points[pointer.active] : null;
+  const activeRows: PointCardRow[] =
+    active && pointer.active !== null
+      ? visibleSeries.map((series) => ({
+          label: series.label,
+          color: series.color,
+          value: active[series.key].toLocaleString(),
+          change: pointChange(active[series.key], points[pointer.active! - 1]?.[series.key]),
+          invert: 'invert' in series ? series.invert : undefined
+        }))
+      : [];
 
   return (
     <div
@@ -152,24 +201,23 @@ export function OverviewTabbedChart({ data = [], windowLabel = '14-day', classNa
             )}
           </div>
 
-          {currentHover && (
-            <div className="flex items-center gap-2 rounded border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium dark:border-slate-800 dark:bg-slate-800/80">
-              <span className="text-neutral-500 dark:text-slate-400">{currentHover.bucket}:</span>
-              <span className="text-blue-600 dark:text-blue-400 font-bold">{currentHover.events.toLocaleString()} ev</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">· {currentHover.apiCalls.toLocaleString()} api</span>
-              {currentHover.errors > 0 && <span className="text-rose-600 dark:text-rose-400 font-bold">· {currentHover.errors} err</span>}
-            </div>
-          )}
         </div>
       </div>
 
       {/* SVG Multi-Series Chart */}
-      <div className="relative mt-4 flex-1 flex flex-col justify-end min-h-[220px] w-full">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-full min-h-[200px] max-h-72 overflow-visible"
-          preserveAspectRatio="none"
-        >
+      <div
+        ref={pointer.containerRef}
+        className="relative mt-4 h-60 w-full cursor-crosshair rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        tabIndex={points.length > 0 ? 0 : -1}
+        role="group"
+        aria-label="Trend chart. Use the arrow keys to move between points and Enter to pin one."
+        onMouseMove={(event) => pointer.setHover(indexFromClientX(event.clientX))}
+        onMouseLeave={() => pointer.setHover(null)}
+        onClick={(event) => pointer.togglePin(indexFromClientX(event.clientX))}
+        onKeyDown={pointer.onKeyDown}
+        onBlur={pointer.onBlur}
+      >
+        <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <linearGradient id="tab-events-grad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.22" />
@@ -213,40 +261,38 @@ export function OverviewTabbedChart({ data = [], windowLabel = '14-day', classNa
             <path d={createSmoothPath('errors', activeTab === 'errors' ? maxErrors : activeMax)} fill="none" stroke="#f43f5e" strokeWidth="1.75" strokeLinecap="round" />
           )}
 
-          {/* Hover indicator crosshair */}
-          {hoverIdx !== null && points[hoverIdx] && (
-            <g>
-              <line
-                x1={getCoordinates(points[hoverIdx].events, hoverIdx).x}
-                y1={paddingY}
-                x2={getCoordinates(points[hoverIdx].events, hoverIdx).x}
-                y2={paddingY + chartH}
-                stroke="#94a3b8"
-                strokeWidth="1"
-                strokeDasharray="2 2"
-              />
-              <circle
-                cx={getCoordinates(points[hoverIdx].events, hoverIdx).x}
-                cy={getCoordinates(points[hoverIdx].events, hoverIdx).y}
-                r="4.5"
-                className="fill-blue-500 stroke-white dark:stroke-slate-900"
-                strokeWidth="2"
-              />
-            </g>
-          )}
         </svg>
 
-        {/* Hover interaction overlay */}
-        <div className="absolute inset-0 flex">
-          {points.map((_, idx) => (
+        {pointer.active !== null && active ? (
+          <>
             <div
-              key={idx}
-              className="flex-1 cursor-crosshair"
-              onMouseEnter={() => setHoverIdx(idx)}
-              onMouseLeave={() => setHoverIdx(null)}
+              className="pointer-events-none absolute bottom-[11%] top-[11%] border-l border-dashed border-slate-400/80"
+              style={{ left: `${xFraction(pointer.active) * 100}%` }}
+              aria-hidden="true"
             />
-          ))}
-        </div>
+            {visibleSeries.map((series) => (
+              <span
+                key={series.key}
+                className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white dark:ring-slate-950"
+                style={{
+                  left: `${xFraction(pointer.active!) * 100}%`,
+                  top: `${yFraction(active[series.key], maxFor(series.key)) * 100}%`,
+                  background: series.color
+                }}
+                aria-hidden="true"
+              />
+            ))}
+            <ChartPointCard
+              title={active.label ?? active.bucket}
+              rows={activeRows}
+              pinned={pointer.pinned !== null}
+              onClose={pointer.unpin}
+              links={active.links}
+              anchorX={xFraction(pointer.active) * plotWidth}
+              containerWidth={plotWidth}
+            />
+          </>
+        ) : null}
       </div>
 
       {points.length > 0 ? (
