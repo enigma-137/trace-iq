@@ -70,20 +70,24 @@ export function KpiStrip({ items, className = '' }: { items: Kpi[]; className?: 
   const cols =
     items.length >= 5 ? 'lg:grid-cols-5' : items.length === 4 ? 'lg:grid-cols-4' : items.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
   return (
-    // No overflow-hidden here: the comparison cards open below the strip.
-    <section className={`${cardShell.replace('overflow-hidden ', '')} ${className}`} aria-label="Key metrics">
-      <dl className={`grid grid-cols-2 ${cols} [&>div]:border-neutral-100 dark:[&>div]:border-slate-800`}>
+    <section className={className} aria-label="Key metrics">
+      {/* Separate tiles. No overflow-hidden on them: comparison cards open below. */}
+      <dl className={`grid grid-cols-2 gap-3 ${cols}`}>
         {items.map((item, index) => (
           <div
             key={item.label}
-            className={`min-w-0 px-4 py-3.5 ${index > 0 ? 'lg:border-l' : ''} ${index % 2 === 1 ? 'border-l' : ''} ${index >= 2 ? 'border-t lg:border-t-0' : ''}`}
+            className={`min-w-0 ${cardShell.replace('overflow-hidden ', '')} transition hover:border-neutral-300 dark:hover:border-slate-700`}
           >
             {item.comparison ? (
               <ComparisonHoverCard title={item.label} comparison={item.comparison} align={index >= items.length - 2 ? 'right' : 'left'}>
-                <KpiCell item={item} />
+                <div className="px-4 py-3.5">
+                  <KpiCell item={item} />
+                </div>
               </ComparisonHoverCard>
             ) : (
-              <KpiCell item={item} />
+              <div className="px-4 py-3.5">
+                <KpiCell item={item} />
+              </div>
             )}
           </div>
         ))}
