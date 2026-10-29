@@ -31,9 +31,6 @@ export function LandingHero() {
             <span className={styles.liveDot} aria-hidden="true" />
             Live demo
           </Link>
-          <Link className={styles.heroSecondary} href="/docs">
-            Read the docs
-          </Link>
         </div>
         <p className={styles.heroNote}>
           Free up to 50,000 events a month, or self-host with no limits.
