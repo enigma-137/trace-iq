@@ -16,6 +16,7 @@ export class LinksPublicController {
       userAgent: headers['user-agent'],
       referrer: headers['x-traceiq-referrer'] ?? headers.referer,
       ip,
+      clientIp: headers['x-traceiq-client-ip'],
       forwardedFor: headers['x-forwarded-for'],
       realIp: headers['x-real-ip'],
       headers

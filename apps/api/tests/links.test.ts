@@ -120,6 +120,35 @@ describe('LinksService.resolve', () => {
     expect(db.queryCalls('FROM short_links WHERE slug')).toHaveLength(1);
   });
 
+  it('tells visitors apart by the IP the /l route forwards, not the proxy address', async () => {
+    const { db, service } = makeService((text) => (text.includes('FROM short_links WHERE slug') ? rows([linkRow()]) : empty()));
+    // Both requests reach the API from the same server, with the same browser.
+    const viaDashboard = { userAgent: SAFARI_IPHONE, ip: '172.18.0.1', forwardedFor: '76.76.21.21' };
+
+    await service.resolve('launch', { ...viaDashboard, clientIp: '198.51.100.10' });
+    await service.resolve('launch', { ...viaDashboard, clientIp: '198.51.100.11' });
+    await flush();
+
+    const inserts = db.queryCalls('INSERT INTO events');
+    expect(inserts).toHaveLength(2);
+    // Different visitors get different daily anonymous ids.
+    expect(inserts[0].values[3]).not.toBe(inserts[1].values[3]);
+  });
+
+  it('records the location from Vercel geo headers', async () => {
+    const { db, service } = makeService((text) => (text.includes('FROM short_links WHERE slug') ? rows([linkRow()]) : empty()));
+
+    await service.resolve('launch', {
+      userAgent: CHROME_MAC,
+      clientIp: '198.51.100.12',
+      headers: { 'x-vercel-ip-country': 'NG', 'x-vercel-ip-country-region': 'LA', 'x-vercel-ip-city': 'Lagos' }
+    });
+    await flush();
+
+    const insert = db.queryCalls('INSERT INTO events')[0];
+    expect(JSON.parse(insert.values[7] as string)).toEqual({ country: 'NG', region: 'LA', city: 'Lagos' });
+  });
+
   it('still redirects when the click cannot be recorded', async () => {
     const { usage, service } = makeService((text) => (text.includes('FROM short_links WHERE slug') ? rows([linkRow()]) : empty()));
     usage.consumeProjectEvents.mockRejectedValueOnce(new Error('Monthly event limit reached'));

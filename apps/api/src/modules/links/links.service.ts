@@ -61,6 +61,12 @@ export interface LinkInput {
 export interface ClickMeta {
   userAgent?: string;
   referrer?: string;
+  /**
+   * The visitor's IP as seen by the dashboard's /l route. Only shapes click dedupe, the
+   * daily anonymous id and the geo fallback; a caller that fakes it gains nothing a real
+   * click wouldn't give them.
+   */
+  clientIp?: string;
   ip?: string;
   forwardedFor?: string;
   realIp?: string;
@@ -294,7 +300,7 @@ export class LinksService {
 
   /** Drops repeat clicks from the same visitor within a few seconds (double taps, refreshes). */
   private shouldCount(linkId: string, meta: ClickMeta): boolean {
-    const visitor = extractClientIp(meta.forwardedFor, meta.ip, meta.realIp) ?? 'unknown';
+    const visitor = visitorIp(meta) ?? 'unknown';
     const key = `${linkId}:${visitor}:${meta.userAgent ?? ''}`;
     const now = Date.now();
     const last = this.recentClicks.get(key);
@@ -310,7 +316,7 @@ export class LinksService {
   }
 
   private async recordClick(link: LinkRow, destination: string, meta: ClickMeta) {
-    const clientIp = extractClientIp(meta.forwardedFor, meta.ip, meta.realIp);
+    const clientIp = visitorIp(meta);
     // Country/region/city only: the raw IP is not stored for link clicks.
     const { country, region, city } = resolveGeo(clientIp, meta.headers ?? {});
     const host = referrerHost(meta.referrer);
@@ -409,6 +415,12 @@ export class LinksService {
       updatedAt: toIso(row.updated_at)
     };
   }
+}
+
+function visitorIp(meta: ClickMeta): string | undefined {
+  const forwarded = meta.clientIp?.trim();
+  if (forwarded && /^[0-9a-f.:]{3,45}$/i.test(forwarded)) return forwarded.replace(/^::ffff:/, '');
+  return extractClientIp(meta.forwardedFor, meta.ip, meta.realIp);
 }
 
 function cleanTitle(value: unknown): string | null {
