@@ -33,7 +33,9 @@ export function ComparisonHoverCard({ title, icon, comparison, align = 'left', c
       {children}
       <div
         role="tooltip"
-        className={`pointer-events-none invisible absolute top-[calc(100%-0.5rem)] z-30 w-72 max-w-[calc(100vw-2rem)] translate-y-1 opacity-0 transition duration-150 group-focus-within/compare:visible group-focus-within/compare:translate-y-0 group-focus-within/compare:opacity-100 group-hover/compare:visible group-hover/compare:translate-y-0 group-hover/compare:opacity-100 ${
+        // display:none until opened: an invisible card still takes layout space, and
+        // on narrow screens it pushed the page wider than the viewport.
+        className={`pointer-events-none absolute top-[calc(100%-0.5rem)] z-30 hidden w-72 max-w-[calc(100vw-2rem)] group-focus-within/compare:block group-hover/compare:block ${
           align === 'right' ? 'right-2' : 'left-2'
         }`}
       >

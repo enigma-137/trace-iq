@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChartPointCard, pointChange, useChartPointer } from './ChartPointCard';
 
 interface TrendPoint {
@@ -33,7 +33,10 @@ const SERIES_STYLES = [
   { stroke: 'stroke-neutral-400', fill: 'fill-neutral-400', color: 'rgb(163 163 163)', dash: '4 4' }
 ];
 
-const WIDTH = 760;
+// The SVG is drawn at its container's real width (at least MIN_WIDTH, which
+// scrolls on narrow screens), so it fills wide cards instead of letterboxing.
+const DEFAULT_WIDTH = 760;
+const MIN_WIDTH = 560;
 const HEIGHT = 260;
 const PAD = { top: 16, right: 16, bottom: 28, left: 48 };
 
@@ -44,11 +47,24 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
   const pointer = useChartPointer(buckets.length);
   const hover = pointer.active;
   const [anchor, setAnchor] = useState<{ x: number; width: number } | null>(null);
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const gradientId = useId().replace(/:/g, '');
+
+  useLayoutEffect(() => {
+    const element = pointer.containerRef.current;
+    if (!element) return;
+    const update = () => setWidth(Math.max(MIN_WIDTH, Math.round(element.clientWidth)));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+    // `series` too: an empty chart renders no container, so measure again once data arrives.
+  }, [pointer.containerRef, series]);
 
   const fmt = (value: number) =>
     format === 'compact' ? compactFmt.format(value) : Math.round(value).toLocaleString('en-US');
 
-  const plotWidth = WIDTH - PAD.left - PAD.right;
+  const plotWidth = width - PAD.left - PAD.right;
   const plotHeight = HEIGHT - PAD.top - PAD.bottom;
 
   const maxY = Math.max(1, ...series.flatMap((s) => s.points.map((p) => Number(p.value ?? p.total ?? 0))));
@@ -67,13 +83,13 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
       setAnchor(null);
       return;
     }
-    const point = new DOMPoint(PAD.left + (hover / Math.max(buckets.length - 1, 1)) * (WIDTH - PAD.left - PAD.right), PAD.top).matrixTransform(matrix);
+    const point = new DOMPoint(PAD.left + (hover / Math.max(buckets.length - 1, 1)) * (width - PAD.left - PAD.right), PAD.top).matrixTransform(matrix);
     const rect = wrapper.getBoundingClientRect();
     setAnchor({ x: point.x - rect.left, width: rect.width });
-  }, [hover, buckets.length, pointer.containerRef]);
+  }, [hover, buckets.length, pointer.containerRef, width]);
 
   const gridValues = [0, maxY / 2, maxY];
-  const labelIndexes = pickLabelIndexes(buckets.length);
+  const labelIndexes = pickLabelIndexes(buckets.length, Math.floor(width / 120));
   const total = series.reduce((sum, s) => sum + s.points.reduce((inner, p) => inner + Number(p.value ?? p.total ?? 0), 0), 0);
 
   if (total === 0) {
@@ -108,8 +124,8 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
       <div className="overflow-x-auto">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="h-64 w-full min-w-[560px] cursor-crosshair"
+          viewBox={`0 0 ${width} ${HEIGHT}`}
+          className="h-[260px] w-full min-w-[560px] cursor-crosshair"
           role="img"
           aria-label="Event trend chart"
           onMouseMove={(event) => pointer.setHover(indexAt(event))}
@@ -120,7 +136,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
             {series.map((s, seriesIndex) => {
               const style = SERIES_STYLES[seriesIndex % SERIES_STYLES.length];
               return (
-                <linearGradient key={s.key} id={`trend-fill-${seriesIndex}`} x1="0" x2="0" y1="0" y2="1">
+                <linearGradient key={s.key} id={`${gradientId}-fill-${seriesIndex}`} x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stopColor={style.color} stopOpacity="0.34" />
                   <stop offset="74%" stopColor={style.color} stopOpacity="0.06" />
                   <stop offset="100%" stopColor={style.color} stopOpacity="0" />
@@ -133,7 +149,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
             <g key={value}>
               <line
                 x1={PAD.left}
-                x2={WIDTH - PAD.right}
+                x2={width - PAD.right}
                 y1={yFor(value)}
                 y2={yFor(value)}
                 className="stroke-neutral-200 dark:stroke-slate-800"
@@ -156,9 +172,12 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
             const path = s.points
               .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(Number(point.value ?? point.total ?? 0))}`)
               .join(' ');
+            // Shade under one or two lines, like an area chart; more would muddy.
+            const area = series.length <= 2 ? `${path} L ${xFor(s.points.length - 1)} ${yFor(0)} L ${xFor(0)} ${yFor(0)} Z` : null;
             return (
+              <g key={s.key}>
+                {area ? <path d={area} fill={`url(#${gradientId}-fill-${seriesIndex})`} opacity={series.length === 1 ? 1 : 0.6} /> : null}
               <path
-                key={s.key}
                 d={path}
                 fill="none"
                 className={style.stroke}
@@ -167,6 +186,7 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
+              </g>
             );
           })}
 
@@ -237,9 +257,9 @@ export function TrendChart({ buckets, series, interval, format = 'number', legen
   );
 }
 
-function pickLabelIndexes(count: number): number[] {
+function pickLabelIndexes(count: number, room = 6): number[] {
   if (count <= 1) return [0];
-  const desired = Math.min(count, 6);
+  const desired = Math.min(count, Math.max(2, room));
   const step = (count - 1) / (desired - 1);
   const indexes = new Set<number>();
   for (let i = 0; i < desired; i += 1) {
