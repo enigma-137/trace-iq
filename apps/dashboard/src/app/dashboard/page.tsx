@@ -496,7 +496,7 @@ export default async function DashboardPage({
             </div>
             <div className="mt-3">
               <DonutChart
-                items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total }))}
+                items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total, icon: <BrandIcon label={d.name} size={14} /> }))}
                 centerValue={compactNumber((overview?.topDevices ?? []).reduce((sum, d) => sum + d.total, 0))}
                 centerLabel="events"
                 emptyLabel="No device data yet."

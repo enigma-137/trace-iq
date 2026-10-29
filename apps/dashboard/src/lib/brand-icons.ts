@@ -56,6 +56,7 @@ export type ResolvedIcon =
   | { kind: 'glyph'; glyph: BrandGlyph }
   | { kind: 'device'; device: 'desktop' | 'mobile' | 'tablet' }
   | { kind: 'direct' }
+  | { kind: 'unknown' }
   | { kind: 'favicon'; domain: string }
   | { kind: 'letter'; letter: string; hue: number };
 
@@ -204,6 +205,9 @@ const DOMAIN_ALIASES: Record<string, string> = {
   'gemini.google.com': 'gemini'
 };
 
+/** Placeholders SDKs and parsers report when they can't tell. */
+const UNKNOWN = new Set(['unknown', '(unknown)', 'other', '(other)', 'n/a', '']);
+
 /** How analytics report visits with no referrer. */
 const DIRECT = new Set(['direct', '(direct)', '(none)', 'none', 'direct / none']);
 
@@ -264,6 +268,7 @@ export function resolveIcon(label: string, domain?: string | null): ResolvedIcon
 
   const name = label.trim().toLowerCase();
   if (DIRECT.has(name)) return { kind: 'direct' };
+  if (UNKNOWN.has(name)) return { kind: 'unknown' };
   const device = DEVICES[name];
   if (device) return { kind: 'device', device };
   const key = NAME_ALIASES[name] ?? name.replace(/[\s.]+/g, '');

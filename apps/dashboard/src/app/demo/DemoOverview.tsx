@@ -184,7 +184,7 @@ export function DemoOverview() {
           <p className="text-xs text-neutral-500 dark:text-slate-400">Device breakdown</p>
           <div className="mt-3">
             <DonutChart
-              items={overview.devices.map((row) => ({ label: row.label, value: row.visitors }))}
+              items={overview.devices.map((row) => ({ label: row.label, value: row.visitors, icon: <BrandIcon label={row.label} size={14} /> }))}
               centerValue={compactNumber(overview.totals.visitors)}
               centerLabel="visitors"
             />
