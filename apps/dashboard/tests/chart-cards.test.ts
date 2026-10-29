@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { comparisonRanges } from '../src/components/charts/ComparisonHoverCard';
+import { comparisonRanges, snapshotLabels } from '../src/components/charts/ComparisonHoverCard';
 import { pointChange } from '../src/components/charts/ChartPointCard';
 import { buildOverview, buildSeries } from '../src/lib/demo-data';
 
@@ -8,6 +8,12 @@ describe('comparison cards', () => {
     const end = new Date('2026-10-29T12:00:00Z');
     expect(comparisonRanges(end, 30)).toEqual({ previousLabel: 'Aug 30 – Sep 29', currentLabel: 'Sep 29 – Oct 29' });
     expect(comparisonRanges(end, 1).currentLabel).toBe('Oct 28, 12 PM – Oct 29, 12 PM');
+  });
+
+  it('labels an all-time count against its value when the window started', () => {
+    const end = new Date('2026-10-29T12:00:00Z');
+    expect(snapshotLabels(end, 7)).toEqual({ previousLabel: 'As of Oct 22', currentLabel: 'Now' });
+    expect(snapshotLabels(end, 1).previousLabel).toBe('As of Oct 28, 12 PM');
   });
 
   it('computes point-to-point change and skips a zero base', () => {

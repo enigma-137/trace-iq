@@ -172,7 +172,18 @@ export interface OverviewResponse {
     sessions: number;
   };
   /** The same counts for the window before `range`, for period-over-period comparison. */
-  previousTotals: { events: number; sessions: number };
+  previousTotals: {
+    events: number;
+    sessions: number;
+    /** Identified profiles that existed when the window started (users is an all-time count). */
+    users: number;
+    /** API telemetry for the previous window, on the same latency source as the current one. */
+    apiRequests: number;
+    failedRequests: number;
+    serverErrors: number;
+    errorRate: number;
+    p95: number;
+  };
   // When the last event was received — drives the availability/freshness readout.
   lastEventAt: string | null;
   // GTV = sum of the numeric `amount` property across events (last 30d vs the 30d before).
@@ -273,7 +284,7 @@ export class AnalyticsService {
         project: null,
         range,
         totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0 },
-        previousTotals: { events: 0, sessions: 0 },
+        previousTotals: { events: 0, sessions: 0, users: 0, apiRequests: 0, failedRequests: 0, serverErrors: 0, errorRate: 0, p95: 0 },
         lastEventAt: null,
         revenue: { total: 0, previous: 0, transactions: 0 },
         topEvents: [],
@@ -323,6 +334,7 @@ export class AnalyticsService {
       total_sessions: number;
       previous_events: number;
       previous_sessions: number;
+      previous_users: number;
       last_event_at: string | null;
     }>(
       `
@@ -331,6 +343,7 @@ export class AnalyticsService {
           counts.events_24h,
           counts.events_1h,
           (SELECT count(*) FROM users WHERE project_id = $1)::int AS total_users,
+          (SELECT count(*) FROM users WHERE project_id = $1 AND first_seen_at < ${since})::int AS previous_users,
           (SELECT count(*) FROM sessions WHERE project_id = $1 AND started_at >= ${since})::int AS total_sessions,
           (
             SELECT count(*) FROM sessions
@@ -545,6 +558,25 @@ export class AnalyticsService {
             ORDER BY 1 ASC
           `,
           [project.id]
+        ).catch(() => ({ rows: [] })),
+
+        // The window before this one, for the overview's comparison cards.
+        this.database.query<{ total_requests: number; http_errors: number; server_errors: number; p95: number }>(
+          `
+            SELECT
+              count(*)::int AS total_requests,
+              count(*) FILTER (WHERE (properties->>'status')::int >= 400)::int AS http_errors,
+              count(*) FILTER (WHERE (properties->>'status')::int >= 500)::int AS server_errors,
+              COALESCE(round((percentile_cont(0.95) WITHIN GROUP (ORDER BY (properties->>'durationMs')::numeric))::numeric, 1)::float, 0) AS p95
+            FROM events
+            WHERE project_id = $1 AND event_name = '$api_request'
+              AND occurred_at >= ${since} * 2 AND occurred_at < ${since}
+              AND properties->>'durationMs' ~ '^[0-9]+(\\.[0-9]+)?$'
+              AND properties->>'status' ~ '^[0-9]+$'
+              ${MAX_LATENCY_FILTER}
+              ${latencySourceFilter}
+          `,
+          [project.id]
         ).catch(() => ({ rows: [] }))
       ]);
     });
@@ -557,7 +589,7 @@ export class AnalyticsService {
       topCountries,
       topReferrers,
       revenueResult,
-      [apiTelemetryResult, apiLatencyResult],
+      [apiTelemetryResult, apiLatencyResult, previousTelemetryResult],
       topErrorsResult,
       alertsResult,
       tracesResult,
@@ -718,6 +750,7 @@ export class AnalyticsService {
     const totals = totalsResult.rows[0];
     const revenue = revenueResult.rows[0];
     const apiTel = apiTelemetryResult.rows[0];
+    const previousTel = previousTelemetryResult.rows[0];
     const alertsRow = alertsResult.rows[0] ?? { total: 0, firing: 0, healthy: 0 };
     const frictionRow = frictionResult.rows[0] ?? { rage_clicks: 0, dead_clicks: 0, error_sessions: 0 };
     const distRow = eventDistResult.rows[0] ?? { autocapture_count: 0, custom_count: 0 };
@@ -766,7 +799,13 @@ export class AnalyticsService {
       },
       previousTotals: {
         events: totals?.previous_events ?? 0,
-        sessions: totals?.previous_sessions ?? 0
+        sessions: totals?.previous_sessions ?? 0,
+        users: totals?.previous_users ?? 0,
+        apiRequests: previousTel?.total_requests ?? 0,
+        failedRequests: previousTel?.http_errors ?? 0,
+        serverErrors: previousTel?.server_errors ?? 0,
+        errorRate: previousTel?.total_requests ? Number(((previousTel.http_errors / previousTel.total_requests) * 100).toFixed(2)) : 0,
+        p95: previousTel?.p95 ?? 0
       },
       lastEventAt: totals?.last_event_at ?? null,
       revenue: {

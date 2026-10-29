@@ -28,7 +28,7 @@ import { RecentLogsPanel } from './RecentLogsPanel';
 import { alpha2ToName } from '@/lib/country-codes';
 import { OverviewGeographyGlobe } from './OverviewGeographyGlobe';
 import { PageBanner } from '@/components/PageBanner';
-import { comparisonRanges, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
+import { comparisonRanges, snapshotLabels, type MetricComparison } from '@/components/charts/ComparisonHoverCard';
 import { percentChange } from '@/components/dashboard/DashCard';
 import { DEFAULT_FILTERS, filtersToSearch } from '@/lib/requests';
 import { BrandIcon } from '@/components/icons/BrandIcon';
@@ -116,7 +116,17 @@ interface OverviewResponse {
   range?: OverviewRange;
   totals: { events: number; events24h: number; events1h: number; users: number; sessions: number };
   /** Counts for the window before `range`. Older APIs omit it. */
-  previousTotals?: { events: number; sessions: number };
+  previousTotals?: {
+    events: number;
+    sessions: number;
+    /** Fields below arrived later; an API from before them omits them. */
+    users?: number;
+    apiRequests?: number;
+    failedRequests?: number;
+    serverErrors?: number;
+    errorRate?: number;
+    p95?: number;
+  };
   lastEventAt: string | null;
   revenue: { total: number; previous: number; transactions: number };
   topEvents: Array<{ eventName: string; total: number }>;
@@ -200,16 +210,22 @@ export default async function DashboardPage({
   const eventsChange = previousTotals ? percentChange(overview?.totals.events, previousTotals.events) : null;
   const activityDelta = previousTotals ? (eventsChange === null ? undefined : signedPercent(eventsChange)) : trendLabel(sparkValues);
   const activityTone = previousTotals ? (eventsChange === null || Math.round(eventsChange) === 0 ? 'neutral' : eventsChange > 0 ? 'green' : 'red') : trendTone(sparkValues);
-  const ranges = appliedRange ? comparisonRanges(new Date(), appliedRange.days) : null;
-  const eventsComparison: MetricComparison | undefined =
-    previousTotals && ranges
-      ? {
-          previous: previousTotals.events.toLocaleString(),
-          current: (overview?.totals.events ?? 0).toLocaleString(),
-          ...ranges,
-          change: eventsChange
-        }
-      : undefined;
+  const now = new Date();
+  const ranges = appliedRange ? comparisonRanges(now, appliedRange.days) : null;
+  // One card per metric the API sent a previous value for.
+  const compare = (
+    current: number | undefined,
+    previous: number | undefined,
+    format: (value: number) => string,
+    options: { invert?: boolean; labels?: { previousLabel: string; currentLabel: string } } = {}
+  ): MetricComparison | undefined =>
+    current === undefined || previous === undefined || !ranges
+      ? undefined
+      : { previous: format(previous), current: format(current), ...(options.labels ?? ranges), change: percentChange(current, previous), invert: options.invert };
+  const ms = (value: number) => (value > 0 ? `${value.toLocaleString()} ms` : '–');
+  const pct = (value: number) => `${value}%`;
+  const count = (value: number) => value.toLocaleString();
+  const eventsComparison = compare(overview?.totals.events ?? 0, previousTotals?.events, count);
 
   // Tabbed chart data points
   const hourly = appliedRange?.value === '24h';
@@ -352,6 +368,7 @@ export default async function DashboardPage({
             deltaDirection="up"
             color="emerald"
             sparklineData={latencySparkline}
+            comparison={compare(overview?.apiTelemetry?.p95, previousTotals?.p95, ms, { invert: true })}
           />
 
           <OverviewMetricCard
@@ -364,6 +381,7 @@ export default async function DashboardPage({
             deltaSubtext={failedRequests !== undefined ? `${serverErrors.toLocaleString()} server errors (5xx)` : undefined}
             color="rose"
             sparklineData={failedSparkline}
+            comparison={compare(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, pct, { invert: true })}
           />
 
           <OverviewMetricCard
@@ -376,6 +394,12 @@ export default async function DashboardPage({
             deltaSubtext={overview?.totals.sessions ? 'active sessions' : undefined}
             color="purple"
             sparklineData={usersSparkline}
+            comparison={
+              appliedRange
+                ? compare(overview?.totals.users, previousTotals?.users, count, { labels: snapshotLabels(now, appliedRange.days) })
+                : undefined
+            }
+            comparisonAlign="right"
           />
 
           <OverviewMetricCard
@@ -387,6 +411,8 @@ export default async function DashboardPage({
             deltaDirection="up"
             color="cyan"
             sparklineData={apiSparkline}
+            comparison={compare(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests, count)}
+            comparisonAlign="right"
           />
         </section>
 

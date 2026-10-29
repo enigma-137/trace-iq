@@ -75,7 +75,7 @@ describe('overview period comparison', () => {
   it('counts the window before the selected range in the same scan', async () => {
     const { db, service } = setup((sql) =>
       sql.includes('AS total_events')
-        ? rows([{ total_events: 120, previous_events: 80, events_24h: 20, events_1h: 2, total_users: 9, total_sessions: 30, previous_sessions: 24, last_event_at: null }])
+        ? rows([{ total_events: 120, previous_events: 80, events_24h: 20, events_1h: 2, total_users: 9, previous_users: 7, total_sessions: 30, previous_sessions: 24, last_event_at: null }])
         : undefined
     );
 
@@ -85,8 +85,31 @@ describe('overview period comparison', () => {
     expect(totals).toContain("occurred_at >= now() - interval '7 days' * 2");
     expect(totals).toContain("count(*) FILTER (WHERE occurred_at < now() - interval '7 days')::int AS previous_events");
     expect(totals).toContain("started_at >= now() - interval '7 days' * 2 AND started_at < now() - interval '7 days'");
+    expect(totals).toContain("first_seen_at < now() - interval '7 days')::int AS previous_users");
     expect(result.totals.events).toBe(120);
-    expect(result.previousTotals).toEqual({ events: 80, sessions: 24 });
+    expect(result.previousTotals).toMatchObject({ events: 80, sessions: 24, users: 7 });
+  });
+
+  it('measures the previous window\'s API requests, failures and p95 on the same latency source', async () => {
+    const { db, service } = setup((sql) => {
+      if (sql.includes('AS present')) return rows([{ present: true }]);
+      if (sql.includes('AS server_errors')) return rows([{ total_requests: 200, http_errors: 30, server_errors: 4, p95: 410.5 }]);
+      return undefined;
+    });
+
+    const result = await service.getOverview(user, undefined, undefined, '30d');
+
+    const previous = db.queryCalls('AS server_errors')[0].text;
+    expect(previous).toContain("occurred_at >= now() - interval '30 days' * 2 AND occurred_at < now() - interval '30 days'");
+    // Server-timed projects compare server timings with server timings.
+    expect(previous).toContain('AND NOT');
+    expect(result.previousTotals).toMatchObject({ apiRequests: 200, failedRequests: 30, serverErrors: 4, errorRate: 15, p95: 410.5 });
+  });
+
+  it('reports zeros for an empty previous window instead of dividing by zero', async () => {
+    const { service } = setup();
+    const result = await service.getOverview(user, undefined, undefined, '7d');
+    expect(result.previousTotals).toMatchObject({ apiRequests: 0, failedRequests: 0, errorRate: 0, p95: 0 });
   });
 });
 
