@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * when a client module became async, which went unnoticed because the page
  * still rendered after hydration.
  */
-const PUBLIC_PAGES = ['/', '/pricing', '/docs?page=welcome', '/docs?page=quickstart', '/docs?page=cli', '/docs?page=logs'];
+const PUBLIC_PAGES = ['/', '/demo', '/demo/funnels', '/demo/requests', '/pricing', '/docs?page=welcome', '/docs?page=quickstart', '/docs?page=cli', '/docs?page=logs'];
 
 function collectPageErrors(page: Page): string[] {
   const errors: string[] = [];
