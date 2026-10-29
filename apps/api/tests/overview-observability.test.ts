@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService } from '../src/modules/analytics/analytics.service';
+import { NON_REVENUE_EVENT } from '../src/common/measures';
 import { mockDatabase, rows } from './helpers/mock-db';
 
 const project = {
@@ -121,6 +122,35 @@ describe('overview observability series', () => {
     expect(tracesSql).toContain("event_name = '$api_request'");
     expect(tracesSql).toContain('LIMIT 5');
     expect(tracesSql).not.toContain('random()');
+  });
+});
+
+describe('overview revenue', () => {
+  it('sums only completed-payment events, not checkout intent', async () => {
+    const db = mockDatabase((sql) => {
+      if (sql.includes('WITH rev AS')) {
+        return rows([{ current_revenue: 3500, previous_revenue: 0, current_transactions: 1 }]);
+      }
+      return rows([]);
+    });
+    const projects = { resolveActiveProject: vi.fn().mockResolvedValue(project) };
+    const service = new AnalyticsService(db as never, projects as never);
+
+    const result = await service.getOverview(user);
+
+    expect(result.revenue).toEqual({ total: 3500, previous: 0, transactions: 1 });
+    expect(db.queryCalls('WITH rev AS')[0].text).toContain(`event_name !~* ${NON_REVENUE_EVENT}`);
+  });
+
+  it('classifies intent and failure events as non-revenue', () => {
+    // The SQL literal minus its quotes; Postgres and JS agree on this subset of regex.
+    const nonRevenue = new RegExp(NON_REVENUE_EVENT.slice(1, -1), 'i');
+    for (const name of ['checkout_started', 'checkout_redirected_to_gateway', 'premium_plan_selected', 'payment_failed', 'payment_gateway_returned', 'add_to_cart_clicked', '$api_request']) {
+      expect(nonRevenue.test(name), name).toBe(true);
+    }
+    for (const name of ['revenue', 'subscription_purchased', 'payout_succeeded', 'order_completed', 'payment_received', 'restarted_subscription']) {
+      expect(nonRevenue.test(name), name).toBe(false);
+    }
   });
 });
 

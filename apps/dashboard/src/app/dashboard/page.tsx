@@ -8,6 +8,7 @@ import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
 import UserMultiple02Icon from '@hugeicons/core-free-icons/UserMultiple02Icon';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import DashboardSpeed01Icon from '@hugeicons/core-free-icons/DashboardSpeed01Icon';
+import Coins01Icon from '@hugeicons/core-free-icons/Coins01Icon';
 import { DashboardShell } from './DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { compactNumber } from '@/lib/metrics';
@@ -256,6 +257,9 @@ export default async function DashboardPage({
   const serverErrors = overview?.apiTelemetry?.serverErrors ?? 0;
   const usersSparkline: number[] = [];
   const apiSparkline = observabilitySeries.map((p) => p.apiCalls ?? 0);
+  // Completed-payment events only; amounts are summed as sent, so no currency is assumed.
+  const revenue = overview?.revenue;
+  const revenuePrevious = previousTotals ? revenue?.previous : undefined;
 
   return (
     <DashboardShell
@@ -351,8 +355,8 @@ export default async function DashboardPage({
           </nav>
         ) : null}
 
-        {/* 5 KPI Metric Cards (Dynamic values only, '-' or 0 fallback) */}
-        <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {/* 6 KPI Metric Cards (Dynamic values only, '-' or 0 fallback) */}
+        <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <OverviewMetricCard
             icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
             title={appliedRange ? `Events (${appliedRange.label})` : 'Total Events'}
@@ -451,6 +455,27 @@ export default async function DashboardPage({
             color="cyan"
             sparklineData={apiSparkline}
             comparison={compare(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests, count)}
+            comparisonAlign="right"
+          />
+
+          <OverviewMetricCard
+            icon={<HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.8} />}
+            title="Revenue"
+            value={revenue ? revenue.total.toLocaleString() : '-'}
+            {...(changeDelta(revenue?.total, revenuePrevious) ?? {
+              delta: revenue ? `${revenue.transactions.toLocaleString()} payments` : undefined,
+              deltaTone: 'neutral' as const,
+              deltaDirection: 'up' as const
+            })}
+            deltaSubtext={
+              revenue
+                ? changeDelta(revenue.total, revenuePrevious)
+                  ? `${revenue.transactions.toLocaleString()} payments`
+                  : 'completed payments'
+                : undefined
+            }
+            color="emerald"
+            comparison={compare(revenue?.total, revenuePrevious, count)}
             comparisonAlign="right"
           />
         </section>
