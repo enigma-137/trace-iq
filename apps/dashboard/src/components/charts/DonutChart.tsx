@@ -137,11 +137,14 @@ export function DonutChart({
                   : 'hover:bg-neutral-50 dark:hover:bg-slate-800/40'
               }`}
             >
-              <span
-                className={`size-2.5 shrink-0 rounded-sm transition-transform ${isHovered ? 'scale-125' : ''}`}
-                style={{ background: segment.color }}
-              />
-              {segment.icon}
+              {/* A row with an icon (a brand logo) drops the color swatch; hovering
+                  the row still highlights its slice. */}
+              {segment.icon ?? (
+                <span
+                  className={`size-2.5 shrink-0 rounded-sm transition-transform ${isHovered ? 'scale-125' : ''}`}
+                  style={{ background: segment.color }}
+                />
+              )}
               <span
                 className={`min-w-0 flex-1 truncate ${
                   isHovered ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-600 dark:text-slate-300'
