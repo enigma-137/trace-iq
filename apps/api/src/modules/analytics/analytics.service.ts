@@ -4,7 +4,7 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
 import { RequestSource, clientRequestSql, parseRequestSource } from '../requests/request-capture';
 import { DIMENSION_SOURCES, FilterCondition, buildFilterClause, parseFiltersParam } from '../../common/filters';
-import { ALLOWED_MEASURES, NUMERIC_GUARD, TrendMeasure, buildMeasureExpr } from '../../common/measures';
+import { ALLOWED_MEASURES, NON_REVENUE_EVENT, NUMERIC_GUARD, TrendMeasure, buildMeasureExpr } from '../../common/measures';
 
 type TrendInterval = 'hour' | 'day' | 'week';
 
@@ -186,7 +186,8 @@ export interface OverviewResponse {
   };
   // When the last event was received — drives the availability/freshness readout.
   lastEventAt: string | null;
-  // GTV = sum of the numeric `amount` property across events (last 30d vs the 30d before).
+  // GTV = sum of the numeric `amount` property across completed-payment events
+  // (intent events like checkout_started are excluded), current period vs the one before.
   revenue: {
     total: number;
     previous: number;
@@ -459,6 +460,7 @@ export class AnalyticsService {
             CASE WHEN properties->>'amount' ~ ${NUMERIC_GUARD} THEN (properties->>'amount')::numeric END AS amount
           FROM events
           WHERE project_id = $1 AND occurred_at >= now() - interval '${span.sql}' * 2
+            AND event_name !~* ${NON_REVENUE_EVENT}
         )
         SELECT
           COALESCE(sum(amount) FILTER (WHERE occurred_at >= ${since}), 0)::float AS current_revenue,
