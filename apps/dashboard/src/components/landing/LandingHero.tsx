@@ -38,6 +38,10 @@ export function LandingHero() {
           <a className={styles.button} href="/auth/login?mode=signup">
             Get started free <ArrowRight size={16} aria-hidden="true" />
           </a>
+          <Link className={`${styles.heroSecondary} ${styles.heroDemo}`} href="/demo">
+            <span className={styles.liveDot} aria-hidden="true" />
+            Live demo
+          </Link>
           <Link className={styles.heroSecondary} href="/docs">
             Read the docs
           </Link>
