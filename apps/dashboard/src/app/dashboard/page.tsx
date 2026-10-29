@@ -260,6 +260,8 @@ export default async function DashboardPage({
   // Completed-payment events only; amounts are summed as sent, so no currency is assumed.
   const revenue = overview?.revenue;
   const revenuePrevious = previousTotals ? revenue?.previous : undefined;
+  // Many projects never send revenue; only show the card once some has been recorded.
+  const showRevenue = Boolean(revenue && (revenue.total !== 0 || revenue.previous !== 0));
 
   return (
     <DashboardShell
@@ -355,8 +357,10 @@ export default async function DashboardPage({
           </nav>
         ) : null}
 
-        {/* 6 KPI Metric Cards (Dynamic values only, '-' or 0 fallback) */}
-        <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        {/* 5 KPI Metric Cards, plus Revenue when recorded (Dynamic values only, '-' or 0 fallback) */}
+        <section
+          className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 ${showRevenue ? '2xl:grid-cols-6' : 'xl:grid-cols-5'}`}
+        >
           <OverviewMetricCard
             icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
             title={appliedRange ? `Events (${appliedRange.label})` : 'Total Events'}
@@ -458,26 +462,22 @@ export default async function DashboardPage({
             comparisonAlign="right"
           />
 
-          <OverviewMetricCard
-            icon={<HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.8} />}
-            title="Revenue"
-            value={revenue ? revenue.total.toLocaleString() : '-'}
-            {...(changeDelta(revenue?.total, revenuePrevious) ?? {
-              delta: revenue ? `${revenue.transactions.toLocaleString()} payments` : undefined,
-              deltaTone: 'neutral' as const,
-              deltaDirection: 'up' as const
-            })}
-            deltaSubtext={
-              revenue
-                ? changeDelta(revenue.total, revenuePrevious)
-                  ? `${revenue.transactions.toLocaleString()} payments`
-                  : 'completed payments'
-                : undefined
-            }
-            color="emerald"
-            comparison={compare(revenue?.total, revenuePrevious, count)}
-            comparisonAlign="right"
-          />
+          {showRevenue && revenue ? (
+            <OverviewMetricCard
+              icon={<HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.8} />}
+              title="Revenue"
+              value={revenue.total.toLocaleString()}
+              {...(changeDelta(revenue.total, revenuePrevious) ?? {
+                delta: `${revenue.transactions.toLocaleString()} payments`,
+                deltaTone: 'neutral' as const,
+                deltaDirection: 'up' as const
+              })}
+              deltaSubtext={changeDelta(revenue.total, revenuePrevious) ? `${revenue.transactions.toLocaleString()} payments` : 'completed payments'}
+              color="emerald"
+              comparison={compare(revenue.total, revenuePrevious, count)}
+              comparisonAlign="right"
+            />
+          ) : null}
         </section>
 
         {/* Row 1: Observability Tabbed Trends Chart & Allocation */}
