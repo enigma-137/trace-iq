@@ -337,7 +337,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function formatMoney(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
   } catch {
     return `${value.toLocaleString()} ${currency}`;
   }

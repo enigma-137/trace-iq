@@ -843,7 +843,8 @@ function mergeObservabilitySeries(
 
 function formatMoney(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+    // narrowSymbol gives ₦7,000 rather than NGN 7,000.00 in most locales.
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
   } catch {
     return `${value.toLocaleString()} ${currency}`;
   }
