@@ -125,5 +125,5 @@ is validated independently — one malformed event fails only itself; the rest s
 - Delivery is at-most-once: if a batch fails after `maxRetries`, it is dropped and
   reported via `onError`. Long-running services can rely on the periodic flush; short
   scripts should `await traceiq.shutdown()`.
-- `properties.amount` (a number) is what powers the Revenue/GTV and Sum/Average-of-amount
-  metrics in the dashboard.
+- `properties.amount` (a number) powers Sum/Average-of-amount metrics, and Revenue for the
+  payment events you choose in Settings → Revenue (see the Revenue docs).

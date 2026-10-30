@@ -28,7 +28,11 @@ describe('parseOverviewRange', () => {
 
 describe('overview time range', () => {
   it('bounds every event scan by the selected range instead of counting all time', async () => {
-    const { db, service } = setup();
+    const { db, service } = setup((sql) =>
+      sql.includes('FROM revenue_settings')
+        ? rows([{ enabled: true, success_events: ['paid'], failed_events: [], amount_property: 'amount', currency: 'USD' }])
+        : undefined
+    );
     const result = await service.getOverview(user, undefined, undefined, '30d');
 
     expect(result.range).toBe('30d');
@@ -41,7 +45,7 @@ describe('overview time range', () => {
       expect(unbounded).toMatch(/occurred_at >= now\(\) - interval '30 days'/);
     }
     expect(db.calls.map((call) => call.text).join('\n')).not.toMatch(/interval '(14|60) days'/);
-    expect(db.queryCalls('WITH rev AS')[0].text).toContain("interval '30 days' * 2");
+    expect(db.queryCalls('WITH payments AS')[0].text).toContain("interval '30 days' * 2");
   });
 
   it('uses hourly buckets for the last 24 hours', async () => {

@@ -4,7 +4,8 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
 import { RequestSource, clientRequestSql, parseRequestSource } from '../requests/request-capture';
 import { DIMENSION_SOURCES, FilterCondition, buildFilterClause, parseFiltersParam } from '../../common/filters';
-import { ALLOWED_MEASURES, NON_REVENUE_EVENT, NUMERIC_GUARD, TrendMeasure, buildMeasureExpr } from '../../common/measures';
+import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
+import { RevenueTotals, loadRevenueSettings, queryRevenueTotals, revenueActive } from '../revenue/revenue.util';
 
 type TrendInterval = 'hour' | 'day' | 'week';
 
@@ -186,13 +187,9 @@ export interface OverviewResponse {
   };
   // When the last event was received — drives the availability/freshness readout.
   lastEventAt: string | null;
-  // GTV = sum of the numeric `amount` property across completed-payment events
-  // (intent events like checkout_started are excluded), current period vs the one before.
-  revenue: {
-    total: number;
-    previous: number;
-    transactions: number;
-  };
+  // The amount summed over the project's successful payment events, current period vs the
+  // one before, with successful and failed payment counts. Null until revenue is set up.
+  revenue: (RevenueTotals & { currency: string }) | null;
   topEvents: Array<{ eventName: string; total: number }>;
   topDevices: Array<{ name: string; total: number }>;
   topCountries: Array<{ name: string; total: number }>;
@@ -287,7 +284,7 @@ export class AnalyticsService {
         totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0 },
         previousTotals: { events: 0, sessions: 0, users: 0, apiRequests: 0, failedRequests: 0, serverErrors: 0, errorRate: 0, p95: 0 },
         lastEventAt: null,
-        revenue: { total: 0, previous: 0, transactions: 0 },
+        revenue: null,
         topEvents: [],
         topDevices: [],
         topCountries: [],
@@ -448,27 +445,11 @@ export class AnalyticsService {
       [project.id]
     );
 
-    const revenueQuery = this.database.query<{
-      current_revenue: number;
-      previous_revenue: number;
-      current_transactions: number;
-    }>(
-      `
-        WITH rev AS (
-          SELECT
-            occurred_at,
-            CASE WHEN properties->>'amount' ~ ${NUMERIC_GUARD} THEN (properties->>'amount')::numeric END AS amount
-          FROM events
-          WHERE project_id = $1 AND occurred_at >= now() - interval '${span.sql}' * 2
-            AND event_name !~* ${NON_REVENUE_EVENT}
-        )
-        SELECT
-          COALESCE(sum(amount) FILTER (WHERE occurred_at >= ${since}), 0)::float AS current_revenue,
-          COALESCE(sum(amount) FILTER (WHERE occurred_at < ${since}), 0)::float AS previous_revenue,
-          count(amount) FILTER (WHERE occurred_at >= ${since})::int AS current_transactions
-        FROM rev
-      `,
-      [project.id]
+    // Revenue is opt-in: only projects that set it up in Settings → Revenue get the card.
+    const revenueQuery = loadRevenueSettings(this.database, project.id).then(async (settings) =>
+      revenueActive(settings)
+        ? { currency: settings.currency, ...(await queryRevenueTotals(this.database, project.id, settings, span.sql)) }
+        : null
     );
 
     // Latency tiles follow API performance: server timings when the project sends any,
@@ -750,7 +731,6 @@ export class AnalyticsService {
     });
 
     const totals = totalsResult.rows[0];
-    const revenue = revenueResult.rows[0];
     const apiTel = apiTelemetryResult.rows[0];
     const previousTel = previousTelemetryResult.rows[0];
     const alertsRow = alertsResult.rows[0] ?? { total: 0, firing: 0, healthy: 0 };
@@ -810,11 +790,7 @@ export class AnalyticsService {
         p95: previousTel?.p95 ?? 0
       },
       lastEventAt: totals?.last_event_at ?? null,
-      revenue: {
-        total: revenue?.current_revenue ?? 0,
-        previous: revenue?.previous_revenue ?? 0,
-        transactions: revenue?.current_transactions ?? 0
-      },
+      revenue: revenueResult,
       topEvents: topEventsResult.rows,
       topDevices: topDevices.rows,
       topCountries: topCountries.rows,
