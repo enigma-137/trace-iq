@@ -5,6 +5,7 @@ import { CodeBlock } from './CodeBlock';
 import { SessionReplayDocs } from './SessionReplayDocs';
 import { sdkDocsSections } from './sdk-docs';
 import { SDK_VERSIONS } from '@/lib/sdkVersions';
+import { buildRevenueSetupPrompt } from '@/lib/revenue-setup-prompt';
 
 export const docsSections = [
   { id: 'welcome', label: 'Welcome', category: 'Getting started' },
@@ -30,6 +31,7 @@ export const docsSections = [
   { id: 'api-performance', label: 'API performance', category: 'Features' },
   { id: 'source-maps', label: 'Source maps', category: 'Features' },
   { id: 'logs', label: 'Logs', category: 'Features' },
+  { id: 'revenue', label: 'Revenue', category: 'Features' },
   { id: 'links', label: 'Short links', category: 'Features' },
   { id: 'webhooks', label: 'Webhooks', category: 'Features' },
   { id: 'export', label: 'Data export', category: 'Features' },
@@ -2152,6 +2154,106 @@ traceiq logs --search checkout --follow`}</Code>
     );
   }
 
+  if (id === 'revenue') {
+    return (
+      <Section id="revenue" title="Revenue">
+        <P>
+          Revenue tracking is opt-in. You choose which events mean a payment went through and which mean it failed, and TraceIQ
+          sums the amount on the successful ones. Projects that never set it up don&rsquo;t see a Revenue card at all.
+        </P>
+        <P><strong>1. Send payment events</strong></P>
+        <P>
+          Send one event when a payment succeeds and one when it fails. Any names work; these are the ones we suggest:
+        </P>
+        <Bullets
+          items={[
+            ['payment_succeeded', 'The provider confirmed the payment. Carries amount, currency, provider and reference.'],
+            ['payment_failed', 'The charge was declined or verification failed. Same properties, plus reason.']
+          ]}
+        />
+        <Bullets
+          items={[
+            ['amount', 'A number in the main currency unit: naira, not kobo; dollars, not cents. Paystack and Stripe send the smallest unit, so divide by 100.'],
+            ['currency', 'An ISO code such as NGN or USD. Send every amount in the currency you pick in settings.'],
+            ['reference', "The provider's transaction reference, so you can match an event to a payment."],
+            ['reason', 'On failures, the provider message or code (for example "Insufficient funds").']
+          ]}
+        />
+        <P><strong>2. Send them from your backend</strong></P>
+        <P>
+          Send payment events where your payment provider confirms them: in its webhook handler, or after your server verifies the
+          transaction. A browser event fires only if the customer comes back to your site after paying, so closing the tab loses
+          the sale, and a decline on the provider&rsquo;s page sends nothing at all.
+        </P>
+        <Code lang="ts">{`// Paystack webhook (Express). Check x-paystack-signature first.
+import { TraceIQ } from 'traceiq-node';
+
+const traceiq = new TraceIQ({
+  projectId: process.env.TRACEIQ_PROJECT_ID!, // ${projectId}
+  writeKey: process.env.TRACEIQ_WRITE_KEY!
+});
+
+app.post('/webhooks/paystack', verifyPaystackSignature, (req, res) => {
+  const { event, data } = req.body;
+  const payment = {
+    amount: data.amount / 100, // kobo to naira
+    currency: data.currency,
+    provider: 'paystack',
+    reference: data.reference,
+    plan: data.metadata?.plan
+  };
+
+  if (event === 'charge.success') {
+    traceiq.capture({ event: 'payment_succeeded', userId: data.metadata?.userId, properties: payment });
+  }
+  if (event === 'charge.failed') {
+    traceiq.capture({
+      event: 'payment_failed',
+      userId: data.metadata?.userId,
+      properties: { ...payment, reason: data.gateway_response }
+    });
+  }
+  res.sendStatus(200);
+});`}</Code>
+        <P>
+          Use the same <Mono>userId</Mono> your frontend passes to <Mono>identify</Mono>, so payments join the rest of that
+          person&rsquo;s activity. Webhooks are retried, so record each reference once. Stripe works the same way with{' '}
+          <Mono>payment_intent.succeeded</Mono> and <Mono>payment_intent.payment_failed</Mono>; Flutterwave with{' '}
+          <Mono>charge.completed</Mono> and its <Mono>status</Mono>.
+        </P>
+        <P>
+          Keep your frontend checkout events (<Mono>checkout_started</Mono>, <Mono>plan_selected</Mono>) as funnel steps, but
+          don&rsquo;t put an <Mono>amount</Mono> on them. Call it <Mono>price</Mono> instead.
+        </P>
+        <P><strong>3. Turn it on</strong></P>
+        <P>
+          Open{' '}
+          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/settings/revenue">
+            Settings → Revenue
+          </a>
+          . Mark your events as <strong>Paid</strong> or <strong>Failed</strong>, check the currency and amount property, switch
+          revenue on and save. The page lists your recent events, pre-selects ones that look like payments, and shows the last 30
+          days with your settings so you can compare them with your provider&rsquo;s dashboard.
+        </P>
+        <Bullets
+          items={[
+            ['Overview', 'A Revenue card with the total, successful and failed payments, and the change from the previous period.'],
+            ['Weekly digest', 'Revenue for the week, for projects that turned it on.'],
+            ['Funnels', 'Add payment_succeeded as the last step of your checkout funnel to see who actually paid.'],
+            ['Alerts', 'Alert on a spike in payment_failed.']
+          ]}
+        />
+        <P><strong>Set it up with AI</strong></P>
+        <P>
+          Paste this prompt into Claude Code, Cursor or another coding assistant inside your app&rsquo;s repository. It finds
+          your payment provider, adds both events in the webhook handler, and tells you the event names to select. The same
+          prompt, filled in with your settings, is on the Revenue settings page.
+        </P>
+        <Code lang="text">{buildRevenueSetupPrompt({ projectId })}</Code>
+      </Section>
+    );
+  }
+
   if (id === 'links') {
     return (
       <Section id="links" title="Short links">
@@ -2383,6 +2485,7 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
             ['Surveys', 'In-app NPS, rating, choice and text questions, targeted to everyone, a user property or an event, with per-question results.'],
             ['Synthetic monitors', 'Scheduled Playwright journeys that report which step failed, with console logs, network failures and a screenshot; can also run on pull-request previews.'],
             ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
+            ['Revenue', 'Opt-in revenue from the payment events you choose: total, successful and failed payments, and success rate.'],
             ['Short links', 'Branded /l/<slug> redirects that record each click with referrer, country and device, plus UTM tagging.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
             ['Achievements', 'Milestones that unlock automatically as your workspace grows, with progress and downloadable share cards.'],

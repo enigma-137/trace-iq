@@ -259,8 +259,8 @@ hooks, and closes its HTTP client.
 The SDK posts batches to `POST /v1/events/batch`, authenticates with
 `x-traceiq-write-key`, and sends `{ "projectId": "...", "batch": [...] }`.
 Screen, identify, and exception events use `$page`, `$identify`, and `$exception`.
-There is no separate revenue endpoint; numeric `properties.amount` follows the
-canonical ingestion/revenue contract.
+There is no separate revenue endpoint: `revenue()` sends a `revenue` event with a
+numeric `properties.amount`. Select `revenue` in Settings → Revenue to count it.
 
 ## Platform notes
 

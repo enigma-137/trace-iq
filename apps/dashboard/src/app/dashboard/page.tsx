@@ -129,7 +129,8 @@ interface OverviewResponse {
     p95?: number;
   };
   lastEventAt: string | null;
-  revenue: { total: number; previous: number; transactions: number };
+  // Null until revenue tracking is set up in Settings → Revenue.
+  revenue: { total: number; previous: number; transactions: number; failed: number; currency: string } | null;
   topEvents: Array<{ eventName: string; total: number }>;
   topDevices: Array<{ name: string; total: number }>;
   topCountries: Array<{ name: string; total: number }>;
@@ -257,11 +258,14 @@ export default async function DashboardPage({
   const serverErrors = overview?.apiTelemetry?.serverErrors ?? 0;
   const usersSparkline: number[] = [];
   const apiSparkline = observabilitySeries.map((p) => p.apiCalls ?? 0);
-  // Completed-payment events only; amounts are summed as sent, so no currency is assumed.
-  const revenue = overview?.revenue;
+  // The project's chosen successful-payment events; the card only shows once revenue is set up.
+  // An API from before revenue settings sends no currency; treat that as not set up.
+  const revenue = overview?.revenue?.currency ? overview.revenue : null;
   const revenuePrevious = previousTotals ? revenue?.previous : undefined;
-  // Many projects never send revenue; only show the card once some has been recorded.
-  const showRevenue = Boolean(revenue && (revenue.total !== 0 || revenue.previous !== 0));
+  const showRevenue = revenue !== null;
+  const revenuePayments = revenue
+    ? `${revenue.transactions.toLocaleString()} paid${revenue.failed ? ` · ${revenue.failed.toLocaleString()} failed` : ''}`
+    : '';
 
   return (
     <DashboardShell
@@ -357,7 +361,7 @@ export default async function DashboardPage({
           </nav>
         ) : null}
 
-        {/* 5 KPI Metric Cards, plus Revenue when recorded (Dynamic values only, '-' or 0 fallback) */}
+        {/* 5 KPI Metric Cards, plus Revenue when set up (Dynamic values only, '-' or 0 fallback) */}
         <section
           className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 ${showRevenue ? '2xl:grid-cols-6' : 'xl:grid-cols-5'}`}
         >
@@ -466,15 +470,15 @@ export default async function DashboardPage({
             <OverviewMetricCard
               icon={<HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.8} />}
               title="Revenue"
-              value={revenue.total.toLocaleString()}
+              value={formatMoney(revenue.total, revenue.currency)}
               {...(changeDelta(revenue.total, revenuePrevious) ?? {
-                delta: `${revenue.transactions.toLocaleString()} payments`,
+                delta: revenuePayments,
                 deltaTone: 'neutral' as const,
                 deltaDirection: 'up' as const
               })}
-              deltaSubtext={changeDelta(revenue.total, revenuePrevious) ? `${revenue.transactions.toLocaleString()} payments` : 'completed payments'}
+              deltaSubtext={changeDelta(revenue.total, revenuePrevious) ? revenuePayments : 'payments'}
               color="emerald"
-              comparison={compare(revenue.total, revenuePrevious, count)}
+              comparison={compare(revenue.total, revenuePrevious, (value) => formatMoney(value, revenue.currency))}
               comparisonAlign="right"
             />
           ) : null}
@@ -835,4 +839,12 @@ function mergeObservabilitySeries(
   return Array.from(map.entries())
     .map(([bucket, values]) => ({ bucket, ...values }))
     .sort((a, b) => new Date(a.bucket).getTime() - new Date(b.bucket).getTime());
+}
+
+function formatMoney(value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+  } catch {
+    return `${value.toLocaleString()} ${currency}`;
+  }
 }

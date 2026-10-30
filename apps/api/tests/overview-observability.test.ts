@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService } from '../src/modules/analytics/analytics.service';
-import { NON_REVENUE_EVENT } from '../src/common/measures';
 import { mockDatabase, rows } from './helpers/mock-db';
 
 const project = {
@@ -26,9 +25,6 @@ describe('overview observability series', () => {
         return rows([{
           bucket: '2026-09-01T00:00:00Z', total: 12, api_calls: 4, failed_requests: 1, errors: 2
         }]);
-      }
-      if (sql.includes('WITH rev AS')) {
-        return rows([{ current_revenue: 0, previous_revenue: 0, current_transactions: 0 }]);
       }
       return rows([]);
     });
@@ -86,9 +82,6 @@ describe('overview observability series', () => {
           duration_ms: 5609, occurred_at: '2026-09-03T11:00:00Z', actor: 'anon_1'
         }]);
       }
-      if (sql.includes('WITH rev AS')) {
-        return rows([{ current_revenue: 0, previous_revenue: 0, current_transactions: 0 }]);
-      }
       return rows([]);
     });
     const projects = { resolveActiveProject: vi.fn().mockResolvedValue(project) };
@@ -126,10 +119,27 @@ describe('overview observability series', () => {
 });
 
 describe('overview revenue', () => {
-  it('sums only completed-payment events, not checkout intent', async () => {
+  it('has no revenue until the project sets it up', async () => {
+    const db = mockDatabase(() => rows([]));
+    const projects = { resolveActiveProject: vi.fn().mockResolvedValue(project) };
+    const service = new AnalyticsService(db as never, projects as never);
+
+    const result = await service.getOverview(user);
+
+    expect(result.revenue).toBeNull();
+    expect(db.queryCalls('WITH payments AS')).toHaveLength(0);
+  });
+
+  it('sums the chosen success events and counts the failed ones', async () => {
     const db = mockDatabase((sql) => {
-      if (sql.includes('WITH rev AS')) {
-        return rows([{ current_revenue: 3500, previous_revenue: 0, current_transactions: 1 }]);
+      if (sql.includes('FROM revenue_settings')) {
+        return rows([{
+          enabled: true, success_events: ['subscription_purchased'], failed_events: ['subscription_purchase_failed'],
+          amount_property: 'amount', currency: 'NGN'
+        }]);
+      }
+      if (sql.includes('WITH payments AS')) {
+        return rows([{ total: 3500, previous: 0, transactions: 1, failed: 2, previousTransactions: 0, previousFailed: 0 }]);
       }
       return rows([]);
     });
@@ -138,19 +148,11 @@ describe('overview revenue', () => {
 
     const result = await service.getOverview(user);
 
-    expect(result.revenue).toEqual({ total: 3500, previous: 0, transactions: 1 });
-    expect(db.queryCalls('WITH rev AS')[0].text).toContain(`event_name !~* ${NON_REVENUE_EVENT}`);
-  });
-
-  it('classifies intent and failure events as non-revenue', () => {
-    // The SQL literal minus its quotes; Postgres and JS agree on this subset of regex.
-    const nonRevenue = new RegExp(NON_REVENUE_EVENT.slice(1, -1), 'i');
-    for (const name of ['checkout_started', 'checkout_redirected_to_gateway', 'premium_plan_selected', 'payment_failed', 'payment_gateway_returned', 'add_to_cart_clicked', '$api_request']) {
-      expect(nonRevenue.test(name), name).toBe(true);
-    }
-    for (const name of ['revenue', 'subscription_purchased', 'payout_succeeded', 'order_completed', 'payment_received', 'restarted_subscription']) {
-      expect(nonRevenue.test(name), name).toBe(false);
-    }
+    expect(result.revenue).toEqual({
+      currency: 'NGN', total: 3500, previous: 0, transactions: 1, failed: 2, previousTransactions: 0, previousFailed: 0
+    });
+    const revenueCall = db.queryCalls('WITH payments AS')[0];
+    expect(revenueCall.values).toEqual(['proj_1', ['subscription_purchased'], ['subscription_purchase_failed'], 'amount']);
   });
 });
 

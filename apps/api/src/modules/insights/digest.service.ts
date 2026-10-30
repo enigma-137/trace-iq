@@ -66,21 +66,25 @@ export class DigestService {
           count(DISTINCT e.session_id) FILTER (WHERE e.occurred_at >= $2 AND e.occurred_at < $3)::int AS sessions,
           COALESCE(sum(CASE
             WHEN e.occurred_at >= $2 AND e.occurred_at < $3
-                 AND e.properties->>'amount' ~ '^-?[0-9]+(\\.[0-9]+)?$'
-            THEN (e.properties->>'amount')::numeric
+                 AND e.event_name = ANY(rs.success_events)
+                 AND e.properties->>rs.amount_property ~ '^-?[0-9]+(\\.[0-9]+)?$'
+            THEN (e.properties->>rs.amount_property)::numeric
           END), 0)::float AS revenue,
           COALESCE(sum(CASE
             WHEN e.occurred_at >= $4 AND e.occurred_at < $5
-                 AND e.properties->>'amount' ~ '^-?[0-9]+(\\.[0-9]+)?$'
-            THEN (e.properties->>'amount')::numeric
+                 AND e.event_name = ANY(rs.success_events)
+                 AND e.properties->>rs.amount_property ~ '^-?[0-9]+(\\.[0-9]+)?$'
+            THEN (e.properties->>rs.amount_property)::numeric
           END), 0)::float AS "previousRevenue",
           count(CASE
             WHEN e.occurred_at >= $2 AND e.occurred_at < $3
-                 AND e.properties->>'amount' ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                 AND e.event_name = ANY(rs.success_events)
             THEN 1
           END)::int AS transactions
         FROM projects p
         LEFT JOIN events e ON e.project_id = p.id
+        -- Revenue counts only for projects that set it up (Settings → Revenue).
+        LEFT JOIN revenue_settings rs ON rs.project_id = p.id AND rs.enabled
         WHERE p.organization_id = $1
         GROUP BY p.id, p.name
         ORDER BY p.created_at ASC

@@ -64,7 +64,7 @@ export interface CaptureParams {
   userId?: string;
   /** Anonymous identifier, when there is no user yet. */
   anonymousId?: string;
-  /** Arbitrary event properties. Numeric `amount` powers revenue metrics. */
+  /** Arbitrary event properties. Numeric `amount` is summed for revenue on events chosen in Settings → Revenue. */
   properties?: Record<string, unknown>;
   /** Extra context (server, request id, …). */
   context?: Record<string, unknown>;

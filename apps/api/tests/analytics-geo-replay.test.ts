@@ -32,9 +32,6 @@ describe('Analytics Replay Count & Geography', () => {
         if (sql.includes('FROM session_replays')) {
           return rows([{ count: 0 }]);
         }
-        if (sql.includes('WITH rev AS')) {
-          return rows([{ current_revenue: 0, previous_revenue: 0, current_transactions: 0 }]);
-        }
         return rows([]);
       });
 
@@ -72,9 +69,6 @@ describe('Analytics Replay Count & Geography', () => {
         if (sql.includes('FROM session_replays')) {
           return rows([{ count: 5 }]);
         }
-        if (sql.includes('WITH rev AS')) {
-          return rows([{ current_revenue: 0, previous_revenue: 0, current_transactions: 0 }]);
-        }
         return rows([]);
       });
 
@@ -93,9 +87,6 @@ describe('Analytics Replay Count & Geography', () => {
             { name: 'NG', total: 1150 },
             { name: 'US', total: 143 }
           ]);
-        }
-        if (sql.includes('WITH rev AS')) {
-          return rows([{ current_revenue: 0, previous_revenue: 0, current_transactions: 0 }]);
         }
         return rows([]);
       });

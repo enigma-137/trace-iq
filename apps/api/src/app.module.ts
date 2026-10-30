@@ -12,6 +12,7 @@ import { CohortsModule } from './modules/cohorts/cohorts.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { LinksModule } from './modules/links/links.module';
+import { RevenueModule } from './modules/revenue/revenue.module';
 import { FlagsModule } from './modules/flags/flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ExportModule } from './modules/export/export.module';
@@ -60,6 +61,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     AlertsModule,
     FlagsModule,
     LinksModule,
+    RevenueModule,
     ExperimentsModule,
     SurveysModule,
     SyntheticMonitoringModule,
