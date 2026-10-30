@@ -392,7 +392,7 @@ function EventPicker({
       ) : null}
 
       <div className="relative">
-        <HugeiconsIcon icon={Search01Icon} size={15} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+        <HugeiconsIcon icon={Search01Icon} size={15} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-[18px] -translate-y-1/2 text-neutral-400" />
         <input
           role="combobox"
           aria-label={`Search events for ${label.toLowerCase()}`}
