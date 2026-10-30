@@ -7,7 +7,12 @@ import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import { buildRevenueSetupPrompt } from '@/lib/revenue-setup-prompt';
 import Coins01Icon from '@hugeicons/core-free-icons/Coins01Icon';
-import CreditCardIcon from '@hugeicons/core-free-icons/CreditCardIcon';
+import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
+import CancelCircleIcon from '@hugeicons/core-free-icons/CancelCircleIcon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import { HugeiconsIcon } from '@hugeicons/react';
 import AiMagicIcon from '@hugeicons/core-free-icons/AiMagicIcon';
 import { Skeleton } from '@/components/Skeleton';
 import {
@@ -19,8 +24,7 @@ import {
   StatusPill,
   Switch,
   inputClass,
-  primaryButton,
-  secondaryButton
+  primaryButton
 } from '../SettingsUI';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -35,8 +39,6 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [data, setData] = useState<Response>();
   const [settings, setSettings] = useState<Settings>();
-  const [extraEvents, setExtraEvents] = useState<string[]>([]);
-  const [newEvent, setNewEvent] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   useEffect(() => { void load(); }, [projectId]);
@@ -75,7 +77,6 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
       });
       if (!response.ok) throw new Error(await readApiError(response));
       apply(await response.json() as Response);
-      setExtraEvents([]);
       setMessage('Revenue settings saved.');
       toast.success(settings.enabled ? 'Revenue now shows on Overview.' : 'Revenue tracking is off.', { title: 'Revenue settings updated' });
     } catch (error) {
@@ -105,25 +106,12 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
     );
   }
 
-  const roleOf = (name: string): Role =>
-    settings.successEvents.includes(name) ? 'success' : settings.failedEvents.includes(name) ? 'failed' : null;
-  const setRole = (name: string, role: Role) => {
-    const successEvents = settings.successEvents.filter((n) => n !== name);
-    const failedEvents = settings.failedEvents.filter((n) => n !== name);
-    if (role === 'success') successEvents.push(name);
-    if (role === 'failed') failedEvents.push(name);
-    setSettings({ ...settings, successEvents, failedEvents, enabled: successEvents.length === 0 ? false : settings.enabled });
-  };
-  const candidates: Candidate[] = [
-    ...data.candidates,
-    ...extraEvents.filter((name) => !data.candidates.some((c) => c.name === name)).map((name) => ({ name, count: 0, withAmount: 0, suggested: null }))
-  ];
-  const addEvent = () => {
-    const name = newEvent.trim();
-    if (!name || name.startsWith('$')) return;
-    if (!candidates.some((c) => c.name === name)) setExtraEvents([...extraEvents, name]);
-    setNewEvent('');
-  };
+  const candidates = data.candidates;
+  const setSuccessEvents = (successEvents: string[]) =>
+    setSettings({ ...settings, successEvents, enabled: successEvents.length === 0 ? false : settings.enabled });
+  const setFailedEvents = (failedEvents: string[]) => setSettings({ ...settings, failedEvents });
+  const successSuggestions = candidates.filter((c) => c.suggested === 'success' || (isPaymentEvent(c.name) && !FAILED_NAME.test(c.name) && !INTENT_NAME.test(c.name)));
+  const failedSuggestions = candidates.filter((c) => c.suggested === 'failed' || (isPaymentEvent(c.name) && FAILED_NAME.test(c.name)));
   const prompt = buildRevenueSetupPrompt({
     projectId: data.project.id,
     currency: settings.currency,
@@ -183,55 +171,46 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
 
       <SettingsSection
         id="events"
-        title="Payment events"
-        description="Mark which events mean a payment succeeded and which mean it failed. Everything else is ignored."
+        title="Which events are payments?"
+        description="TraceIQ can't tell which of your events mean money. Pick the event your app sends when a payment goes through, and the one it sends when a payment fails."
       >
+        {successSuggestions.length === 0 && failedSuggestions.length === 0 && settings.successEvents.length === 0 ? (
+          <Notice tone="info">
+            None of {data.project.name}&rsquo;s events from the last 30 days look like a completed payment. Your app needs to send
+            one first: copy the AI prompt below into your coding assistant, or type the event name you plan to send.
+          </Notice>
+        ) : null}
         <SettingsCard
-          icon={CreditCardIcon}
-          title="Events from the last 30 days"
-          description={`${settings.successEvents.length} successful · ${settings.failedEvents.length} failed`}
+          icon={CheckmarkCircle02Icon}
+          title="Payment succeeded"
+          description="Each time this event arrives, its amount is added to revenue. For example payment_succeeded or subscription_purchased."
         >
-          {candidates.length > 0 ? (
-            <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
-              {candidates.map((candidate) => {
-                const role = roleOf(candidate.name);
-                return (
-                  <li key={candidate.name} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <code className="truncate font-mono text-sm text-neutral-900 dark:text-white">{candidate.name}</code>
-                        {candidate.suggested && role === null ? (
-                          <StatusPill tone="neutral">Looks like a {candidate.suggested === 'success' ? 'payment' : 'failure'}</StatusPill>
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-neutral-500 dark:text-slate-400">
-                        {candidate.count.toLocaleString()} events
-                        {candidate.withAmount > 0 ? ` · ${candidate.withAmount.toLocaleString()} with ${settings.amountProperty}` : ` · no ${settings.amountProperty}`}
-                      </span>
-                    </span>
-                    <RoleToggle name={candidate.name} value={role} onChange={(next) => setRole(candidate.name, next)} />
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="px-5 py-4 text-sm text-neutral-500 dark:text-slate-400">
-              No events in the last 30 days. Use the AI prompt below to add payment tracking, or add the event names you plan to send.
-            </p>
-          )}
-          <div className="flex flex-col gap-2 border-t border-neutral-100 p-5 sm:flex-row dark:border-slate-800">
-            <input
-              aria-label="Event name"
-              className={`${inputClass} font-mono text-xs`}
-              placeholder="payment_succeeded"
-              value={newEvent}
-              onChange={(e) => setNewEvent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); addEvent(); }
-              }}
-            />
-            <button type="button" className={secondaryButton} onClick={addEvent}>Add event</button>
-          </div>
+          <EventPicker
+            label="Payment succeeded events"
+            selected={settings.successEvents}
+            onChange={setSuccessEvents}
+            candidates={candidates}
+            suggestions={successSuggestions}
+            taken={settings.failedEvents}
+            amountProperty={settings.amountProperty}
+            placeholder="payment_succeeded"
+          />
+        </SettingsCard>
+        <SettingsCard
+          icon={CancelCircleIcon}
+          title="Payment failed"
+          description="Counted as a failed payment; its amount isn't added. Optional, but it gives you a success rate. For example payment_failed."
+        >
+          <EventPicker
+            label="Payment failed events"
+            selected={settings.failedEvents}
+            onChange={setFailedEvents}
+            candidates={candidates}
+            suggestions={failedSuggestions}
+            taken={settings.successEvents}
+            amountProperty={settings.amountProperty}
+            placeholder="payment_failed"
+          />
         </SettingsCard>
         {settings.successEvents.length > 0 && settings.successEvents.every((name) => (candidates.find((c) => c.name === name)?.withAmount ?? 0) === 0) ? (
           <Notice tone="warning">
@@ -290,40 +269,164 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   );
 }
 
-const ROLES: { value: Role; label: string }[] = [
-  { value: 'success', label: 'Paid' },
-  { value: 'failed', label: 'Failed' },
-  { value: null, label: 'Ignore' }
-];
+// Name hints for suggesting payment events; the user always confirms the choice.
+const PAYMENT_NAME = /(^|_)(payments?|paid|pay|charges?|charged|purchases?|purchased|subscriptions?|subscribed|orders?|checkout|transfers?|payouts?|deposits?|invoices?|renewals?|renewed|revenue|sales?|billing)($|_)/i;
+const FAILED_NAME = /(^|_)(failed|failure|declined|error)($|_)/i;
+const INTENT_NAME = /(^|_)(start|started|initiated|redirected|viewed|opened|clicked|selected|shown|dismissed|added|attempted|abandoned|cancelled|canceled|pending|returned)($|_)/i;
+const MAX_OPTIONS = 8;
 
-function RoleToggle({ name, value, onChange }: { name: string; value: Role; onChange: (value: Role) => void }) {
+function isPaymentEvent(name: string) {
+  return PAYMENT_NAME.test(name);
+}
+
+/** Selected events as removable chips, plus a search box over the project's recent events. */
+function EventPicker({
+  label,
+  selected,
+  onChange,
+  candidates,
+  suggestions,
+  taken,
+  amountProperty,
+  placeholder
+}: {
+  label: string;
+  selected: string[];
+  onChange: (events: string[]) => void;
+  candidates: Candidate[];
+  suggestions: Candidate[];
+  taken: string[];
+  amountProperty: string;
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const search = query.trim();
+  const available = (c: Candidate) => !selected.includes(c.name) && !taken.includes(c.name);
+  const options = (search
+    ? candidates.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+    : suggestions
+  ).filter(available).slice(0, MAX_OPTIONS);
+  const canUseTyped = Boolean(search) && !search.startsWith('$') && !/\s/.test(search)
+    && !candidates.some((c) => c.name === search) && !selected.includes(search) && !taken.includes(search);
+  const quickPicks = suggestions.filter(available).slice(0, 3);
+  const info = (name: string) => candidates.find((c) => c.name === name);
+
+  const add = (name: string) => {
+    onChange([...selected, name]);
+    setQuery('');
+  };
+
   return (
-    <div role="radiogroup" aria-label={`What ${name} means`} className="inline-flex shrink-0 rounded-lg border border-neutral-200 p-0.5 dark:border-slate-700">
-      {ROLES.map((role) => {
-        const selected = value === role.value;
-        return (
-          <button
-            key={role.label}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => onChange(role.value)}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-              selected
-                ? role.value === 'success'
-                  ? 'bg-emerald-600 text-white'
-                  : role.value === 'failed'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-neutral-900 text-white dark:bg-white dark:text-slate-950'
-                : 'text-neutral-600 hover:bg-neutral-100 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
+    <div className="grid gap-3 p-5">
+      {selected.length > 0 ? (
+        <ul className="flex flex-wrap gap-2" aria-label={label}>
+          {selected.map((name) => {
+            const event = info(name);
+            return (
+              <li key={name} className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 py-1 pl-3 pr-1 dark:border-slate-700 dark:bg-slate-800/60">
+                <span className="min-w-0">
+                  <code className="block truncate font-mono text-xs font-medium text-neutral-900 dark:text-white">{name}</code>
+                  <span className="block text-[11px] text-neutral-500 dark:text-slate-400">{describe(event, amountProperty)}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${name}`}
+                  onClick={() => onChange(selected.filter((n) => n !== name))}
+                  className="grid h-6 w-6 place-items-center rounded-md text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      <div className="relative">
+        <HugeiconsIcon icon={Search01Icon} size={15} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+        <input
+          role="combobox"
+          aria-label={`Search events for ${label.toLowerCase()}`}
+          aria-expanded={open}
+          className={`${inputClass} pl-9 font-mono text-xs`}
+          placeholder={selected.length ? 'Add another event…' : `Search your events, or type one like ${placeholder}`}
+          value={query}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (options[0]) add(options[0].name);
+              else if (canUseTyped) add(search);
+            }
+            if (e.key === 'Escape') setOpen(false);
+          }}
+        />
+        {open && (options.length > 0 || canUseTyped || !search) ? (
+          <ul
+            role="listbox"
+            className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
-            {role.label}
-          </button>
-        );
-      })}
+            {!search ? (
+              <li className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400 dark:text-slate-500">
+                {options.length ? 'Looks like a payment' : 'Type to search all your events'}
+              </li>
+            ) : null}
+            {options.map((c) => (
+              <li key={c.name} role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); add(c.name); }}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-slate-800"
+                >
+                  <code className="truncate font-mono text-xs text-neutral-900 dark:text-white">{c.name}</code>
+                  <span className="shrink-0 text-[11px] text-neutral-500 dark:text-slate-400">{describe(c, amountProperty)}</span>
+                </button>
+              </li>
+            ))}
+            {canUseTyped ? (
+              <li role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); add(search); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={13} strokeWidth={2} />
+                  Use <code className="font-mono">{search}</code>
+                  <span className="text-neutral-400">· not received yet</span>
+                </button>
+              </li>
+            ) : null}
+          </ul>
+        ) : null}
+      </div>
+
+      {selected.length === 0 && quickPicks.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-slate-400">
+          Suggested:
+          {quickPicks.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => add(c.name)}
+              className="inline-flex items-center gap-1 rounded-md border border-dashed border-neutral-300 px-2 py-1 font-mono text-neutral-700 hover:border-neutral-500 hover:text-neutral-950 dark:border-slate-600 dark:text-slate-300 dark:hover:text-white"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={2} />
+              {c.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function describe(event: Candidate | undefined, amountProperty: string) {
+  if (!event || event.count === 0) return 'No events in the last 30 days';
+  const count = `${event.count.toLocaleString()} in 30 days`;
+  return event.withAmount > 0 ? `${count} · has ${amountProperty}` : `${count} · no ${amountProperty}`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
