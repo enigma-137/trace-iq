@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import { buildRevenueSetupPrompt } from '@/lib/revenue-setup-prompt';
+import { DEFAULT_FAILED_EVENT, DEFAULT_SUCCESS_EVENT, buildRevenueSetupPrompt } from '@/lib/revenue-setup-prompt';
 import Coins01Icon from '@hugeicons/core-free-icons/Coins01Icon';
 import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
 import CancelCircleIcon from '@hugeicons/core-free-icons/CancelCircleIcon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
-import { HugeiconsIcon } from '@hugeicons/react';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import AiMagicIcon from '@hugeicons/core-free-icons/AiMagicIcon';
 import { Skeleton } from '@/components/Skeleton';
 import {
@@ -47,11 +47,16 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
 
   function apply(body: Response) {
     setData(body);
-    // First visit: pre-select events that look like payments so setup is one review and a save.
-    setSettings(body.configured ? body.settings : {
+    if (body.configured) return setSettings(body.settings);
+    // First visit: use events that already look like payments, or the names we recommend
+    // sending, so a new project only has to send them and switch revenue on.
+    const suggested = (role: Role) => body.candidates.filter((c) => c.suggested === role).map((c) => c.name);
+    const successEvents = suggested('success');
+    const failedEvents = suggested('failed');
+    setSettings({
       ...body.settings,
-      successEvents: body.candidates.filter((c) => c.suggested === 'success').map((c) => c.name),
-      failedEvents: body.candidates.filter((c) => c.suggested === 'failed').map((c) => c.name)
+      successEvents: successEvents.length ? successEvents : [DEFAULT_SUCCESS_EVENT],
+      failedEvents: failedEvents.length ? failedEvents : [DEFAULT_FAILED_EVENT]
     });
   }
 
@@ -112,25 +117,118 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   const setFailedEvents = (failedEvents: string[]) => setSettings({ ...settings, failedEvents });
   const successSuggestions = candidates.filter((c) => c.suggested === 'success' || (isPaymentEvent(c.name) && !FAILED_NAME.test(c.name) && !INTENT_NAME.test(c.name)));
   const failedSuggestions = candidates.filter((c) => c.suggested === 'failed' || (isPaymentEvent(c.name) && FAILED_NAME.test(c.name)));
-  const prompt = buildRevenueSetupPrompt({
-    projectId: data.project.id,
-    currency: settings.currency,
-    successEvent: settings.successEvents[0],
-    failedEvent: settings.failedEvents[0]
-  });
+  const successEvent = settings.successEvents[0] ?? DEFAULT_SUCCESS_EVENT;
+  const failedEvent = settings.failedEvents[0] ?? DEFAULT_FAILED_EVENT;
+  const prompt = buildRevenueSetupPrompt({ projectId: data.project.id, currency: settings.currency, successEvent, failedEvent });
+  const usesOwnNames =
+    successSuggestions.length + failedSuggestions.length > 0 ||
+    settings.successEvents.some((name) => name !== DEFAULT_SUCCESS_EVENT) ||
+    settings.failedEvents.some((name) => name !== DEFAULT_FAILED_EVENT);
+  const received = (name: string) => candidates.find((c) => c.name === name)?.count ?? 0;
   const summary = data.summary;
   const attempts = summary ? summary.transactions + summary.failed : 0;
+  const example = `traceiq.capture({
+  event: '${successEvent}',
+  userId: user.id,
+  properties: { amount: 5000, currency: '${settings.currency}', reference: 'T123' }
+});`;
 
   return (
     <form onSubmit={save} className="mt-8 grid max-w-4xl gap-12">
-      {!data.configured ? (
-        <Notice tone="info">
-          Revenue is off for {data.project.name}. Pick the events that mean a payment went through, and the ones that mean it failed,
-          then turn it on. {settings.successEvents.length + settings.failedEvents.length > 0 ? 'We pre-selected events that look like payments; check them before saving.' : ''}
-        </Notice>
-      ) : null}
+      <SettingsSection
+        id="send"
+        title="1. Send payment events from your app"
+        description="Revenue comes from two events your app sends: one when a payment goes through, and one when it fails. Send them from your backend, when your payment provider (Paystack, Flutterwave, Stripe…) confirms the payment."
+      >
+        <SettingsCard
+          icon={AiMagicIcon}
+          title="Events TraceIQ is waiting for"
+          description="Copy the prompt into Claude Code, Cursor or another coding assistant in your app's repository. It adds both events for you."
+          actions={<CopyButton value={prompt} label="Copy AI prompt" />}
+          footer={
+            <span>
+              Prefer to write it yourself? The{' '}
+              <Link className="font-medium underline underline-offset-2" href="/docs?page=revenue">
+                revenue docs
+              </Link>{' '}
+              have a full Paystack webhook example.
+            </span>
+          }
+        >
+          <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
+            <EventStatus
+              icon={CheckmarkCircle02Icon}
+              names={settings.successEvents.length ? settings.successEvents : [successEvent]}
+              meaning="A payment went through. Its amount is added to revenue."
+              properties={`${settings.amountProperty}, currency, reference`}
+              received={received}
+            />
+            <EventStatus
+              icon={CancelCircleIcon}
+              names={settings.failedEvents.length ? settings.failedEvents : [failedEvent]}
+              meaning="A payment failed. Counted, but nothing is added. Optional."
+              properties="reason, plus the same as above"
+              received={received}
+            />
+          </ul>
+          <div className="border-t border-neutral-100 px-5 py-4 dark:border-slate-800">
+            <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">What the code looks like (Node.js)</p>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-neutral-50 p-3 font-mono text-xs leading-5 text-neutral-700 dark:bg-slate-950 dark:text-slate-300">{example}</pre>
+            <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
+              Send <code className="font-mono">{settings.amountProperty}</code> in the main currency unit: naira, not kobo. Paystack and Stripe give you the smallest unit, so divide by 100.
+            </p>
+          </div>
+        </SettingsCard>
 
-      <SettingsSection id="revenue" title="Revenue tracking" description="Only projects that turn this on get revenue on Overview and in the weekly digest.">
+        <details
+          open={usesOwnNames || undefined}
+          className="group rounded-xl border border-neutral-200 bg-white dark:border-slate-800 dark:bg-slate-900/40"
+        >
+          <summary className="cursor-pointer list-none px-5 py-4 text-sm font-medium text-neutral-900 dark:text-white">
+            <span className="mr-2 inline-block transition group-open:rotate-90">›</span>
+            Already sending payments under other names?
+            <span className="mt-0.5 block pl-4 text-sm font-normal text-neutral-500 dark:text-slate-400">
+              Use your existing events instead, like subscription_purchased or order_paid.
+            </span>
+          </summary>
+          <div className="grid gap-6 border-t border-neutral-100 p-5 dark:border-slate-800">
+            <EventPicker
+              title="Payment went through"
+              label="Payment succeeded events"
+              selected={settings.successEvents}
+              onChange={setSuccessEvents}
+              candidates={candidates}
+              suggestions={successSuggestions}
+              taken={settings.failedEvents}
+              amountProperty={settings.amountProperty}
+              placeholder={DEFAULT_SUCCESS_EVENT}
+            />
+            <EventPicker
+              title="Payment failed"
+              label="Payment failed events"
+              selected={settings.failedEvents}
+              onChange={setFailedEvents}
+              candidates={candidates}
+              suggestions={failedSuggestions}
+              taken={settings.successEvents}
+              amountProperty={settings.amountProperty}
+              placeholder={DEFAULT_FAILED_EVENT}
+            />
+            <label className="grid gap-1.5 text-sm font-medium text-neutral-700 dark:text-slate-300">
+              Amount property
+              <input
+                aria-label="Amount property"
+                className={`${inputClass} max-w-[220px] font-mono text-xs`}
+                value={settings.amountProperty}
+                onChange={(e) => setSettings({ ...settings, amountProperty: e.target.value })}
+              />
+              <span className="text-xs font-normal text-neutral-500 dark:text-slate-400">The event property that holds the amount.</span>
+            </label>
+          </div>
+        </details>
+      </SettingsSection>
+
+      <SettingsSection id="revenue" title="2. Turn on revenue" description="Adds a Revenue card to Overview and revenue to the weekly digest.">
         <SettingsCard
           icon={Coins01Icon}
           title={
@@ -139,7 +237,11 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
               <StatusPill tone={settings.enabled ? 'success' : 'neutral'}>{settings.enabled ? 'On' : 'Off'}</StatusPill>
             </span>
           }
-          description="Sums the amount on your successful payment events and counts failed ones."
+          description={
+            received(successEvent) === 0 && settings.successEvents.every((name) => received(name) === 0)
+              ? 'You can turn it on now. Revenue reads 0 until the first payment event arrives.'
+              : 'Sums the amount on your successful payments and counts failed ones.'
+          }
           actions={
             <Switch
               label="Enable revenue tracking"
@@ -158,102 +260,14 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
               onChange={(e) => setSettings({ ...settings, currency: e.target.value.toUpperCase() })}
             />
           </SettingsRow>
-          <SettingsRow label="Amount property" hint="The event property that holds the amount, in the main unit (naira, not kobo).">
-            <input
-              aria-label="Amount property"
-              className={`${inputClass} max-w-[220px] font-mono text-xs`}
-              value={settings.amountProperty}
-              onChange={(e) => setSettings({ ...settings, amountProperty: e.target.value })}
-            />
-          </SettingsRow>
-        </SettingsCard>
-      </SettingsSection>
-
-      <SettingsSection
-        id="events"
-        title="Which events are payments?"
-        description="TraceIQ can't tell which of your events mean money. Pick the event your app sends when a payment goes through, and the one it sends when a payment fails."
-      >
-        {successSuggestions.length === 0 && failedSuggestions.length === 0 && settings.successEvents.length === 0 ? (
-          <Notice tone="info">
-            None of {data.project.name}&rsquo;s events from the last 30 days look like a completed payment. Your app needs to send
-            one first: copy the AI prompt below into your coding assistant, or type the event name you plan to send.
-          </Notice>
-        ) : null}
-        <SettingsCard
-          icon={CheckmarkCircle02Icon}
-          title="Payment succeeded"
-          description="Each time this event arrives, its amount is added to revenue. For example payment_succeeded or subscription_purchased."
-        >
-          <EventPicker
-            label="Payment succeeded events"
-            selected={settings.successEvents}
-            onChange={setSuccessEvents}
-            candidates={candidates}
-            suggestions={successSuggestions}
-            taken={settings.failedEvents}
-            amountProperty={settings.amountProperty}
-            placeholder="payment_succeeded"
-          />
-        </SettingsCard>
-        <SettingsCard
-          icon={CancelCircleIcon}
-          title="Payment failed"
-          description="Counted as a failed payment; its amount isn't added. Optional, but it gives you a success rate. For example payment_failed."
-        >
-          <EventPicker
-            label="Payment failed events"
-            selected={settings.failedEvents}
-            onChange={setFailedEvents}
-            candidates={candidates}
-            suggestions={failedSuggestions}
-            taken={settings.successEvents}
-            amountProperty={settings.amountProperty}
-            placeholder="payment_failed"
-          />
-        </SettingsCard>
-        {settings.successEvents.length > 0 && settings.successEvents.every((name) => (candidates.find((c) => c.name === name)?.withAmount ?? 0) === 0) ? (
-          <Notice tone="warning">
-            None of your successful payment events carried a numeric <code className="font-mono">{settings.amountProperty}</code> in the last 30 days, so revenue
-            will read 0 and only payments will be counted.
-          </Notice>
-        ) : null}
-      </SettingsSection>
-
-      {summary ? (
-        <SettingsSection id="check" title="Last 30 days" description="Computed with the saved settings, so you can check they match your payment provider.">
-          <SettingsCard>
-            <dl className="grid grid-cols-2 gap-px bg-neutral-100 sm:grid-cols-4 dark:bg-slate-800">
-              <Stat label="Revenue" value={formatMoney(summary.total, data.settings.currency)} />
+          {summary ? (
+            <dl className="grid grid-cols-2 gap-px border-t border-neutral-100 bg-neutral-100 sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-800">
+              <Stat label="Revenue, 30 days" value={formatMoney(summary.total, data.settings.currency)} />
               <Stat label="Successful payments" value={summary.transactions.toLocaleString()} />
               <Stat label="Failed payments" value={summary.failed.toLocaleString()} />
               <Stat label="Success rate" value={attempts ? `${Math.round((summary.transactions / attempts) * 100)}%` : '–'} />
             </dl>
-          </SettingsCard>
-        </SettingsSection>
-      ) : null}
-
-      <SettingsSection
-        id="ai"
-        title="Set it up with AI"
-        description="Paste this into Claude Code, Cursor or another coding assistant inside your app's repository."
-      >
-        <SettingsCard
-          icon={AiMagicIcon}
-          title="Revenue setup prompt"
-          description="It sends successful and failed payments from your backend, where your payment provider confirms them."
-          actions={<CopyButton value={prompt} label="Copy prompt" />}
-          footer={
-            <span>
-              Want to do it by hand? Read the{' '}
-              <Link className="font-medium underline underline-offset-2" href="/docs?page=revenue">
-                revenue docs
-              </Link>
-              .
-            </span>
-          }
-        >
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap px-5 py-4 font-mono text-xs leading-5 text-neutral-600 dark:text-slate-400">{prompt}</pre>
+          ) : null}
         </SettingsCard>
       </SettingsSection>
 
@@ -269,6 +283,37 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   );
 }
 
+function EventStatus({
+  icon,
+  names,
+  meaning,
+  properties,
+  received
+}: {
+  icon: IconSvgElement;
+  names: string[];
+  meaning: string;
+  properties: string;
+  received: (name: string) => number;
+}) {
+  const total = names.reduce((sum, name) => sum + received(name), 0);
+  return (
+    <li className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <span className="flex min-w-0 gap-3">
+        <HugeiconsIcon icon={icon} size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-neutral-500 dark:text-slate-400" />
+        <span className="min-w-0">
+          <code className="block truncate font-mono text-sm font-medium text-neutral-900 dark:text-white">{names.join(', ')}</code>
+          <span className="mt-0.5 block text-sm text-neutral-600 dark:text-slate-300">{meaning}</span>
+          <span className="mt-0.5 block text-xs text-neutral-500 dark:text-slate-400">Properties: {properties}</span>
+        </span>
+      </span>
+      <StatusPill tone={total > 0 ? 'success' : 'warning'}>
+        {total > 0 ? `${total.toLocaleString()} received in 30 days` : 'Not received yet'}
+      </StatusPill>
+    </li>
+  );
+}
+
 // Name hints for suggesting payment events; the user always confirms the choice.
 const PAYMENT_NAME = /(^|_)(payments?|paid|pay|charges?|charged|purchases?|purchased|subscriptions?|subscribed|orders?|checkout|transfers?|payouts?|deposits?|invoices?|renewals?|renewed|revenue|sales?|billing)($|_)/i;
 const FAILED_NAME = /(^|_)(failed|failure|declined|error)($|_)/i;
@@ -281,6 +326,7 @@ function isPaymentEvent(name: string) {
 
 /** Selected events as removable chips, plus a search box over the project's recent events. */
 function EventPicker({
+  title,
   label,
   selected,
   onChange,
@@ -290,6 +336,7 @@ function EventPicker({
   amountProperty,
   placeholder
 }: {
+  title: string;
   label: string;
   selected: string[];
   onChange: (events: string[]) => void;
@@ -318,7 +365,8 @@ function EventPicker({
   };
 
   return (
-    <div className="grid gap-3 p-5">
+    <div className="grid gap-2.5">
+      <p className="text-sm font-medium text-neutral-900 dark:text-white">{title}</p>
       {selected.length > 0 ? (
         <ul className="flex flex-wrap gap-2" aria-label={label}>
           {selected.map((name) => {
@@ -344,7 +392,7 @@ function EventPicker({
       ) : null}
 
       <div className="relative">
-        <HugeiconsIcon icon={Search01Icon} size={15} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+        <HugeiconsIcon icon={Search01Icon} size={15} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-[18px] -translate-y-1/2 text-neutral-400" />
         <input
           role="combobox"
           aria-label={`Search events for ${label.toLowerCase()}`}
@@ -367,7 +415,7 @@ function EventPicker({
         {open && (options.length > 0 || canUseTyped || !search) ? (
           <ul
             role="listbox"
-            className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+            className="mt-1 max-h-72 w-full overflow-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
             {!search ? (
               <li className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400 dark:text-slate-500">
