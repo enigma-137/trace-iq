@@ -2246,8 +2246,9 @@ app.post('/webhooks/paystack', verifyPaystackSignature, (req, res) => {
         <P><strong>Set it up with AI</strong></P>
         <P>
           Paste this prompt into Claude Code, Cursor or another coding assistant inside your app&rsquo;s repository. It finds
-          your payment provider, adds both events in the webhook handler, and tells you the event names to select. The same
-          prompt, filled in with your settings, is on the Revenue settings page.
+          your payment provider, adds both events in the webhook handler, and tells you the event names to select. This one
+          is for a Node.js backend. Settings → Revenue has the same prompt for Python (Django, Flask, FastAPI), PHP, Rust
+          or any other language over the HTTP API, filled in with your settings.
         </P>
         <Code lang="text">{buildRevenueSetupPrompt({ projectId })}</Code>
       </Section>
