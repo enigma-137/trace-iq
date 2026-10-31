@@ -5,7 +5,14 @@ import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import { DEFAULT_FAILED_EVENT, DEFAULT_SUCCESS_EVENT, buildRevenueSetupPrompt } from '@/lib/revenue-setup-prompt';
+import {
+  DEFAULT_FAILED_EVENT,
+  DEFAULT_SUCCESS_EVENT,
+  REVENUE_BACKENDS,
+  buildRevenueExample,
+  buildRevenueSetupPrompt,
+  type RevenueBackend
+} from '@/lib/revenue-setup-prompt';
 import Coins01Icon from '@hugeicons/core-free-icons/Coins01Icon';
 import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
 import CancelCircleIcon from '@hugeicons/core-free-icons/CancelCircleIcon';
@@ -41,6 +48,7 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   const [settings, setSettings] = useState<Settings>();
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [backend, setBackend] = useState<RevenueBackend>('node');
   useEffect(() => { void load(); }, [projectId]);
 
   async function token() { return (await supabase.auth.getSession()).data.session?.access_token; }
@@ -119,7 +127,14 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   const failedSuggestions = candidates.filter((c) => c.suggested === 'failed' || (isPaymentEvent(c.name) && FAILED_NAME.test(c.name)));
   const successEvent = settings.successEvents[0] ?? DEFAULT_SUCCESS_EVENT;
   const failedEvent = settings.failedEvents[0] ?? DEFAULT_FAILED_EVENT;
-  const prompt = buildRevenueSetupPrompt({ projectId: data.project.id, currency: settings.currency, successEvent, failedEvent });
+  const prompt = buildRevenueSetupPrompt({
+    projectId: data.project.id,
+    currency: settings.currency,
+    successEvent,
+    failedEvent,
+    amountProperty: settings.amountProperty,
+    backend
+  });
   const usesOwnNames =
     successSuggestions.length + failedSuggestions.length > 0 ||
     settings.successEvents.some((name) => name !== DEFAULT_SUCCESS_EVENT) ||
@@ -127,11 +142,7 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
   const received = (name: string) => candidates.find((c) => c.name === name)?.count ?? 0;
   const summary = data.summary;
   const attempts = summary ? summary.transactions + summary.failed : 0;
-  const example = `traceiq.capture({
-  event: '${successEvent}',
-  userId: user.id,
-  properties: { amount: 5000, currency: '${settings.currency}', reference: 'T123' }
-});`;
+  const example = buildRevenueExample(backend, { successEvent, currency: settings.currency, amountProperty: settings.amountProperty });
 
   return (
     <form onSubmit={save} className="mt-8 grid max-w-4xl gap-12">
@@ -155,6 +166,36 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
             </span>
           }
         >
+          <div className="border-b border-neutral-100 px-5 py-4 dark:border-slate-800">
+            <p id="revenue-backend-label" className="text-xs font-medium text-neutral-500 dark:text-slate-400">
+              Your backend
+            </p>
+            <div role="radiogroup" aria-labelledby="revenue-backend-label" className="mt-2 flex flex-wrap gap-2">
+              {REVENUE_BACKENDS.map((item) => {
+                const active = item.id === backend;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    title={item.hint}
+                    onClick={() => setBackend(item.id)}
+                    className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                      active
+                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                        : 'border-neutral-200 text-neutral-700 hover:border-neutral-400 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
+              {REVENUE_BACKENDS.find((item) => item.id === backend)?.hint}. The prompt and example below use this.
+            </p>
+          </div>
           <ul className="divide-y divide-neutral-100 dark:divide-slate-800">
             <EventStatus
               icon={CheckmarkCircle02Icon}
@@ -172,8 +213,8 @@ export function RevenueSettingsPanel({ projectId }: { projectId?: string }) {
             />
           </ul>
           <div className="border-t border-neutral-100 px-5 py-4 dark:border-slate-800">
-            <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">What the code looks like (Node.js)</p>
-            <pre className="mt-2 overflow-x-auto rounded-lg bg-neutral-50 p-3 font-mono text-xs leading-5 text-neutral-700 dark:bg-slate-950 dark:text-slate-300">{example}</pre>
+            <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">What the code looks like ({example.language})</p>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-neutral-50 p-3 font-mono text-xs leading-5 text-neutral-700 dark:bg-slate-950 dark:text-slate-300">{example.code}</pre>
             <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
               Send <code className="font-mono">{settings.amountProperty}</code> in the main currency unit: naira, not kobo. Paystack and Stripe give you the smallest unit, so divide by 100.
             </p>
