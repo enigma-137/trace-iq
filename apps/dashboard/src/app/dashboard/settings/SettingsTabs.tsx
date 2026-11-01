@@ -9,6 +9,7 @@ import CreditCardIcon from '@hugeicons/core-free-icons/CreditCardIcon';
 import PlayCircleIcon from '@hugeicons/core-free-icons/PlayCircleIcon';
 import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
 import Coins01Icon from '@hugeicons/core-free-icons/Coins01Icon';
+import SentIcon from '@hugeicons/core-free-icons/SentIcon';
 
 const tabs = [
   { href: '/dashboard/settings', label: 'Overview', icon: Settings02Icon },
@@ -16,6 +17,7 @@ const tabs = [
   { href: '/dashboard/settings/billing', label: 'Billing', icon: CreditCardIcon },
   { href: '/dashboard/settings/replay', label: 'Session Replay', icon: PlayCircleIcon },
   { href: '/dashboard/settings/revenue', label: 'Revenue', icon: Coins01Icon },
+  { href: '/dashboard/settings/brief', label: 'Daily brief', icon: SentIcon },
   { href: '/dashboard/settings/team', label: 'Team', icon: UserGroupIcon }
 ];
 
