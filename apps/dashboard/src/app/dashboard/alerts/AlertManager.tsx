@@ -1,65 +1,38 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { DashboardDialog } from '../DashboardDialog';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import type { FilterCondition } from '@/components/SegmentFilters';
 import { CreateAlertModal, AlertFormData, type ChatChannelOption } from './CreateAlertModal';
-import { SlackLogo, TelegramLogo } from '@/components/BrandLogos';
-import { deliveryLabel, deliveryOutcome } from '@/lib/alert-delivery';
+import { AlertDetailsModal, DestinationIcon } from './AlertDetailsModal';
+import {
+  alertDestinations,
+  alertStatus,
+  destinationKinds,
+  formatDate,
+  formatNumber,
+  formatRelative,
+  ruleSummary,
+  thresholdLabel,
+  type AlertRecord as Alert
+} from '@/lib/alert-helpers';
 import { NotificationGroupModal } from './NotificationGroupModal';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
 import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
-import Clock01Icon from '@hugeicons/core-free-icons/Clock01Icon';
-import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
 import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
-import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
 import Notification02Icon from '@hugeicons/core-free-icons/Notification02Icon';
-import PauseIcon from '@hugeicons/core-free-icons/PauseIcon';
 import PencilEdit02Icon from '@hugeicons/core-free-icons/PencilEdit02Icon';
-import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
-import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
-import WebhookIcon from '@hugeicons/core-free-icons/WebhookIcon';
 import { retryAfterStepUp } from '@/lib/step-up';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-
-interface AlertDelivery {
-  channel: string;
-  recipient: string | null;
-  status: string;
-  error: string | null;
-  sentAt: string;
-}
-
-interface Alert {
-  id: string;
-  name: string;
-  eventName: string;
-  measure: string;
-  property: string | null;
-  filters: FilterCondition[];
-  windowHours: number;
-  condition: string;
-  threshold: number;
-  webhookUrl: string | null;
-  emailRecipients: string[];
-  notificationGroupIds: string[];
-  chatChannelIds: string[];
-  enabled: boolean;
-  lastStatus: string;
-  lastValue: number | null;
-  lastEvaluatedAt: string | null;
-  deliveries: AlertDelivery[];
-}
 
 interface AlertEvent {
   id: string;
@@ -118,37 +91,6 @@ const TEMPLATE_ALERTS: Array<{
     }
   ];
 
-function humanReadableCondition(alert: Alert): string {
-  const metric =
-    alert.measure === 'count'
-      ? `count of "${alert.eventName}"`
-      : alert.measure === 'unique'
-        ? `unique users for "${alert.eventName}"`
-        : `average ${alert.property ? `"${alert.property}"` : 'property'} for "${alert.eventName}"`;
-
-  const windowStr = alert.windowHours === 168 ? '7 days' : alert.windowHours === 1 ? '1 hour' : `${alert.windowHours} hours`;
-
-  switch (alert.condition) {
-    case 'drops_by':
-      return `Triggers when ${metric} drops by ${alert.threshold}% over a rolling ${windowStr} window.`;
-    case 'spikes_by':
-      return `Triggers when ${metric} spikes by ${alert.threshold}% over a rolling ${windowStr} window.`;
-    case 'above':
-      return `Triggers when ${metric} rises above ${alert.threshold.toLocaleString()} in a rolling ${windowStr} window.`;
-    case 'below':
-      return `Triggers when ${metric} falls below ${alert.threshold.toLocaleString()} in a rolling ${windowStr} window.`;
-    default:
-      return `${metric} ${alert.condition} ${alert.threshold} over ${windowStr}`;
-  }
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
-
 type AlertFilter = 'all' | 'firing' | 'active' | 'paused';
 
 const FILTERS: Array<{ value: AlertFilter; label: string }> = [
@@ -162,72 +104,6 @@ const FILTERS: Array<{ value: AlertFilter; label: string }> = [
 function statusRank(alert: Alert): number {
   if (alert.enabled && alert.lastStatus === 'triggered') return 0;
   return alert.enabled ? 1 : 2;
-}
-
-function alertStatus(alert: Alert, alertsAvailable: boolean) {
-  if (!alertsAvailable) {
-    return { key: 'locked', label: 'Pro required', badge: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300', dot: 'bg-amber-500' };
-  }
-  if (!alert.enabled) {
-    return { key: 'paused', label: 'Paused', badge: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300', dot: 'bg-neutral-400' };
-  }
-  if (alert.lastStatus === 'triggered') {
-    return { key: 'firing', label: 'Firing', badge: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300', dot: 'bg-red-500 animate-pulse' };
-  }
-  return { key: 'active', label: 'Active', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', dot: 'bg-emerald-500' };
-}
-
-function formatNumber(value: number): string {
-  return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-function thresholdLabel(alert: Alert): string {
-  switch (alert.condition) {
-    case 'above':
-      return `above ${formatNumber(alert.threshold)}`;
-    case 'below':
-      return `below ${formatNumber(alert.threshold)}`;
-    case 'drops_by':
-      return `drop of ${alert.threshold}%`;
-    case 'spikes_by':
-      return `spike of ${alert.threshold}%`;
-    default:
-      return `${alert.condition} ${formatNumber(alert.threshold)}`;
-  }
-}
-
-function formatRelative(value: string | null): string {
-  if (!value) return 'never';
-  const then = new Date(value).getTime();
-  if (Number.isNaN(then)) return value;
-  const seconds = Math.round((Date.now() - then) / 1000);
-  if (seconds < 45) return 'just now';
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.round(hours / 24);
-  return days < 30 ? `${days} d ago` : formatDate(value);
-}
-
-/** The deliveries from the most recent firing (they share a send time within a minute). */
-function latestDeliveries(deliveries: AlertDelivery[]): AlertDelivery[] {
-  if (deliveries.length === 0) return [];
-  const sorted = [...deliveries].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
-  const newest = new Date(sorted[0].sentAt).getTime();
-  return sorted.filter((d) => newest - new Date(d.sentAt).getTime() < 60_000).slice(0, 5);
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
-
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 function StatTile({ label, value, hint, tone }: { label: string; value: number; hint: string; tone?: 'critical' | 'good' }) {
@@ -276,18 +152,6 @@ function IconButton({
   );
 }
 
-function Chip({ icon, iconNode, title, children }: { icon?: IconSvgElement; iconNode?: ReactNode; title?: string; children: ReactNode }) {
-  return (
-    <span
-      title={title}
-      className="inline-flex max-w-full items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-    >
-      {iconNode ?? (icon ? <HugeiconsIcon icon={icon} size={12} className="shrink-0 text-neutral-400 dark:text-slate-500" /> : null)}
-      <span className="truncate">{children}</span>
-    </span>
-  );
-}
-
 export function AlertManager({
   alerts,
   recentEvents,
@@ -320,6 +184,9 @@ export function AlertManager({
 
   // Alert deletion state
   const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
+  // The alert whose details are open. Looked up from the live list so it refreshes after an action.
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const detailsAlert = detailsId ? alerts.find((item) => item.id === detailsId) ?? null : null;
   const [groupToDelete, setGroupToDelete] = useState<NotificationGroup | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { message: string; triggered: boolean }>>({});
@@ -706,130 +573,43 @@ export function AlertManager({
             <ul className="divide-y divide-neutral-200 dark:divide-slate-800">
               {visibleAlerts.map((alert) => {
                 const status = alertStatus(alert, alertsAvailable);
-                const testResult = testResults[alert.id];
-                const deliveries = latestDeliveries(alert.deliveries);
-                const busy = busyId === alert.id;
+                const destinations = alertDestinations(alert, notificationGroups, chatChannels);
+                const kinds = destinationKinds(destinations);
                 return (
-                  <li key={alert.id} className={`p-4 sm:p-5 ${status.key === 'firing' ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.badge}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                            {status.label}
-                          </span>
-                          <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{alert.name}</h3>
-                        </div>
-                        <p className="text-sm text-neutral-600 dark:text-slate-300">{humanReadableCondition(alert)}</p>
-                        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
-                          <span className="font-mono text-neutral-600 dark:text-slate-300">{alert.eventName}</span>
-                          {!alertsAvailable ? (
-                            <span>Not checked on the Free plan</span>
-                          ) : alert.lastValue !== null ? (
-                            <>
-                              <span>
-                                Last value <strong className="font-semibold text-neutral-800 tabular-nums dark:text-slate-100">{formatNumber(alert.lastValue)}</strong>{' '}
-                                · threshold {thresholdLabel(alert)}
-                              </span>
-                              <span className="inline-flex items-center gap-1" title={formatDate(alert.lastEvaluatedAt)}>
-                                <HugeiconsIcon icon={Clock01Icon} size={12} />
-                                Checked {formatRelative(alert.lastEvaluatedAt)}
-                              </span>
-                            </>
-                          ) : (
-                            <span>Waiting for the first check (runs every few minutes)</span>
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                        <IconButton
-                          label={busy ? 'Testing…' : 'Test now'}
-                          icon={PlayIcon}
-                          onClick={() => handleTest(alert)}
-                          disabled={!alertsAvailable || busy}
-                          showLabel
-                        />
-                        <IconButton
-                          label={alert.enabled ? 'Pause' : 'Resume'}
-                          icon={alert.enabled ? PauseIcon : PlayIcon}
-                          onClick={() => handleToggle(alert)}
-                          disabled={!alertsAvailable || busy}
-                          showLabel
-                        />
-                        <IconButton label="Duplicate" icon={Copy01Icon} onClick={() => handleOpenDuplicateAlert(alert)} disabled={createDisabled} />
-                        <IconButton label={`Delete ${alert.name}`} icon={Delete02Icon} onClick={() => setAlertToDelete(alert)} danger />
-                      </div>
-                    </div>
-
-                    {/* Destinations and delivery results */}
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-                      {alert.webhookUrl ? (
-                        <Chip icon={WebhookIcon} title={alert.webhookUrl}>
-                          Webhook · {hostOf(alert.webhookUrl)}
-                        </Chip>
-                      ) : null}
-                      {alert.emailRecipients.map((email) => (
-                        <Chip key={email} icon={Mail01Icon}>
-                          {email}
-                        </Chip>
-                      ))}
-                      {alert.notificationGroupIds.map((groupId) => (
-                        <Chip key={groupId} icon={UserGroupIcon}>
-                          {notificationGroups.find((g) => g.id === groupId)?.name ?? 'Deleted group'}
-                        </Chip>
-                      ))}
-                      {alert.chatChannelIds.map((channelId) => {
-                        const channel = chatChannels.find((item) => item.id === channelId);
-                        return (
-                          <Chip
-                            key={channelId}
-                            iconNode={channel?.kind === 'slack' ? <SlackLogo size={12} /> : <TelegramLogo size={12} />}
-                            title={channel && !channel.enabled ? 'Paused in Daily brief: alerts skip it until it is turned on.' : undefined}
-                          >
-                            {channel ? `${channel.kind === 'slack' ? 'Slack' : 'Telegram'} · ${channel.name}${channel.enabled ? '' : ' (paused)'}` : 'Disconnected chat'}
-                          </Chip>
-                        );
-                      })}
-                    </div>
-
-                    {deliveries.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
-                        <span>Last notified {formatRelative(deliveries[0].sentAt)}:</span>
-                        {deliveries.map((d, i) => (
-                          <span
-                            key={`${d.channel}-${d.recipient ?? i}`}
-                            className={
-                              deliveryOutcome(d.status) === 'sent'
-                                ? 'text-emerald-700 dark:text-emerald-400'
-                                : deliveryOutcome(d.status) === 'skipped'
-                                  ? 'text-neutral-500 dark:text-slate-400'
-                                  : 'text-red-700 dark:text-red-400'
-                            }
-                            title={d.error ?? undefined}
-                          >
-                            {deliveryLabel(d)} {deliveryOutcome(d.status)}
-                            {deliveryOutcome(d.status) !== 'sent' && d.error ? ` (${truncate(d.error, 60)})` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {testResult ? (
-                      <div
-                        className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
-                          testResult.triggered
-                            ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
-                            : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
-                        }`}
-                      >
-                        <HugeiconsIcon icon={testResult.triggered ? Alert02Icon : CheckmarkCircle02Icon} size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
-                        <span>
-                          <strong className="font-semibold">{testResult.triggered ? 'Would fire now. ' : 'Within limits. '}</strong>
-                          {testResult.message} No notification was sent.
+                  <li key={alert.id} className={status.key === 'firing' ? 'bg-red-50/50 dark:bg-red-500/5' : ''}>
+                    <button
+                      type="button"
+                      onClick={() => setDetailsId(alert.id)}
+                      aria-label={`Open ${alert.name}`}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-neutral-50 focus-visible:bg-neutral-50 focus-visible:outline-none dark:hover:bg-slate-900/60 dark:focus-visible:bg-slate-900/60 sm:gap-4 sm:px-5"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-white">{alert.name}</span>
+                        <span className="mt-0.5 block truncate font-mono text-xs text-neutral-500 dark:text-slate-400">{ruleSummary(alert)}</span>
+                      </span>
+                      {kinds.length > 0 ? (
+                        <span
+                          className="hidden shrink-0 items-center -space-x-1.5 sm:flex"
+                          role="img"
+                          aria-label={`Sends to ${destinations.map((destination) => destination.label).join(', ')}`}
+                          title={destinations.map((destination) => destination.label).join('\n')}
+                        >
+                          {kinds.slice(0, 4).map((kind) => (
+                            <span
+                              key={kind}
+                              className="grid h-6 w-6 place-items-center rounded-full border border-white bg-neutral-100 dark:border-slate-950 dark:bg-slate-800"
+                            >
+                              <DestinationIcon kind={kind} size={13} />
+                            </span>
+                          ))}
                         </span>
-                      </div>
-                    ) : null}
+                      ) : null}
+                      <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.badge}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                        {status.label}
+                      </span>
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={14} className="shrink-0 text-neutral-300 dark:text-slate-600" />
+                    </button>
                   </li>
                 );
               })}
@@ -913,6 +693,27 @@ export function AlertManager({
           </section>
         </div>
       </div>
+
+      <AlertDetailsModal
+        alert={detailsAlert}
+        alertsAvailable={alertsAvailable}
+        groups={notificationGroups}
+        channels={chatChannels}
+        testResult={detailsAlert ? testResults[detailsAlert.id] : null}
+        busy={detailsAlert ? busyId === detailsAlert.id : false}
+        createDisabled={createDisabled}
+        onClose={() => setDetailsId(null)}
+        onTest={(target) => void handleTest(target)}
+        onToggle={(target) => void handleToggle(target)}
+        onDuplicate={(target) => {
+          setDetailsId(null);
+          handleOpenDuplicateAlert(target);
+        }}
+        onDelete={(target) => {
+          setDetailsId(null);
+          setAlertToDelete(target);
+        }}
+      />
 
       {/* Create / Edit Alert Modal */}
       <CreateAlertModal
