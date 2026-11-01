@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { formatShare } from '@/lib/share-format';
 
 interface DonutChartProps {
   /** `icon` is drawn before the label in the legend, e.g. a brand logo. */
@@ -10,6 +11,8 @@ interface DonutChartProps {
   centerLabel?: string;
   centerValue?: string;
   emptyLabel?: string;
+  /** Show each row's count next to its share, for charts where the sizes differ by orders of magnitude. */
+  showValues?: boolean;
   className?: string;
 }
 
@@ -28,6 +31,7 @@ export function DonutChart({
   centerLabel,
   centerValue,
   emptyLabel = 'No data yet',
+  showValues = false,
   className
 }: DonutChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -49,14 +53,13 @@ export function DonutChart({
 
   const segments = points.map((item, i) => {
     const dash = (item.value / total) * circumference;
-    const pct = Math.round((item.value / total) * 100);
     const segment = {
       label: item.label,
       value: item.value,
       icon: item.icon,
       dash,
       offset,
-      pct,
+      share: formatShare(item.value, total),
       color: item.color ?? PALETTE[i % PALETTE.length]
     };
     offset += dash;
@@ -109,7 +112,7 @@ export function DonutChart({
                 {formatCompact(activeSegment.value)}
               </span>
               <span className="max-w-[120px] truncate text-[11px] font-semibold text-neutral-600 dark:text-slate-300" title={activeSegment.label}>
-                {activeSegment.label} ({activeSegment.pct}%)
+                {activeSegment.label} ({activeSegment.share})
               </span>
             </>
           ) : centerValue !== undefined ? (
@@ -153,7 +156,7 @@ export function DonutChart({
                 {segment.label}
               </span>
               <span className="font-mono text-xs text-neutral-400 dark:text-slate-400">
-                {segment.pct}%
+                {showValues ? `${formatCompact(segment.value)} · ${segment.share}` : segment.share}
               </span>
             </li>
           );

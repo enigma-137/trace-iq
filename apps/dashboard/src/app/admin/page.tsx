@@ -96,6 +96,7 @@ export default async function AdminPage() {
               centerValue={compactNumber(overview.eventsTotal)}
               centerLabel="events"
               emptyLabel="No event data yet."
+              showValues
             />
           </div>
         </section>
