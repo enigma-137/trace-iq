@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
@@ -40,6 +41,8 @@ interface Overview {
   project: { id: string; name: string };
   telegram: { configured: boolean; botUsername: string | null };
   slack: { configured: boolean };
+  /** Weekly on the Free plan (Mondays, last 7 days), daily on Pro. Absent from an older API. */
+  cadence?: 'daily' | 'weekly';
   channels: Channel[];
 }
 
@@ -284,8 +287,18 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
       <SettingsSection
         id="brief"
         title="Daily brief"
-        description="A short plain-English summary of your project, sent to your chat once a day: what changed, and one thing to look at. Quiet days send nothing."
+        description="A short plain-English summary of your project, sent to your chat: what changed, and one thing to look at. Quiet periods send nothing."
       >
+        {status.cadence === 'weekly' ? (
+          <Notice tone="info">
+            <strong className="font-semibold">Your plan sends the brief weekly.</strong> It arrives on Mondays at the time you pick and covers the
+            last 7 days. Pro sends it every day.{' '}
+            <Link href="/dashboard/settings/billing" className="font-medium underline underline-offset-2">
+              Upgrade to Pro
+            </Link>
+          </Notice>
+        ) : null}
+
         {!status.telegram.configured && !status.slack.configured ? (
           <Notice tone="info">Neither Telegram nor Slack is set up on this TraceIQ server yet, so briefs cannot be sent.</Notice>
         ) : null}

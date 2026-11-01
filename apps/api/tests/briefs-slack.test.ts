@@ -148,6 +148,7 @@ describe('BriefsService with Slack', () => {
     exchangeCode: vi.fn(),
     sendMessage: vi.fn()
   };
+  const entitlements = { getSnapshot: vi.fn().mockResolvedValue({ plan: 'pro' }) };
   const insights = { getProjectStory: vi.fn() };
   const projects = { requireWritableProject: vi.fn(), requireActiveProject: vi.fn() };
 
@@ -166,7 +167,7 @@ describe('BriefsService with Slack', () => {
     const db = mockDatabase(onQuery);
     return {
       db,
-      service: new BriefsService(db as never, projects as never, insights as never, { ...telegram, ...telegramOverride } as never, slack as never)
+      service: new BriefsService(db as never, projects as never, insights as never, { ...telegram, ...telegramOverride } as never, slack as never, entitlements as never)
     };
   }
 

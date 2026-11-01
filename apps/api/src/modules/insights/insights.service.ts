@@ -127,17 +127,18 @@ export class InsightsService {
   }
 
   /**
-   * The last 24 hours of a project as facts plus a narrative, for messages that go out
-   * without a signed-in user (the daily brief). Same narrative rules as the story card.
+   * A project as facts plus a narrative, for messages that go out without a signed-in user
+   * (the brief). `windowDays` 1 is the last 24 hours against the 24 before, with the same
+   * AI narrative as the story card. 7 compares the last week with the week before, in plain
+   * template wording: the AI prompt is written for a single day.
    */
-  async getProjectStory(project: {
-    id: string;
-    name: string;
-    organizationId: string;
-  }): Promise<{ facts: TodayStoryFacts; narrative: string }> {
-    const facts = await this.computeFacts(project.id);
-    const template = this.templateNarrative(facts);
-    if (facts.eventsToday + facts.eventsYesterday === 0) return { facts, narrative: template };
+  async getProjectStory(
+    project: { id: string; name: string; organizationId: string },
+    windowDays = 1
+  ): Promise<{ facts: TodayStoryFacts; narrative: string }> {
+    const facts = await this.computeFacts(project.id, windowDays);
+    const template = this.templateNarrative(facts, windowDays);
+    if (windowDays > 1 || facts.eventsToday + facts.eventsYesterday === 0) return { facts, narrative: template };
 
     const aiNarrative = await this.ai.generateStoryNarrative(project, facts).catch(() => null);
     return { facts, narrative: aiNarrative ?? template };
@@ -197,10 +198,11 @@ export class InsightsService {
     };
   }
 
-  private async computeFacts(projectId: string): Promise<TodayStoryFacts> {
+  /** `eventsToday` / `eventsYesterday` are the latest window and the one before it, whatever its length. */
+  private async computeFacts(projectId: string, windowDays = 1): Promise<TodayStoryFacts> {
     const now = Date.now();
-    const todayStart = new Date(now - DAY_MS);
-    const yesterdayStart = new Date(now - 2 * DAY_MS);
+    const todayStart = new Date(now - windowDays * DAY_MS);
+    const yesterdayStart = new Date(now - 2 * windowDays * DAY_MS);
 
     const [totals, topEvent, topCountry, topDevice, lastEvent] = await Promise.all([
       this.database.query<{ today: number; yesterday: number; uniques_today: number; active_now: number }>(
@@ -282,21 +284,28 @@ export class InsightsService {
     };
   }
 
-  private templateNarrative(facts: TodayStoryFacts): string {
+  private templateNarrative(facts: TodayStoryFacts, windowDays = 1): string {
+    const weekly = windowDays > 1;
+    const span = weekly
+      ? { now: 'this week', previous: 'last week', last: 'the last 7 days' }
+      : { now: 'today', previous: 'yesterday', last: 'the last 24 hours' };
+
     if (facts.eventsToday + facts.eventsYesterday === 0) {
-      return 'No events today. As soon as your SDK starts sending, the story of your day shows up here.';
+      return weekly
+        ? 'No events this week. As soon as your SDK starts sending, the story of your week shows up here.'
+        : 'No events today. As soon as your SDK starts sending, the story of your day shows up here.';
     }
 
     const parts: string[] = [];
 
     if (facts.deltaPct === null) {
-      parts.push(`Your project saw ${facts.eventsToday.toLocaleString()} events in the last 24 hours — a clean start.`);
+      parts.push(`Your project saw ${facts.eventsToday.toLocaleString()} events in ${span.last} — a clean start.`);
     } else if (facts.deltaPct > 0) {
-      parts.push(`Events are up ${facts.deltaPct}% today (${facts.eventsToday.toLocaleString()} vs ${facts.eventsYesterday.toLocaleString()} yesterday).`);
+      parts.push(`Events are up ${facts.deltaPct}% ${span.now} (${facts.eventsToday.toLocaleString()} vs ${facts.eventsYesterday.toLocaleString()} ${span.previous}).`);
     } else if (facts.deltaPct < 0) {
-      parts.push(`Events dipped ${Math.abs(facts.deltaPct)}% today (${facts.eventsToday.toLocaleString()} vs ${facts.eventsYesterday.toLocaleString()} yesterday).`);
+      parts.push(`Events dipped ${Math.abs(facts.deltaPct)}% ${span.now} (${facts.eventsToday.toLocaleString()} vs ${facts.eventsYesterday.toLocaleString()} ${span.previous}).`);
     } else {
-      parts.push(`Event volume is flat — ${facts.eventsToday.toLocaleString()} today, the same as yesterday.`);
+      parts.push(`Event volume is flat — ${facts.eventsToday.toLocaleString()} ${span.now}, the same as ${span.previous}.`);
     }
 
     if (facts.topEvent) {

@@ -98,6 +98,7 @@ describe('BriefsService', () => {
     setWebhook: vi.fn()
   };
   const slack = { isConfigured: true, authorizeUrl: vi.fn(), exchangeCode: vi.fn(), sendMessage: vi.fn() };
+  const entitlements = { getSnapshot: vi.fn().mockResolvedValue({ plan: 'pro' }) };
   const insights = { getProjectStory: vi.fn() };
   const projects = { requireWritableProject: vi.fn(), requireActiveProject: vi.fn() };
   const user = { id: 'usr_1', email: 'a@b.co', authMethod: 'session' };
@@ -124,7 +125,7 @@ describe('BriefsService', () => {
 
   function service(onQuery: Parameters<typeof mockDatabase>[0]) {
     const db = mockDatabase(onQuery);
-    return { db, service: new BriefsService(db as never, projects as never, insights as never, telegram as never, slack as never) };
+    return { db, service: new BriefsService(db as never, projects as never, insights as never, telegram as never, slack as never, entitlements as never) };
   }
 
   it('sends one brief per channel, claiming the day before sending', async () => {
@@ -242,7 +243,7 @@ describe('BriefsService', () => {
   });
 
   it('refuses to make a link when the bot is not configured', async () => {
-    const off = new BriefsService(mockDatabase() as never, projects as never, insights as never, { ...telegram, isConfigured: false } as never, slack as never);
+    const off = new BriefsService(mockDatabase() as never, projects as never, insights as never, { ...telegram, isConfigured: false } as never, slack as never, entitlements as never);
     await expect(off.createTelegramLink(user as never, 'proj_1')).rejects.toThrow('not set up');
   });
 });

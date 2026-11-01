@@ -33,16 +33,34 @@ export function localDateAndHour(now: Date, timeZone: string): { date: string; h
   return { date: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')) % 24 };
 }
 
+/** Daily on Pro, weekly on Free. Weekly briefs go out on Mondays and cover the last 7 days. */
+export type BriefCadence = 'daily' | 'weekly';
+export const WEEKLY_BRIEF_WEEKDAY = 1;
+
+export function briefWindowDays(cadence: BriefCadence): number {
+  return cadence === 'weekly' ? 7 : 1;
+}
+
+/** The ISO weekday (Monday 1 … Sunday 7) it currently is in `timeZone`. */
+export function localWeekday(now: Date, timeZone: string): number {
+  const zone = isValidTimezone(timeZone) ? timeZone : DEFAULT_TIMEZONE;
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }).format(now);
+  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(name) + 1;
+}
+
 /**
  * A channel is due once its local send hour has arrived and today's brief hasn't gone
- * out. `>=` rather than `==` so a restart during the send hour still delivers it.
+ * out (and, for a weekly brief, it is Monday there). `>=` rather than `==` so a restart
+ * during the send hour still delivers it.
  */
 export function isBriefDue(
   channel: { sendHour: number; timezone: string; lastSentOn: string | null },
-  now: Date
+  now: Date,
+  cadence: BriefCadence = 'daily'
 ): { due: boolean; localDate: string } {
   const local = localDateAndHour(now, channel.timezone);
-  return { due: local.hour >= channel.sendHour && channel.lastSentOn !== local.date, localDate: local.date };
+  const rightDay = cadence === 'daily' || localWeekday(now, channel.timezone) === WEEKLY_BRIEF_WEEKDAY;
+  return { due: rightDay && local.hour >= channel.sendHour && channel.lastSentOn !== local.date, localDate: local.date };
 }
 
 export function newLinkCode(): { code: string; hash: string } {
@@ -85,6 +103,9 @@ export interface BriefInput {
   facts: TodayStoryFacts;
   revenue: BriefRevenue | null;
   dashboardUrl: string;
+  /** Defaults to daily. A weekly brief covers 7 days and offers the upgrade to daily. */
+  cadence?: BriefCadence;
+  upgradeUrl?: string;
 }
 
 /** True when a project had no activity in the last two days, so there is nothing to say. */
@@ -96,17 +117,18 @@ export function isQuietDay(facts: TodayStoryFacts): boolean {
  * One concrete thing to look at, chosen by plain rules from the numbers. Returns null
  * when nothing stands out, so the brief never invents advice.
  */
-export function suggestAction(facts: TodayStoryFacts, revenue: BriefRevenue | null): string | null {
+export function suggestAction(facts: TodayStoryFacts, revenue: BriefRevenue | null, cadence: BriefCadence = 'daily'): string | null {
+  const weekly = cadence === 'weekly';
   if (revenue) {
     const attempts = revenue.transactions + revenue.failed;
     if (revenue.failed >= 3 && attempts > 0 && revenue.failed / attempts >= 0.3) {
-      return `${revenue.failed} of ${attempts} payments failed in the last 24 hours. Check the failure reasons and your payment provider.`;
+      return `${revenue.failed} of ${attempts} payments failed in ${weekly ? 'the last 7 days' : 'the last 24 hours'}. Check the failure reasons and your payment provider.`;
     }
   }
   // A percentage means little on a small base: 3 events falling to 1 is "down 67%". Below this
   // many events the day before, the brief reports the numbers and keeps quiet about trends.
   if (facts.deltaPct !== null && facts.eventsYesterday >= MIN_BASELINE_EVENTS) {
-    const counts = `${facts.eventsToday.toLocaleString('en')} events vs ${facts.eventsYesterday.toLocaleString('en')} the day before`;
+    const counts = `${facts.eventsToday.toLocaleString('en')} events vs ${facts.eventsYesterday.toLocaleString('en')} the ${weekly ? 'week' : 'day'} before`;
     if (facts.deltaPct <= -25) {
       return `Activity is down ${Math.abs(facts.deltaPct)}% (${counts}). Check Errors and anything you shipped recently.`;
     }
@@ -147,7 +169,8 @@ export function statsLine(narrative: string, facts: TodayStoryFacts): string | n
 /** The Telegram message (HTML parse mode). Kept short: it's read on a phone. */
 export function buildBriefMessage(input: BriefInput): string {
   const { facts, revenue } = input;
-  const lines: string[] = [`<b>${escapeHtml(input.projectName)}</b> · your daily brief`, '', escapeHtml(input.narrative)];
+  const cadence = input.cadence ?? 'daily';
+  const lines: string[] = [`<b>${escapeHtml(input.projectName)}</b> · your ${cadence === 'weekly' ? 'weekly' : 'daily'} brief`, '', escapeHtml(input.narrative)];
 
   const summary: string[] = [];
   const stats = statsLine(input.narrative, facts);
@@ -159,10 +182,13 @@ export function buildBriefMessage(input: BriefInput): string {
   }
   if (summary.length > 0) lines.push('', ...summary);
 
-  const action = suggestAction(facts, revenue);
+  const action = suggestAction(facts, revenue, cadence);
   if (action) lines.push('', `<b>Look at this:</b> ${escapeHtml(action)}`);
 
   lines.push('', `<a href="${escapeHtml(input.dashboardUrl)}">Open TraceIQ</a>`);
+  if (cadence === 'weekly' && input.upgradeUrl) {
+    lines.push(`Want this every day? <a href="${escapeHtml(input.upgradeUrl)}">Upgrade to Pro</a>.`);
+  }
   return lines.join('\n');
 }
 
@@ -173,7 +199,8 @@ export function escapeSlack(value: string): string {
 /** The same brief as {@link buildBriefMessage}, in Slack mrkdwn. */
 export function buildSlackBriefMessage(input: BriefInput): string {
   const { facts, revenue } = input;
-  const lines: string[] = [`*${escapeSlack(input.projectName)}* · your daily brief`, '', escapeSlack(input.narrative)];
+  const cadence = input.cadence ?? 'daily';
+  const lines: string[] = [`*${escapeSlack(input.projectName)}* · your ${cadence === 'weekly' ? 'weekly' : 'daily'} brief`, '', escapeSlack(input.narrative)];
 
   const summary: string[] = [];
   const stats = statsLine(input.narrative, facts);
@@ -184,9 +211,12 @@ export function buildSlackBriefMessage(input: BriefInput): string {
   }
   if (summary.length > 0) lines.push('', ...summary);
 
-  const action = suggestAction(facts, revenue);
+  const action = suggestAction(facts, revenue, cadence);
   if (action) lines.push('', `*Look at this:* ${escapeSlack(action)}`);
 
   lines.push('', `<${input.dashboardUrl}|Open TraceIQ>`);
+  if (cadence === 'weekly' && input.upgradeUrl) {
+    lines.push(`Want this every day? <${input.upgradeUrl}|Upgrade to Pro>.`);
+  }
   return lines.join('\n');
 }
