@@ -17,7 +17,7 @@ import {
   inputClass,
   primaryButton,
   secondaryButton
-} from '../SettingsUI';
+} from '../settings/SettingsUI';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const POLL_MS = 3000;
@@ -175,7 +175,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
 
   if (!status) {
     return (
-      <div className="mt-8 grid max-w-4xl gap-4">
+      <div className="grid max-w-4xl gap-4">
         {message ? (
           <Notice tone="error">{message}</Notice>
         ) : (
@@ -195,7 +195,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
   const tz = browserTimezone();
 
   return (
-    <div className="mt-8 grid max-w-4xl gap-12">
+    <div className="grid max-w-4xl gap-12">
       <SettingsSection
         id="brief"
         title="Daily brief"
