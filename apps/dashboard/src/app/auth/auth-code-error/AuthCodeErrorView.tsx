@@ -29,25 +29,25 @@ export function AuthCodeErrorView() {
 
   return (
     <section className="grid w-full max-w-md gap-4 text-center">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400 dark:text-neutral-500">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b44008]">
         {backToSettings ? 'Connection failed' : 'Sign-in failed'}
       </p>
       <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
-      <p className="text-sm leading-6 text-neutral-600 dark:text-neutral-400">{copy.message}</p>
+      <p className="text-sm leading-6 text-neutral-600">{copy.message}</p>
       {copy.details ? (
-        <p className="break-words rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left font-mono text-xs leading-5 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
+        <p className="break-words rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left font-mono text-xs leading-5 text-neutral-600">
           {copy.details}
         </p>
       ) : null}
       <Link
-        className="mt-2 grid min-h-11 place-items-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+        className="mt-2 grid min-h-11 place-items-center rounded-lg bg-[#245beb] px-4 text-sm font-semibold text-white transition hover:bg-[#1247ce]"
         href={backHref}
       >
         {backToSettings ? 'Back to settings' : 'Back to sign in'}
       </Link>
-      <p className="text-xs text-neutral-500 dark:text-neutral-500">
+      <p className="text-xs text-neutral-500">
         Still stuck?{' '}
-        <a className="font-semibold text-neutral-800 underline-offset-4 hover:underline dark:text-neutral-200" href={`mailto:${SUPPORT_EMAIL}`}>
+        <a className="font-semibold text-neutral-800 underline-offset-4 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>
           {SUPPORT_EMAIL}
         </a>
       </p>
