@@ -8,6 +8,7 @@ import { readApiError } from '@/lib/api-error';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { retryAfterStepUp } from '@/lib/step-up';
 import { ProjectSwitcher } from './ProjectSwitcher';
+import { InstallWithAiCard } from './InstallWithAiCard';
 
 export interface SetupWizardProps {
   projectId: string;
@@ -471,15 +472,25 @@ function SetupWizardContent({
               2. Install TraceIQ SDK
             </h3>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-              You can run our automated CLI wizard or install manually into your codebase.
+              Let your coding assistant do it, run our CLI, or install manually. Pick whichever you like; they all end at the same check.
             </p>
           </div>
 
-          {/* Option A: Automated CLI Banner */}
+          {/* Option A: Install with AI */}
+          <InstallWithAiCard
+            projectId={projectId}
+            projectName={projectName}
+            writeKey={writeKey}
+            maskedWriteKey={maskKey(writeKey)}
+            apiUrl={apiUrl}
+            products={selectedProducts}
+          />
+
+          {/* Option B: Automated CLI Banner */}
           <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-5 dark:border-blue-900/50 dark:from-blue-950/20 dark:to-slate-900">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
-                Recommended · Automated Setup
+                Or run the CLI · No AI needed
               </span>
               <span className="font-mono text-xs text-blue-600 dark:text-blue-400">useTrace CLI</span>
             </div>
@@ -504,7 +515,7 @@ function SetupWizardContent({
             </div>
           </div>
 
-          {/* Option B: Manual Installation Tabs */}
+          {/* Option C: Manual Installation Tabs */}
           <div>
             <div className="flex items-center justify-between border-b border-neutral-200 pb-2 dark:border-slate-800">
               <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
