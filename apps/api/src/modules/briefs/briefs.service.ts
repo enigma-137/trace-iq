@@ -10,7 +10,9 @@ import {
   DEFAULT_TIMEZONE,
   LINK_CODE_TTL_MS,
   BriefRevenue,
+  BriefInput,
   buildBriefMessage,
+  buildSlackBriefMessage,
   escapeHtml,
   hashLinkCode,
   isBriefDue,
@@ -19,13 +21,14 @@ import {
   localDateAndHour,
   newLinkCode
 } from './briefs.util';
+import { SlackClient } from './slack.client';
 import { TelegramClient, TelegramSendResult } from './telegram.client';
 
 export interface BriefChannel {
   [column: string]: unknown;
   id: string;
   projectId: string;
-  kind: 'telegram';
+  kind: 'telegram' | 'slack';
   chatId: string;
   chatName: string | null;
   enabled: boolean;
@@ -62,8 +65,82 @@ export class BriefsService {
     private readonly database: DatabaseService,
     private readonly projects: ProjectsService,
     private readonly insights: InsightsService,
-    private readonly telegram: TelegramClient
+    private readonly telegram: TelegramClient,
+    private readonly slack: SlackClient
   ) {}
+
+  /** Every destination for a project, with which services this server has set up. */
+  async getOverview(user: DashboardUser, projectId?: string) {
+    const project = await this.projects.requireActiveProject(user, projectId);
+    const channels = await this.database.query<BriefChannel>(
+      `SELECT ${CHANNEL_COLUMNS} FROM brief_channels WHERE project_id = $1 ORDER BY created_at`,
+      [project.id]
+    );
+    return {
+      project: { id: project.id, name: project.name },
+      telegram: {
+        configured: this.telegram.isConfigured,
+        botUsername: this.telegram.isConfigured ? this.telegram.botUsername : null
+      },
+      slack: { configured: this.slack.isConfigured },
+      channels: channels.rows
+    };
+  }
+
+  /** The "Add to Slack" link. Slack sends the person back to {@link finishSlackInstall}. */
+  async createSlackLink(user: DashboardUser, projectId?: string, timezone?: unknown) {
+    if (!this.slack.isConfigured) {
+      throw new ServiceUnavailableException('Slack is not set up on this TraceIQ server.');
+    }
+    const project = await this.projects.requireWritableProject(user, projectId);
+    const { code, expiresAt } = await this.storeLinkCode(user.id, project.id, 'slack', timezone);
+    return { url: this.slack.authorizeUrl(code), expiresAt };
+  }
+
+  /**
+   * Slack redirects the browser here after the person picks a channel. Returns the dashboard
+   * URL to send them on to. Identity comes from the one-time `state`, not a session: it was
+   * made for a signed-in user with write access and can be used once.
+   */
+  async finishSlackInstall(params: { code?: string; state?: string; error?: string }): Promise<string> {
+    const back = (result: string) => `${dashboardUrl()}/dashboard/alerts?tab=brief&slack=${result}`;
+    if (params.error) return back('cancelled');
+    if (!params.code || !params.state) return back('error');
+
+    const redeemed = await this.redeemStoredCode(params.state, 'slack');
+    if (!redeemed) return back('expired');
+
+    const exchanged = await this.slack.exchangeCode(params.code);
+    if ('error' in exchanged) {
+      this.logger.warn(`Slack install failed: ${exchanged.error}`);
+      return back('error');
+    }
+    const { install } = exchanged;
+    const today = localDateAndHour(new Date(), redeemed.timezone).date;
+    const chatName = install.teamName ? `#${install.channelName.replace(/^#/, '')} (${install.teamName})` : `#${install.channelName.replace(/^#/, '')}`;
+
+    const saved = await this.database.query<BriefChannel>(
+      `INSERT INTO brief_channels (id, project_id, kind, chat_id, chat_name, webhook_url, send_hour, timezone, created_by_user_id, last_sent_on)
+       VALUES ($1, $2, 'slack', $3, $4, $5, $6, $7, $8, $9::date)
+       ON CONFLICT (project_id, kind, chat_id)
+       DO UPDATE SET enabled = true, chat_name = EXCLUDED.chat_name, webhook_url = EXCLUDED.webhook_url, last_error = NULL, updated_at = now()
+       RETURNING ${CHANNEL_COLUMNS}`,
+      [
+        `brc_${randomUUID().replace(/-/g, '')}`,
+        redeemed.projectId,
+        install.channelId,
+        chatName,
+        install.webhookUrl,
+        DEFAULT_SEND_HOUR,
+        redeemed.timezone,
+        redeemed.userId,
+        today
+      ]
+    );
+    // A first brief right away, so the channel sees what it signed up for.
+    await this.sendBrief(saved.rows[0], { force: true });
+    return back('connected');
+  }
 
   async getTelegram(user: DashboardUser, projectId?: string) {
     const project = await this.projects.requireActiveProject(user, projectId);
@@ -85,25 +162,43 @@ export class BriefsService {
       throw new ServiceUnavailableException('The Telegram bot is not set up on this TraceIQ server.');
     }
     const project = await this.projects.requireWritableProject(user, projectId);
-    const zone = isValidTimezone(timezone) ? timezone : DEFAULT_TIMEZONE;
-    const { code, hash } = newLinkCode();
-    const expiresAt = new Date(Date.now() + LINK_CODE_TTL_MS);
-
-    await this.database.query(`DELETE FROM brief_link_codes WHERE expires_at < now() OR (project_id = $1 AND user_id = $2)`, [
-      project.id,
-      user.id
-    ]);
-    await this.database.query(
-      `INSERT INTO brief_link_codes (code_hash, project_id, user_id, kind, timezone, expires_at) VALUES ($1, $2, $3, 'telegram', $4, $5)`,
-      [hash, project.id, user.id, zone, expiresAt.toISOString()]
-    );
+    const { code, expiresAt } = await this.storeLinkCode(user.id, project.id, 'telegram', timezone);
 
     const bot = this.telegram.botUsername;
     return {
       url: `https://t.me/${bot}?start=${code}`,
       groupUrl: `https://t.me/${bot}?startgroup=${code}`,
-      expiresAt: expiresAt.toISOString()
+      expiresAt
     };
+  }
+
+  /** Stores a one-time code (only its hash) that ties a chat or Slack install to this user and project. */
+  private async storeLinkCode(userId: string, projectId: string, kind: 'telegram' | 'slack', timezone: unknown) {
+    const zone = isValidTimezone(timezone) ? timezone : DEFAULT_TIMEZONE;
+    const { code, hash } = newLinkCode();
+    const expiresAt = new Date(Date.now() + LINK_CODE_TTL_MS).toISOString();
+
+    // One open link per person, project and service; expired ones are swept here.
+    await this.database.query(
+      `DELETE FROM brief_link_codes WHERE expires_at < now() OR (project_id = $1 AND user_id = $2 AND kind = $3)`,
+      [projectId, userId, kind]
+    );
+    await this.database.query(
+      `INSERT INTO brief_link_codes (code_hash, project_id, user_id, kind, timezone, expires_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [hash, projectId, userId, kind, zone, expiresAt]
+    );
+    return { code, expiresAt };
+  }
+
+  /** Uses up a code. Null when it is unknown, already used, expired, or made for the other service. */
+  private async redeemStoredCode(code: string, kind: 'telegram' | 'slack') {
+    const redeemed = await this.database.query<{ projectId: string; userId: string; timezone: string; expiresAt: string }>(
+      `DELETE FROM brief_link_codes WHERE code_hash = $1 AND kind = $2
+       RETURNING project_id AS "projectId", user_id AS "userId", timezone, expires_at AS "expiresAt"`,
+      [hashLinkCode(code), kind]
+    );
+    const link = redeemed.rows[0];
+    return link && new Date(link.expiresAt).getTime() >= Date.now() ? link : null;
   }
 
   async updateChannel(user: DashboardUser, channelId: string, patch: BriefChannelPatch) {
@@ -152,7 +247,7 @@ export class BriefsService {
     await this.projects.requireWritableProject(user, channel.projectId);
     const result = await this.sendBrief(channel, { force: true });
     if (result !== 'quiet' && !result.ok) {
-      throw new BadRequestException(result.description ?? 'Telegram did not accept the message.');
+      throw new BadRequestException(result.description ?? `${channel.kind === 'slack' ? 'Slack' : 'Telegram'} did not accept the message.`);
     }
     return { sent: true };
   }
@@ -200,13 +295,14 @@ export class BriefsService {
 
   /** Called every minute: sends the brief to every channel whose local send time has come. */
   async sendDueBriefs(now = new Date()): Promise<number> {
-    if (!this.telegram.isConfigured) return 0;
     const channels = await this.database.query<BriefChannel>(
-      `SELECT ${CHANNEL_COLUMNS} FROM brief_channels WHERE enabled AND kind = 'telegram'`
+      `SELECT ${CHANNEL_COLUMNS} FROM brief_channels WHERE enabled AND kind IN ('telegram', 'slack')`
     );
 
     let sent = 0;
     for (const channel of channels.rows) {
+      // Telegram needs the bot token on this server; a Slack channel carries its own webhook.
+      if (channel.kind === 'telegram' && !this.telegram.isConfigured) continue;
       const { due, localDate } = isBriefDue(channel, now);
       if (!due) continue;
 
@@ -236,13 +332,8 @@ export class BriefsService {
   }
 
   private async redeemLink(chatId: string, chatName: string | null, code: string) {
-    const redeemed = await this.database.query<{ projectId: string; userId: string; timezone: string; expiresAt: string }>(
-      `DELETE FROM brief_link_codes WHERE code_hash = $1
-       RETURNING project_id AS "projectId", user_id AS "userId", timezone, expires_at AS "expiresAt"`,
-      [hashLinkCode(code)]
-    );
-    const link = redeemed.rows[0];
-    if (!link || new Date(link.expiresAt).getTime() < Date.now()) {
+    const link = await this.redeemStoredCode(code, 'telegram');
+    if (!link) {
       await this.telegram.sendMessage(
         chatId,
         'That link has expired or was already used. In TraceIQ, open Alerts → Daily brief and connect Telegram again.'
@@ -307,14 +398,24 @@ export class BriefsService {
     const { facts, narrative } = await this.insights.getProjectStory(project.rows[0]);
     if (!options.force && isQuietDay(facts)) return 'quiet';
 
-    const message = buildBriefMessage({
+    const input: BriefInput = {
       projectName: project.rows[0].name,
       narrative,
       facts,
       revenue: await this.revenueFor(channel.projectId),
       dashboardUrl: `${dashboardUrl()}/dashboard`
-    });
-    return this.telegram.sendMessage(channel.chatId, message);
+    };
+
+    if (channel.kind === 'slack') {
+      const stored = await this.database.query<{ webhookUrl: string | null }>(
+        `SELECT webhook_url AS "webhookUrl" FROM brief_channels WHERE id = $1`,
+        [channel.id]
+      );
+      const webhookUrl = stored.rows[0]?.webhookUrl;
+      if (!webhookUrl) return { ok: false, status: 0, description: 'This Slack channel has no webhook. Connect it again.', permanent: true };
+      return this.slack.sendMessage(webhookUrl, buildSlackBriefMessage(input));
+    }
+    return this.telegram.sendMessage(channel.chatId, buildBriefMessage(input));
   }
 
   private async revenueFor(projectId: string): Promise<BriefRevenue | null> {
@@ -330,9 +431,9 @@ export class BriefsService {
   }
 
   private async recordFailure(channel: BriefChannel, localDate: string, result: TelegramSendResult) {
-    const reason = (result.description ?? 'Telegram did not accept the message.').slice(0, 300);
+    const reason = (result.description ?? 'The message was not accepted.').slice(0, 300);
     if (result.permanent) {
-      // Bot blocked or chat gone: stop trying until the person reconnects.
+      // Bot blocked, chat gone or webhook revoked: stop trying until the person reconnects.
       await this.database.query(`UPDATE brief_channels SET enabled = false, last_error = $2, updated_at = now() WHERE id = $1`, [
         channel.id,
         reason

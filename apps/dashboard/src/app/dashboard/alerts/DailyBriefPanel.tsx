@@ -5,6 +5,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import SentIcon from '@hugeicons/core-free-icons/SentIcon';
+import SlackIcon from '@hugeicons/core-free-icons/SlackIcon';
 import { Skeleton } from '@/components/Skeleton';
 import {
   Notice,
@@ -23,8 +24,11 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 15 * 60 * 1000;
 
+type Kind = 'telegram' | 'slack';
+
 interface Channel {
   id: string;
+  kind: Kind;
   chatName: string | null;
   enabled: boolean;
   sendHour: number;
@@ -33,10 +37,10 @@ interface Channel {
   lastError: string | null;
 }
 
-interface TelegramStatus {
+interface Overview {
   project: { id: string; name: string };
-  configured: boolean;
-  botUsername: string | null;
+  telegram: { configured: boolean; botUsername: string | null };
+  slack: { configured: boolean };
   channels: Channel[];
 }
 
@@ -46,8 +50,16 @@ interface Link {
   expiresAt: string;
 }
 
+const SLACK_RESULTS: Record<string, { tone: 'success' | 'error'; title: string; text: string }> = {
+  connected: { tone: 'success', title: 'Slack connected', text: 'Your first brief is on its way to the channel.' },
+  cancelled: { tone: 'error', title: 'Slack not connected', text: 'You cancelled on Slack, so nothing was added.' },
+  expired: { tone: 'error', title: 'That link expired', text: 'Start again with Add to Slack. Each link works once and lasts 15 minutes.' },
+  error: { tone: 'error', title: 'Slack not connected', text: 'Slack did not complete the connection. Try Add to Slack again.' }
+};
+
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const formatHour = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+const serviceName = (kind: Kind) => (kind === 'slack' ? 'Slack' : 'Telegram');
 
 function browserTimezone() {
   try {
@@ -69,15 +81,29 @@ function timezoneOptions(current: string) {
 
 export function DailyBriefPanel({ projectId }: { projectId?: string }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [status, setStatus] = useState<TelegramStatus>();
+  const [status, setStatus] = useState<Overview>();
   const [message, setMessage] = useState('');
   const [link, setLink] = useState<Link | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const pollUntil = useRef(0);
+  const telegramCount = useRef(0);
 
   useEffect(() => { void load(); }, [projectId]);
 
-  // After a link is made, check every few seconds for the chat to appear.
+  // Slack sends the person back here with ?slack=<result>. Say what happened, then tidy the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('slack');
+    if (!result) return;
+    const outcome = SLACK_RESULTS[result] ?? SLACK_RESULTS.error;
+    if (outcome.tone === 'success') toast.success(outcome.text, { title: outcome.title });
+    else toast.error(outcome.text, { title: outcome.title });
+    params.delete('slack');
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+  }, []);
+
+  // After a Telegram link is made, check every few seconds for the chat to appear.
   useEffect(() => {
     if (!link) return;
     pollUntil.current = Date.now() + POLL_LIMIT_MS;
@@ -88,7 +114,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
         return;
       }
       const next = await fetchStatus();
-      if (next && next.channels.length > (status?.channels.length ?? 0)) {
+      if (next && next.channels.filter((channel) => channel.kind === 'telegram').length > telegramCount.current) {
         window.clearInterval(timer);
         setStatus(next);
         setLink(null);
@@ -112,9 +138,11 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
     return response.json();
   }
 
-  async function fetchStatus(): Promise<TelegramStatus | null> {
+  const overviewPath = `/v1/dashboard/briefs${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`;
+
+  async function fetchStatus(): Promise<Overview | null> {
     try {
-      return (await request(`/v1/dashboard/briefs/telegram${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)) as TelegramStatus;
+      return (await request(overviewPath)) as Overview;
     } catch {
       return null;
     }
@@ -122,8 +150,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
 
   async function load() {
     try {
-      const body = await request(`/v1/dashboard/briefs/telegram${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
-      setStatus(body as TelegramStatus);
+      setStatus((await request(overviewPath)) as Overview);
     } catch (error) {
       setMessage(await readApiError(error, 'The daily brief settings could not be loaded.'));
     }
@@ -143,8 +170,9 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
     }
   }
 
-  async function connect() {
-    const created = await run('connect', () =>
+  async function connectTelegram() {
+    telegramCount.current = status?.channels.filter((channel) => channel.kind === 'telegram').length ?? 0;
+    const created = await run('connect-telegram', () =>
       request('/v1/dashboard/briefs/telegram/link', {
         method: 'POST',
         body: JSON.stringify({ projectId: status?.project.id ?? projectId, timezone: browserTimezone() })
@@ -152,6 +180,18 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
       'Could not start the Telegram connection'
     );
     if (created) setLink(created);
+  }
+
+  async function connectSlack() {
+    const created = await run('connect-slack', () =>
+      request('/v1/dashboard/briefs/slack/link', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: status?.project.id ?? projectId, timezone: browserTimezone() })
+      }) as Promise<{ url: string }>,
+      'Could not start the Slack connection'
+    );
+    // Slack's own screen asks which channel to use, then sends the person back here.
+    if (created) window.location.assign(created.url);
   }
 
   async function update(channel: Channel, patch: Partial<Pick<Channel, 'enabled' | 'sendHour' | 'timezone'>>) {
@@ -164,7 +204,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
 
   async function sendNow(channel: Channel) {
     const sent = await run(`test-${channel.id}`, () => request(`/v1/dashboard/briefs/channels/${channel.id}/test`, { method: 'POST' }), 'Could not send the brief');
-    if (sent) toast.success('Check Telegram.', { title: 'Brief sent' });
+    if (sent) toast.success(`Check ${serviceName(channel.kind)}.`, { title: 'Brief sent' });
   }
 
   async function disconnect(channel: Channel) {
@@ -191,8 +231,54 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
     );
   }
 
-  const connected = status.channels.length > 0;
   const tz = browserTimezone();
+  const telegramChannels = status.channels.filter((channel) => channel.kind === 'telegram');
+  const slackChannels = status.channels.filter((channel) => channel.kind === 'slack');
+
+  const channelRows = (channels: Channel[]) =>
+    channels.map((channel) => (
+      <div key={channel.id} className="border-t border-neutral-100 dark:border-slate-800">
+        <SettingsRow
+          label={channel.chatName ?? `${serviceName(channel.kind)} chat`}
+          hint={channel.lastError ? `Stopped: ${channel.lastError}` : channel.lastSentOn ? `Last brief ${channel.lastSentOn}` : 'No brief sent yet'}
+          actions={
+            <>
+              <button type="button" className={secondaryButton} onClick={() => sendNow(channel)} disabled={busy === `test-${channel.id}`}>
+                {busy === `test-${channel.id}` ? 'Sending…' : 'Send now'}
+              </button>
+              <button type="button" className={dangerButton} onClick={() => disconnect(channel)} disabled={busy === `delete-${channel.id}`}>
+                Disconnect
+              </button>
+            </>
+          }
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <Switch label={`Send daily briefs to ${channel.chatName ?? 'this chat'}`} checked={channel.enabled} onChange={(enabled) => update(channel, { enabled })} disabled={busy === channel.id} />
+            <label className="flex items-center gap-2 text-sm">
+              <span className="sr-only">Send time</span>
+              <select
+                aria-label="Send time"
+                className={`${inputClass} w-auto`}
+                value={channel.sendHour}
+                onChange={(event) => update(channel, { sendHour: Number(event.target.value) })}
+                disabled={busy === channel.id}
+              >
+                {HOURS.map((hour) => <option key={hour} value={hour}>{formatHour(hour)}</option>)}
+              </select>
+            </label>
+            <select
+              aria-label="Timezone"
+              className={`${inputClass} w-auto max-w-[220px]`}
+              value={channel.timezone}
+              onChange={(event) => update(channel, { timezone: event.target.value })}
+              disabled={busy === channel.id}
+            >
+              {timezoneOptions(channel.timezone === 'UTC' ? tz : channel.timezone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+            </select>
+          </div>
+        </SettingsRow>
+      </div>
+    ));
 
   return (
     <div className="grid max-w-4xl gap-12">
@@ -201,8 +287,8 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
         title="Daily brief"
         description="A short plain-English summary of your project, sent to your chat once a day: what changed, and one thing to look at. Quiet days send nothing."
       >
-        {!status.configured ? (
-          <Notice tone="info">The Telegram bot is not set up on this TraceIQ server yet, so briefs cannot be sent.</Notice>
+        {!status.telegram.configured && !status.slack.configured ? (
+          <Notice tone="info">Neither Telegram nor Slack is set up on this TraceIQ server yet, so briefs cannot be sent.</Notice>
         ) : null}
 
         <SettingsCard
@@ -210,18 +296,18 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
           title={
             <span className="flex flex-wrap items-center gap-2">
               Telegram
-              <StatusPill tone={connected ? 'success' : 'neutral'}>{connected ? 'Connected' : 'Not connected'}</StatusPill>
+              <StatusPill tone={telegramChannels.length > 0 ? 'success' : 'neutral'}>{telegramChannels.length > 0 ? 'Connected' : 'Not connected'}</StatusPill>
             </span>
           }
           description={
-            connected
+            telegramChannels.length > 0
               ? `Briefs for ${status.project.name} go to the chats below.`
               : 'Connect a chat and the first brief arrives straight away, so you can see what to expect.'
           }
           actions={
-            status.configured ? (
-              <button type="button" className={connected ? secondaryButton : primaryButton} onClick={connect} disabled={busy === 'connect' || Boolean(link)}>
-                {busy === 'connect' ? 'Preparing…' : connected ? 'Add another chat' : 'Connect Telegram'}
+            status.telegram.configured ? (
+              <button type="button" className={telegramChannels.length > 0 ? secondaryButton : primaryButton} onClick={connectTelegram} disabled={busy === 'connect-telegram' || Boolean(link)}>
+                {busy === 'connect-telegram' ? 'Preparing…' : telegramChannels.length > 0 ? 'Add another chat' : 'Connect Telegram'}
               </button>
             ) : null
           }
@@ -234,54 +320,35 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
                 <a className={secondaryButton} href={link.groupUrl} target="_blank" rel="noreferrer">Add to a group instead</a>
               </div>
               <p className="mt-3 text-sm text-neutral-500 dark:text-slate-400" role="status">
-                2. Waiting for you to tap Start in {status.botUsername ? `@${status.botUsername}` : 'the bot'}. This page updates by itself. The link works once and expires in 15 minutes.
+                2. Waiting for you to tap Start in {status.telegram.botUsername ? `@${status.telegram.botUsername}` : 'the bot'}. This page updates by itself. The link works once and expires in 15 minutes.
               </p>
             </div>
           ) : null}
+          {channelRows(telegramChannels)}
+        </SettingsCard>
 
-          {status.channels.map((channel) => (
-            <div key={channel.id} className="border-t border-neutral-100 dark:border-slate-800">
-              <SettingsRow
-                label={channel.chatName ?? 'Telegram chat'}
-                hint={channel.lastError ? `Stopped: ${channel.lastError}` : channel.lastSentOn ? `Last brief ${channel.lastSentOn}` : 'No brief sent yet'}
-                actions={
-                  <>
-                    <button type="button" className={secondaryButton} onClick={() => sendNow(channel)} disabled={busy === `test-${channel.id}`}>
-                      {busy === `test-${channel.id}` ? 'Sending…' : 'Send now'}
-                    </button>
-                    <button type="button" className={dangerButton} onClick={() => disconnect(channel)} disabled={busy === `delete-${channel.id}`}>
-                      Disconnect
-                    </button>
-                  </>
-                }
-              >
-                <div className="flex flex-wrap items-center gap-3">
-                  <Switch label={`Send daily briefs to ${channel.chatName ?? 'this chat'}`} checked={channel.enabled} onChange={(enabled) => update(channel, { enabled })} disabled={busy === channel.id} />
-                  <label className="flex items-center gap-2 text-sm">
-                    <span className="sr-only">Send time</span>
-                    <select
-                      aria-label="Send time"
-                      className={`${inputClass} w-auto`}
-                      value={channel.sendHour}
-                      onChange={(event) => update(channel, { sendHour: Number(event.target.value) })}
-                      disabled={busy === channel.id}
-                    >
-                      {HOURS.map((hour) => <option key={hour} value={hour}>{formatHour(hour)}</option>)}
-                    </select>
-                  </label>
-                  <select
-                    aria-label="Timezone"
-                    className={`${inputClass} w-auto max-w-[220px]`}
-                    value={channel.timezone}
-                    onChange={(event) => update(channel, { timezone: event.target.value })}
-                    disabled={busy === channel.id}
-                  >
-                    {timezoneOptions(channel.timezone === 'UTC' ? tz : channel.timezone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-                  </select>
-                </div>
-              </SettingsRow>
-            </div>
-          ))}
+        <SettingsCard
+          icon={SlackIcon}
+          title={
+            <span className="flex flex-wrap items-center gap-2">
+              Slack
+              <StatusPill tone={slackChannels.length > 0 ? 'success' : 'neutral'}>{slackChannels.length > 0 ? 'Connected' : 'Not connected'}</StatusPill>
+            </span>
+          }
+          description={
+            slackChannels.length > 0
+              ? `Briefs for ${status.project.name} are posted to the channels below.`
+              : 'Pick a channel on Slack and the brief is posted there. You choose the channel on Slack, and TraceIQ can only post to that one.'
+          }
+          actions={
+            status.slack.configured ? (
+              <button type="button" className={slackChannels.length > 0 ? secondaryButton : primaryButton} onClick={connectSlack} disabled={busy === 'connect-slack'}>
+                {busy === 'connect-slack' ? 'Opening Slack…' : slackChannels.length > 0 ? 'Add another channel' : 'Add to Slack'}
+              </button>
+            ) : null
+          }
+        >
+          {channelRows(slackChannels)}
         </SettingsCard>
 
         {message ? <Notice tone="error">{message}</Notice> : null}
@@ -298,7 +365,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
               <p className="mt-2 text-sky-600 dark:text-sky-400 underline">Open TraceIQ</p>
             </div>
             <p className="mt-3 text-xs text-neutral-500 dark:text-slate-400">
-              Send /brief to the bot any time for one right now, or /stop to pause. Times use your chosen timezone ({tz} is this browser&apos;s).
+              On Telegram, send /brief to the bot any time for one right now, or /stop to pause. Times use your chosen timezone ({tz} is this browser&apos;s).
             </p>
           </div>
         </SettingsCard>

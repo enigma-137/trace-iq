@@ -135,3 +135,26 @@ export function buildBriefMessage(input: BriefInput): string {
   lines.push('', `<a href="${escapeHtml(input.dashboardUrl)}">Open TraceIQ</a>`);
   return lines.join('\n');
 }
+
+export function escapeSlack(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** The same brief as {@link buildBriefMessage}, in Slack mrkdwn. */
+export function buildSlackBriefMessage(input: BriefInput): string {
+  const { facts, revenue } = input;
+  const lines: string[] = [`*${escapeSlack(input.projectName)}* · your daily brief`, '', escapeSlack(input.narrative)];
+
+  lines.push('', `${facts.eventsToday.toLocaleString('en')} events · ${facts.uniquesToday.toLocaleString('en')} visitors`);
+
+  if (revenue) {
+    const failed = revenue.failed > 0 ? ` · ${revenue.failed.toLocaleString('en')} failed` : '';
+    lines.push(`Revenue: ${escapeSlack(formatMoney(revenue.total, revenue.currency))} · ${revenue.transactions.toLocaleString('en')} paid${failed}`);
+  }
+
+  const action = suggestAction(facts, revenue);
+  if (action) lines.push('', `*Look at this:* ${escapeSlack(action)}`);
+
+  lines.push('', `<${input.dashboardUrl}|Open TraceIQ>`);
+  return lines.join('\n');
+}
