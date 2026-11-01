@@ -18,7 +18,8 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
-  Tag
+  Tag,
+  Wand
 } from 'lucide-react';
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -770,7 +771,7 @@ export function ErrorTrackingClientView({
                         title="Copies the error, stack and source with instructions, to paste into Claude Code, Cursor or Codex"
                         className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
                       >
-                        {copiedPrompt ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        {copiedPrompt ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Wand className="h-3.5 w-3.5" />}
                         {copiedPrompt ? 'Copied' : 'Copy fix prompt'}
                       </button>
                     </div>

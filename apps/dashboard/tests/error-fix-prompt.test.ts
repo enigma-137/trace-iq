@@ -127,4 +127,12 @@ describe('error view', () => {
     expect(view).toContain("from '@/lib/error-fix-prompt'");
     expect(view).toContain('Copy fix prompt');
   });
+
+  it('uses a plain wand on the button, not the sparkles icon', () => {
+    const view = readFileSync(new URL('../src/app/dashboard/errors/ErrorTrackingClientView.tsx', import.meta.url), 'utf8');
+    const button = view.slice(view.indexOf('onClick={() => void copyFixPrompt()}'));
+    const buttonMarkup = button.slice(0, button.indexOf('</button>'));
+    expect(buttonMarkup).toContain('<Wand ');
+    expect(buttonMarkup).not.toContain('Sparkles');
+  });
 });
