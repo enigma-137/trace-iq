@@ -1983,6 +1983,41 @@ app.use(traceiq.middleware({
           exploding per id.
         </P>
         <P>
+          <strong>Backend (Python)</strong> — <Mono>traceiq-py</Mono> 0.3 times requests the same way for Django,
+          Flask (any WSGI app) and FastAPI (any ASGI app). These are server timings:
+        </P>
+        <Code lang="python">{`# Django: settings.py
+from traceiq import Client
+
+TRACEIQ_CLIENT = Client(
+    project_id="${projectId}",
+    write_key="YOUR_WRITE_KEY",
+    endpoint="${apiBaseUrl}",
+    service_name="my-api",
+)
+TRACEIQ_MIDDLEWARE = {  # optional
+    "resolve_user_id": lambda request: request.user.email if request.user.is_authenticated else None,
+    "ignore": lambda request: request.path == "/health/",
+}
+MIDDLEWARE = [
+    "traceiq.middleware.DjangoMiddleware",  # near the top, so it times the middleware below it
+    # ...
+]
+
+# Flask or any WSGI app
+from traceiq.middleware import WSGIMiddleware
+app.wsgi_app = WSGIMiddleware(app.wsgi_app, traceiq)
+
+# FastAPI, Starlette or any ASGI app
+from traceiq.middleware import ASGIMiddleware
+app.add_middleware(ASGIMiddleware, client=traceiq)`}</Code>
+        <P>
+          Django and FastAPI report their own route template (<Mono>/api/pay/verify/:ref/</Mono>). Flask and other
+          WSGI apps don&apos;t expose one, so ids are collapsed (<Mono>/orders/42</Mono> becomes{' '}
+          <Mono>/orders/:id</Mono>) unless you pass <Mono>route=</Mono>. Have <Mono>resolve_user_id</Mono> return the
+          same id your frontend passes to <Mono>identify()</Mono>.
+        </P>
+        <P>
           <strong>Browser</strong> — opt in and the SDK wraps <Mono>fetch</Mono> and <Mono>XMLHttpRequest</Mono>{' '}
           (so axios and other XHR clients are included) to time each call. Its own calls to TraceIQ are skipped:
         </P>

@@ -65,6 +65,48 @@ if traceiq.is_feature_enabled("new-payouts", "user_123", properties={"plan": "pr
 Flag calls are synchronous HTTP requests (one per call), so evaluate once per request and
 reuse the result, for example with `evaluate_flags()`.
 
+## Request timing (Django, Flask, FastAPI)
+
+`traceiq.middleware` times every request and reports it as a server timing, the same number your
+logs and Postman show. It appears under **Server** in API performance. The browser SDK reports a
+different number (the full round trip from the visitor's device) and the dashboard keeps the two apart.
+
+```python
+# Django: settings.py
+from traceiq import Client
+
+TRACEIQ_CLIENT = Client(project_id="proj_...", write_key="trq_...",
+                        endpoint="https://api.traceiq.run", service_name="my-api")
+TRACEIQ_MIDDLEWARE = {  # optional
+    "resolve_user_id": lambda request: request.user.email if request.user.is_authenticated else None,
+    "ignore": lambda request: request.path == "/health/",
+}
+MIDDLEWARE = [
+    "traceiq.middleware.DjangoMiddleware",  # near the top, so it times the middleware below it
+    # ...
+]
+
+# Flask or any WSGI app
+from traceiq.middleware import WSGIMiddleware
+app.wsgi_app = WSGIMiddleware(app.wsgi_app, traceiq)
+
+# FastAPI, Starlette or any ASGI app
+from traceiq.middleware import ASGIMiddleware
+app.add_middleware(ASGIMiddleware, client=traceiq)
+```
+
+Routes are templates (`/api/pay/verify/:ref/`), not raw URLs, so requests group instead of
+exploding per id. Django and FastAPI report their own template; for Flask and other WSGI apps ids
+are collapsed (`/orders/42` becomes `/orders/:id`), or pass `route=lambda environ: ...`.
+`resolve_user_id` should return the same id your frontend passes to `identify()`.
+
+Options: `ignore`, `resolve_user_id`, `service`, `environment`, `route`, `include_page_requests`,
+`request_id_header` (`"x-request-id"`), `echo_request_id` (True). Static files and HTML pages are
+skipped. The middleware reads the incoming `x-request-id` and `traceparent` headers, so a request joins
+the trace that started in the browser, and `traceiq.middleware.get_trace_headers()` gives you a
+`traceparent` to send on calls your handler makes to other services. It never reads headers, query
+strings or bodies, and a failure inside it never reaches your request.
+
 ## Options
 
 `endpoint`, `flush_at` (20), `flush_interval` (10.0s), `max_retries` (3),
