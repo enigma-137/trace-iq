@@ -1,6 +1,8 @@
 import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { AlertManager } from './AlertManager';
+import { AlertsTabs, type AlertsTab } from './AlertsTabs';
+import { DailyBriefPanel } from './DailyBriefPanel';
 import type { FilterCondition } from '@/components/SegmentFilters';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +43,19 @@ interface EventNamesResponse {
   eventNames: Array<{ eventName: string; total: number }>;
 }
 
-export default async function AlertsPage() {
+export default async function AlertsPage({ searchParams }: { searchParams: { tab?: string; projectId?: string } }) {
+  const tab: AlertsTab = searchParams.tab === 'brief' ? 'brief' : 'alerts';
+
+  if (tab === 'brief') {
+    const { user } = await requireDashboardSession('/dashboard/alerts?tab=brief');
+    return (
+      <DashboardShell active="alerts" title="Alerts" userEmail={user.email} projectId={searchParams.projectId}>
+        <AlertsTabs active="brief" />
+        <DailyBriefPanel projectId={searchParams.projectId} />
+      </DashboardShell>
+    );
+  }
+
   const { user, token } = await requireDashboardSession('/dashboard/alerts');
   const [{ data, error }, { data: eventNamesData }] = await Promise.all([
     dashboardGet<AlertsResponse>('/v1/dashboard/alerts', token),
@@ -52,6 +66,7 @@ export default async function AlertsPage() {
 
   return (
     <DashboardShell active="alerts" title="Alerts" userEmail={user.email}>
+      <AlertsTabs active="alerts" />
       {error ? (
         <section className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
           {error}

@@ -1,15 +1,6 @@
-import { DashboardShell } from '../../DashboardShell';
-import { requireDashboardSession } from '@/lib/dashboard';
-import { SettingsTabs } from '../SettingsTabs';
-import { DailyBriefPanel } from './DailyBriefPanel';
+import { redirect } from 'next/navigation';
 
-export default async function DailyBriefSettingsPage({ searchParams }: { searchParams: { projectId?: string; organizationId?: string } }) {
-  const { user } = await requireDashboardSession('/dashboard/settings/brief');
-  return (
-    <DashboardShell active="settings" title="Daily brief" userEmail={user.email}
-      projectId={searchParams.projectId} organizationId={searchParams.organizationId}>
-      <SettingsTabs />
-      <DailyBriefPanel projectId={searchParams.projectId} />
-    </DashboardShell>
-  );
+// The daily brief now lives next to alerts. Keeps old links and bookmarks working.
+export default function DailyBriefSettingsRedirect() {
+  redirect('/dashboard/alerts?tab=brief');
 }

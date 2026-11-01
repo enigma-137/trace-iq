@@ -245,7 +245,7 @@ export class BriefsService {
     if (!link || new Date(link.expiresAt).getTime() < Date.now()) {
       await this.telegram.sendMessage(
         chatId,
-        'That link has expired or was already used. In TraceIQ, open Settings → Daily brief and connect Telegram again.'
+        'That link has expired or was already used. In TraceIQ, open Alerts → Daily brief and connect Telegram again.'
       );
       return;
     }
@@ -266,7 +266,7 @@ export class BriefsService {
 
     await this.telegram.sendMessage(
       chatId,
-      `Connected to <b>${escapeHtml(projectName)}</b>. You'll get a short brief here every day at ${String(channel.sendHour).padStart(2, '0')}:00 (${escapeHtml(channel.timezone)}). Change the time in TraceIQ → Settings → Daily brief.\n\nSend /brief any time for one now, or /stop to pause.`
+      `Connected to <b>${escapeHtml(projectName)}</b>. You'll get a short brief here every day at ${String(channel.sendHour).padStart(2, '0')}:00 (${escapeHtml(channel.timezone)}). Change the time in TraceIQ → Alerts → Daily brief.\n\nSend /brief any time for one now, or /stop to pause.`
     );
     // A first brief right away, so the person sees what they signed up for.
     await this.sendBrief(channel, { force: true });
@@ -280,7 +280,7 @@ export class BriefsService {
     if (channels.rows.length === 0) {
       await this.telegram.sendMessage(
         chatId,
-        'This chat is not connected to a project yet. In TraceIQ, open Settings → Daily brief to connect it.'
+        'This chat is not connected to a project yet. In TraceIQ, open Alerts → Daily brief to connect it.'
       );
       return;
     }
@@ -289,11 +289,11 @@ export class BriefsService {
 
   private async stopChat(chatId: string) {
     await this.database.query(`UPDATE brief_channels SET enabled = false, updated_at = now() WHERE kind = 'telegram' AND chat_id = $1`, [chatId]);
-    await this.telegram.sendMessage(chatId, 'Daily briefs paused. Open TraceIQ → Settings → Daily brief to turn them back on.');
+    await this.telegram.sendMessage(chatId, 'Daily briefs paused. Open TraceIQ → Alerts → Daily brief to turn them back on.');
   }
 
   private helpText(): string {
-    return 'I send a short daily brief about your TraceIQ project. To connect this chat, open TraceIQ → Settings → Daily brief and tap Connect Telegram.\n\n/brief sends one now · /stop pauses them.';
+    return 'I send a short daily brief about your TraceIQ project. To connect this chat, open TraceIQ → Alerts → Daily brief and tap Connect Telegram.\n\n/brief sends one now · /stop pauses them.';
   }
 
   /** Builds and sends one brief. Returns 'quiet' when there was nothing to report and `force` is off. */
