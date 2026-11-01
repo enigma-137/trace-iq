@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AuthParticles } from './AuthParticles';
 
 const POINTS = ['Revenue & GTV as a first-class metric', 'Funnels with per-step drop-off', 'SDKs for web, server & mobile'];
 
@@ -6,14 +7,7 @@ const POINTS = ['Revenue & GTV as a first-class metric', 'Funnels with per-step 
 export function AuthBrandPanel() {
   return (
     <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-[#d4e2f2] bg-gradient-to-br from-[#e5f3ff] via-white to-[#fff0e4] p-12 text-[#101715] lg:flex">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage: 'radial-gradient(#245beb33 1px, transparent 1px)',
-          backgroundSize: '22px 22px'
-        }}
-      />
+      <AuthParticles />
       <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-[#245beb]/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-[#ee8034]/15 blur-3xl" />
 
