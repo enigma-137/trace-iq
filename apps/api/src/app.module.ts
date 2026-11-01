@@ -14,6 +14,7 @@ import { AlertsModule } from './modules/alerts/alerts.module';
 import { LinksModule } from './modules/links/links.module';
 import { RevenueModule } from './modules/revenue/revenue.module';
 import { BriefsModule } from './modules/briefs/briefs.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { FlagsModule } from './modules/flags/flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ExportModule } from './modules/export/export.module';
@@ -64,6 +65,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     LinksModule,
     RevenueModule,
     BriefsModule,
+    OnboardingModule,
     ExperimentsModule,
     SurveysModule,
     SyntheticMonitoringModule,

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { StarterChecklist } from '@/components/StarterChecklist';
+import { EMPTY_ONBOARDING, starterMode, type OnboardingSteps } from '@/lib/starter-steps';
 import { cookies } from 'next/headers';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
@@ -198,12 +200,22 @@ export default async function DashboardPage({
   // Fallbacks for older APIs that omit these fields; fetched together, not in turn.
   const needsReferrers = Boolean(canonicalProjectId) && (overview?.topReferrers ?? []).length === 0;
   const needsObservability = Boolean(canonicalProjectId) && (overview?.observabilitySeries ?? []).length === 0;
-  const [dashboardReferrers, observabilitySeries] = await Promise.all([
+  const [dashboardReferrers, observabilitySeries, onboardingResponse] = await Promise.all([
     needsReferrers ? loadReferrers(canonicalProjectId!, token, appliedRange?.days ?? 30) : Promise.resolve(overview?.topReferrers ?? []),
     needsObservability
       ? loadObservabilitySeries(canonicalProjectId!, token, overview?.sparkline ?? [], rangeDays)
-      : Promise.resolve(overview?.observabilitySeries ?? [])
+      : Promise.resolve(overview?.observabilitySeries ?? []),
+    canonicalProjectId
+      ? dashboardGet<{ steps: OnboardingSteps }>(withParams('/v1/dashboard/onboarding', { projectId: canonicalProjectId }), token)
+      : Promise.resolve(null)
   ]);
+
+  // A project with no events yet gets the getting-started checklist instead of an Overview full of empty charts.
+  // If the status can't be loaded the checklist still works from what the Overview itself knows.
+  const isBrandNew = hasNoProject || (Boolean(overview?.project) && !overview?.lastEventAt);
+  const onboardingSteps: OnboardingSteps | null =
+    onboardingResponse?.data?.steps ?? (overview?.project ? { ...EMPTY_ONBOARDING, firstEvent: Boolean(overview.lastEventAt) } : null);
+  const showStarter = Boolean(overview?.project) && onboardingSteps !== null && starterMode(onboardingSteps) !== 'none';
 
   const sparkValues = overview?.sparkline.map((point) => point.total) ?? [];
   // Compare with the previous window when the API reports it; older APIs only
@@ -315,26 +327,13 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
-        {/* Lightweight Onboarding Setup Reminder (disappears after first event is received) */}
-        {overview?.project && !overview.lastEventAt ? (
-          <PageBanner
-            variant="accent"
-            badge="Setup Required"
-            title={`Connect ${overview.project.name} to TraceIQ`}
-            description="No events have been received from this project yet. Install the lightweight SDK snippet or CLI to start streaming live telemetry and unlock dashboards."
-            illustrationSrc="/dashboards/banner-connect-project.png"
-            illustrationAlt="Connect Project Artwork"
-            primaryAction={{
-              label: 'Set up tracking →',
-              href: `/dashboard/setup?projectId=${encodeURIComponent(canonicalProjectId!)}`
-            }}
-            secondaryAction={{
-              label: 'SDK Documentation',
-              href: '/docs'
-            }}
-          />
+        {/* Getting started: the whole page until the first event arrives, then a small card until the rest is done. */}
+        {showStarter && overview?.project && onboardingSteps ? (
+          <StarterChecklist projectId={overview.project.id} projectName={overview.project.name} steps={onboardingSteps} />
         ) : null}
 
+        {!isBrandNew ? (
+          <>
         {/* Highlighted Insight Banner: Today's Story */}
         {overview?.project ? <TodayStoryCard projectId={canonicalProjectId} /> : null}
 
@@ -644,6 +643,8 @@ export default async function DashboardPage({
           </div>
         </section>
 
+          </>
+        ) : null}
       </div>
     </DashboardShell>
   );
