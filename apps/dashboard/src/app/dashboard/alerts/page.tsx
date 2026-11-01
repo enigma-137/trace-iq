@@ -2,6 +2,7 @@ import { DashboardShell } from '../DashboardShell';
 import { dashboardGet, requireDashboardSession } from '@/lib/dashboard';
 import { AlertManager } from './AlertManager';
 import { AlertsTabs, type AlertsTab } from './AlertsTabs';
+import type { ChatChannelOption } from './CreateAlertModal';
 import { DailyBriefPanel } from './DailyBriefPanel';
 import type { FilterCondition } from '@/components/SegmentFilters';
 
@@ -22,6 +23,7 @@ interface AlertsResponse {
     webhookUrl: string | null;
     emailRecipients: string[];
     notificationGroupIds: string[];
+    chatChannelIds: string[];
     enabled: boolean;
     lastStatus: string;
     lastValue: number | null;
@@ -35,6 +37,8 @@ interface AlertsResponse {
     }>;
   }>;
   notificationGroups: Array<{ id: string; name: string; memberEmails: string[] }>;
+  /** Telegram chats and Slack channels connected under Daily brief. Absent from an older API. */
+  chatChannels?: ChatChannelOption[];
   recentEvents: Array<{ id: string; alertName: string; value: number | null; message: string; triggeredAt: string }>;
   entitlement: { available: boolean; plan: string } | null;
 }
@@ -78,6 +82,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: { tab
         recentEvents={data?.recentEvents ?? []}
         eventNames={eventNames}
         notificationGroups={data?.notificationGroups ?? []}
+        chatChannels={data?.chatChannels ?? []}
         alertsAvailable={data?.entitlement?.available !== false}
       />
     </DashboardShell>

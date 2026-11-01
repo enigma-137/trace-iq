@@ -9,6 +9,7 @@ import { EmailService, toUniqueEmails } from '../emails/email.service';
 import { NotificationGroupsService } from './notification-groups.service';
 import { assertSafeFetchUrl } from '../../common/url';
 import { EntitlementService } from '../billing/entitlement.service';
+import { ChatNotifier } from '../briefs/chat-notifier';
 
 type AlertCondition = 'above' | 'below' | 'drops_by' | 'spikes_by';
 const ALLOWED_CONDITIONS: AlertCondition[] = ['above', 'below', 'drops_by', 'spikes_by'];
@@ -33,6 +34,8 @@ type AlertRow = {
   webhook_url: string | null;
   email_recipients: string[] | null;
   notification_group_ids: string[] | null;
+  /** Telegram chats and Slack channels connected for the daily brief (brief_channels ids). */
+  chat_channel_ids: string[] | null;
   enabled: boolean;
   last_status: string;
   last_value: number | null;
@@ -52,6 +55,7 @@ export interface CreateAlertRequest {
   webhookUrl?: string;
   emailRecipients?: string[];
   notificationGroupIds?: string[];
+  chatChannelIds?: string[];
   projectId?: string;
 }
 
@@ -73,7 +77,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     private readonly projects: ProjectsService,
     private readonly groups: NotificationGroupsService,
     private readonly email: EmailService,
-    private readonly entitlements: EntitlementService
+    private readonly entitlements: EntitlementService,
+    private readonly chat: ChatNotifier
   ) {}
 
   onModuleInit(): void {
@@ -96,7 +101,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
   async list(user: DashboardUser, projectId?: string) {
     const project = await this.projects.resolveActiveProject(user, projectId);
     if (!project) {
-      return { project: null, alerts: [], recentEvents: [], notificationGroups: [], entitlement: null };
+      return { project: null, alerts: [], recentEvents: [], notificationGroups: [], chatChannels: [], entitlement: null };
     }
     const entitlement = await this.entitlements.getSnapshot(project.organizationId);
 
@@ -170,6 +175,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         webhookUrl: row.webhook_url,
         emailRecipients: row.email_recipients ?? [],
         notificationGroupIds: row.notification_group_ids ?? [],
+        chatChannelIds: row.chat_channel_ids ?? [],
         enabled: row.enabled,
         lastStatus: row.last_status,
         lastValue: row.last_value,
@@ -182,6 +188,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         memberEmails: row.member_emails ?? []
       })),
       recentEvents: events.rows,
+      // The chats connected for the daily brief, offered as alert destinations.
+      chatChannels: await this.chat.listForProject(project.id),
       entitlement: { available: entitlement.features.alerts, plan: entitlement.plan }
     };
   }
@@ -225,8 +233,17 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
       ? toUniqueGroupIds(body.notificationGroupIds)
       : [];
 
-    if (!webhookUrl && emailRecipients.length === 0 && notificationGroupIds.length === 0) {
-      throw new BadRequestException('Pick at least one notification channel (webhook and/or email recipients/groups).');
+    // Chat channels must be this project's own: an alert can never post into someone else's chat.
+    const requestedChatIds = Array.isArray(body.chatChannelIds)
+      ? toUniqueGroupIds(body.chatChannelIds.filter((id): id is string => typeof id === 'string'))
+      : [];
+    const chatChannelIds = await this.chat.idsInProject(project.id, requestedChatIds);
+    if (chatChannelIds.length !== requestedChatIds.length) {
+      throw new BadRequestException('One of the chosen Telegram or Slack channels is not connected to this project.');
+    }
+
+    if (!webhookUrl && emailRecipients.length === 0 && notificationGroupIds.length === 0 && chatChannelIds.length === 0) {
+      throw new BadRequestException('Pick at least one notification channel (email, a webhook, or a connected Telegram or Slack channel).');
     }
 
     // Resolve the members of each chosen group now and persist the flat list so the alert
@@ -239,8 +256,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
       `
         INSERT INTO alerts
           (id, project_id, name, event_name, measure, property, filters, window_hours, condition, threshold,
-           webhook_url, email_recipients, notification_group_ids, created_by_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14)
+           webhook_url, email_recipients, notification_group_ids, created_by_user_id, chat_channel_ids)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15)
       `,
       [
         id,
@@ -256,7 +273,8 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
         webhookUrl || null,
         resolvedRecipients,
         notificationGroupIds,
-        user.id
+        user.id,
+        chatChannelIds
       ]
     );
 
@@ -436,6 +454,20 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     if (alert.webhook_url) {
       await this.entitlements.assertAlertsAvailable(await this.alertOrganizationId(alert));
       await this.notifyWebhook(alert, eventId, value, previous, message);
+    }
+
+    if (alert.chat_channel_ids && alert.chat_channel_ids.length > 0) {
+      await this.entitlements.assertAlertsAvailable(await this.alertOrganizationId(alert));
+      const dashboardUrl = (process.env.DASHBOARD_URL ?? 'https://traceiq.run').replace(/\/+$/, '');
+      const results = await this.chat.send(alert.project_id, alert.chat_channel_ids, {
+        name: alert.name,
+        message,
+        alertUrl: `${dashboardUrl}/dashboard/alerts`
+      });
+      // One delivery row per chat, labelled by service, so the alert shows what reached whom.
+      for (const result of results) {
+        await this.recordDelivery(eventId, alert, result.kind, result.name, result.status, result.error);
+      }
     }
   }
 

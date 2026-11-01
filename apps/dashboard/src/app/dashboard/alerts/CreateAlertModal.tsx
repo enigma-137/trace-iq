@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { Select, Combobox, Checkbox } from '@traceiq/ui';
 import { SegmentFilters, FilterCondition, cleanFilters } from '@/components/SegmentFilters';
 import { DashboardDialog } from '../DashboardDialog';
+import { SlackLogo, TelegramLogo } from '@/components/BrandLogos';
 
 export interface AlertFormData {
   name: string;
@@ -17,6 +18,16 @@ export interface AlertFormData {
   webhookUrl?: string;
   emailRecipients: string[];
   notificationGroupIds: string[];
+  /** Telegram chats and Slack channels connected for the daily brief. */
+  chatChannelIds: string[];
+}
+
+/** A Telegram chat or Slack channel the project connected under Alerts → Daily brief. */
+export interface ChatChannelOption {
+  id: string;
+  kind: 'telegram' | 'slack';
+  name: string;
+  enabled: boolean;
 }
 
 interface NotificationGroup {
@@ -31,6 +42,7 @@ interface CreateAlertModalProps {
   onSave: (data: AlertFormData) => Promise<void>;
   eventNames: string[];
   notificationGroups: NotificationGroup[];
+  chatChannels: ChatChannelOption[];
   initialData?: Partial<AlertFormData>;
   isSubmitting: boolean;
   error?: string | null;
@@ -63,6 +75,7 @@ export function CreateAlertModal({
   onSave,
   eventNames,
   notificationGroups,
+  chatChannels,
   initialData,
   isSubmitting,
   error
@@ -79,6 +92,7 @@ export function CreateAlertModal({
   const [webhookUrl, setWebhookUrl] = useState('');
   const [recipientsInput, setRecipientsInput] = useState('');
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,8 +109,11 @@ export function CreateAlertModal({
       setWebhookUrl(initialData?.webhookUrl ?? '');
       setRecipientsInput(initialData?.emailRecipients ? initialData.emailRecipients.join(', ') : '');
       setSelectedGroupIds(initialData?.notificationGroupIds ?? []);
+      // Keep only chats that still exist, so a duplicated alert can't carry a disconnected one.
+      setSelectedChatIds((initialData?.chatChannelIds ?? []).filter((id) => chatChannels.some((channel) => channel.id === id)));
       setValidationError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData, eventNames]);
 
   const needsProperty = measure === 'sum' || measure === 'avg';
@@ -104,6 +121,10 @@ export function CreateAlertModal({
 
   function toggleGroup(id: string) {
     setSelectedGroupIds((prev) => (prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]));
+  }
+
+  function toggleChat(id: string) {
+    setSelectedChatIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -121,8 +142,8 @@ export function CreateAlertModal({
       .filter(Boolean);
 
     const webhook = webhookUrl.trim();
-    if (!webhook && emailRecipients.length === 0 && selectedGroupIds.length === 0) {
-      return setValidationError('Please specify at least one notification destination (email, webhook, or group).');
+    if (!webhook && emailRecipients.length === 0 && selectedGroupIds.length === 0 && selectedChatIds.length === 0) {
+      return setValidationError('Please specify at least one notification destination (email, webhook, group, or a connected Telegram or Slack channel).');
     }
 
     await onSave({
@@ -136,7 +157,8 @@ export function CreateAlertModal({
       filters: cleanFilters(filters),
       webhookUrl: webhook || undefined,
       emailRecipients,
-      notificationGroupIds: selectedGroupIds
+      notificationGroupIds: selectedGroupIds,
+      chatChannelIds: selectedChatIds
     });
   }
 
@@ -399,6 +421,40 @@ export function CreateAlertModal({
               </div>
             </div>
           ) : null}
+
+          <div className="space-y-1.5 pt-1">
+            <span className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
+              Telegram and Slack
+            </span>
+            {chatChannels.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {chatChannels.map((channel) => (
+                  <label
+                    key={channel.id}
+                    title={channel.enabled ? undefined : 'Paused. Turn it on in Daily brief, or alerts will skip it.'}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 select-none transition hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    <Checkbox
+                      checked={selectedChatIds.includes(channel.id)}
+                      onCheckedChange={() => toggleChat(channel.id)}
+                      aria-label={`${channel.kind === 'slack' ? 'Slack' : 'Telegram'} ${channel.name}`}
+                    />
+                    {channel.kind === 'slack' ? <SlackLogo size={14} /> : <TelegramLogo size={14} />}
+                    <span>{channel.name}</span>
+                    {channel.enabled ? null : <span className="text-neutral-400 dark:text-slate-500">(paused)</span>}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500 dark:text-slate-400">
+                No chats connected yet.{' '}
+                <a className="font-medium text-blue-700 underline underline-offset-2 dark:text-blue-400" href="/dashboard/alerts?tab=brief">
+                  Connect Telegram or Slack
+                </a>{' '}
+                under Daily brief, then pick it here.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Real-time Rule Preview */}

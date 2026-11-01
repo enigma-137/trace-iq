@@ -8,7 +8,9 @@ import { DashboardDialog } from '../DashboardDialog';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import type { FilterCondition } from '@/components/SegmentFilters';
-import { CreateAlertModal, AlertFormData } from './CreateAlertModal';
+import { CreateAlertModal, AlertFormData, type ChatChannelOption } from './CreateAlertModal';
+import { SlackLogo, TelegramLogo } from '@/components/BrandLogos';
+import { deliveryLabel, deliveryOutcome } from '@/lib/alert-delivery';
 import { NotificationGroupModal } from './NotificationGroupModal';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
@@ -51,6 +53,7 @@ interface Alert {
   webhookUrl: string | null;
   emailRecipients: string[];
   notificationGroupIds: string[];
+  chatChannelIds: string[];
   enabled: boolean;
   lastStatus: string;
   lastValue: number | null;
@@ -273,13 +276,13 @@ function IconButton({
   );
 }
 
-function Chip({ icon, title, children }: { icon: IconSvgElement; title?: string; children: ReactNode }) {
+function Chip({ icon, iconNode, title, children }: { icon?: IconSvgElement; iconNode?: ReactNode; title?: string; children: ReactNode }) {
   return (
     <span
       title={title}
       className="inline-flex max-w-full items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-neutral-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
     >
-      <HugeiconsIcon icon={icon} size={12} className="shrink-0 text-neutral-400 dark:text-slate-500" />
+      {iconNode ?? (icon ? <HugeiconsIcon icon={icon} size={12} className="shrink-0 text-neutral-400 dark:text-slate-500" /> : null)}
       <span className="truncate">{children}</span>
     </span>
   );
@@ -290,12 +293,14 @@ export function AlertManager({
   recentEvents,
   eventNames,
   notificationGroups,
+  chatChannels,
   alertsAvailable
 }: {
   alerts: Alert[];
   recentEvents: AlertEvent[];
   eventNames: string[];
   notificationGroups: NotificationGroup[];
+  chatChannels: ChatChannelOption[];
   alertsAvailable: boolean;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -368,7 +373,8 @@ export function AlertManager({
       filters: alert.filters,
       webhookUrl: alert.webhookUrl ?? undefined,
       emailRecipients: alert.emailRecipients,
-      notificationGroupIds: alert.notificationGroupIds
+      notificationGroupIds: alert.notificationGroupIds,
+      chatChannelIds: alert.chatChannelIds
     });
   }
 
@@ -773,6 +779,18 @@ export function AlertManager({
                           {notificationGroups.find((g) => g.id === groupId)?.name ?? 'Deleted group'}
                         </Chip>
                       ))}
+                      {alert.chatChannelIds.map((channelId) => {
+                        const channel = chatChannels.find((item) => item.id === channelId);
+                        return (
+                          <Chip
+                            key={channelId}
+                            iconNode={channel?.kind === 'slack' ? <SlackLogo size={12} /> : <TelegramLogo size={12} />}
+                            title={channel && !channel.enabled ? 'Paused in Daily brief: alerts skip it until it is turned on.' : undefined}
+                          >
+                            {channel ? `${channel.kind === 'slack' ? 'Slack' : 'Telegram'} · ${channel.name}${channel.enabled ? '' : ' (paused)'}` : 'Disconnected chat'}
+                          </Chip>
+                        );
+                      })}
                     </div>
 
                     {deliveries.length > 0 ? (
@@ -781,10 +799,17 @@ export function AlertManager({
                         {deliveries.map((d, i) => (
                           <span
                             key={`${d.channel}-${d.recipient ?? i}`}
-                            className={d.status === 'sent' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}
+                            className={
+                              deliveryOutcome(d.status) === 'sent'
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : deliveryOutcome(d.status) === 'skipped'
+                                  ? 'text-neutral-500 dark:text-slate-400'
+                                  : 'text-red-700 dark:text-red-400'
+                            }
                             title={d.error ?? undefined}
                           >
-                            {d.channel === 'webhook' ? 'Webhook' : d.recipient ?? 'Email'} {d.status === 'sent' ? 'sent' : `failed${d.error ? ` (${truncate(d.error, 60)})` : ''}`}
+                            {deliveryLabel(d)} {deliveryOutcome(d.status)}
+                            {deliveryOutcome(d.status) !== 'sent' && d.error ? ` (${truncate(d.error, 60)})` : ''}
                           </span>
                         ))}
                       </div>
@@ -899,6 +924,7 @@ export function AlertManager({
         onSave={handleSaveAlert}
         eventNames={eventNames}
         notificationGroups={notificationGroups}
+        chatChannels={chatChannels}
         initialData={alertModalData}
         isSubmitting={isAlertSubmitting}
         error={alertError}

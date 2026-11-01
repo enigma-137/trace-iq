@@ -2,6 +2,9 @@ import { Pool } from 'pg';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseService } from '../src/database/database.service';
 
+// Chat delivery is covered in alerts-chat.test.ts; these tests don't use it.
+const noChat = { listForProject: vi.fn(async () => []), idsInProject: vi.fn(async () => []), send: vi.fn(async () => []) };
+
 /** A DatabaseService whose pool hands out one scripted client. */
 function withFakeClient(options: { lockGranted?: boolean; unlockFails?: boolean } = {}) {
   const queries: Array<{ text: string; values: unknown[] }> = [];
@@ -123,7 +126,7 @@ describe('periodic jobs with side effects run under a job lock', () => {
     vi.useFakeTimers();
     const { AlertsService } = await import('../src/modules/alerts/alerts.service');
     const database = lockingDatabase();
-    const service = new AlertsService(database as never, {} as never, {} as never, {} as never, {} as never);
+    const service = new AlertsService(database as never, {} as never, {} as never, {} as never, {} as never, noChat as never);
     service.onModuleInit();
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
     expect(database.runExclusive).toHaveBeenCalledWith('alerts.evaluate', expect.any(Function));
