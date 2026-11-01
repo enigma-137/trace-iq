@@ -127,6 +127,23 @@ export class InsightsService {
   }
 
   /**
+   * The last 24 hours of a project as facts plus a narrative, for messages that go out
+   * without a signed-in user (the daily brief). Same narrative rules as the story card.
+   */
+  async getProjectStory(project: {
+    id: string;
+    name: string;
+    organizationId: string;
+  }): Promise<{ facts: TodayStoryFacts; narrative: string }> {
+    const facts = await this.computeFacts(project.id);
+    const template = this.templateNarrative(facts);
+    if (facts.eventsToday + facts.eventsYesterday === 0) return { facts, narrative: template };
+
+    const aiNarrative = await this.ai.generateStoryNarrative(project, facts).catch(() => null);
+    return { facts, narrative: aiNarrative ?? template };
+  }
+
+  /**
    * "Now" feed for the overview: the events received in the last `minutes`,
    * with the actor, page path, country and device. Used by the live activity
    * panel which polls this endpoint rather than opening a socket.
