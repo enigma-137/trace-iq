@@ -1688,16 +1688,18 @@ await traceiq.surveys.submitResponse(survey.id, [
             ['Edge-triggered', 'A firing is recorded once when the alert transitions into the triggered state, so you are not paged every check while it stays fired.']
           ]}
         />
-        <P>When an alert fires you can be reached through one or both channels:</P>
+        <P>When an alert fires you can be reached through any of these channels:</P>
         <Bullets
           items={[
+            ['Telegram or Slack', 'A message in a chat you have already connected under Alerts → Daily brief. Pick it in the alert form under "Telegram and Slack"; no URL to paste. An alert can only use its own project\'s chats. If the chat blocks the bot or the Slack channel is archived, TraceIQ switches that chat off and shows why, and a chat you have paused is skipped.'],
             ['Webhook', 'A POST with the alert details to any URL (Slack, ops tools, …).'],
             ['Email', 'A formatted email to any list of recipients, or to the members of a saved notification group. Groups live under Alerts, so you can attach an on-call list to many alerts and edit it once.']
           ]}
         />
         <P>
-          Every firing records a per-recipient delivery row — the Alerts page shows who was emailed / webhook-posted and
-          whether each delivery succeeded. Use <Mono>Test</Mono> on an alert to evaluate it once without firing.
+          Every firing records a delivery row per recipient, and the Alerts page shows who was emailed, which chats were
+          messaged and whether the webhook was posted, with whether each one succeeded. Use <Mono>Test</Mono> on an
+          alert to evaluate it once without firing.
         </P>
       </Section>
     );

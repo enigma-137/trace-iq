@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AlertsService } from '../src/modules/alerts/alerts.service';
 import { affected, mockDatabase, rows, type MockDb } from './helpers/mock-db';
 
+// Chat delivery is covered in alerts-chat.test.ts; these tests don't use it.
+const noChat = { listForProject: vi.fn(async () => []), idsInProject: vi.fn(async () => []), send: vi.fn(async () => []) };
+
 type AlertRow = {
   [column: string]: unknown;
   id: string;
@@ -78,7 +81,7 @@ function makeService(metricValues: number[]): Harness {
     projects as never,
     groups as never,
     email as never,
-    entitlements as never
+    entitlements as never, noChat as never
   );
   return { db, email, groups, entitlements, service };
 }
@@ -185,7 +188,7 @@ describe('AlertsService.evaluateAlert (persist + notify)', () => {
     const groups = { resolveMembers: vi.fn().mockResolvedValue([]) };
     const projects = { resolveActiveProject: vi.fn(), requireActiveProject: vi.fn() };
     const entitlements = { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) };
-    const service = new AlertsService(db as never, projects as never, groups as never, email as never, entitlements as never);
+    const service = new AlertsService(db as never, projects as never, groups as never, email as never, entitlements as never, noChat as never);
 
     await service.evaluateAlert(makeAlert(), { persist: true, notify: true });
 
@@ -211,7 +214,7 @@ describe('AlertsService.evaluateAlert (persist + notify)', () => {
     const groups = { resolveMembers: vi.fn().mockResolvedValue(['pager@b.co', 'ops@b.co']) };
     const projects = { resolveActiveProject: vi.fn(), requireActiveProject: vi.fn() };
     const entitlements = { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) };
-    const service = new AlertsService(db as never, projects as never, groups as never, email as never, entitlements as never);
+    const service = new AlertsService(db as never, projects as never, groups as never, email as never, entitlements as never, noChat as never);
 
     const alert = makeAlert({
       email_recipients: ['ops@b.co'],
@@ -260,7 +263,7 @@ describe('AlertsService Cloud feature gates', () => {
       { requireWritableProject: vi.fn().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1' }) } as never,
       { resolveMembers: vi.fn().mockResolvedValue([]) } as never,
       { send: vi.fn() } as never,
-      entitlements as never
+      entitlements as never, noChat as never
     );
 
     await expect(service.create({ id: 'usr_1' } as never, {
@@ -278,7 +281,7 @@ describe('AlertsService Cloud feature gates', () => {
         { requireWritableProject: vi.fn().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1' }) } as never,
         { resolveMembers: vi.fn().mockResolvedValue([]) } as never,
         { send: vi.fn() } as never,
-        { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) } as never
+        { assertAlertsAvailable: vi.fn().mockResolvedValue(undefined) } as never, noChat as never
       );
     const base = { projectId: 'proj_1', name: 'Signups', eventName: 'signup', measure: 'count', condition: 'above', threshold: 10 };
 
@@ -301,7 +304,7 @@ describe('AlertsService Cloud feature gates', () => {
       projects as never,
       { resolveMembers: vi.fn().mockResolvedValue([]) } as never,
       { send: vi.fn() } as never,
-      entitlements as never
+      entitlements as never, noChat as never
     );
 
     await expect(service.create({ id: 'usr_1' } as never, {
@@ -326,7 +329,7 @@ describe('AlertsService Cloud feature gates', () => {
       {} as never,
       { resolveMembers: vi.fn() } as never,
       email as never,
-      entitlements as never
+      entitlements as never, noChat as never
     );
 
     await (service as unknown as { evaluateDueAlerts(): Promise<void> }).evaluateDueAlerts();

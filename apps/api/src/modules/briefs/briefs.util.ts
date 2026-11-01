@@ -220,3 +220,24 @@ export function buildSlackBriefMessage(input: BriefInput): string {
   }
   return lines.join('\n');
 }
+
+export interface ChatAlert {
+  name: string;
+  message: string;
+  alertUrl: string;
+}
+
+/** An alert that fired, as a Telegram message (HTML parse mode). */
+export function buildTelegramAlertMessage(alert: ChatAlert): string {
+  return [
+    `<b>Alert: ${escapeHtml(alert.name)}</b>`,
+    escapeHtml(alert.message),
+    '',
+    `<a href="${escapeHtml(alert.alertUrl)}">Open in TraceIQ</a>`
+  ].join('\n');
+}
+
+/** The same alert in Slack mrkdwn. */
+export function buildSlackAlertMessage(alert: ChatAlert): string {
+  return [`*Alert: ${escapeSlack(alert.name)}*`, escapeSlack(alert.message), '', `<${alert.alertUrl}|Open in TraceIQ>`].join('\n');
+}

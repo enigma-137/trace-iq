@@ -6,12 +6,11 @@ import { InsightsModule } from '../insights/insights.module';
 import { BriefsController } from './briefs.controller';
 import { BriefsScheduler } from './briefs.scheduler';
 import { BriefsService } from './briefs.service';
-import { SlackClient } from './slack.client';
-import { TelegramClient } from './telegram.client';
+import { ChatDeliveryModule } from './chat-delivery.module';
 
 @Module({
-  imports: [AuthModule, ProjectsModule, InsightsModule, BillingModule],
+  imports: [AuthModule, ProjectsModule, InsightsModule, BillingModule, ChatDeliveryModule],
   controllers: [BriefsController],
-  providers: [BriefsService, BriefsScheduler, TelegramClient, SlackClient]
+  providers: [BriefsService, BriefsScheduler]
 })
 export class BriefsModule {}
