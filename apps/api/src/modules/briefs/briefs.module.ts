@@ -5,11 +5,12 @@ import { InsightsModule } from '../insights/insights.module';
 import { BriefsController } from './briefs.controller';
 import { BriefsScheduler } from './briefs.scheduler';
 import { BriefsService } from './briefs.service';
+import { SlackClient } from './slack.client';
 import { TelegramClient } from './telegram.client';
 
 @Module({
   imports: [AuthModule, ProjectsModule, InsightsModule],
   controllers: [BriefsController],
-  providers: [BriefsService, BriefsScheduler, TelegramClient]
+  providers: [BriefsService, BriefsScheduler, TelegramClient, SlackClient]
 })
 export class BriefsModule {}

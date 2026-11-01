@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Query, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  Query,
+  Redirect,
+  UnauthorizedException
+} from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 import { AuthService } from '../auth/auth.service';
 import { BriefChannelPatch, BriefsService } from './briefs.service';
@@ -17,6 +30,27 @@ export class BriefsController {
     private readonly authService: AuthService,
     private readonly briefs: BriefsService
   ) {}
+
+  @Get('dashboard/briefs')
+  async overview(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'analytics:read');
+    return this.briefs.getOverview(user, projectId);
+  }
+
+  @Post('dashboard/briefs/slack/link')
+  async slackLink(@Body() body: { projectId?: string; timezone?: unknown }, @Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'analytics:write');
+    return this.briefs.createSlackLink(user, body?.projectId, body?.timezone);
+  }
+
+  /** Slack sends the browser here after the person picks a channel; we send it on to the dashboard. */
+  @Get('integrations/slack/callback')
+  @Redirect()
+  async slackCallback(@Query('code') code?: string, @Query('state') state?: string, @Query('error') error?: string) {
+    return { url: await this.briefs.finishSlackInstall({ code, state, error }), statusCode: 302 };
+  }
 
   @Get('dashboard/briefs/telegram')
   async telegram(@Headers('authorization') authorization?: string, @Query('projectId') projectId?: string) {
