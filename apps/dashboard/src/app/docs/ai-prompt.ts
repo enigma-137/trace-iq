@@ -145,7 +145,8 @@ traceiq = Client(
       'Install the client and create a `Client` with your project id and write key.',
       'Keep the write key in an environment variable on the server.',
       'Call `capture(...)` for events and `identify(...)` to associate a user profile.',
-      'Call `shutdown()` before a short-lived process exits so buffered events flush.'
+      'Call `shutdown()` before a short-lived process exits so buffered events flush.',
+      'Optional: time every request with `traceiq.middleware` (`DjangoMiddleware`, `WSGIMiddleware` for Flask, or `ASGIMiddleware` for FastAPI) so API performance shows server response times.'
     ],
     featureSnippets: {
       'event-tracking': `traceiq.capture(
@@ -156,7 +157,13 @@ traceiq = Client(
       'user-identity': `traceiq.identify(
     user_id="user_123",
     traits={"kyc_tier": 2, "email": "a@b.com"},
-)`
+)`,
+      'api-performance': `# Django: settings.py
+TRACEIQ_CLIENT = traceiq  # the Client created above
+MIDDLEWARE = ["traceiq.middleware.DjangoMiddleware", ...]
+
+# Flask: app.wsgi_app = WSGIMiddleware(app.wsgi_app, traceiq)
+# FastAPI: app.add_middleware(ASGIMiddleware, client=traceiq)`
     },
     docs: [
       { label: 'Python SDK', href: '/docs?page=python' },
