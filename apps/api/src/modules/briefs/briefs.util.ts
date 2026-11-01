@@ -103,16 +103,45 @@ export function suggestAction(facts: TodayStoryFacts, revenue: BriefRevenue | nu
       return `${revenue.failed} of ${attempts} payments failed in the last 24 hours. Check the failure reasons and your payment provider.`;
     }
   }
-  if (facts.deltaPct !== null && facts.eventsYesterday >= 20) {
+  // A percentage means little on a small base: 3 events falling to 1 is "down 67%". Below this
+  // many events the day before, the brief reports the numbers and keeps quiet about trends.
+  if (facts.deltaPct !== null && facts.eventsYesterday >= MIN_BASELINE_EVENTS) {
+    const counts = `${facts.eventsToday.toLocaleString('en')} events vs ${facts.eventsYesterday.toLocaleString('en')} the day before`;
     if (facts.deltaPct <= -25) {
-      return `Activity is down ${Math.abs(facts.deltaPct)}%. Check Errors and anything you shipped recently.`;
+      return `Activity is down ${Math.abs(facts.deltaPct)}% (${counts}). Check Errors and anything you shipped recently.`;
     }
     if (facts.deltaPct >= 50) {
       const where = facts.topCountry ? `, ${facts.topCountry.pct}% from ${facts.topCountry.name}` : '';
-      return `Activity is up ${facts.deltaPct}%${where}. Find out where it came from.`;
+      return `Activity is up ${facts.deltaPct}%${where} (${counts}). Find out where it came from.`;
     }
   }
   return null;
+}
+
+export const MIN_BASELINE_EVENTS = 50;
+
+const NUMBER_WORDS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'
+];
+
+/** True when the text already states this number, as digits ("1,320" or "1320") or a word up to twenty. */
+export function mentionsNumber(text: string, value: number): boolean {
+  const digits = [value.toLocaleString('en'), String(value)];
+  if (digits.some((form) => new RegExp(`(?<![\\d,.])${form.replace(/[.,]/g, '\\$&')}(?![\\d])`).test(text))) return true;
+  const word = NUMBER_WORDS[value];
+  return word !== undefined && new RegExp(`\\b${word}\\b`, 'i').test(text);
+}
+
+/**
+ * The "N events · N visitors" line, without repeating what the narrative already says.
+ * Returns null when the narrative covers both numbers.
+ */
+export function statsLine(narrative: string, facts: TodayStoryFacts): string | null {
+  const parts: string[] = [];
+  if (!mentionsNumber(narrative, facts.eventsToday)) parts.push(`${facts.eventsToday.toLocaleString('en')} events`);
+  if (!mentionsNumber(narrative, facts.uniquesToday)) parts.push(`${facts.uniquesToday.toLocaleString('en')} visitors`);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /** The Telegram message (HTML parse mode). Kept short: it's read on a phone. */
@@ -120,14 +149,15 @@ export function buildBriefMessage(input: BriefInput): string {
   const { facts, revenue } = input;
   const lines: string[] = [`<b>${escapeHtml(input.projectName)}</b> · your daily brief`, '', escapeHtml(input.narrative)];
 
-  const stats = [`${facts.eventsToday.toLocaleString('en')} events`, `${facts.uniquesToday.toLocaleString('en')} visitors`];
-  lines.push('', stats.join(' · '));
-
+  const summary: string[] = [];
+  const stats = statsLine(input.narrative, facts);
+  if (stats) summary.push(stats);
   if (revenue) {
     const paid = `${revenue.transactions.toLocaleString('en')} paid`;
     const failed = revenue.failed > 0 ? ` · ${revenue.failed.toLocaleString('en')} failed` : '';
-    lines.push(`Revenue: ${escapeHtml(formatMoney(revenue.total, revenue.currency))} · ${paid}${failed}`);
+    summary.push(`Revenue: ${escapeHtml(formatMoney(revenue.total, revenue.currency))} · ${paid}${failed}`);
   }
+  if (summary.length > 0) lines.push('', ...summary);
 
   const action = suggestAction(facts, revenue);
   if (action) lines.push('', `<b>Look at this:</b> ${escapeHtml(action)}`);
@@ -145,12 +175,14 @@ export function buildSlackBriefMessage(input: BriefInput): string {
   const { facts, revenue } = input;
   const lines: string[] = [`*${escapeSlack(input.projectName)}* · your daily brief`, '', escapeSlack(input.narrative)];
 
-  lines.push('', `${facts.eventsToday.toLocaleString('en')} events · ${facts.uniquesToday.toLocaleString('en')} visitors`);
-
+  const summary: string[] = [];
+  const stats = statsLine(input.narrative, facts);
+  if (stats) summary.push(stats);
   if (revenue) {
     const failed = revenue.failed > 0 ? ` · ${revenue.failed.toLocaleString('en')} failed` : '';
-    lines.push(`Revenue: ${escapeSlack(formatMoney(revenue.total, revenue.currency))} · ${revenue.transactions.toLocaleString('en')} paid${failed}`);
+    summary.push(`Revenue: ${escapeSlack(formatMoney(revenue.total, revenue.currency))} · ${revenue.transactions.toLocaleString('en')} paid${failed}`);
   }
+  if (summary.length > 0) lines.push('', ...summary);
 
   const action = suggestAction(facts, revenue);
   if (action) lines.push('', `*Look at this:* ${escapeSlack(action)}`);
