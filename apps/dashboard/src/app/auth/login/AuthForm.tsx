@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { AuthBrandPanel } from '../AuthBrandPanel';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { safeRedirectPath } from '@/lib/utils';
@@ -344,71 +345,23 @@ export function AuthForm() {
   }
 
   const inputClass =
-    'h-11 rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-950 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:placeholder:text-neutral-600 dark:focus:border-white dark:focus:ring-white/10';
+    'h-11 rounded-lg border border-[#d4e2f2] bg-white px-3 text-sm text-[#101715] outline-none transition placeholder:text-neutral-400 focus:border-[#245beb] focus:ring-2 focus:ring-[#245beb]/20';
 
   return (
-    <main className="grid min-h-screen bg-white text-neutral-950 dark:bg-black dark:text-neutral-50 lg:grid-cols-2">
-      {/* Brand panel — fills the space, hidden on small screens */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-neutral-200 bg-white p-12 text-neutral-950 dark:border-transparent dark:bg-neutral-950 dark:text-white lg:flex">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.14] dark:hidden"
-          style={{
-            backgroundImage: 'radial-gradient(rgba(0,0,0,0.9) 1px, transparent 1px)',
-            backgroundSize: '22px 22px'
-          }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 hidden opacity-[0.14] dark:block"
-          style={{
-            backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)',
-            backgroundSize: '22px 22px'
-          }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-neutral-900/5 blur-3xl dark:bg-white/5"
-        />
-        <Link className="relative inline-flex" href="/" aria-label="TraceIQ home">
-          <img className="h-9 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
-          <img className="hidden h-9 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
-        </Link>
-
-        <div className="relative max-w-md">
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Product analytics built for how your users actually behave.
-          </h2>
-          <p className="mt-4 text-sm leading-7 text-neutral-500 dark:text-neutral-400">
-            Trends, funnels, retention, revenue, and error tracking — in one fast, self-hostable dashboard.
-          </p>
-          <ul className="mt-8 grid gap-3 text-sm text-neutral-700 dark:text-neutral-300">
-            {['Revenue & GTV as a first-class metric', 'Funnels with per-step drop-off', 'SDKs for web, server & mobile'].map(
-              (item) => (
-                <li key={item} className="flex items-center gap-2.5">
-                  <span aria-hidden className="text-neutral-900 dark:text-white">✓</span>
-                  {item}
-                </li>
-              )
-            )}
-          </ul>
-        </div>
-
-        <p className="relative font-mono text-xs text-neutral-400 dark:text-neutral-500">TraceIQ · product analytics</p>
-      </aside>
+    <main style={{ colorScheme: "light" }} className="grid min-h-screen bg-white text-[#101715] lg:grid-cols-2">
+      <AuthBrandPanel />
 
       {/* Form panel */}
       <div className="flex items-center justify-center px-5 py-10 sm:px-8">
         <section className="w-full max-w-sm" aria-labelledby="auth-title">
           <Link className="mb-8 inline-flex lg:hidden" href="/" aria-label="TraceIQ home">
-            <img className="h-8 w-auto dark:hidden" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
-            <img className="hidden h-8 w-auto dark:block" src="/brand/logo-white-no-bg.png" alt="TraceIQ" />
+            <img className="h-8 w-auto" src="/brand/logo-black-no-bg.png" alt="TraceIQ" />
           </Link>
 
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400 dark:text-neutral-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b44008]">
             Dashboard access
           </p>
-          <h1 id="auth-title" className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+          <h1 id="auth-title" className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
             {stage === 'credentials'
               ? mode === 'signin'
                 ? 'Welcome back'
@@ -417,7 +370,7 @@ export function AuthForm() {
                 ? 'Two-factor authentication'
                 : 'Secure your account'}
           </h1>
-          <p className="mt-2 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2 text-sm leading-6 text-[#64706e]">
             {stage === 'credentials'
               ? mode === 'signin'
                 ? 'Sign in to your TraceIQ dashboard.'
@@ -430,7 +383,7 @@ export function AuthForm() {
           {stage === 'credentials' ? (
             <>
               <div
-                className="mt-7 grid grid-cols-2 gap-1 rounded-lg border border-neutral-200 bg-neutral-100 p-1 dark:border-neutral-800 dark:bg-neutral-900"
+                className="mt-7 grid grid-cols-2 gap-1 rounded-lg border border-[#d4e2f2] bg-[#f8fbfd] p-1"
                 role="tablist"
                 aria-label="Authentication mode"
               >
@@ -442,8 +395,8 @@ export function AuthForm() {
                     aria-selected={mode === value}
                     className={`min-h-9 rounded-md text-sm font-semibold transition ${
                       mode === value
-                        ? 'bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white'
-                        : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'
+                        ? 'bg-white text-[#245beb] shadow-sm ring-1 ring-[#d4e2f2]'
+                        : 'text-[#64706e] hover:text-neutral-900'
                     }`}
                     onClick={() => setMode(value)}
                   >
@@ -454,7 +407,7 @@ export function AuthForm() {
 
               <form className="mt-7 grid gap-4" onSubmit={handleSubmit}>
                 <div className="grid gap-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="email">
+                  <label className="text-xs font-semibold uppercase tracking-[0.06em] text-[#64706e]" htmlFor="email">
                     Email
                   </label>
                   <input
@@ -472,13 +425,13 @@ export function AuthForm() {
 
                 <div className="grid gap-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="password">
+                    <label className="text-xs font-semibold uppercase tracking-[0.06em] text-[#64706e]" htmlFor="password">
                       Password
                     </label>
                     {mode === 'signin' ? (
                       <Link
                         href="/auth/forgot-password"
-                        className="text-xs text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline dark:text-neutral-400 dark:hover:text-white"
+                        className="text-xs text-[#64706e] underline-offset-4 hover:text-[#245beb] hover:underline"
                       >
                         Forgot password?
                       </Link>
@@ -496,12 +449,12 @@ export function AuthForm() {
                     required
                   />
                   {mode === 'signup' ? (
-                    <p className="text-xs text-neutral-400 dark:text-neutral-500">At least 6 characters.</p>
+                    <p className="text-xs text-neutral-400">At least 6 characters.</p>
                   ) : null}
                 </div>
 
                 <button
-                  className="mt-2 min-h-11 rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                  className="mt-2 min-h-11 rounded-lg bg-[#245beb] px-4 text-sm font-semibold text-white shadow-sm shadow-[#245beb]/25 transition hover:bg-[#1247ce] disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting || missingConfig}
                 >
@@ -510,26 +463,26 @@ export function AuthForm() {
               </form>
 
               <div className="mt-6 flex items-center gap-3" aria-hidden>
-                <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
-                <span className="text-xs font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                <span className="h-px flex-1 bg-neutral-200" />
+                <span className="text-xs font-medium uppercase tracking-wider text-neutral-400">
                   or
                 </span>
-                <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+                <span className="h-px flex-1 bg-neutral-200" />
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-2.5">
                 <button
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#d4e2f2] bg-white text-sm font-semibold text-neutral-800 transition hover:bg-[#e5f3ff] disabled:cursor-not-allowed disabled:opacity-60"
                   type="button"
                   disabled={isSubmitting || missingConfig}
                   onClick={() => void handleOAuth('github')}
                 >
-                  <GitHubIcon className="size-[18px] shrink-0 text-neutral-900 dark:text-white" />
+                  <GitHubIcon className="size-[18px] shrink-0 text-neutral-900" />
                   {oauthProvider === 'github' ? 'Opening GitHub…' : 'GitHub'}
                 </button>
 
                 <button
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#d4e2f2] bg-white text-sm font-semibold text-neutral-800 transition hover:bg-[#e5f3ff] disabled:cursor-not-allowed disabled:opacity-60"
                   type="button"
                   disabled={isSubmitting || missingConfig}
                   onClick={() => void handleOAuth('gitlab')}
@@ -543,19 +496,19 @@ export function AuthForm() {
                 <p
                   className={`mt-5 rounded-lg border px-3 py-2.5 text-sm ${
                     status.tone === 'error'
-                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-                      : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
+                      ? 'border-red-300 bg-red-50 text-red-700'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800'
                   }`}
                 >
                   {status.message}
                 </p>
               ) : null}
 
-              <p className="mt-6 text-sm text-neutral-500 dark:text-neutral-400">
+              <p className="mt-6 text-sm text-[#64706e]">
                 {mode === 'signin' ? 'New to TraceIQ? ' : 'Already have an account? '}
                 <button
                   type="button"
-                  className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white"
+                  className="font-semibold text-[#245beb] underline-offset-4 hover:underline"
                   onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
                 >
                   {mode === 'signin' ? 'Create an account' : 'Sign in'}
@@ -564,27 +517,27 @@ export function AuthForm() {
             </>
           ) : stage === 'setup-prompt' ? (
             <div className="mt-7 grid gap-4">
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/70 dark:bg-amber-950/20">
-                <div className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="m10.3 3.9-8.2 14a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0Z" />
                     <path d="M12 9v4M12 17h.01" />
                   </svg>
                   Recommended, not required
                 </div>
-                <p className="mt-2 text-sm leading-6 text-amber-800 dark:text-amber-200/80">
+                <p className="mt-2 text-sm leading-6 text-amber-800">
                   Two-factor authentication adds a one-time code from your authenticator app to sign-in. We recommend it
                   to keep your account and projects secure.
                 </p>
               </div>
               <Link
-                className="mt-1 grid min-h-11 place-items-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                className="mt-1 grid min-h-11 place-items-center rounded-lg bg-[#245beb] px-4 text-sm font-semibold text-white shadow-sm shadow-[#245beb]/25 transition hover:bg-[#1247ce]"
                 href="/dashboard/settings/2fa"
               >
                 Set up 2FA now
               </Link>
               <button
-                className="min-h-11 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                className="min-h-11 rounded-lg border border-[#d4e2f2] bg-white px-4 text-sm font-semibold text-neutral-700 transition hover:bg-[#e5f3ff]"
                 type="button"
                 onClick={() => {
                   router.push(effectiveNext);
@@ -597,7 +550,7 @@ export function AuthForm() {
           ) : (
             <form className="mt-7 grid gap-4" onSubmit={handleMfaSubmit}>
               <div className="grid gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500 dark:text-neutral-400" htmlFor="mfaCode">
+                <label className="text-xs font-semibold uppercase tracking-[0.06em] text-[#64706e]" htmlFor="mfaCode">
                   Authenticator code
                 </label>
                 <input
@@ -620,7 +573,7 @@ export function AuthForm() {
               </div>
 
               <button
-                className="mt-2 min-h-11 rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                className="mt-2 min-h-11 rounded-lg bg-[#245beb] px-4 text-sm font-semibold text-white shadow-sm shadow-[#245beb]/25 transition hover:bg-[#1247ce] disabled:cursor-not-allowed disabled:opacity-60"
                 type="submit"
                 disabled={isSubmitting}
               >
@@ -628,7 +581,7 @@ export function AuthForm() {
               </button>
 
               <button
-                className="min-h-11 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-900"
+                className="min-h-11 rounded-lg border border-[#d4e2f2] px-4 text-sm font-semibold text-neutral-700 transition hover:bg-[#e5f3ff] disabled:cursor-not-allowed disabled:opacity-60"
                 type="button"
                 onClick={() => void restartSignIn()}
                 disabled={isSubmitting}
@@ -640,8 +593,8 @@ export function AuthForm() {
                 <p
                   className={`mt-5 rounded-lg border px-3 py-2.5 text-sm ${
                     status.tone === 'error'
-                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
-                      : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
+                      ? 'border-red-300 bg-red-50 text-red-700'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800'
                   }`}
                 >
                   {status.message}
