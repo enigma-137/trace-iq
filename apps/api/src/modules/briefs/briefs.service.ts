@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnav
 import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
+import { EntitlementService } from '../billing/entitlement.service';
 import { InsightsService } from '../insights/insights.service';
 import { ProjectsService } from '../projects/projects.service';
 import { loadRevenueSettings, queryRevenueTotals, revenueActive } from '../revenue/revenue.util';
@@ -9,8 +10,10 @@ import {
   DEFAULT_SEND_HOUR,
   DEFAULT_TIMEZONE,
   LINK_CODE_TTL_MS,
+  BriefCadence,
   BriefRevenue,
   BriefInput,
+  briefWindowDays,
   buildBriefMessage,
   buildSlackBriefMessage,
   escapeHtml,
@@ -66,8 +69,36 @@ export class BriefsService {
     private readonly projects: ProjectsService,
     private readonly insights: InsightsService,
     private readonly telegram: TelegramClient,
-    private readonly slack: SlackClient
+    private readonly slack: SlackClient,
+    private readonly entitlements: EntitlementService
   ) {}
+
+  private readonly cadenceCache = new Map<string, { cadence: BriefCadence; expiresAt: number }>();
+
+  /**
+   * Daily on Pro (and self-hosted), weekly on Free. When the plan can't be read the brief
+   * stays daily: a lookup problem should never quietly downgrade someone who is paying.
+   * Cached for ten minutes so the per-minute scheduler doesn't query billing every tick.
+   */
+  async cadenceFor(projectId: string): Promise<BriefCadence> {
+    const cached = this.cadenceCache.get(projectId);
+    if (cached && cached.expiresAt > Date.now()) return cached.cadence;
+    try {
+      const owner = await this.database.query<{ organizationId: string }>(
+        `SELECT organization_id AS "organizationId" FROM projects WHERE id = $1`,
+        [projectId]
+      );
+      const organizationId = owner.rows[0]?.organizationId;
+      if (!organizationId) return 'daily';
+      const snapshot = await this.entitlements.getSnapshot(organizationId);
+      const cadence: BriefCadence = snapshot.plan === 'free' ? 'weekly' : 'daily';
+      this.cadenceCache.set(projectId, { cadence, expiresAt: Date.now() + 10 * 60_000 });
+      return cadence;
+    } catch (error) {
+      this.logger.warn(`Could not read the plan for ${projectId}, sending daily: ${error instanceof Error ? error.message : 'unknown error'}`);
+      return 'daily';
+    }
+  }
 
   /** Every destination for a project, with which services this server has set up. */
   async getOverview(user: DashboardUser, projectId?: string) {
@@ -83,6 +114,8 @@ export class BriefsService {
         botUsername: this.telegram.isConfigured ? this.telegram.botUsername : null
       },
       slack: { configured: this.slack.isConfigured },
+      // 'weekly' on the Free plan (Mondays, last 7 days); 'daily' on Pro.
+      cadence: await this.cadenceFor(project.id),
       channels: channels.rows
     };
   }
@@ -303,7 +336,10 @@ export class BriefsService {
     for (const channel of channels.rows) {
       // Telegram needs the bot token on this server; a Slack channel carries its own webhook.
       if (channel.kind === 'telegram' && !this.telegram.isConfigured) continue;
-      const { due, localDate } = isBriefDue(channel, now);
+      // Cheap check first (hour reached, not sent today); only then look up the plan.
+      if (!isBriefDue(channel, now).due) continue;
+      const cadence = await this.cadenceFor(channel.projectId);
+      const { due, localDate } = isBriefDue(channel, now, cadence);
       if (!due) continue;
 
       // Claim the day first, so a second replica (or a slow send) can't send it twice.
@@ -355,9 +391,11 @@ export class BriefsService {
     );
     const channel = saved.rows[0];
 
+    const weekly = (await this.cadenceFor(link.projectId)) === 'weekly';
+    const when = `${weekly ? 'every Monday' : 'every day'} at ${String(channel.sendHour).padStart(2, '0')}:00 (${escapeHtml(channel.timezone)})`;
     await this.telegram.sendMessage(
       chatId,
-      `Connected to <b>${escapeHtml(projectName)}</b>. You'll get a short brief here every day at ${String(channel.sendHour).padStart(2, '0')}:00 (${escapeHtml(channel.timezone)}). Change the time in TraceIQ → Alerts → Daily brief.\n\nSend /brief any time for one now, or /stop to pause.`
+      `Connected to <b>${escapeHtml(projectName)}</b>. You'll get a short ${weekly ? 'weekly ' : ''}brief here ${when}.${weekly ? ' The Free plan sends it weekly; Pro sends it every day.' : ''} Change the time in TraceIQ → Alerts → Daily brief.\n\nSend /brief any time for one now, or /stop to pause.`
     );
     // A first brief right away, so the person sees what they signed up for.
     await this.sendBrief(channel, { force: true });
@@ -395,15 +433,18 @@ export class BriefsService {
     );
     if (!project.rows[0]) return { ok: false, status: 404, description: 'Project no longer exists.', permanent: true };
 
-    const { facts, narrative } = await this.insights.getProjectStory(project.rows[0]);
+    const cadence = await this.cadenceFor(channel.projectId);
+    const { facts, narrative } = await this.insights.getProjectStory(project.rows[0], briefWindowDays(cadence));
     if (!options.force && isQuietDay(facts)) return 'quiet';
 
     const input: BriefInput = {
       projectName: project.rows[0].name,
       narrative,
       facts,
-      revenue: await this.revenueFor(channel.projectId),
-      dashboardUrl: `${dashboardUrl()}/dashboard`
+      revenue: await this.revenueFor(channel.projectId, cadence === 'weekly' ? '7 days' : '1 day'),
+      dashboardUrl: `${dashboardUrl()}/dashboard`,
+      cadence,
+      upgradeUrl: `${dashboardUrl()}/dashboard/settings/billing`
     };
 
     if (channel.kind === 'slack') {
@@ -418,11 +459,11 @@ export class BriefsService {
     return this.telegram.sendMessage(channel.chatId, buildBriefMessage(input));
   }
 
-  private async revenueFor(projectId: string): Promise<BriefRevenue | null> {
+  private async revenueFor(projectId: string, interval: '1 day' | '7 days'): Promise<BriefRevenue | null> {
     try {
       const settings = await loadRevenueSettings(this.database, projectId);
       if (!revenueActive(settings)) return null;
-      const totals = await queryRevenueTotals(this.database, projectId, settings, '1 day');
+      const totals = await queryRevenueTotals(this.database, projectId, settings, interval);
       return { total: totals.total, transactions: totals.transactions, failed: totals.failed, currency: settings.currency };
     } catch {
       // The brief is still worth sending without its revenue line.
