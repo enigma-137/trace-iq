@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import SentIcon from '@hugeicons/core-free-icons/SentIcon';
-import SlackIcon from '@hugeicons/core-free-icons/SlackIcon';
+import { SlackLogo, TelegramLogo } from '@/components/BrandLogos';
 import { Skeleton } from '@/components/Skeleton';
 import {
   Notice,
@@ -292,7 +291,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
         ) : null}
 
         <SettingsCard
-          icon={SentIcon}
+          iconNode={<TelegramLogo size={20} />}
           title={
             <span className="flex flex-wrap items-center gap-2">
               Telegram
@@ -328,7 +327,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
         </SettingsCard>
 
         <SettingsCard
-          icon={SlackIcon}
+          iconNode={<SlackLogo size={20} />}
           title={
             <span className="flex flex-wrap items-center gap-2">
               Slack
