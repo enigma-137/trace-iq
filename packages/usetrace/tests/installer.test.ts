@@ -83,6 +83,9 @@ describe('useTrace Installer and Idempotency', () => {
     const layoutSecondTime = await fs.readFile(path.join(tempDir, 'app', 'layout.tsx'), 'utf8');
     const matches = layoutSecondTime.match(/TraceIQProvider/g);
     expect(matches?.length).toBe(3); // 1 for import + 1 for opening tag + 1 for closing tag
+    // The function signature must survive, and the provider must wrap the JSX child.
+    expect(layoutSecondTime).toContain('RootLayout({ children }: { children: React.ReactNode })');
+    expect(layoutSecondTime).toContain('<body><TraceIQProvider>{children}</TraceIQProvider></body>');
     expect(secondChanges.createdFiles).toHaveLength(0); // No duplicate files created
   });
 

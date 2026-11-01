@@ -3,6 +3,7 @@ import path from 'node:path';
 import { FrameworkAdapter, InstallOptions } from './adapter.interface.js';
 import { SetupChanges, SetupState } from '../types.js';
 import { inspectProjectCsp, patchProjectCsp } from './csp.js';
+import { repairDamagedParameter, wrapJsxChildren } from './layout.js';
 import {
   applyEnvVariables,
   detectExistingEnvCredentials,
@@ -302,7 +303,8 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
     ]);
 
     if (appLayoutPath) {
-      const layoutContent = await fs.readFile(appLayoutPath, 'utf8');
+      const originalLayout = await fs.readFile(appLayoutPath, 'utf8');
+      const layoutContent = repairDamagedParameter(originalLayout);
       const hasProviderMounted = /<TraceIQProvider[\s>]/.test(layoutContent);
       if (!hasProviderMounted) {
         let updatedLayout = layoutContent;
@@ -314,17 +316,18 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Wrap children with <TraceIQProvider>
-        if (/\{\s*children\s*\}/.test(updatedLayout)) {
-          updatedLayout = updatedLayout.replace(/\{\s*children\s*\}/, '<TraceIQProvider>{children}</TraceIQProvider>');
+        const wrappedChildren = wrapJsxChildren(updatedLayout);
+        if (wrappedChildren !== null) {
+          updatedLayout = wrappedChildren;
         } else if (/<Component\s+\{\.\.\.pageProps\}\s*\/>/.test(updatedLayout)) {
           updatedLayout = updatedLayout.replace(
             /<Component\s+\{\.\.\.pageProps\}\s*\/>/,
             '<TraceIQProvider><Component {...pageProps} /></TraceIQProvider>'
           );
-        } else if (updatedLayout.includes('<body>')) {
+        } else if (/<body[\s>]/.test(updatedLayout)) {
           updatedLayout = updatedLayout.replace(
-            /<body>([\s\S]*?)<\/body>/,
-            '<body><TraceIQProvider>$1</TraceIQProvider></body>'
+            /(<body[^>]*>)([\s\S]*?)(<\/body>)/,
+            '$1<TraceIQProvider>$2</TraceIQProvider>$3'
           );
         }
 
