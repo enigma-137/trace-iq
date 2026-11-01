@@ -761,3 +761,215 @@
     border-bottom: 0;
   }
 }
+
+/* ---------- Alerts + daily brief demo ---------- */
+.alertBody {
+  min-height: 450px;
+}
+.alertPanel {
+  margin-top: 20px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.alertStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.statusWatching,
+.statusFiring,
+.statusReady {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+  font: 500 10px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.statusWatching i,
+.statusFiring i,
+.statusReady i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.statusWatching {
+  background: var(--sky);
+  color: var(--blue-hover);
+}
+.statusFiring {
+  background: var(--orange-paper);
+  color: var(--orange-ink);
+}
+.statusReady {
+  background: var(--green-paper);
+  color: var(--ink);
+}
+.alertValue {
+  font: 600 22px/1 var(--mono);
+  letter-spacing: -0.5px;
+}
+.alertChart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 12px;
+  overflow: visible;
+}
+.thresholdLine {
+  stroke: var(--orange);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.thresholdLabel {
+  font: 500 6px var(--mono);
+  fill: var(--orange-ink);
+}
+.lineSteady,
+.lineFiring {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.lineSteady {
+  stroke: var(--blue);
+}
+.lineFiring {
+  stroke: var(--orange);
+}
+.briefStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.briefStats > div {
+  padding: 9px 10px;
+  background: var(--panel);
+  border-left: 2px solid var(--blue);
+}
+.briefStats span {
+  display: block;
+  font: 500 9px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.briefStats strong {
+  display: block;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+}
+.briefStatIdle {
+  opacity: 0.55;
+}
+.deliveries {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  min-height: 150px;
+  align-content: start;
+}
+.delivery {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--sky);
+}
+.deliveryLogo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+}
+.mailLogo {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  background: var(--ink);
+  color: var(--paper);
+}
+.deliveryText {
+  min-width: 0;
+}
+.deliveryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font: 11px/1.4 var(--mono);
+  color: var(--muted);
+}
+.deliveryHead strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.deliveryHead time {
+  margin-left: auto;
+}
+.deliveryTitle {
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+}
+.deliveryBody {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lineSteady {
+    animation: draw 900ms ease-out both;
+  }
+  .lineFiring {
+    animation: draw 800ms ease-out both;
+  }
+  .statusFiring i {
+    animation: ping 1.2s ease-out infinite;
+  }
+}
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes ping {
+  0% {
+    box-shadow: 0 0 0 0 rgb(238 128 52 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 7px rgb(238 128 52 / 0);
+  }
+}
+
+@media (max-width: 600px) {
+  .alertBody {
+    min-height: 520px;
+  }
+  .alertValue {
+    font-size: 19px;
+  }
+  .briefStats strong {
+    font-size: 15px;
+  }
+}

@@ -44,6 +44,7 @@ export function SettingsSection({
 
 export function SettingsCard({
   icon,
+  iconNode,
   title,
   description,
   actions,
@@ -53,6 +54,8 @@ export function SettingsCard({
   children
 }: {
   icon?: IconSvgElement;
+  /** A ready-made icon, such as a brand logo, shown instead of `icon`. */
+  iconNode?: ReactNode;
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
@@ -71,7 +74,9 @@ export function SettingsCard({
       {title ? (
         <div className={`flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center ${children ? `border-b ${divider}` : ''}`}>
           <div className="flex min-w-0 items-start gap-3">
-            {icon ? (
+            {iconNode ? (
+              <span className="mt-0.5 shrink-0">{iconNode}</span>
+            ) : icon ? (
               <HugeiconsIcon
                 icon={icon}
                 size={18}

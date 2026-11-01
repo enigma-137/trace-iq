@@ -1,6 +1,7 @@
 "use client";
 
 import { LandingAiSection } from "@/components/landing/LandingAiSection";
+import { LandingAlertsSection } from "@/components/landing/LandingAlertsSection";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingProductOverview } from "@/components/landing/LandingProductOverview";
 import { LandingSignalPath } from "@/components/landing/LandingSignalPath";
@@ -28,6 +29,7 @@ export default function Page() {
       <LandingHero />
       <LandingProductOverview />
       <LandingSignalPath />
+      <LandingAlertsSection />
       <LandingAiSection />
       <section
         className={`${styles.frame} ${styles.setup}`}
