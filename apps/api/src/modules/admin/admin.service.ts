@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { ACTIVATION_WEEKS, ActivationOrgRow, AdminActivation, buildActivation } from './activation.util';
 
 export interface AdminOverview {
   [column: string]: unknown;
@@ -176,6 +177,32 @@ const TIMELINE_SQL = `
   ORDER BY date_trunc('day', received_at) ASC
 `;
 
+// One row per workspace created in the activation window, with when its first and latest
+// event arrived. First/last come from the (project_id, received_at) index, one row each,
+// so this never scans a workspace's whole event history.
+const ACTIVATION_SQL = `
+  SELECT
+    o.id,
+    o.name,
+    o.created_at AS "createdAt",
+    (SELECT COUNT(*)::int FROM projects p WHERE p.organization_id = o.id) AS "projectCount",
+    fe.first_at AS "firstEventAt",
+    fe.last_at AS "lastEventAt"
+  FROM organizations o
+  LEFT JOIN LATERAL (
+    SELECT MIN(pe.first_at) AS first_at, MAX(pe.last_at) AS last_at
+    FROM projects p
+    CROSS JOIN LATERAL (
+      SELECT
+        (SELECT e.received_at FROM events e WHERE e.project_id = p.id ORDER BY e.received_at ASC LIMIT 1) AS first_at,
+        (SELECT e.received_at FROM events e WHERE e.project_id = p.id ORDER BY e.received_at DESC LIMIT 1) AS last_at
+    ) pe
+    WHERE p.organization_id = o.id
+  ) fe ON true
+  WHERE o.created_at >= now() - ($1::int * interval '1 week')
+  ORDER BY o.created_at DESC
+`;
+
 @Injectable()
 export class AdminService {
   constructor(private readonly database: DatabaseService) {}
@@ -203,6 +230,13 @@ export class AdminService {
   async logs(): Promise<AdminLogEntry[]> {
     const result = await this.database.query<AdminLogEntry>(LOGS_SQL);
     return result.rows;
+  }
+
+  /** Signup → project → first event → still sending a week later, by weekly signup cohort. */
+  async activation(): Promise<AdminActivation> {
+    // One extra week of rows so a workspace created early in the oldest week isn't cut off.
+    const result = await this.database.query<ActivationOrgRow>(ACTIVATION_SQL, [ACTIVATION_WEEKS + 1]);
+    return buildActivation(result.rows);
   }
 
   async timeline(): Promise<AdminTimelinePoint[]> {

@@ -51,8 +51,26 @@ export interface AdminTimelinePoint {
   total: number;
 }
 
+export interface AdminActivationWeek {
+  /** Monday of the signup week, UTC (YYYY-MM-DD). */
+  weekStart: string;
+  signedUp: number;
+  createdProject: number;
+  sentEvent: number;
+  eligibleForReturn: number;
+  returned: number;
+}
+
+export interface AdminActivation {
+  weeks: AdminActivationWeek[];
+  totals: Omit<AdminActivationWeek, 'weekStart'>;
+  medianHoursToFirstEvent: number | null;
+  stalled: Array<{ id: string; name: string; createdAt: string; stage: 'no_project' | 'no_events' }>;
+}
+
 export interface AdminAccess {
   isAdmin: boolean;
+  activation?: AdminActivation | null;
   overview?: AdminOverview;
   organizations?: AdminOrganization[];
   projects?: AdminProject[];
@@ -69,12 +87,14 @@ export interface AdminAccess {
 export async function requireAdminAccess(nextPath = '/admin'): Promise<AdminAccess> {
   const { token } = await requireDashboardSession(nextPath);
 
-  const [overview, organizations, projects, logs, timeline] = await Promise.all([
+  const [overview, organizations, projects, logs, timeline, activation] = await Promise.all([
     dashboardGet<AdminOverview>('/v1/admin/overview', token),
     dashboardGet<AdminOrganization[]>('/v1/admin/organizations', token),
     dashboardGet<AdminProject[]>('/v1/admin/projects', token),
     dashboardGet<AdminLogEntry[]>('/v1/admin/logs', token),
-    dashboardGet<AdminTimelinePoint[]>('/v1/admin/timeline', token)
+    dashboardGet<AdminTimelinePoint[]>('/v1/admin/timeline', token),
+    // Newer than the other admin endpoints: an API that predates it just hides the section.
+    dashboardGet<AdminActivation>('/v1/admin/activation', token)
   ]);
 
   if (!overview.data) {
@@ -87,7 +107,8 @@ export async function requireAdminAccess(nextPath = '/admin'): Promise<AdminAcce
     organizations: organizations.data ?? [],
     projects: projects.data ?? [],
     logs: logs.data ?? [],
-    timeline: timeline.data ?? []
+    timeline: timeline.data ?? [],
+    activation: activation.data ?? null
   };
 }
 
