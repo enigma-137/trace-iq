@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
       }
       const needsStepUp = aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
       if (needsStepUp) {
-        return NextResponse.redirect(`${origin}/auth/login?next=${encodeURIComponent(next)}`);
+        // `mfa=1` tells the login page this sign-in just happened, so it asks for the code
+        // instead of discarding the unverified session.
+        return NextResponse.redirect(`${origin}/auth/login?next=${encodeURIComponent(next)}&mfa=1`);
       }
       const response = NextResponse.redirect(`${origin}${next}`);
       // Sign-in with GitHub/GitLab finished: leave a short-lived marker so the next page can

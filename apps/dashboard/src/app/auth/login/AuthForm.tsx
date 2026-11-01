@@ -25,6 +25,7 @@ export function AuthForm() {
   const pendingInvite = useMemo(() => peekPendingInvite(), []);
   const effectiveNext = pendingInvite ? `/invite/${encodeURIComponent(pendingInvite)}` : nextPath;
   const missingConfig = searchParams.get('missingConfig') === '1';
+  const resumeMfa = searchParams.get('mfa') === '1';
   const [mode, setMode] = useState<AuthMode>(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
   const [stage, setStage] = useState<AuthStage>('credentials');
   const [email, setEmail] = useState('');
@@ -87,6 +88,15 @@ export function AuthForm() {
           return;
         }
         if (!data.session) return;
+        // A password sign-in that stopped at the 2FA code is still stored in the browser.
+        // Coming back to this page starts over at email and password, rather than
+        // trapping someone without their code on the code screen. GitHub/GitLab sign-ins
+        // arrive here mid-flow (`mfa=1`) and continue to the code.
+        if (!resumeMfa && (await needsMfaChallenge())) {
+          await supabase.auth.signOut({ scope: 'local' });
+          return;
+        }
+        if (cancelled) return;
         await decideNextStep(true);
       } catch (error) {
         if (!cancelled) {
@@ -201,6 +211,28 @@ export function AuthForm() {
     if (successMessage) setPendingSuccessMessage(successMessage);
     setMfaFactorId(factor.id);
     setStage('mfa-challenge');
+  }
+
+  async function needsMfaChallenge() {
+    if (!supabase) return false;
+    const { data: aal, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    return !error && aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2';
+  }
+
+  /** Drops the half-finished sign-in so another account (or the same one) can start over. */
+  async function restartSignIn() {
+    if (supabase) await supabase.auth.signOut({ scope: 'local' });
+    setMfaCode('');
+    setMfaFactorId(null);
+    setPassword('');
+    setStatus(null);
+    setStage('credentials');
+    if (resumeMfa) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('mfa');
+      const query = params.toString();
+      router.replace(query ? `/auth/login?${query}` : '/auth/login');
+    }
   }
 
   function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
@@ -593,6 +625,15 @@ export function AuthForm() {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Verifying…' : 'Verify and continue'}
+              </button>
+
+              <button
+                className="min-h-11 rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-900"
+                type="button"
+                onClick={() => void restartSignIn()}
+                disabled={isSubmitting}
+              >
+                Back to sign in
               </button>
 
               {status ? (
