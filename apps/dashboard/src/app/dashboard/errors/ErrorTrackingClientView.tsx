@@ -23,6 +23,7 @@ import {
 import { AddCurrentViewToDashboardButton } from '@/components/dashboards/AddCurrentViewToDashboardButton';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
+import { buildErrorFixPrompt } from '@/lib/error-fix-prompt';
 import { toast } from '@/lib/toast';
 import { BrandIcon } from '@/components/icons/BrandIcon';
 import { EmptyState } from '@/components/EmptyState';
@@ -208,6 +209,7 @@ export function ErrorTrackingClientView({
   const [severityFilter, setSeverityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
   const [activeTab, setActiveTab] = useState<'overview' | 'stack' | 'occurrences' | 'replay'>('overview');
   const [copied, setCopied] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [showMinifiedStack, setShowMinifiedStack] = useState(false);
   // Workflow state returned by the last PATCH, so the buttons update without waiting on router.refresh().
   const [savedState, setSavedState] = useState<Record<string, { status: IssueStatus; assigneeUserId: string | null }>>({});
@@ -320,6 +322,39 @@ export function ErrorTrackingClientView({
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // A ready-to-paste brief for a coding assistant, from what was captured for this issue.
+  const copyFixPrompt = async () => {
+    if (!activeIssue) return;
+    const detail = detailMatches ? activeDetail : null;
+    const prompt = buildErrorFixPrompt({
+      type: activeIssue.type,
+      message: activeIssue.message,
+      occurrences: detail?.totals.occurrences ?? activeIssue.occurrences,
+      users: detail?.totals.users ?? activeIssue.users,
+      sessions: detail?.totals.sessions ?? activeIssue.sessions,
+      firstSeen: detail?.totals.firstSeen ?? activeIssue.firstSeen,
+      lastSeen: detail?.totals.lastSeen ?? activeIssue.lastSeen,
+      firstRelease,
+      lastRelease,
+      regressedInRelease,
+      // The original source when source maps matched, whichever stack is on screen.
+      stack: detail ? (latestSymbolicated?.stack ?? latestSample?.stack ?? null) : null,
+      stackIsSourceMapped: Boolean(detail && latestSymbolicated),
+      sourceContext: detail ? (latestSymbolicated?.context ?? null) : null,
+      pages: detail?.pages?.map((page) => page.name),
+      browsers: detail?.browsers.map((browser) => browser.name),
+      issueUrl: `${window.location.origin}/dashboard/errors?issue=${encodeURIComponent(activeIssue.id)}`
+    });
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2500);
+      toast.success('Paste it into Claude Code, Cursor or Codex, in this app’s repository.', { title: 'Fix prompt copied' });
+    } catch {
+      toast.error('Your browser blocked copying. Allow clipboard access and try again.');
+    }
   };
 
   return (
@@ -728,6 +763,15 @@ export function ErrorTrackingClientView({
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                         {copied ? 'Copied' : 'Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyFixPrompt()}
+                        title="Copies the error, stack and source with instructions, to paste into Claude Code, Cursor or Codex"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
+                      >
+                        {copiedPrompt ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        {copiedPrompt ? 'Copied' : 'Copy fix prompt'}
                       </button>
                     </div>
                   </div>
