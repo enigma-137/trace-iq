@@ -5,6 +5,7 @@ import { BarChart } from '@/components/charts/BarChart';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { RankedList } from '@/components/charts/RankedList';
 import { AdminActivityFeed } from './AdminActivityFeed';
+import { AdminActivationSection } from './AdminActivation';
 
 export const metadata = { title: 'Admin · TraceIQ' };
 
@@ -67,6 +68,8 @@ export default async function AdminPage() {
           <StatTile label="Events (24h)" value={overview.events24h} hint={`${overview.eventsTotal.toLocaleString()} all time`} tone="green" />
           <StatTile label="Tracked users" value={overview.trackedUsers} hint={`${totalMembers} workspace members`} tone="blue" />
         </section>
+
+        {access.activation ? <AdminActivationSection activation={access.activation} /> : null}
 
         {/* Charts row */}
         <section className="mb-5 grid gap-3 lg:grid-cols-[1.6fr_1fr]">
