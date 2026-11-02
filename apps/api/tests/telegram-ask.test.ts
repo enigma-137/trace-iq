@@ -55,7 +55,7 @@ describe('askFailureMessage', () => {
   });
 
   it('says plainly when Ask is not set up, when the account lost access, and for anything else', () => {
-    expect(askFailureMessage(new ServiceUnavailableException('gateway down'), 'u')).toContain('busy or temporarily unavailable');
+    expect(askFailureMessage(new ServiceUnavailableException('gateway down'), 'u')).toContain('Give me a minute, then ask again');
     expect(askFailureMessage(new ForbiddenException('nope'), 'u')).toContain('Reconnect');
     expect(askFailureMessage(new Error('boom: secret detail'), 'u')).toBe('Something went wrong while looking into that. Try again in a moment.');
   });
@@ -206,6 +206,37 @@ describe('asking a question in Telegram', () => {
     const last = telegram.sendMessage.mock.calls.at(-1)![1] as string;
     expect(last).toContain("this month's Ask TraceIQ allowance");
     expect(last).toContain('/dashboard/settings/billing');
+  });
+
+  it('retries once when the AI gateway refuses, and answers if the second try works', async () => {
+    vi.useFakeTimers();
+    try {
+      ask.ask.mockRejectedValueOnce(new ServiceUnavailableException('gateway down'));
+      const { service, chatId } = setup();
+      await service.handleTelegramUpdate({ update_id: 5, message: { text: 'how many visitors?', chat: { id: chatId, type: 'private' } } });
+      await vi.advanceTimersByTimeAsync(4_100);
+      await service.waitForAsks();
+      expect(ask.ask).toHaveBeenCalledTimes(2);
+      expect(ask.ask.mock.calls[1][1].idempotencyKey).toBe(`telegram:${chatId}:5:retry`);
+      expect(telegram.sendMessage.mock.calls.at(-1)![1]).toBe('<b>Signups</b> are flat.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks the person to try again in a minute if the retry fails too', async () => {
+    vi.useFakeTimers();
+    try {
+      ask.ask.mockRejectedValue(new ServiceUnavailableException('gateway down'));
+      const { service, chatId } = setup();
+      await service.handleTelegramUpdate({ message: { text: 'q', chat: { id: chatId, type: 'private' } } });
+      await vi.advanceTimersByTimeAsync(4_100);
+      await service.waitForAsks();
+      expect(ask.ask).toHaveBeenCalledTimes(2);
+      expect(telegram.sendMessage.mock.calls.at(-1)![1]).toContain('Give me a minute, then ask again');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never shows a raw error, and frees the chat for the next question', async () => {

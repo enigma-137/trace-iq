@@ -93,6 +93,8 @@ describe('overview period comparison', () => {
     expect(result.totals.events).toBe(120);
     expect(result.previousTotals).toMatchObject({ events: 80, sessions: 24, users: 7, visitors: 40 });
     expect(result.totals.visitors).toBe(55);
+    // The previous window's event count must actually be selected, or it reads as 0.
+    expect(totals).toContain('counts.previous_events');
     expect(totals).toContain('count(DISTINCT COALESCE(user_id::text, anonymous_id))');
   });
 
