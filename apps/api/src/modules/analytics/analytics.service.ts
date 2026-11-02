@@ -343,6 +343,7 @@ export class AnalyticsService {
       `
         SELECT
           counts.total_events,
+          counts.previous_events,
           counts.events_24h,
           counts.events_1h,
           counts.total_visitors,
