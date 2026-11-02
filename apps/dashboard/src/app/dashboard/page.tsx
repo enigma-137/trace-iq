@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
+import UserGroupIcon from '@hugeicons/core-free-icons/UserGroupIcon';
 import UserMultiple02Icon from '@hugeicons/core-free-icons/UserMultiple02Icon';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import DashboardSpeed01Icon from '@hugeicons/core-free-icons/DashboardSpeed01Icon';
@@ -117,11 +118,12 @@ interface OverviewResponse {
   project: { id: string; name: string; organizationName: string } | null;
   /** Window the API applied. Older APIs omit it and use fixed 14/30-day windows. */
   range?: OverviewRange;
-  totals: { events: number; events24h: number; events1h: number; users: number; sessions: number };
+  totals: { events: number; events24h: number; events1h: number; users: number; sessions: number; visitors?: number };
   /** Counts for the window before `range`. Older APIs omit it. */
   previousTotals?: {
     events: number;
     sessions: number;
+    visitors?: number;
     /** Fields below arrived later; an API from before them omits them. */
     users?: number;
     apiRequests?: number;
@@ -362,7 +364,7 @@ export default async function DashboardPage({
 
         {/* 5 KPI Metric Cards, plus Revenue when set up (Dynamic values only, '-' or 0 fallback) */}
         <section
-          className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 ${showRevenue ? '2xl:grid-cols-6' : 'xl:grid-cols-5'}`}
+          className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 ${showRevenue ? '2xl:grid-cols-4' : '2xl:grid-cols-6'}`}
         >
           <OverviewMetricCard
             icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
@@ -422,6 +424,23 @@ export default async function DashboardPage({
             sparklineData={failedSparkline}
             comparison={compare(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, pct, { invert: true })}
           />
+
+          <Link href={withProjectId('/dashboard/web', canonicalProjectId)} className="block rounded-2xl transition-opacity hover:opacity-95">
+            <OverviewMetricCard
+              icon={<HugeiconsIcon icon={UserGroupIcon} size={16} strokeWidth={1.8} />}
+              title="Visitors"
+              value={overview?.totals.visitors ?? 0}
+              {...(changeDelta(overview?.totals.visitors, previousTotals?.visitors) ?? {
+                delta: overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : 'from web analytics',
+                deltaTone: 'neutral' as const,
+                deltaDirection: 'up' as const
+              })}
+              deltaSubtext={changeDelta(overview?.totals.visitors, previousTotals?.visitors) ? `vs previous ${appliedRange?.long ?? ''}` : undefined}
+              color="blue"
+              comparison={compare(overview?.totals.visitors, previousTotals?.visitors, count)}
+              comparisonAlign="right"
+            />
+          </Link>
 
           <OverviewMetricCard
             icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}

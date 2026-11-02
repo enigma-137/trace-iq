@@ -79,7 +79,7 @@ describe('overview period comparison', () => {
   it('counts the window before the selected range in the same scan', async () => {
     const { db, service } = setup((sql) =>
       sql.includes('AS total_events')
-        ? rows([{ total_events: 120, previous_events: 80, events_24h: 20, events_1h: 2, total_users: 9, previous_users: 7, total_sessions: 30, previous_sessions: 24, last_event_at: null }])
+        ? rows([{ total_events: 120, previous_events: 80, events_24h: 20, events_1h: 2, total_users: 9, previous_users: 7, total_visitors: 55, previous_visitors: 40, total_sessions: 30, previous_sessions: 24, last_event_at: null }])
         : undefined
     );
 
@@ -91,7 +91,9 @@ describe('overview period comparison', () => {
     expect(totals).toContain("started_at >= now() - interval '7 days' * 2 AND started_at < now() - interval '7 days'");
     expect(totals).toContain("first_seen_at < now() - interval '7 days')::int AS previous_users");
     expect(result.totals.events).toBe(120);
-    expect(result.previousTotals).toMatchObject({ events: 80, sessions: 24, users: 7 });
+    expect(result.previousTotals).toMatchObject({ events: 80, sessions: 24, users: 7, visitors: 40 });
+    expect(result.totals.visitors).toBe(55);
+    expect(totals).toContain('count(DISTINCT COALESCE(user_id::text, anonymous_id))');
   });
 
   it('measures the previous window\'s API requests, failures and p95 on the same latency source', async () => {
