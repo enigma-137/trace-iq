@@ -662,11 +662,68 @@ export class EventsService {
       };
     }
 
-    const events = await this.queryRecentEvents(project.id as string, safeLimit);
+    const [events, summary] = await Promise.all([
+      this.queryRecentEvents(project.id as string, safeLimit),
+      this.queryEventsSummary(project.id as string)
+    ]);
 
     return {
       project,
-      events
+      events,
+      summary
+    };
+  }
+
+  /**
+   * Totals for the Events page cards and charts. They cover the last 7 days of the whole
+   * project, so they are not capped by how many rows the list below loads.
+   */
+  private async queryEventsSummary(projectId: string) {
+    const actor = 'COALESCE(u.external_id, e.user_id::text, e.anonymous_id)';
+    const base = `FROM events e LEFT JOIN users u ON u.id = e.user_id WHERE e.project_id = $1 AND e.occurred_at >= now() - interval '7 days'`;
+    const [totals, topEvents, hours, devices, topUsers] = await Promise.all([
+      this.database.query<{ total: number; types: number; users: number; last24h: number }>(
+        `SELECT count(*)::int AS total,
+                count(DISTINCT e.event_name)::int AS types,
+                count(DISTINCT COALESCE(e.user_id::text, e.anonymous_id))::int AS users,
+                count(*) FILTER (WHERE e.occurred_at >= now() - interval '24 hours')::int AS "last24h"
+         ${base}`,
+        [projectId]
+      ),
+      this.database.query<{ label: string; value: number }>(
+        `SELECT e.event_name AS label, count(*)::int AS value ${base} GROUP BY 1 ORDER BY value DESC LIMIT 8`,
+        [projectId]
+      ),
+      this.database.query<{ hour: number; value: number }>(
+        `SELECT extract(hour FROM e.occurred_at AT TIME ZONE 'UTC')::int AS hour, count(*)::int AS value
+         ${base} AND e.occurred_at >= now() - interval '24 hours' GROUP BY 1`,
+        [projectId]
+      ),
+      this.database.query<{ label: string; value: number }>(
+        `SELECT COALESCE(NULLIF(e.device_info->>'deviceType', ''), NULLIF(e.device_info->>'browser', ''), 'unknown') AS label,
+                count(*)::int AS value
+         ${base} GROUP BY 1 ORDER BY value DESC LIMIT 7`,
+        [projectId]
+      ),
+      this.database.query<{ label: string; total: number }>(
+        `SELECT ${actor} AS label, count(*)::int AS total ${base} AND ${actor} IS NOT NULL GROUP BY 1 ORDER BY total DESC LIMIT 6`,
+        [projectId]
+      )
+    ]);
+
+    const hourCounts = new Array<number>(24).fill(0);
+    for (const row of hours.rows) hourCounts[row.hour] = row.value;
+    const row = totals.rows[0];
+    return {
+      windowDays: 7,
+      total: row?.total ?? 0,
+      eventTypes: row?.types ?? 0,
+      users: row?.users ?? 0,
+      last24h: row?.last24h ?? 0,
+      topEvents: topEvents.rows,
+      hourCounts,
+      devices: devices.rows,
+      topUsers: topUsers.rows
     };
   }
 

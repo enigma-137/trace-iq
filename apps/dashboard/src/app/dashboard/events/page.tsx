@@ -22,6 +22,20 @@ interface DashboardProject {
 interface RecentEventsResponse {
   project: DashboardProject | null;
   events: RecentEvent[];
+  /** Totals over the project's last 7 days, not just the rows loaded. Older APIs omit it. */
+  summary?: EventsSummary;
+}
+
+interface EventsSummary {
+  windowDays: number;
+  total: number;
+  eventTypes: number;
+  users: number;
+  last24h: number;
+  topEvents: Array<{ label: string; value: number }>;
+  hourCounts: number[];
+  devices: Array<{ label: string; value: number }>;
+  topUsers: Array<{ label: string; total: number }>;
 }
 
 export default async function DashboardEventsPage() {
@@ -30,7 +44,7 @@ export default async function DashboardEventsPage() {
 
   const project = data?.project ?? null;
   const events = data?.events ?? [];
-  const overview = buildOverview(events);
+  const overview = data?.summary ? overviewFromSummary(data.summary) : buildOverview(events);
 
   return (
     <DashboardShell active="events" title="Events" userEmail={user.email}>
@@ -83,16 +97,16 @@ export default async function DashboardEventsPage() {
       {project && events.length > 0 ? (
         <section className="mb-3 grid gap-3">
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile label="Events" value={events.length} hint="Loaded" delta="recent">
+            <StatTile label="Events" value={overview.events} hint={overview.windowLabel} delta="total">
               <MiniBars values={overview.hourCounts} tone="blue" />
             </StatTile>
-            <StatTile label="Event types" value={overview.eventTypes.length} hint="Unique names" delta="kinds">
+            <StatTile label="Event types" value={overview.eventTypeCount} hint="Unique names" delta="kinds">
               <MiniBars values={overview.typeCounts} tone="green" />
             </StatTile>
             <StatTile label="Users" value={overview.users} hint="Identified + anonymous" delta="people">
               <MiniBars values={overview.userCounts} tone="green" />
             </StatTile>
-            <StatTile label="Last 24h" value={overview.last24h} hint="Of these events" delta={overview.last24h > 0 ? 'Live' : 'Idle'} tone={overview.last24h > 0 ? 'green' : 'red'}>
+            <StatTile label="Last 24h" value={overview.last24h} hint={overview.windowLabel === 'Loaded' ? 'Of these events' : 'Events in the day'} delta={overview.last24h > 0 ? 'Live' : 'Idle'} tone={overview.last24h > 0 ? 'green' : 'red'}>
               <MiniBars values={overview.hourCounts.slice(-12)} tone={overview.last24h > 0 ? 'green' : 'red'} />
             </StatTile>
           </section>
@@ -119,7 +133,7 @@ export default async function DashboardEventsPage() {
               </p>
               <DonutChart
                 items={overview.devices}
-                centerValue={String(events.length)}
+                centerValue={String(overview.deviceTotal)}
                 centerLabel="events"
                 emptyLabel="No device info captured yet."
               />
@@ -145,6 +159,24 @@ export default async function DashboardEventsPage() {
       ) : null}
     </DashboardShell>
   );
+}
+
+function overviewFromSummary(summary: EventsSummary) {
+  return {
+    eventTypeCount: summary.eventTypes,
+    typeCounts: summary.topEvents.map((item) => item.value),
+    hourCounts: summary.hourCounts,
+    userCounts: summary.topUsers.map((item) => item.total),
+    topEvents: summary.topEvents,
+    devices: summary.devices,
+    topUsers: summary.topUsers,
+    events: summary.total,
+    users: summary.users,
+    last24h: summary.last24h,
+    deviceTotal: summary.devices.reduce((sum, item) => sum + item.value, 0),
+    windowLabel: `Last ${summary.windowDays} days`,
+    hourBuckets: summary.hourCounts.map((value, hour) => ({ label: `${hour}:00`, value }))
+  };
 }
 
 function buildOverview(events: RecentEvent[]) {
@@ -183,7 +215,7 @@ function buildOverview(events: RecentEvent[]) {
   }).length;
 
   return {
-    eventTypes: Array.from(typeCounts.keys()),
+    eventTypeCount: typeCounts.size,
     typeCounts: [...typeCounts.values()],
     hourCounts,
     userCounts: [...userCounts.values()],
@@ -192,6 +224,8 @@ function buildOverview(events: RecentEvent[]) {
     topUsers,
     events: events.length,
     users: userCounts.size,
+    deviceTotal: events.length,
+    windowLabel: 'Loaded',
     last24h,
     hourBuckets: hourCounts.map((value, hour) => ({ label: `${hour}:00`, value }))
   };
