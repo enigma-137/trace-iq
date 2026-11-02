@@ -258,6 +258,67 @@ describe('CencoriProvider', () => {
     ).rejects.toThrow(ServiceUnavailableException);
   });
 
+  function providerWith(create: ReturnType<typeof vi.fn>) {
+    const provider = new CencoriProvider();
+    (provider as any).client = { chat: { completions: { create } } };
+    (provider as any).initializedKey = 'csk_test_key';
+    return provider;
+  }
+  const chatOptions = { model: 'gemini-2.5-flash', messages: [{ role: 'user' as const, content: 'hi' }] };
+  const okResponse = { choices: [{ message: { content: 'hello' }, finish_reason: 'stop' }], model: 'gemini-2.5-flash-lite' };
+
+  it('asks once on a different model when the requested one keeps failing', async () => {
+    vi.useFakeTimers();
+    try {
+      const create = vi.fn().mockRejectedValueOnce({ statusCode: 500, message: '' }).mockRejectedValueOnce({ statusCode: 500, message: '' }).mockResolvedValueOnce(okResponse);
+      const promise = providerWith(create).chat(chatOptions);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const result = await promise;
+      expect(result.content).toBe('hello');
+      expect(create.mock.calls.map((call) => call[0].model)).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses TRACEIQ_AI_FALLBACK_MODEL when set, and never falls back to the model that just failed', async () => {
+    vi.useFakeTimers();
+    try {
+      process.env.TRACEIQ_AI_FALLBACK_MODEL = 'gemini-2.5-pro';
+      const create = vi.fn().mockRejectedValue({ statusCode: 500, message: '' });
+      const first = providerWith(create).chat(chatOptions);
+      const settled = expect(first).rejects.toThrow(ServiceUnavailableException);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await settled;
+      expect(create.mock.calls.map((call) => call[0].model)).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-pro']);
+
+      process.env.TRACEIQ_AI_FALLBACK_MODEL = 'gemini-2.5-flash';
+      create.mockClear();
+      const second = providerWith(create).chat(chatOptions);
+      const settledAgain = expect(second).rejects.toThrow(ServiceUnavailableException);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await settledAgain;
+      expect(create.mock.calls[2][0].model).toBe('gemini-2.5-flash-lite');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not try a fallback when the model is missing', async () => {
+    const create = vi.fn();
+    await expect(providerWith(create).chat({ ...chatOptions, model: 'unknown' })).rejects.toThrow(ServiceUnavailableException);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('describes a gateway error without headers or keys, even when the message is empty', async () => {
+    const { describeGatewayError } = await import('../src/modules/ai/providers/cencori.provider');
+    expect(describeGatewayError({ message: '' })).toBe('message=(empty)');
+    const text = describeGatewayError({ name: 'CencoriError', code: 'upstream_error', message: 'boom', details: { provider: 'openai' }, headers: { authorization: 'Bearer secret' } });
+    expect(text).toContain('code=upstream_error');
+    expect(text).toContain('details={"provider":"openai"}');
+    expect(text).not.toContain('secret');
+  });
+
   it('classifies missing model correctly', async () => {
     const { classifyCencoriError } = await import('../src/modules/ai/providers/cencori.provider');
     const result = classifyCencoriError(new Error('fail'), '');
