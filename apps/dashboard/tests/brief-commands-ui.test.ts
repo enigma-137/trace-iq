@@ -10,4 +10,9 @@ describe('Daily brief page', () => {
     }
     expect(panel).toContain('choose daily, weekly, monthly or all time');
   });
+
+  it('says questions can be typed in a private chat', () => {
+    expect(panel).toContain('/ask');
+    expect(panel).toContain('private chat');
+  });
 });

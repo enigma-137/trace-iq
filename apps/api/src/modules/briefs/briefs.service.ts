@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
+import { AskService } from '../ai/ask/ask.service';
 import { EntitlementService } from '../billing/entitlement.service';
 import { InsightsService } from '../insights/insights.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -28,6 +29,7 @@ import {
   newLinkCode
 } from './briefs.util';
 import { SlackClient } from './slack.client';
+import { MAX_QUESTION_LENGTH, askFailureMessage, clipAnswer, markdownToTelegramHtml } from './telegram-ask.util';
 import { TelegramClient, TelegramSendResult } from './telegram.client';
 
 export interface BriefChannel {
@@ -42,6 +44,8 @@ export interface BriefChannel {
   timezone: string;
   lastSentOn: string | null;
   lastError: string | null;
+  /** Who connected the chat; only selected where a chat's questions need an account to run as. */
+  createdByUserId?: string | null;
 }
 
 export interface BriefChannelPatch {
@@ -51,6 +55,7 @@ export interface BriefChannelPatch {
 }
 
 interface TelegramUpdate {
+  update_id?: unknown;
   message?: {
     text?: unknown;
     chat?: { id?: unknown; type?: unknown; title?: unknown; first_name?: unknown; username?: unknown };
@@ -65,6 +70,12 @@ interface TelegramUpdate {
 
 /** Minimum gap between on-demand briefs in one chat. All-time and monthly ones read a lot of events. */
 const ON_DEMAND_COOLDOWN_MS = 8_000;
+
+/** One question at a time per chat, a few a minute, and a follow-up keeps its thread for half an hour. */
+const ASK_MAX_PER_MINUTE = 6;
+const ASK_THREAD_TTL_MS = 30 * 60_000;
+const ASK_THREAD_MAX_ENTRIES = 500;
+const TYPING_REFRESH_MS = 4_500;
 
 const PERIOD_BUTTONS: Array<Array<{ text: string; callback_data: string }>> = [
   [
@@ -93,8 +104,19 @@ export class BriefsService {
     private readonly insights: InsightsService,
     private readonly telegram: TelegramClient,
     private readonly slack: SlackClient,
-    private readonly entitlements: EntitlementService
+    private readonly entitlements: EntitlementService,
+    @Optional() private readonly ask?: AskService
   ) {}
+
+  private readonly askBusy = new Set<string>();
+  private readonly askRecent = new Map<string, number[]>();
+  private readonly askThreads = new Map<string, { conversationId: string; projectId: string; expiresAt: number }>();
+  private readonly askTasks = new Set<Promise<void>>();
+
+  /** Resolves when every in-flight Ask has finished. For tests and shutdown. */
+  async waitForAsks(): Promise<void> {
+    await Promise.all([...this.askTasks]);
+  }
 
   private readonly cadenceCache = new Map<string, { cadence: BriefCadence; expiresAt: number }>();
 
@@ -330,7 +352,19 @@ export class BriefsService {
               ? chat.first_name
               : null;
 
-      const command = /^\/(\w+)(?:@\w+)?(?:\s+(\S+))?\s*$/.exec(text.trim());
+      const trimmed = text.trim();
+      const asked = /^\/ask(?:@\w+)?(?:\s+([\s\S]+))?$/i.exec(trimmed);
+      if (asked) {
+        await this.startAsk(chatId, chat.type, asked[1] ?? '', update.update_id);
+        return;
+      }
+      // In a private chat any plain message is a question. In a group it is just talk.
+      if (!trimmed.startsWith('/')) {
+        if (chat.type === 'private' && trimmed) await this.startAsk(chatId, 'private', trimmed, update.update_id);
+        return;
+      }
+
+      const command = /^\/(\w+)(?:@\w+)?(?:\s+(\S+))?\s*$/.exec(trimmed);
       if (!command) return;
       const [, name, argument] = command;
 
@@ -441,7 +475,7 @@ export class BriefsService {
   /** The project's connected Telegram channels for a chat, or null (after saying so) when there are none. */
   private async channelsForChat(chatId: string): Promise<BriefChannel[] | null> {
     const channels = await this.database.query<BriefChannel>(
-      `SELECT ${CHANNEL_COLUMNS} FROM brief_channels WHERE kind = 'telegram' AND chat_id = $1 AND enabled`,
+      `SELECT ${CHANNEL_COLUMNS}, created_by_user_id AS "createdByUserId" FROM brief_channels WHERE kind = 'telegram' AND chat_id = $1 AND enabled ORDER BY created_at DESC`,
       [chatId]
     );
     if (channels.rows.length === 0) {
@@ -513,9 +547,111 @@ export class BriefsService {
     await this.telegram.sendMessage(chatId, 'Daily briefs paused. Open TraceIQ → Alerts → Daily brief to turn them back on.');
   }
 
+  /**
+   * Checks a question can be asked in this chat, then runs it in the background: an
+   * investigation takes a while and Telegram re-sends an update that is not answered quickly.
+   */
+  private async startAsk(chatId: string, chatType: unknown, rawQuestion: string, updateId: unknown) {
+    if (chatType !== 'private') {
+      const bot = this.telegram.botUsername;
+      await this.telegram.sendMessage(
+        chatId,
+        `Questions work in a private chat with me, so answers about your project stay out of the group.${bot ? ` Message @${escapeHtml(bot)} directly.` : ''}`
+      );
+      return;
+    }
+
+    const question = rawQuestion.trim().slice(0, MAX_QUESTION_LENGTH);
+    if (!question) {
+      await this.telegram.sendMessage(
+        chatId,
+        'Ask me anything about your project, like <i>why did signups drop this week?</i> or <i>which errors are new today?</i> Just type it here.'
+      );
+      return;
+    }
+
+    const channels = await this.channelsForChat(chatId);
+    if (channels === null) return;
+    if (!this.ask) {
+      await this.telegram.sendMessage(chatId, "Ask TraceIQ isn't available on this server right now.");
+      return;
+    }
+    const channel = channels[0];
+    if (!channel.createdByUserId) {
+      await this.telegram.sendMessage(chatId, 'Reconnect this chat from TraceIQ → Alerts → Daily brief so I know whose project to read.');
+      return;
+    }
+
+    if (this.askBusy.has(chatId)) {
+      await this.telegram.sendMessage(chatId, "I'm still working on your last question. One moment.");
+      return;
+    }
+    const now = Date.now();
+    const recent = (this.askRecent.get(chatId) ?? []).filter((at) => now - at < 60_000);
+    if (recent.length >= ASK_MAX_PER_MINUTE) {
+      await this.telegram.sendMessage(chatId, "That's a lot of questions at once. Give me a minute.");
+      return;
+    }
+    this.askRecent.set(chatId, [...recent, now]);
+
+    this.askBusy.add(chatId);
+    const task: Promise<void> = this.runAsk(chatId, channel, question, updateId).finally(() => {
+      this.askBusy.delete(chatId);
+      this.askTasks.delete(task);
+    });
+    this.askTasks.add(task);
+  }
+
+  private async runAsk(chatId: string, channel: BriefChannel, question: string, updateId: unknown): Promise<void> {
+    const typing = setInterval(() => void this.telegram.sendChatAction(chatId), TYPING_REFRESH_MS);
+    void this.telegram.sendChatAction(chatId);
+    try {
+      const now = Date.now();
+      const thread = this.askThreads.get(chatId);
+      const conversationId = thread && thread.expiresAt > now && thread.projectId === channel.projectId ? thread.conversationId : undefined;
+
+      const answer = await this.ask!.ask(
+        { id: channel.createdByUserId as string, authMethod: 'local', scopes: ['analytics:read'] },
+        {
+          question,
+          projectId: channel.projectId,
+          conversationId,
+          source: 'telegram',
+          idempotencyKey: typeof updateId === 'number' ? `telegram:${chatId}:${updateId}` : undefined
+        }
+      );
+
+      this.rememberThread(chatId, channel.projectId, answer.conversationId);
+
+      const { text, clipped } = clipAnswer(answer.answer || 'I could not find anything to report on that.');
+      const html =
+        markdownToTelegramHtml(text, dashboardUrl()) +
+        (clipped ? `\n\n<a href="${dashboardUrl()}/dashboard">Open TraceIQ for the full answer</a>` : '');
+      const sent = await this.telegram.sendMessage(chatId, html);
+      // Telegram refuses markup it cannot parse; fall back to plain text rather than saying nothing.
+      if (!sent.ok && /parse|entities/i.test(sent.description ?? '')) await this.telegram.sendMessage(chatId, escapeHtml(text));
+    } catch (error) {
+      this.logger.warn(`Telegram ask failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      await this.telegram.sendMessage(chatId, askFailureMessage(error, `${dashboardUrl()}/dashboard/settings/billing`));
+    } finally {
+      clearInterval(typing);
+    }
+  }
+
+  private rememberThread(chatId: string, projectId: string, conversationId: string) {
+    const now = Date.now();
+    if (this.askThreads.size >= ASK_THREAD_MAX_ENTRIES) {
+      for (const [key, thread] of this.askThreads) if (thread.expiresAt <= now) this.askThreads.delete(key);
+      if (this.askThreads.size >= ASK_THREAD_MAX_ENTRIES) this.askThreads.clear();
+    }
+    this.askThreads.set(chatId, { conversationId, projectId, expiresAt: now + ASK_THREAD_TTL_MS });
+  }
+
   private helpText(): string {
     return [
       'I send a short brief about your TraceIQ project. To connect this chat, open TraceIQ → Alerts → Daily brief and tap Connect Telegram.',
+      '',
+      'Ask me a question in a private chat, or with /ask <question>.',
       '',
       '/brief asks which one you want',
       '/brief_daily · /brief_weekly · /brief_monthly · /brief_alltime',

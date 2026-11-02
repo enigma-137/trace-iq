@@ -6,6 +6,7 @@ const TICK_MS = 60_000;
 
 /** What the bot's "/" menu lists. Names are lowercase letters, digits and underscores, as Telegram requires. */
 export const TELEGRAM_COMMANDS = [
+  { command: 'ask', description: 'Ask a question about your project' },
   { command: 'brief', description: 'Get a brief: choose daily, weekly, monthly or all time' },
   { command: 'brief_daily', description: 'The last 24 hours' },
   { command: 'brief_weekly', description: 'The last 7 days' },
