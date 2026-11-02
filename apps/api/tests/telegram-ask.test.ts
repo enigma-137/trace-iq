@@ -55,7 +55,7 @@ describe('askFailureMessage', () => {
   });
 
   it('says plainly when Ask is not set up, when the account lost access, and for anything else', () => {
-    expect(askFailureMessage(new ServiceUnavailableException('no key'), 'u')).toContain("isn't available");
+    expect(askFailureMessage(new ServiceUnavailableException('gateway down'), 'u')).toContain('busy or temporarily unavailable');
     expect(askFailureMessage(new ForbiddenException('nope'), 'u')).toContain('Reconnect');
     expect(askFailureMessage(new Error('boom: secret detail'), 'u')).toBe('Something went wrong while looking into that. Try again in a moment.');
   });
