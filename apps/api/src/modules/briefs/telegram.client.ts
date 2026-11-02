@@ -46,6 +46,11 @@ export class TelegramClient {
   }
 
   /** Stops the button's loading spinner. Telegram wants an answer to every press, even with no text. */
+  /** Shows "typing..." in the chat for a few seconds. */
+  async sendChatAction(chatId: string, action: 'typing' = 'typing'): Promise<TelegramSendResult> {
+    return this.call('sendChatAction', { chat_id: chatId, action });
+  }
+
   async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<TelegramSendResult> {
     return this.call('answerCallbackQuery', { callback_query_id: callbackQueryId, ...(text ? { text } : {}) });
   }

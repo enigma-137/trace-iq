@@ -216,10 +216,10 @@ describe('BriefsService', () => {
     expect(telegram.sendMessage.mock.calls[0][1]).toContain('expired');
   });
 
-  it('ignores channel posts and plain text', async () => {
+  it('ignores channel posts and plain text in a group', async () => {
     const { service: s } = service(() => ({ rows: [], rowCount: 0 }));
     await s.handleTelegramUpdate({ message: { text: '/start abc', chat: { id: 1, type: 'channel' } } });
-    await s.handleTelegramUpdate({ message: { text: 'hello', chat: { id: 1, type: 'private' } } });
+    await s.handleTelegramUpdate({ message: { text: 'hello', chat: { id: 1, type: 'group' } } });
     await s.handleTelegramUpdate({});
     expect(telegram.sendMessage).not.toHaveBeenCalled();
   });

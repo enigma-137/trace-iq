@@ -380,7 +380,7 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
               On Telegram, send /brief and choose daily, weekly, monthly or all time, or go straight there with{' '}
               <code className="font-mono">/brief_daily</code>, <code className="font-mono">/brief_weekly</code>,{' '}
               <code className="font-mono">/brief_monthly</code> or <code className="font-mono">/brief_alltime</code>. <code className="font-mono">/stop</code>{' '}
-              pauses the scheduled brief. Times use your chosen timezone ({tz} is this browser&apos;s).
+              pauses the scheduled brief. In a private chat with the bot you can also just type a question, like &quot;why did signups drop this week?&quot;, or use <code className="font-mono">/ask</code>. Times use your chosen timezone ({tz} is this browser&apos;s).
             </p>
           </div>
         </SettingsCard>
