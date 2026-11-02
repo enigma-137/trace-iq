@@ -25,6 +25,18 @@ export interface ClassifiedAiError {
   isTransient: boolean;
 }
 
+/** What the gateway told us, with no headers or keys, cut short. The message alone is often empty. */
+export function describeGatewayError(err: any): string {
+  const parts = [
+    err?.name && err.name !== 'Error' ? `name=${err.name}` : '',
+    err?.code ? `code=${String(err.code)}` : '',
+    err?.message ? `message=${String(err.message)}` : 'message=(empty)',
+    err?.details ? `details=${typeof err.details === 'string' ? err.details : JSON.stringify(err.details)}` : '',
+    err?.cause?.message ? `cause=${String(err.cause.message)}` : ''
+  ].filter(Boolean);
+  return parts.join(' ').slice(0, 400);
+}
+
 export function classifyCencoriError(err: any, model?: string): ClassifiedAiError {
   if (!model || !model.trim() || model === 'unknown') {
     return {
@@ -197,8 +209,30 @@ export class CencoriProvider implements AiProvider {
     throw new ServiceUnavailableException('AI analysis is temporarily unavailable. Try again shortly.');
   }
 
+  /**
+   * The gateway sometimes answers a request with a 500 and no detail (seen on a model we
+   * never asked for), while the same request works moments later. So when the requested
+   * model fails after its own retries, ask once more on a different model.
+   */
   async chat(options: AiChatOptions): Promise<AiChatResponse> {
-    const effectiveModel = options.model?.trim() || 'gemini-2.5-flash-lite';
+    const primary = options.model?.trim() || 'gemini-2.5-flash-lite';
+    try {
+      return await this.chatOnModel(options, primary);
+    } catch (error) {
+      if (!(error instanceof ServiceUnavailableException) || primary === 'unknown') throw error;
+      const fallback = this.fallbackModel(primary);
+      this.logger.warn(`Chat on ${primary} failed; trying ${fallback} once.`);
+      return this.chatOnModel(options, fallback);
+    }
+  }
+
+  private fallbackModel(primary: string): string {
+    const configured = (process.env.TRACEIQ_AI_FALLBACK_MODEL ?? '').trim();
+    const choice = configured && configured !== 'unknown' ? configured : 'gemini-2.5-flash';
+    return choice === primary ? 'gemini-2.5-flash-lite' : choice;
+  }
+
+  private async chatOnModel(options: AiChatOptions, effectiveModel: string): Promise<AiChatResponse> {
     if (!effectiveModel || effectiveModel === 'unknown') {
       this.logger.error('[AI_ERROR:missing_model] Outbound chat payload missing valid model identifier.');
       throw new ServiceUnavailableException('Ask TraceIQ is temporarily unavailable. Try again shortly.');
@@ -206,7 +240,8 @@ export class CencoriProvider implements AiProvider {
 
     const client = this.getClient();
     const timeoutMs = options.timeoutMs ?? 25_000;
-    const maxRetries = 2;
+    // One retry on this model; a second model (see chat) is a better second chance than a third try.
+    const maxRetries = 1;
 
     let lastError: unknown = null;
     const overallStart = Date.now();
@@ -258,6 +293,8 @@ export class CencoriProvider implements AiProvider {
         }));
 
         const routedModel = response.model || effectiveModel;
+        // Makes a gateway that swaps the model visible in our own logs.
+        if (routedModel !== effectiveModel) this.logger.warn(`Cencori routed chat from ${effectiveModel} to ${routedModel}.`);
         const finishReason = choice?.finish_reason || response.finishReason || (toolCalls.length > 0 ? 'tool_calls' : 'stop');
 
         return {
@@ -275,7 +312,7 @@ export class CencoriProvider implements AiProvider {
         lastError = err;
         const classified = classifyCencoriError(err, effectiveModel);
         this.logger.warn(
-          `Cencori chat attempt ${attempt + 1}/${maxRetries + 1} failed [${classified.classification}] (status=${classified.statusCode}): ${err?.message || err}`
+          `Cencori chat attempt ${attempt + 1}/${maxRetries + 1} on ${effectiveModel} failed [${classified.classification}] (status=${classified.statusCode}): ${describeGatewayError(err)}`
         );
 
         if (!classified.isTransient || attempt === maxRetries) {
