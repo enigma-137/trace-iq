@@ -11,9 +11,12 @@ import {
   DEFAULT_TIMEZONE,
   LINK_CODE_TTL_MS,
   BriefCadence,
+  BriefPeriod,
   BriefRevenue,
   BriefInput,
-  briefWindowDays,
+  periodDays,
+  periodRevenueInterval,
+  parsePeriod,
   buildBriefMessage,
   buildSlackBriefMessage,
   escapeHtml,
@@ -52,7 +55,27 @@ interface TelegramUpdate {
     text?: unknown;
     chat?: { id?: unknown; type?: unknown; title?: unknown; first_name?: unknown; username?: unknown };
   };
+  /** A press on an inline button under one of our messages. */
+  callback_query?: {
+    id?: unknown;
+    data?: unknown;
+    message?: { chat?: { id?: unknown; type?: unknown } };
+  };
 }
+
+/** Minimum gap between on-demand briefs in one chat. All-time and monthly ones read a lot of events. */
+const ON_DEMAND_COOLDOWN_MS = 8_000;
+
+const PERIOD_BUTTONS: Array<Array<{ text: string; callback_data: string }>> = [
+  [
+    { text: 'Daily', callback_data: 'brief:daily' },
+    { text: 'Weekly', callback_data: 'brief:weekly' }
+  ],
+  [
+    { text: 'Monthly', callback_data: 'brief:monthly' },
+    { text: 'All time', callback_data: 'brief:all' }
+  ]
+];
 
 const CHANNEL_COLUMNS = `
   id, project_id AS "projectId", kind, chat_id AS "chatId", chat_name AS "chatName", enabled,
@@ -288,6 +311,10 @@ export class BriefsService {
   /** Handles one update posted by Telegram to the webhook. Never throws: Telegram retries on errors. */
   async handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
     try {
+      if (update?.callback_query) {
+        await this.handleButtonPress(update.callback_query);
+        return;
+      }
       const chat = update?.message?.chat;
       const text = update?.message?.text;
       if (!chat || typeof text !== 'string') return;
@@ -312,14 +339,22 @@ export class BriefsService {
           if (argument) await this.redeemLink(chatId, chatName, argument);
           else await this.telegram.sendMessage(chatId, this.helpText());
           return;
-        case 'brief':
-          await this.briefForChat(chatId);
+        case 'brief': {
+          // "/brief weekly" works too; with nothing, or something we don't know, ask which one.
+          const period = parsePeriod(argument);
+          if (period) await this.briefForChat(chatId, period);
+          else await this.askWhichBrief(chatId);
           return;
+        }
         case 'stop':
           await this.stopChat(chatId);
           return;
-        default:
-          await this.telegram.sendMessage(chatId, this.helpText());
+        default: {
+          // /brief_daily, /brief_weekly, /brief_monthly, /brief_alltime (also /brief_all_time).
+          const period = name.toLowerCase().startsWith('brief_') ? parsePeriod(name.slice('brief_'.length)) : null;
+          if (period) await this.briefForChat(chatId, period);
+          else await this.telegram.sendMessage(chatId, this.helpText());
+        }
       }
     } catch (error) {
       this.logger.error(`Telegram update failed: ${error instanceof Error ? error.message : 'unknown error'}`);
@@ -395,13 +430,16 @@ export class BriefsService {
     const when = `${weekly ? 'every Monday' : 'every day'} at ${String(channel.sendHour).padStart(2, '0')}:00 (${escapeHtml(channel.timezone)})`;
     await this.telegram.sendMessage(
       chatId,
-      `Connected to <b>${escapeHtml(projectName)}</b>. You'll get a short ${weekly ? 'weekly ' : ''}brief here ${when}.${weekly ? ' The Free plan sends it weekly; Pro sends it every day.' : ''} Change the time in TraceIQ → Alerts → Daily brief.\n\nSend /brief any time for one now, or /stop to pause.`
+      `Connected to <b>${escapeHtml(projectName)}</b>. You'll get a short ${weekly ? 'weekly ' : ''}brief here ${when}.${weekly ? ' The Free plan sends it weekly; Pro sends it every day.' : ''} Change the time in TraceIQ → Alerts → Daily brief.\n\nSend /brief any time and choose daily, weekly, monthly or all time. /stop pauses the scheduled brief.`
     );
     // A first brief right away, so the person sees what they signed up for.
     await this.sendBrief(channel, { force: true });
   }
 
-  private async briefForChat(chatId: string) {
+  private readonly lastOnDemand = new Map<string, number>();
+
+  /** The project's connected Telegram channels for a chat, or null (after saying so) when there are none. */
+  private async channelsForChat(chatId: string): Promise<BriefChannel[] | null> {
     const channels = await this.database.query<BriefChannel>(
       `SELECT ${CHANNEL_COLUMNS} FROM brief_channels WHERE kind = 'telegram' AND chat_id = $1 AND enabled`,
       [chatId]
@@ -411,9 +449,63 @@ export class BriefsService {
         chatId,
         'This chat is not connected to a project yet. In TraceIQ, open Alerts → Daily brief to connect it.'
       );
-      return;
+      return null;
     }
-    for (const channel of channels.rows) await this.sendBrief(channel, { force: true });
+    return channels.rows;
+  }
+
+  /** "/brief" with no period: ask which one, with buttons. */
+  private async askWhichBrief(chatId: string) {
+    if ((await this.channelsForChat(chatId)) === null) return;
+    await this.telegram.sendMessage(chatId, 'Which brief do you want?', { inlineKeyboard: PERIOD_BUTTONS });
+  }
+
+  /** True when this chat asked for a brief a moment ago. Stops a chat from hammering the heavier reports. */
+  private onCooldown(chatId: string): boolean {
+    const now = Date.now();
+    const last = this.lastOnDemand.get(chatId);
+    if (last !== undefined && now - last < ON_DEMAND_COOLDOWN_MS) return true;
+    this.lastOnDemand.set(chatId, now);
+    // Keep the map small: forget chats that have been quiet for a minute.
+    if (this.lastOnDemand.size > 500) {
+      for (const [id, at] of this.lastOnDemand) if (now - at > 60_000) this.lastOnDemand.delete(id);
+    }
+    return false;
+  }
+
+  private async briefForChat(chatId: string, period: BriefPeriod) {
+    const channels = await this.channelsForChat(chatId);
+    if (channels === null) return;
+    if (this.onCooldown(chatId)) return;
+    for (const channel of channels) {
+      // The Free plan's schedule is weekly, so a daily brief is a Pro feature. The rest are open.
+      if (period === 'daily' && (await this.cadenceFor(channel.projectId)) === 'weekly') {
+        await this.telegram.sendMessage(
+          chatId,
+          `The daily brief is on the Pro plan. Your plan includes the weekly brief: send /brief_weekly, or <a href="${escapeHtml(`${dashboardUrl()}/dashboard/settings/billing`)}">upgrade to Pro</a> for daily.`
+        );
+        continue;
+      }
+      await this.sendBrief(channel, { force: true, period });
+    }
+  }
+
+  /** A tap on one of the period buttons. Always answered, so the button stops spinning. */
+  private async handleButtonPress(query: NonNullable<TelegramUpdate['callback_query']>) {
+    const id = typeof query.id === 'string' ? query.id : '';
+    const chatId = query.message?.chat?.id !== undefined ? String(query.message.chat.id) : null;
+    const match = typeof query.data === 'string' ? /^brief:(\w+)$/.exec(query.data) : null;
+    const period = match ? parsePeriod(match[1]) : null;
+    if (id) await this.telegram.answerCallbackQuery(id, period && !this.willSendNow(chatId) ? 'One moment…' : undefined);
+    if (!chatId || !period) return;
+    await this.briefForChat(chatId, period);
+  }
+
+  /** Whether a brief for this chat would go out right now (not held back by the cooldown). */
+  private willSendNow(chatId: string | null): boolean {
+    if (!chatId) return false;
+    const last = this.lastOnDemand.get(chatId);
+    return last === undefined || Date.now() - last >= ON_DEMAND_COOLDOWN_MS;
   }
 
   private async stopChat(chatId: string) {
@@ -422,29 +514,38 @@ export class BriefsService {
   }
 
   private helpText(): string {
-    return 'I send a short daily brief about your TraceIQ project. To connect this chat, open TraceIQ → Alerts → Daily brief and tap Connect Telegram.\n\n/brief sends one now · /stop pauses them.';
+    return [
+      'I send a short brief about your TraceIQ project. To connect this chat, open TraceIQ → Alerts → Daily brief and tap Connect Telegram.',
+      '',
+      '/brief asks which one you want',
+      '/brief_daily · /brief_weekly · /brief_monthly · /brief_alltime',
+      '/stop pauses the scheduled brief'
+    ].join('\n');
   }
 
   /** Builds and sends one brief. Returns 'quiet' when there was nothing to report and `force` is off. */
-  private async sendBrief(channel: BriefChannel, options: { force: boolean }): Promise<TelegramSendResult | 'quiet'> {
+  private async sendBrief(channel: BriefChannel, options: { force: boolean; period?: BriefPeriod }): Promise<TelegramSendResult | 'quiet'> {
     const project = await this.database.query<{ id: string; name: string; organizationId: string }>(
       `SELECT id, name, organization_id AS "organizationId" FROM projects WHERE id = $1`,
       [channel.projectId]
     );
     if (!project.rows[0]) return { ok: false, status: 404, description: 'Project no longer exists.', permanent: true };
 
-    const cadence = await this.cadenceFor(channel.projectId);
-    const { facts, narrative } = await this.insights.getProjectStory(project.rows[0], briefWindowDays(cadence));
+    // What the plan sends on schedule, unless someone asked for a specific period.
+    const planCadence = await this.cadenceFor(channel.projectId);
+    const period: BriefPeriod = options.period ?? planCadence;
+    const { facts, narrative } = await this.insights.getProjectStory(project.rows[0], periodDays(period));
     if (!options.force && isQuietDay(facts)) return 'quiet';
 
     const input: BriefInput = {
       projectName: project.rows[0].name,
       narrative,
       facts,
-      revenue: await this.revenueFor(channel.projectId, cadence === 'weekly' ? '7 days' : '1 day'),
+      revenue: await this.revenueFor(channel.projectId, periodRevenueInterval(period)),
       dashboardUrl: `${dashboardUrl()}/dashboard`,
-      cadence,
-      upgradeUrl: `${dashboardUrl()}/dashboard/settings/billing`
+      cadence: period,
+      // Only the Free plan's weekly brief offers the upgrade; a Pro person asking for a weekly one doesn't.
+      upgradeUrl: planCadence === 'weekly' ? `${dashboardUrl()}/dashboard/settings/billing` : undefined
     };
 
     if (channel.kind === 'slack') {
@@ -459,7 +560,7 @@ export class BriefsService {
     return this.telegram.sendMessage(channel.chatId, buildBriefMessage(input));
   }
 
-  private async revenueFor(projectId: string, interval: '1 day' | '7 days'): Promise<BriefRevenue | null> {
+  private async revenueFor(projectId: string, interval: ReturnType<typeof periodRevenueInterval>): Promise<BriefRevenue | null> {
     try {
       const settings = await loadRevenueSettings(this.database, projectId);
       if (!revenueActive(settings)) return null;

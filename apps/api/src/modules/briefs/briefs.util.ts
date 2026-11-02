@@ -41,6 +41,42 @@ export function briefWindowDays(cadence: BriefCadence): number {
   return cadence === 'weekly' ? 7 : 1;
 }
 
+/**
+ * What a brief can cover when someone asks for one in a chat. Daily and weekly are also the
+ * two schedules; monthly and all time are only ever asked for.
+ */
+export type BriefPeriod = 'daily' | 'weekly' | 'monthly' | 'all';
+
+export const BRIEF_PERIODS: readonly BriefPeriod[] = ['daily', 'weekly', 'monthly', 'all'];
+
+/** Days a period looks back, or 'all' for everything since the first event. */
+export function periodDays(period: BriefPeriod): number | 'all' {
+  return period === 'daily' ? 1 : period === 'weekly' ? 7 : period === 'monthly' ? 30 : 'all';
+}
+
+/** The word in the brief's title: "your weekly brief", "your all-time brief". */
+export function periodLabel(period: BriefPeriod): string {
+  return period === 'all' ? 'all-time' : period;
+}
+
+/** The look-back window for the revenue query. `all` is long enough to cover any project. */
+export function periodRevenueInterval(period: BriefPeriod): '1 day' | '7 days' | '30 days' | '36500 days' {
+  return period === 'daily' ? '1 day' : period === 'weekly' ? '7 days' : period === 'monthly' ? '30 days' : '36500 days';
+}
+
+/**
+ * Reads a period from what someone typed or tapped: "weekly", "week", "30d", "all time",
+ * "all_time", "alltime". Null when it isn't one, so the caller can ask instead of guessing.
+ */
+export function parsePeriod(text: string | null | undefined): BriefPeriod | null {
+  const word = (text ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (['daily', 'day', 'today', '24h', '1d'].includes(word)) return 'daily';
+  if (['weekly', 'week', '7d', '7days'].includes(word)) return 'weekly';
+  if (['monthly', 'month', '30d', '30days'].includes(word)) return 'monthly';
+  if (['all', 'alltime', 'everything', 'total', 'lifetime'].includes(word)) return 'all';
+  return null;
+}
+
 /** The ISO weekday (Monday 1 … Sunday 7) it currently is in `timeZone`. */
 export function localWeekday(now: Date, timeZone: string): number {
   const zone = isValidTimezone(timeZone) ? timeZone : DEFAULT_TIMEZONE;
@@ -103,8 +139,11 @@ export interface BriefInput {
   facts: TodayStoryFacts;
   revenue: BriefRevenue | null;
   dashboardUrl: string;
-  /** Defaults to daily. A weekly brief covers 7 days and offers the upgrade to daily. */
-  cadence?: BriefCadence;
+  /**
+   * What the brief covers. Defaults to daily. A weekly brief with an `upgradeUrl` (the Free
+   * plan's schedule) offers the upgrade to daily; Pro people asking for a weekly one don't get it.
+   */
+  cadence?: BriefPeriod;
   upgradeUrl?: string;
 }
 
@@ -117,18 +156,26 @@ export function isQuietDay(facts: TodayStoryFacts): boolean {
  * One concrete thing to look at, chosen by plain rules from the numbers. Returns null
  * when nothing stands out, so the brief never invents advice.
  */
-export function suggestAction(facts: TodayStoryFacts, revenue: BriefRevenue | null, cadence: BriefCadence = 'daily'): string | null {
-  const weekly = cadence === 'weekly';
+export function suggestAction(facts: TodayStoryFacts, revenue: BriefRevenue | null, cadence: BriefPeriod = 'daily'): string | null {
+  const span =
+    cadence === 'weekly'
+      ? { when: 'in the last 7 days', unit: 'week' }
+      : cadence === 'monthly'
+        ? { when: 'in the last 30 days', unit: 'month' }
+        : cadence === 'all'
+          ? { when: 'so far', unit: '' }
+          : { when: 'in the last 24 hours', unit: 'day' };
   if (revenue) {
     const attempts = revenue.transactions + revenue.failed;
     if (revenue.failed >= 3 && attempts > 0 && revenue.failed / attempts >= 0.3) {
-      return `${revenue.failed} of ${attempts} payments failed in ${weekly ? 'the last 7 days' : 'the last 24 hours'}. Check the failure reasons and your payment provider.`;
+      return `${revenue.failed} of ${attempts} payments failed ${span.when}. Check the failure reasons and your payment provider.`;
     }
   }
   // A percentage means little on a small base: 3 events falling to 1 is "down 67%". Below this
-  // many events the day before, the brief reports the numbers and keeps quiet about trends.
-  if (facts.deltaPct !== null && facts.eventsYesterday >= MIN_BASELINE_EVENTS) {
-    const counts = `${facts.eventsToday.toLocaleString('en')} events vs ${facts.eventsYesterday.toLocaleString('en')} the ${weekly ? 'week' : 'day'} before`;
+  // many events the period before, the brief reports the numbers and keeps quiet about trends.
+  // All time has nothing before it to compare with.
+  if (cadence !== 'all' && facts.deltaPct !== null && facts.eventsYesterday >= MIN_BASELINE_EVENTS) {
+    const counts = `${facts.eventsToday.toLocaleString('en')} events vs ${facts.eventsYesterday.toLocaleString('en')} the ${span.unit} before`;
     if (facts.deltaPct <= -25) {
       return `Activity is down ${Math.abs(facts.deltaPct)}% (${counts}). Check Errors and anything you shipped recently.`;
     }
@@ -170,7 +217,7 @@ export function statsLine(narrative: string, facts: TodayStoryFacts): string | n
 export function buildBriefMessage(input: BriefInput): string {
   const { facts, revenue } = input;
   const cadence = input.cadence ?? 'daily';
-  const lines: string[] = [`<b>${escapeHtml(input.projectName)}</b> · your ${cadence === 'weekly' ? 'weekly' : 'daily'} brief`, '', escapeHtml(input.narrative)];
+  const lines: string[] = [`<b>${escapeHtml(input.projectName)}</b> · your ${periodLabel(cadence)} brief`, '', escapeHtml(input.narrative)];
 
   const summary: string[] = [];
   const stats = statsLine(input.narrative, facts);
@@ -200,7 +247,7 @@ export function escapeSlack(value: string): string {
 export function buildSlackBriefMessage(input: BriefInput): string {
   const { facts, revenue } = input;
   const cadence = input.cadence ?? 'daily';
-  const lines: string[] = [`*${escapeSlack(input.projectName)}* · your ${cadence === 'weekly' ? 'weekly' : 'daily'} brief`, '', escapeSlack(input.narrative)];
+  const lines: string[] = [`*${escapeSlack(input.projectName)}* · your ${periodLabel(cadence)} brief`, '', escapeSlack(input.narrative)];
 
   const summary: string[] = [];
   const stats = statsLine(input.narrative, facts);

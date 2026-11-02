@@ -129,16 +129,17 @@ export class InsightsService {
   /**
    * A project as facts plus a narrative, for messages that go out without a signed-in user
    * (the brief). `windowDays` 1 is the last 24 hours against the 24 before, with the same
-   * AI narrative as the story card. 7 compares the last week with the week before, in plain
-   * template wording: the AI prompt is written for a single day.
+   * AI narrative as the story card. 7 or 30 compare that many days with the same number before,
+   * and 'all' covers everything since the first event with nothing to compare against. All of
+   * those use plain template wording: the AI prompt is written for a single day.
    */
   async getProjectStory(
     project: { id: string; name: string; organizationId: string },
-    windowDays = 1
+    windowDays: number | 'all' = 1
   ): Promise<{ facts: TodayStoryFacts; narrative: string }> {
     const facts = await this.computeFacts(project.id, windowDays);
     const template = this.templateNarrative(facts, windowDays);
-    if (windowDays > 1 || facts.eventsToday + facts.eventsYesterday === 0) return { facts, narrative: template };
+    if (windowDays !== 1 || facts.eventsToday + facts.eventsYesterday === 0) return { facts, narrative: template };
 
     const aiNarrative = await this.ai.generateStoryNarrative(project, facts).catch(() => null);
     return { facts, narrative: aiNarrative ?? template };
@@ -199,10 +200,12 @@ export class InsightsService {
   }
 
   /** `eventsToday` / `eventsYesterday` are the latest window and the one before it, whatever its length. */
-  private async computeFacts(projectId: string, windowDays = 1): Promise<TodayStoryFacts> {
+  private async computeFacts(projectId: string, windowDays: number | 'all' = 1): Promise<TodayStoryFacts> {
     const now = Date.now();
-    const todayStart = new Date(now - windowDays * DAY_MS);
-    const yesterdayStart = new Date(now - 2 * windowDays * DAY_MS);
+    // 'all' starts at the epoch with an empty "before" window (both starts equal, so the previous
+    // window is the empty range), so nothing is compared and the percentage stays null.
+    const todayStart = windowDays === 'all' ? new Date(0) : new Date(now - windowDays * DAY_MS);
+    const yesterdayStart = windowDays === 'all' ? new Date(0) : new Date(now - 2 * windowDays * DAY_MS);
 
     const [totals, topEvent, topCountry, topDevice, lastEvent] = await Promise.all([
       this.database.query<{ today: number; yesterday: number; uniques_today: number; active_now: number }>(
@@ -284,21 +287,33 @@ export class InsightsService {
     };
   }
 
-  private templateNarrative(facts: TodayStoryFacts, windowDays = 1): string {
-    const weekly = windowDays > 1;
-    const span = weekly
-      ? { now: 'this week', previous: 'last week', last: 'the last 7 days' }
-      : { now: 'today', previous: 'yesterday', last: 'the last 24 hours' };
+  private templateNarrative(facts: TodayStoryFacts, windowDays: number | 'all' = 1): string {
+    const allTime = windowDays === 'all';
+    const monthly = windowDays === 30;
+    const weekly = windowDays === 7 || (typeof windowDays === 'number' && windowDays > 1 && !monthly);
+    const span = allTime
+      ? { now: 'in total', previous: '', last: 'since the start' }
+      : monthly
+        ? { now: 'this month', previous: 'last month', last: 'the last 30 days' }
+        : weekly
+          ? { now: 'this week', previous: 'last week', last: 'the last 7 days' }
+          : { now: 'today', previous: 'yesterday', last: 'the last 24 hours' };
 
     if (facts.eventsToday + facts.eventsYesterday === 0) {
-      return weekly
-        ? 'No events this week. As soon as your SDK starts sending, the story of your week shows up here.'
-        : 'No events today. As soon as your SDK starts sending, the story of your day shows up here.';
+      return allTime
+        ? 'No events yet. As soon as your SDK starts sending, the story of your project shows up here.'
+        : monthly
+          ? 'No events this month. As soon as your SDK starts sending, the story of your month shows up here.'
+          : weekly
+            ? 'No events this week. As soon as your SDK starts sending, the story of your week shows up here.'
+            : 'No events today. As soon as your SDK starts sending, the story of your day shows up here.';
     }
 
     const parts: string[] = [];
 
-    if (facts.deltaPct === null) {
+    if (allTime) {
+      parts.push(`Your project has recorded ${facts.eventsToday.toLocaleString()} events ${span.last}.`);
+    } else if (facts.deltaPct === null) {
       parts.push(`Your project saw ${facts.eventsToday.toLocaleString()} events in ${span.last} — a clean start.`);
     } else if (facts.deltaPct > 0) {
       parts.push(`Events are up ${facts.deltaPct}% ${span.now} (${facts.eventsToday.toLocaleString()} vs ${facts.eventsYesterday.toLocaleString()} ${span.previous}).`);
