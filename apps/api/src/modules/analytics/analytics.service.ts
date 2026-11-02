@@ -171,11 +171,14 @@ export interface OverviewResponse {
     events1h: number;
     users: number;
     sessions: number;
+    /** Distinct people (signed-in user or anonymous id) with any event in the window, as on the Web page. */
+    visitors: number;
   };
   /** The same counts for the window before `range`, for period-over-period comparison. */
   previousTotals: {
     events: number;
     sessions: number;
+    visitors: number;
     /** Identified profiles that existed when the window started (users is an all-time count). */
     users: number;
     /** API telemetry for the previous window, on the same latency source as the current one. */
@@ -281,8 +284,8 @@ export class AnalyticsService {
       return {
         project: null,
         range,
-        totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0 },
-        previousTotals: { events: 0, sessions: 0, users: 0, apiRequests: 0, failedRequests: 0, serverErrors: 0, errorRate: 0, p95: 0 },
+        totals: { events: 0, events24h: 0, events1h: 0, users: 0, sessions: 0, visitors: 0 },
+        previousTotals: { events: 0, sessions: 0, visitors: 0, users: 0, apiRequests: 0, failedRequests: 0, serverErrors: 0, errorRate: 0, p95: 0 },
         lastEventAt: null,
         revenue: null,
         topEvents: [],
@@ -333,6 +336,8 @@ export class AnalyticsService {
       previous_events: number;
       previous_sessions: number;
       previous_users: number;
+      total_visitors: number;
+      previous_visitors: number;
       last_event_at: string | null;
     }>(
       `
@@ -340,6 +345,8 @@ export class AnalyticsService {
           counts.total_events,
           counts.events_24h,
           counts.events_1h,
+          counts.total_visitors,
+          counts.previous_visitors,
           (SELECT count(*) FROM users WHERE project_id = $1)::int AS total_users,
           (SELECT count(*) FROM users WHERE project_id = $1 AND first_seen_at < ${since})::int AS previous_users,
           (SELECT count(*) FROM sessions WHERE project_id = $1 AND started_at >= ${since})::int AS total_sessions,
@@ -353,6 +360,8 @@ export class AnalyticsService {
           SELECT
             count(*) FILTER (WHERE occurred_at >= ${since})::int AS total_events,
             count(*) FILTER (WHERE occurred_at < ${since})::int AS previous_events,
+            count(DISTINCT COALESCE(user_id::text, anonymous_id)) FILTER (WHERE occurred_at >= ${since})::int AS total_visitors,
+            count(DISTINCT COALESCE(user_id::text, anonymous_id)) FILTER (WHERE occurred_at < ${since})::int AS previous_visitors,
             count(*) FILTER (WHERE occurred_at >= now() - interval '24 hours')::int AS events_24h,
             count(*) FILTER (WHERE occurred_at >= now() - interval '1 hour')::int AS events_1h
           FROM events
@@ -777,11 +786,13 @@ export class AnalyticsService {
         events24h: totals?.events_24h ?? 0,
         events1h: totals?.events_1h ?? 0,
         users: totals?.total_users ?? 0,
-        sessions: totals?.total_sessions ?? 0
+        sessions: totals?.total_sessions ?? 0,
+        visitors: totals?.total_visitors ?? 0
       },
       previousTotals: {
         events: totals?.previous_events ?? 0,
         sessions: totals?.previous_sessions ?? 0,
+        visitors: totals?.previous_visitors ?? 0,
         users: totals?.previous_users ?? 0,
         apiRequests: previousTel?.total_requests ?? 0,
         failedRequests: previousTel?.http_errors ?? 0,
