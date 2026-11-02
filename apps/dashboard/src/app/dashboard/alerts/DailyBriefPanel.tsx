@@ -377,7 +377,10 @@ export function DailyBriefPanel({ projectId }: { projectId?: string }) {
               <p className="mt-2 text-sky-600 dark:text-sky-400 underline">Open TraceIQ</p>
             </div>
             <p className="mt-3 text-xs text-neutral-500 dark:text-slate-400">
-              On Telegram, send /brief to the bot any time for one right now, or /stop to pause. Times use your chosen timezone ({tz} is this browser&apos;s).
+              On Telegram, send /brief and choose daily, weekly, monthly or all time, or go straight there with{' '}
+              <code className="font-mono">/brief_daily</code>, <code className="font-mono">/brief_weekly</code>,{' '}
+              <code className="font-mono">/brief_monthly</code> or <code className="font-mono">/brief_alltime</code>. <code className="font-mono">/stop</code>{' '}
+              pauses the scheduled brief. Times use your chosen timezone ({tz} is this browser&apos;s).
             </p>
           </div>
         </SettingsCard>

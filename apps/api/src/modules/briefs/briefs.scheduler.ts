@@ -4,6 +4,16 @@ import { TelegramClient } from './telegram.client';
 
 const TICK_MS = 60_000;
 
+/** What the bot's "/" menu lists. Names are lowercase letters, digits and underscores, as Telegram requires. */
+export const TELEGRAM_COMMANDS = [
+  { command: 'brief', description: 'Get a brief: choose daily, weekly, monthly or all time' },
+  { command: 'brief_daily', description: 'The last 24 hours' },
+  { command: 'brief_weekly', description: 'The last 7 days' },
+  { command: 'brief_monthly', description: 'The last 30 days' },
+  { command: 'brief_alltime', description: 'Everything since the start' },
+  { command: 'stop', description: 'Pause the daily brief' }
+];
+
 /** Checks every minute for briefs whose local send time has arrived. */
 @Injectable()
 export class BriefsScheduler implements OnModuleInit, OnModuleDestroy {
@@ -51,5 +61,9 @@ export class BriefsScheduler implements OnModuleInit, OnModuleDestroy {
     const result = await this.telegram.setWebhook(url, secret);
     if (result.ok) this.logger.log('Telegram webhook registered.');
     else this.logger.warn(`Telegram webhook not registered: ${result.description ?? result.status}`);
+
+    // The "/" menu in the chat, so the commands are discoverable. Failing to set it is harmless.
+    const menu = await this.telegram.setCommands(TELEGRAM_COMMANDS);
+    if (!menu.ok) this.logger.warn(`Telegram command menu not set: ${menu.description ?? menu.status}`);
   }
 }
