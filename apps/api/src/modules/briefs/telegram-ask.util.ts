@@ -54,7 +54,7 @@ export function askFailureMessage(error: unknown, upgradeUrl: string): string {
   if (code === 'MONTHLY_AI_INSIGHTS_LIMIT_REACHED') {
     return `You've used this month's Ask TraceIQ allowance. It resets next month, or you can <a href="${upgradeUrl}">upgrade for more</a>.`;
   }
-  if (status === 503) return "Ask TraceIQ isn't available on this server right now.";
+  if (status === 503) return 'Ask TraceIQ is busy or temporarily unavailable. Try again in a minute.';
   if (status === 403 || status === 404) {
     return "I couldn't open this project with the account that connected the chat. Reconnect it from TraceIQ → Alerts → Daily brief.";
   }

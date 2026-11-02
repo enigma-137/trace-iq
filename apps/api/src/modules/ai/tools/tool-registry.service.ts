@@ -42,16 +42,21 @@ export class ToolRegistryService {
     // 1. Project Overview
     this.register({
       name: 'get_overview',
-      description: 'Get a comprehensive analytical overview of the project (traffic totals, active users, error counts, friction, and alert summary).',
+      description:
+        'Get an overview of the project for a time range: total events, visitors, sessions, users, the same totals for the previous range, API health, errors, friction and alerts. Use this for any "how many events / visitors / sessions" question across the whole project, without asking which event.',
       parameters: {
         type: 'object',
-        properties: {}
+        properties: {
+          range: { type: 'string', enum: ['24h', '7d', '30d'], description: 'Time range (default "7d"). Use "24h" for today, "7d" for this week, "30d" for this month.' }
+        }
       },
-      execute: async (ctx) => {
+      execute: async (ctx, args) => {
         if (!this.analytics) throw new Error('Analytics service unavailable');
-        const overview = await this.analytics.getOverview(ctx.user, ctx.projectId, ctx.organizationId);
+        const overview = await this.analytics.getOverview(ctx.user, ctx.projectId, ctx.organizationId, args?.range ? String(args.range) : undefined);
         const sanitized = this.sanitizer.sanitizeData({
+          range: overview.range,
           totals: overview.totals,
+          previousTotals: overview.previousTotals,
           apiSummary: overview.apiTelemetry,
           topErrors: overview.topErrors?.slice(0, 5),
           alertsSummary: overview.alertsSummary,

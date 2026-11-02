@@ -81,6 +81,26 @@ describe('Ask TraceIQ - Tool Registry & Tenant Security', () => {
     expect(names).toContain('get_api_performance');
   });
 
+  it('get_overview takes a range, and returns the previous range and visitors for comparison', async () => {
+    mockAnalytics.getOverview.mockClear();
+    mockAnalytics.getOverview.mockResolvedValueOnce({
+      range: '30d',
+      totals: { events: 9000, events24h: 300, events1h: 10, users: 150, sessions: 800, visitors: 410 },
+      previousTotals: { events: 7000, sessions: 700, visitors: 380 },
+      apiTelemetry: { totalRequests: 500 },
+      topErrors: []
+    });
+    const context = { user: { id: 'usr_alice' } as DashboardUser, organizationId: 'org_legit', projectId: 'proj_legit' };
+    const result = await toolRegistry.executeTool('get_overview', context, { range: '30d' });
+    expect(mockAnalytics.getOverview).toHaveBeenCalledWith(context.user, 'proj_legit', 'org_legit', '30d');
+    const data = result.data as { range: string; totals: { visitors: number }; previousTotals: { events: number } };
+    expect(data.range).toBe('30d');
+    expect(data.totals.visitors).toBe(410);
+    expect(data.previousTotals.events).toBe(7000);
+    await toolRegistry.executeTool('get_overview', context, {});
+    expect(mockAnalytics.getOverview).toHaveBeenLastCalledWith(context.user, 'proj_legit', 'org_legit', undefined);
+  });
+
   it('answers how-to questions from the product guide with dashboard and docs links', async () => {
     const context = {
       user: { id: 'usr_alice', email: 'alice@example.com' } as DashboardUser,
