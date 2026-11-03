@@ -13,6 +13,44 @@ export function clipAnswer(markdown: string, limit = TELEGRAM_ANSWER_LIMIT): { t
   return { text: (lineBreak > limit * 0.6 ? cut.slice(0, lineBreak) : cut).trimEnd(), clipped: true };
 }
 
+const isTableRow = (line: string) => /^\s*\|.*\|\s*$/.test(line);
+const isTableDivider = (line: string) => /^[\s|:\-—–]+$/.test(line) && /[-—–]/.test(line);
+
+/**
+ * Telegram cannot draw a Markdown table, so it shows as raw pipes. Each data row becomes a
+ * bullet: the first cell is the label and the rest read as "heading value" pairs.
+ */
+export function flattenTables(markdown: string): string {
+  const lines = markdown.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!isTableRow(lines[i])) {
+      out.push(lines[i]);
+      continue;
+    }
+    const block: string[] = [];
+    while (i < lines.length && isTableRow(lines[i])) {
+      block.push(lines[i]);
+      i += 1;
+    }
+    i -= 1;
+    const cells = (row: string) => row.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+    const header = cells(block[0]);
+    for (const row of block.slice(1)) {
+      if (isTableDivider(row)) continue;
+      const values = cells(row);
+      if (values.every((value) => !value)) continue;
+      const rest = values
+        .slice(1)
+        .map((value, index) => (header[index + 1] ? `${header[index + 1]} ${value}` : value))
+        .filter((part) => part.trim())
+        .join(', ');
+      out.push(`- **${values[0]}**${rest ? `: ${rest}` : ''}`);
+    }
+  }
+  return out.join('\n');
+}
+
 /**
  * Turns the Markdown an Ask answer comes in into the small HTML subset Telegram accepts.
  * Everything is escaped first, so nothing in the answer (which can quote event names and
@@ -20,7 +58,7 @@ export function clipAnswer(markdown: string, limit = TELEGRAM_ANSWER_LIMIT): { t
  */
 export function markdownToTelegramHtml(markdown: string, dashboardUrl: string): string {
   const base = dashboardUrl.replace(/\/+$/, '');
-  const lines = escapeHtml(markdown).split('\n');
+  const lines = escapeHtml(flattenTables(markdown)).split('\n');
 
   const converted = lines.map((line) => {
     let out = line;

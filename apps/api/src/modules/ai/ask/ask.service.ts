@@ -203,6 +203,7 @@ export class AskService {
         question,
         conversationHistory: history,
         attachedContext: sanitizedAttachedContext,
+        style: request.source === 'telegram' ? 'chat' : undefined,
         onProgress
       });
     } catch (err: any) {

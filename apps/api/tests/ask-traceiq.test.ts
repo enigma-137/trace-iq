@@ -219,6 +219,24 @@ describe('Ask TraceIQ - Orchestrator & Bounded Tool Calling', () => {
     aiRuns = { recordRun: vi.fn() } as unknown as AiRunsService;
   });
 
+  it('adds a short-answer style note for chat apps, and nothing extra for the dashboard', async () => {
+    const run = async (style?: 'chat') => {
+      const chat = vi.fn().mockResolvedValue({ content: 'Done.', requestedModel: 'm', routedModel: 'm', latencyMs: 1 });
+      const orchestrator = new AskOrchestratorService({ isConfigured: vi.fn().mockReturnValue(true), chat } as unknown as CencoriProvider, modelPolicy, aiRuns, toolRegistry);
+      await orchestrator.runInvestigation({
+        investigationId: 'inv_style',
+        context: { user: { id: 'usr_1' } as DashboardUser, organizationId: 'org_1', projectId: 'proj_1' },
+        question: 'How many events this week?',
+        style
+      });
+      return (chat.mock.calls[0][0].messages as Array<{ role: string; content: string }>).filter((m) => m.role === 'system').map((m) => m.content);
+    };
+    const chatSystem = await run('chat');
+    const dashboardSystem = await run();
+    expect(chatSystem.some((c) => c.includes('Telegram') && c.includes('Never use tables'))).toBe(true);
+    expect(dashboardSystem.some((c) => c.includes('Telegram'))).toBe(false);
+  });
+
   it('executes tool-calling loop and returns synthesized evidence-backed answer with findings', async () => {
     const mockProvider = {
       isConfigured: vi.fn().mockReturnValue(true),
