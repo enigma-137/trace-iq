@@ -8,6 +8,7 @@ import {
   AiProvider,
   AiToolCall
 } from './ai-provider.interface';
+import { DEFAULT_FALLBACK_MODEL, DEFAULT_FAST_MODEL, DEFAULT_REASONING_MODEL } from '../models/ai-model-policy.service';
 
 export type AiErrorClassification =
   | 'missing_model'
@@ -138,7 +139,7 @@ export class CencoriProvider implements AiProvider {
   }
 
   async complete(options: AiCompletionOptions): Promise<AiCompletionResponse> {
-    const effectiveModel = options.model?.trim() || 'gemini-2.5-flash-lite';
+    const effectiveModel = options.model?.trim() || DEFAULT_FAST_MODEL;
     if (!effectiveModel || effectiveModel === 'unknown') {
       this.logger.error('[AI_ERROR:missing_model] Outbound completion payload missing valid model identifier.');
       throw new ServiceUnavailableException('AI analysis is temporarily unavailable. Try again shortly.');
@@ -210,12 +211,11 @@ export class CencoriProvider implements AiProvider {
   }
 
   /**
-   * The gateway sometimes answers a request with a 500 and no detail (seen on a model we
-   * never asked for), while the same request works moments later. So when the requested
-   * model fails after its own retries, ask once more on a different model.
+   * One call on the requested model; if it fails, one call on a different model. That is at
+   * most two gateway requests per step, so a failing question stays cheap.
    */
   async chat(options: AiChatOptions): Promise<AiChatResponse> {
-    const primary = options.model?.trim() || 'gemini-2.5-flash-lite';
+    const primary = options.model?.trim() || DEFAULT_REASONING_MODEL;
     try {
       return await this.chatOnModel(options, primary);
     } catch (error) {
@@ -228,8 +228,9 @@ export class CencoriProvider implements AiProvider {
 
   private fallbackModel(primary: string): string {
     const configured = (process.env.TRACEIQ_AI_FALLBACK_MODEL ?? '').trim();
-    const choice = configured && configured !== 'unknown' ? configured : 'gemini-2.5-flash';
-    return choice === primary ? 'gemini-2.5-flash-lite' : choice;
+    const choice = configured && configured !== 'unknown' ? configured : DEFAULT_FALLBACK_MODEL;
+    if (choice !== primary) return choice;
+    return primary === DEFAULT_FALLBACK_MODEL ? DEFAULT_REASONING_MODEL : DEFAULT_FALLBACK_MODEL;
   }
 
   private async chatOnModel(options: AiChatOptions, effectiveModel: string): Promise<AiChatResponse> {
@@ -240,8 +241,8 @@ export class CencoriProvider implements AiProvider {
 
     const client = this.getClient();
     const timeoutMs = options.timeoutMs ?? 25_000;
-    // One retry on this model; a second model (see chat) is a better second chance than a third try.
-    const maxRetries = 1;
+    // A single try: the second chance is a different model (see chat), not the same call again.
+    const maxRetries = 0;
 
     let lastError: unknown = null;
     const overallStart = Date.now();
@@ -326,7 +327,14 @@ export class CencoriProvider implements AiProvider {
     this.logger.error(
       `All Cencori chat attempts failed after ${elapsed}ms [${finalClassified.classification}] (status=${finalClassified.statusCode}): ${lastError instanceof Error ? lastError.stack : lastError}`
     );
-    throw new ServiceUnavailableException('Ask TraceIQ is temporarily unavailable. Try again shortly.');
+    // The class travels with the error so the caller can say what went wrong, not just "unavailable".
+    throw new ServiceUnavailableException({
+      statusCode: 503,
+      error: 'Service Unavailable',
+      message: 'Ask TraceIQ is temporarily unavailable. Try again shortly.',
+      code: 'AI_GATEWAY_FAILED',
+      classification: finalClassified.classification
+    });
   }
 
   private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

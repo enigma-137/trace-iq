@@ -76,8 +76,6 @@ const ASK_MAX_PER_MINUTE = 6;
 const ASK_THREAD_TTL_MS = 30 * 60_000;
 const ASK_THREAD_MAX_ENTRIES = 500;
 const TYPING_REFRESH_MS = 4_500;
-/** The AI gateway sometimes refuses a request for a moment; one patient retry usually gets through. */
-const ASK_RETRY_DELAY_MS = 4_000;
 
 const PERIOD_BUTTONS: Array<Array<{ text: string; callback_data: string }>> = [
   [
@@ -615,15 +613,7 @@ export class BriefsService {
       const user = { id: channel.createdByUserId as string, authMethod: 'local' as const, scopes: ['analytics:read'] };
       const key = typeof updateId === 'number' ? `telegram:${chatId}:${updateId}` : undefined;
       const request = { question, projectId: channel.projectId, conversationId, source: 'telegram' };
-      let answer;
-      try {
-        answer = await this.ask!.ask(user, { ...request, idempotencyKey: key });
-      } catch (error) {
-        if ((error as { getStatus?: () => number })?.getStatus?.() !== 503) throw error;
-        // A failed run released its allowance, so asking again is free; it gets its own key.
-        await new Promise((resolve) => setTimeout(resolve, ASK_RETRY_DELAY_MS));
-        answer = await this.ask!.ask(user, { ...request, idempotencyKey: key ? `${key}:retry` : undefined });
-      }
+      const answer = await this.ask!.ask(user, { ...request, idempotencyKey: key });
 
       this.rememberThread(chatId, channel.projectId, answer.conversationId);
 

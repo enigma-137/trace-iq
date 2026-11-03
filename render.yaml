@@ -34,6 +34,8 @@ services:
         sync: false
       - key: TRACEIQ_AI_REASONING_MODEL
         sync: false
+      - key: TRACEIQ_AI_FALLBACK_MODEL
+        sync: false
 
   - type: keyvalue
     name: traceiq-redis

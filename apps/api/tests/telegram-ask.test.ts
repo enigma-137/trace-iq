@@ -76,8 +76,15 @@ describe('askFailureMessage', () => {
     expect(message).toContain('https://x/billing');
   });
 
-  it('says plainly when Ask is not set up, when the account lost access, and for anything else', () => {
-    expect(askFailureMessage(new ServiceUnavailableException('gateway down'), 'u')).toContain('Give me a minute, then ask again');
+  it('says what went wrong instead of one vague message', () => {
+    const gateway = (classification: string) => new ServiceUnavailableException({ code: 'AI_GATEWAY_FAILED', classification, message: 'x' });
+    expect(askFailureMessage(gateway('unsupported_model'), 'u')).toContain("model this server is set to isn't available");
+    expect(askFailureMessage(gateway('missing_model'), 'u')).toContain("model this server is set to isn't available");
+    expect(askFailureMessage(gateway('rate_limited'), 'u')).toContain('limiting requests');
+    expect(askFailureMessage(gateway('timeout'), 'u')).toContain('took too long');
+    expect(askFailureMessage(gateway('upstream_5xx'), 'u')).toContain('AI service had a problem');
+    expect(askFailureMessage(new ServiceUnavailableException('AI gateway is not configured. Set CENCORI_API_KEY'), 'u')).toContain("isn't set up on this server");
+    expect(askFailureMessage(new ServiceUnavailableException('something else'), 'u')).toContain("isn't available right now");
     expect(askFailureMessage(new ForbiddenException('nope'), 'u')).toContain('Reconnect');
     expect(askFailureMessage(new Error('boom: secret detail'), 'u')).toBe('Something went wrong while looking into that. Try again in a moment.');
   });
@@ -230,35 +237,12 @@ describe('asking a question in Telegram', () => {
     expect(last).toContain('/dashboard/settings/billing');
   });
 
-  it('retries once when the AI gateway refuses, and answers if the second try works', async () => {
-    vi.useFakeTimers();
-    try {
-      ask.ask.mockRejectedValueOnce(new ServiceUnavailableException('gateway down'));
-      const { service, chatId } = setup();
-      await service.handleTelegramUpdate({ update_id: 5, message: { text: 'how many visitors?', chat: { id: chatId, type: 'private' } } });
-      await vi.advanceTimersByTimeAsync(4_100);
-      await service.waitForAsks();
-      expect(ask.ask).toHaveBeenCalledTimes(2);
-      expect(ask.ask.mock.calls[1][1].idempotencyKey).toBe(`telegram:${chatId}:5:retry`);
-      expect(telegram.sendMessage.mock.calls.at(-1)![1]).toBe('<b>Signups</b> are flat.');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('asks the person to try again in a minute if the retry fails too', async () => {
-    vi.useFakeTimers();
-    try {
-      ask.ask.mockRejectedValue(new ServiceUnavailableException('gateway down'));
-      const { service, chatId } = setup();
-      await service.handleTelegramUpdate({ message: { text: 'q', chat: { id: chatId, type: 'private' } } });
-      await vi.advanceTimersByTimeAsync(4_100);
-      await service.waitForAsks();
-      expect(ask.ask).toHaveBeenCalledTimes(2);
-      expect(telegram.sendMessage.mock.calls.at(-1)![1]).toContain('Give me a minute, then ask again');
-    } finally {
-      vi.useRealTimers();
-    }
+  it('asks the AI once, with no retry of its own, and tells the person what went wrong', async () => {
+    ask.ask.mockRejectedValue(new ServiceUnavailableException({ code: 'AI_GATEWAY_FAILED', classification: 'rate_limited', message: 'x' }));
+    const { say } = setup();
+    await say('q');
+    expect(ask.ask).toHaveBeenCalledTimes(1);
+    expect(telegram.sendMessage.mock.calls.at(-1)![1]).toContain('limiting requests');
   });
 
   it('never shows a raw error, and frees the chat for the next question', async () => {

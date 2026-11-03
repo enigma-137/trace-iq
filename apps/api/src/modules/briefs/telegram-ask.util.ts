@@ -86,13 +86,31 @@ export function markdownToTelegramHtml(markdown: string, dashboardUrl: string): 
 /** Short, plain wording for the ways an Ask can fail, so a chat never sees a stack trace. */
 export function askFailureMessage(error: unknown, upgradeUrl: string): string {
   const response = (error as { getResponse?: () => unknown })?.getResponse?.();
-  const code = response && typeof response === 'object' ? (response as { code?: string }).code : undefined;
+  const body = response && typeof response === 'object' ? (response as { code?: string; classification?: string; message?: unknown }) : undefined;
+  const code = body?.code;
   const status = (error as { getStatus?: () => number })?.getStatus?.();
 
   if (code === 'MONTHLY_AI_INSIGHTS_LIMIT_REACHED') {
     return `You've used this month's Ask TraceIQ allowance. It resets next month, or you can <a href="${upgradeUrl}">upgrade for more</a>.`;
   }
-  if (status === 503) return "I'm getting a lot of requests right now and couldn't finish that. Give me a minute, then ask again.";
+  if (code === 'AI_GATEWAY_FAILED') {
+    switch (body?.classification) {
+      case 'unsupported_model':
+      case 'missing_model':
+        return "The AI model this server is set to isn't available. Whoever runs the server needs to pick another one.";
+      case 'rate_limited':
+        return 'The AI provider is limiting requests right now. Try again in a minute.';
+      case 'timeout':
+        return 'The AI took too long to answer. Try a narrower question, like one metric or one page.';
+      default:
+        return "The AI service had a problem and couldn't answer. Try again in a minute.";
+    }
+  }
+  if (status === 503) {
+    return typeof body?.message === 'string' && /not configured/i.test(body.message)
+      ? "Ask TraceIQ isn't set up on this server yet."
+      : "The AI service isn't available right now. Try again in a minute.";
+  }
   if (status === 403 || status === 404) {
     return "I couldn't open this project with the account that connected the chat. Reconnect it from TraceIQ → Alerts → Daily brief.";
   }
