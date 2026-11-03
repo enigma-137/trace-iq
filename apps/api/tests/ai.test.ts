@@ -92,8 +92,8 @@ describe('AiModelPolicyService', () => {
 
   it('resolves fast and reasoning models with overrides and fallbacks', () => {
     const policy = new AiModelPolicyService();
-    expect(policy.getFastModel()).toBe('gemini-2.5-flash-lite');
-    expect(policy.getReasoningModel()).toBe('gemini-2.5-flash-lite');
+    expect(policy.getFastModel()).toBe('claude-haiku-5-5');
+    expect(policy.getReasoningModel()).toBe('claude-haiku-5-5');
 
     process.env.AI_MODEL = 'gemini-2.5-flash';
     expect(policy.getFastModel()).toBe('gemini-2.5-flash');
@@ -267,41 +267,39 @@ describe('CencoriProvider', () => {
   const chatOptions = { model: 'gemini-2.5-flash', messages: [{ role: 'user' as const, content: 'hi' }] };
   const okResponse = { choices: [{ message: { content: 'hello' }, finish_reason: 'stop' }], model: 'gemini-2.5-flash-lite' };
 
-  it('asks once on a different model when the requested one keeps failing', async () => {
-    vi.useFakeTimers();
-    try {
-      const create = vi.fn().mockRejectedValueOnce({ statusCode: 500, message: '' }).mockRejectedValueOnce({ statusCode: 500, message: '' }).mockResolvedValueOnce(okResponse);
-      const promise = providerWith(create).chat(chatOptions);
-      await vi.advanceTimersByTimeAsync(5_000);
-      const result = await promise;
-      expect(result.content).toBe('hello');
-      expect(create.mock.calls.map((call) => call[0].model)).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']);
-    } finally {
-      vi.useRealTimers();
-    }
+  it('makes one call on the requested model, then one on the fallback, and answers from the fallback', async () => {
+    const create = vi.fn().mockRejectedValueOnce({ statusCode: 500, message: '' }).mockResolvedValueOnce(okResponse);
+    const result = await providerWith(create).chat(chatOptions);
+    expect(result.content).toBe('hello');
+    expect(create.mock.calls.map((call) => call[0].model)).toEqual(['gemini-2.5-flash', 'deepseek-v4.1-flash']);
+  });
+
+  it('stops at two calls when both fail, and the error says what class of failure it was', async () => {
+    const create = vi.fn().mockRejectedValue({ statusCode: 502, message: 'Bad Gateway' });
+    const error = await providerWith(create).chat(chatOptions).catch((e) => e);
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(error.getResponse()).toMatchObject({ statusCode: 503, code: 'AI_GATEWAY_FAILED', classification: 'upstream_5xx' });
+    const unsupported = await providerWith(vi.fn().mockRejectedValue({ statusCode: 404, message: 'Model not found' })).chat(chatOptions).catch((e) => e);
+    expect(unsupported.getResponse()).toMatchObject({ classification: 'unsupported_model' });
   });
 
   it('uses TRACEIQ_AI_FALLBACK_MODEL when set, and never falls back to the model that just failed', async () => {
-    vi.useFakeTimers();
-    try {
-      process.env.TRACEIQ_AI_FALLBACK_MODEL = 'gemini-2.5-pro';
-      const create = vi.fn().mockRejectedValue({ statusCode: 500, message: '' });
-      const first = providerWith(create).chat(chatOptions);
-      const settled = expect(first).rejects.toThrow(ServiceUnavailableException);
-      await vi.advanceTimersByTimeAsync(10_000);
-      await settled;
-      expect(create.mock.calls.map((call) => call[0].model)).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-pro']);
+    process.env.TRACEIQ_AI_FALLBACK_MODEL = 'gemini-2.5-pro';
+    const create = vi.fn().mockRejectedValue({ statusCode: 500, message: '' });
+    await providerWith(create).chat(chatOptions).catch(() => undefined);
+    expect(create.mock.calls.map((call) => call[0].model)).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro']);
 
-      process.env.TRACEIQ_AI_FALLBACK_MODEL = 'gemini-2.5-flash';
-      create.mockClear();
-      const second = providerWith(create).chat(chatOptions);
-      const settledAgain = expect(second).rejects.toThrow(ServiceUnavailableException);
-      await vi.advanceTimersByTimeAsync(10_000);
-      await settledAgain;
-      expect(create.mock.calls[2][0].model).toBe('gemini-2.5-flash-lite');
-    } finally {
-      vi.useRealTimers();
-    }
+    process.env.TRACEIQ_AI_FALLBACK_MODEL = 'gemini-2.5-flash';
+    create.mockClear();
+    await providerWith(create).chat(chatOptions).catch(() => undefined);
+    expect(create.mock.calls[1][0].model).toBe('deepseek-v4.1-flash');
+
+    // The default fallback is the primary itself: pick the default primary instead.
+    process.env.TRACEIQ_AI_FALLBACK_MODEL = '';
+    create.mockClear();
+    await providerWith(create).chat({ ...chatOptions, model: 'deepseek-v4.1-flash' }).catch(() => undefined);
+    expect(create.mock.calls[1][0].model).toBe('claude-haiku-5-5');
   });
 
   it('does not try a fallback when the model is missing', async () => {
