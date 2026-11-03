@@ -2,7 +2,7 @@ import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BriefsService } from '../src/modules/briefs/briefs.service';
 import { TELEGRAM_COMMANDS } from '../src/modules/briefs/briefs.scheduler';
-import { askFailureMessage, clipAnswer, markdownToTelegramHtml } from '../src/modules/briefs/telegram-ask.util';
+import { askFailureMessage, clipAnswer, flattenTables, markdownToTelegramHtml } from '../src/modules/briefs/telegram-ask.util';
 import { affected, mockDatabase, rows } from './helpers/mock-db';
 
 describe('markdownToTelegramHtml', () => {
@@ -28,6 +28,28 @@ describe('markdownToTelegramHtml', () => {
     const html = markdownToTelegramHtml('**one** and **two** and `a` and `b`', 'https://x');
     expect((html.match(/<b>/g) ?? []).length).toBe((html.match(/<\/b>/g) ?? []).length);
     expect((html.match(/<code>/g) ?? []).length).toBe((html.match(/<\/code>/g) ?? []).length);
+  });
+});
+
+describe('flattenTables', () => {
+  it('turns a Markdown table into one bullet per row, with no pipes left', () => {
+    const table = ['| Metric | This week | Last week | Change |', '|---|---|---|---|', '| Events | 1,151 | 941 | +210 (+22.3%) |', '| Users | 17 | 17 | Flat |'].join('\n');
+    expect(flattenTables(table)).toBe('- **Events**: This week 1,151, Last week 941, Change +210 (+22.3%)\n- **Users**: This week 17, Last week 17, Change Flat');
+  });
+
+  it('also handles the dash-style divider a model sometimes writes, and keeps the text around the table', () => {
+    const text = ['Summary line.', '', '| Metric | Now |', '|\u2014|\u2014|', '| Visitors | 74 |', '', 'After.'].join('\n');
+    expect(flattenTables(text)).toBe('Summary line.\n\n- **Visitors**: Now 74\n\nAfter.');
+  });
+
+  it('leaves text without a table untouched, and a lone pipe in prose alone', () => {
+    const plain = 'Errors went from 4 | to 9.\nNothing else.';
+    expect(flattenTables(plain)).toBe(plain);
+  });
+
+  it('is applied before the HTML conversion', () => {
+    const html = markdownToTelegramHtml('| A | B |\n|---|---|\n| x | 1 |', 'https://x');
+    expect(html).toBe('\u2022 <b>x</b>: B 1');
   });
 });
 

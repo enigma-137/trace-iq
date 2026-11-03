@@ -18,8 +18,18 @@ export interface OrchestrationOptions {
     entityId?: string;
     filters?: Record<string, unknown>;
   };
+  /** 'chat' is for a phone chat (Telegram): short, plain sentences, no tables. */
+  style?: 'chat';
   onProgress?: (event: { step: string; tool?: string; status: 'running' | 'completed' | 'failed' }) => void;
 }
+
+/** Added after the main prompt for chat apps, which show Markdown tables as raw pipes. */
+export const CHAT_STYLE_NOTE = `This answer will be read in a Telegram chat on a phone. Be brief and go straight to the point:
+- Start with one short sentence that answers the question with the key number.
+- Then at most 3 short bullet points with the supporting numbers, only if they help.
+- Never use tables or headings, and do not write the OBSERVED / CORRELATED / HYPOTHESIS labels. Write plain sentences. If something is a guess, say so in plain words, like "this may be because...".
+- Do not add a suggested-questions section.
+- Keep the whole answer under about 120 words.`;
 
 export interface OrchestrationResult {
   answer: string;
@@ -61,7 +71,7 @@ export class AskOrchestratorService {
   }
 
   private async executeInvestigation(options: OrchestrationOptions): Promise<OrchestrationResult> {
-    const { investigationId, context, question, conversationHistory = [], attachedContext, onProgress } = options;
+    const { investigationId, context, question, conversationHistory = [], attachedContext, style, onProgress } = options;
     const model = this.modelPolicy.getModelForCapability('assistant');
     const promptDef = PROMPT_REGISTRY.askTraceIq;
     const promptVersion = promptDef.version;
@@ -75,6 +85,8 @@ export class AskOrchestratorService {
     const messages: AiChatMessage[] = [
       { role: 'system', content: promptDef.systemPrompt }
     ];
+
+    if (style === 'chat') messages.push({ role: 'system', content: CHAT_STYLE_NOTE });
 
     // If there is contextual attachment, provide it as a system note
     if (attachedContext && (attachedContext.surface || attachedContext.entityId)) {
