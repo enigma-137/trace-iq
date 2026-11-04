@@ -86,32 +86,6 @@ export default async function DashboardLogsPage({
 
   return (
     <DashboardShell active="logs" title="Logs & Observability" userEmail={user.email}>
-      {/* Page Header */}
-      <section className="mb-5 flex flex-col justify-between gap-4 rounded-md border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 md:flex-row md:items-end">
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
-              Operational Telemetry
-            </p>
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-              Unified
-            </span>
-          </div>
-          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-neutral-500 dark:text-slate-400">
-            Real-time operational activity across API requests, webhooks, AI models, background jobs, alerts, and SDK telemetry with distributed trace correlation and automated credential redaction.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <a
-            className="inline-flex h-9 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            href="/docs"
-          >
-            Telemetry Docs ↗
-          </a>
-        </div>
-      </section>
-
       {/* Main Observability Application Area */}
       <ObservabilityApp
         initialLogs={initialLogs}
