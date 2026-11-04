@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { withProjectId } from '../nav';
 import {
+  addDashboardWidget,
   createInsight,
   updateInsight,
   executeInsightQuery,
   fetchEventNames,
-  fetchEventProperties
+  fetchEventProperties,
+  fetchFunnels
 } from '@/lib/analytics-api';
 import type {
   SavedInsightView,
@@ -22,6 +24,7 @@ import { InsightTypeIcon } from '@/components/insights/InsightTypeIcon';
 import { InsightChartRenderer } from '@/components/charts/InsightChartRenderer';
 import { AddToDashboardModal } from '@/components/dashboards/AddToDashboardModal';
 import { toast } from '@/lib/toast';
+import { buildInsightQuery } from './insight-query';
 
 interface InsightBuilderProps {
   projectId?: string;
@@ -71,10 +74,9 @@ export function InsightBuilder({
   const [availableEvents, setAvailableEvents] = useState<Array<{ eventName: string; total: number; actors: number }>>([]);
   const [availableProperties, setAvailableProperties] = useState<Array<{ key: string; sampleType: string }>>([]);
 
-  // Funnel steps state (when type === 'funnel')
-  const [funnelSteps] = useState<string[]>(
-    initialInsight?.query?.steps || ['$pageview', '$click', 'letter_published']
-  );
+  // Funnel insights run a saved funnel; its steps are managed on the Funnels page
+  const [funnelId, setFunnelId] = useState<string>(initialInsight?.query?.funnelId || '');
+  const [funnels, setFunnels] = useState<Array<{ id: string; name: string; stepCount: number }> | null>(null);
 
   // Live query execution & data state
   const [queryResult, setQueryResult] = useState<any>(null);
@@ -97,6 +99,20 @@ export function InsightBuilder({
     });
   }, [projectId]);
 
+  // Load saved funnels, and reload on return from creating one in another tab
+  useEffect(() => {
+    if (type !== 'funnel') return;
+
+    const loadFunnels = () =>
+      fetchFunnels(projectId).then(({ data }) => {
+        if (data?.funnels) setFunnels(data.funnels);
+      });
+
+    loadFunnels();
+    window.addEventListener('focus', loadFunnels);
+    return () => window.removeEventListener('focus', loadFunnels);
+  }, [type, projectId]);
+
   // Load properties when event changes
   useEffect(() => {
     fetchEventProperties(event, projectId).then(({ data }) => {
@@ -118,21 +134,23 @@ export function InsightBuilder({
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [type, event, measure, property, breakdown, days, interval, compare, funnelSteps]);
+  }, [type, funnelId, event, measure, property, breakdown, days, interval, compare]);
+
+  function currentQuery() {
+    return buildInsightQuery(type, { funnelId, event, measure, property, breakdown, days, interval });
+  }
+
+  function handleFunnelChange(nextId: string) {
+    setFunnelId(nextId);
+    const selected = funnels?.find((funnel) => funnel.id === nextId);
+    if (selected && name === 'Untitled Insight') setName(selected.name);
+  }
 
   async function runQuery() {
     setIsQuerying(true);
     setQueryError(null);
 
-    const queryPayload: Record<string, any> = {
-      event,
-      measure,
-      property: property || undefined,
-      breakdown: breakdown || undefined,
-      days,
-      interval,
-      steps: type === 'funnel' ? funnelSteps : undefined
-    };
+    const queryPayload = currentQuery();
 
     const dateConfig: InsightDateConfig = {
       days,
@@ -161,17 +179,13 @@ export function InsightBuilder({
       toast.error('Please specify an insight name');
       return;
     }
+    if (type === 'funnel' && !funnelId) {
+      toast.error('Choose a funnel for this insight', { title: 'Funnel required' });
+      return;
+    }
 
     setIsSaving(true);
-    const queryPayload: Record<string, any> = {
-      event,
-      measure,
-      property: property || undefined,
-      breakdown: breakdown || undefined,
-      days,
-      interval,
-      steps: type === 'funnel' ? funnelSteps : undefined
-    };
+    const queryPayload = currentQuery();
 
     const visualizationPayload: InsightVisualizationConfig = {
       chartType
@@ -218,11 +232,24 @@ export function InsightBuilder({
       if (error) {
         toast.error(error);
       } else if (data?.insight) {
-        toast.success('Insight saved');
         setSavedInsightId(data.insight.id);
         if (returnDashboardId) {
+          // Opened from a dashboard's "Add chart": the new insight belongs on that dashboard.
+          const { error: widgetError } = await addDashboardWidget(returnDashboardId, {
+            insightId: data.insight.id,
+            title: data.insight.name,
+            layout: { w: type === 'kpi' ? 4 : 6 },
+            projectId
+          });
+          if (widgetError) {
+            toast.error(`Insight saved, but it could not be added to the dashboard: ${widgetError}`);
+            router.replace(withProjectId(`/dashboard/insights/${data.insight.id}`, projectId));
+            return;
+          }
+          toast.success(`Added "${data.insight.name}" to the dashboard`);
           router.push(withProjectId(`/dashboard/dashboards/${returnDashboardId}`, projectId));
         } else {
+          toast.success('Insight saved');
           router.replace(withProjectId(`/dashboard/insights/${data.insight.id}`, projectId));
         }
       }
@@ -240,17 +267,13 @@ export function InsightBuilder({
       toast.error('Please specify an insight name before adding to a dashboard');
       return;
     }
+    if (type === 'funnel' && !funnelId) {
+      toast.error('Choose a funnel for this insight', { title: 'Funnel required' });
+      return;
+    }
 
     setIsSaving(true);
-    const queryPayload: Record<string, any> = {
-      event,
-      measure,
-      property: property || undefined,
-      breakdown: breakdown || undefined,
-      days,
-      interval,
-      steps: type === 'funnel' ? funnelSteps : undefined
-    };
+    const queryPayload = currentQuery();
 
     const visualizationPayload: InsightVisualizationConfig = {
       chartType
@@ -295,10 +318,13 @@ export function InsightBuilder({
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <Link
-                href={withProjectId('/dashboard/insights', projectId)}
+                href={withProjectId(
+                  returnDashboardId ? `/dashboard/dashboards/${returnDashboardId}` : '/dashboard/insights',
+                  projectId
+                )}
                 className="text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
               >
-                ← Insights
+                ← {returnDashboardId ? 'Dashboard' : 'Insights'}
               </Link>
               <span className="text-neutral-300 dark:text-neutral-700">/</span>
               <input
@@ -306,7 +332,7 @@ export function InsightBuilder({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Insight name..."
-                className="rounded bg-transparent px-1.5 py-0.5 text-base font-semibold text-neutral-900 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
+                className="rounded bg-transparent px-1.5 py-0.5 text-base font-semibold text-neutral-900 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:text-white dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
               />
             </div>
             <input
@@ -314,20 +340,22 @@ export function InsightBuilder({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Add a description for this chart..."
-              className="w-full max-w-lg rounded bg-transparent px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-neutral-400 dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
+              className="w-full max-w-lg rounded bg-transparent px-1.5 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-850 dark:focus:bg-neutral-900"
             />
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleAddToDashboardClick}
-            disabled={isSaving}
-            className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          >
-            + Add to dashboard
-          </button>
+          {!returnDashboardId && (
+            <button
+              type="button"
+              onClick={handleAddToDashboardClick}
+              disabled={isSaving}
+              className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              Add to dashboard
+            </button>
+          )}
 
           <button
             type="button"
@@ -335,7 +363,15 @@ export function InsightBuilder({
             disabled={isSaving}
             className="rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
           >
-            {isSaving ? 'Saving...' : savedInsightId ? 'Save changes' : 'Save insight'}
+            {isSaving
+              ? 'Saving...'
+              : returnDashboardId
+                ? savedInsightId
+                  ? 'Save and return'
+                  : 'Save and add to dashboard'
+                : savedInsightId
+                  ? 'Save changes'
+                  : 'Save insight'}
           </button>
         </div>
       </div>
@@ -344,7 +380,7 @@ export function InsightBuilder({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Controls Panel (Cloudflare-style compact cards) */}
         <div className="space-y-4 lg:col-span-4">
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
               Query Configuration
             </h3>
@@ -362,8 +398,9 @@ export function InsightBuilder({
                     else if (newType === 'retention') setChartType('retention');
                     else if (newType === 'kpi') setChartType('kpi');
                     else if (newType === 'table') setChartType('table');
+                    else if (chartType === 'funnel' || chartType === 'retention') setChartType('line');
                   }}
-                  className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                  className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                 >
                   <option value="trend">Trend (Time-series)</option>
                   <option value="kpi">KPI Metric</option>
@@ -376,6 +413,45 @@ export function InsightBuilder({
                   <option value="table">Data Table</option>
                 </select>
               </div>
+
+              {/* Saved funnel */}
+              {type === 'funnel' && (
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label htmlFor="insight-funnel" className="font-medium text-neutral-700 dark:text-neutral-300">
+                      Funnel
+                    </label>
+                    <Link
+                      href={withProjectId('/dashboard/funnels', projectId)}
+                      target="_blank"
+                      className="text-[11px] text-neutral-500 underline underline-offset-2 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    >
+                      Manage funnels
+                    </Link>
+                  </div>
+                  <select
+                    id="insight-funnel"
+                    value={funnelId}
+                    onChange={(e) => handleFunnelChange(e.target.value)}
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                  >
+                    <option value="">{funnels?.length === 0 ? 'No funnels yet' : 'Choose a funnel...'}</option>
+                    {funnels?.map((funnel) => (
+                      <option key={funnel.id} value={funnel.id}>
+                        {funnel.name} ({funnel.stepCount} steps)
+                      </option>
+                    ))}
+                    {funnelId && funnels && !funnels.some((funnel) => funnel.id === funnelId) && (
+                      <option value={funnelId}>Funnel no longer available</option>
+                    )}
+                  </select>
+                  {funnels?.length === 0 && (
+                    <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Create a funnel to define its steps, then come back to this tab to select it.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Event / Action */}
               {type !== 'funnel' && (
@@ -391,7 +467,7 @@ export function InsightBuilder({
                   <select
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   >
                     <option value="*">* (All Events)</option>
                     {availableEvents.map((e) => (
@@ -413,7 +489,7 @@ export function InsightBuilder({
                   <select
                     value={measure}
                     onChange={(e) => setMeasure(e.target.value)}
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   >
                     <option value="count">Total events (Count)</option>
                     <option value="unique">Unique users</option>
@@ -430,7 +506,7 @@ export function InsightBuilder({
                   <select
                     value={property}
                     onChange={(e) => setProperty(e.target.value)}
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   >
                     <option value="">Select numeric property...</option>
                     {availableProperties.map((p) => (
@@ -452,7 +528,7 @@ export function InsightBuilder({
                   <select
                     value={breakdown}
                     onChange={(e) => setBreakdown(e.target.value)}
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 font-mono text-xs text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   >
                     <option value="">(None)</option>
                     {availableProperties.map((p) => {
@@ -472,13 +548,13 @@ export function InsightBuilder({
               )}
 
               {/* Date Range & Interval */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className={type === 'funnel' ? '' : 'grid grid-cols-2 gap-2'}>
                 <div>
                   <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Date Range</label>
                   <select
                     value={days}
                     onChange={(e) => setDays(e.target.value)}
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   >
                     <option value="1">Last 24 hours</option>
                     <option value="7">Last 7 days</option>
@@ -487,38 +563,43 @@ export function InsightBuilder({
                     <option value="90">Last 90 days</option>
                   </select>
                 </div>
+                {type !== 'funnel' && (
                 <div>
                   <label className="mb-1 block font-medium text-neutral-700 dark:text-neutral-300">Interval</label>
                   <select
                     value={interval}
                     onChange={(e) => setInterval(e.target.value as any)}
-                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
+                    className="w-full rounded border border-neutral-200 bg-neutral-50/50 p-2 text-neutral-800 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-200"
                   >
                     <option value="hour">Hourly</option>
                     <option value="day">Daily</option>
                     <option value="week">Weekly</option>
                   </select>
                 </div>
+                )}
               </div>
 
               {/* Compare toggle */}
+              {type !== 'funnel' && (
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
                   id="compare-check"
                   checked={compare}
                   onChange={(e) => setCompare(e.target.checked)}
-                  className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-neutral-300 accent-neutral-700"
                 />
                 <label htmlFor="compare-check" className="cursor-pointer select-none text-neutral-700 dark:text-neutral-300">
                   Compare with previous period
                 </label>
               </div>
+              )}
             </div>
           </div>
 
-          {/* Visualization Picker */}
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          {/* Visualization Picker (a funnel always renders as a funnel) */}
+          {type !== 'funnel' && (
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
               Visualization
             </h3>
@@ -532,8 +613,8 @@ export function InsightBuilder({
                     onClick={() => setChartType(vis.id)}
                     className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-3 text-xs transition-all ${
                       isSelected
-                        ? 'border-blue-500 bg-blue-50/80 font-semibold text-blue-700 shadow-sm ring-1 ring-blue-500 dark:bg-blue-950/50 dark:text-blue-300'
-                        : 'border-neutral-200 bg-neutral-50/40 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-850/40 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                        ? 'border-neutral-900 font-medium text-neutral-900 dark:border-white dark:text-white'
+                        : 'border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:text-neutral-800 dark:border-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-700 dark:hover:text-neutral-200'
                     }`}
                   >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -545,19 +626,24 @@ export function InsightBuilder({
               })}
             </div>
           </div>
+          )}
         </div>
 
         {/* Right Live Preview Panel */}
         <div className="space-y-4 lg:col-span-8">
-          <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
             <div className="mb-4 flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
               <div>
                 <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">{name}</h2>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
                   <span>{days}d window</span>
-                  <span>•</span>
-                  <span>{interval} intervals</span>
-                  {breakdown && (
+                  {type !== 'funnel' && (
+                    <>
+                      <span>•</span>
+                      <span>{interval} intervals</span>
+                    </>
+                  )}
+                  {breakdown && type !== 'funnel' && (
                     <>
                       <span>•</span>
                       <span>by {breakdown}</span>
@@ -567,10 +653,7 @@ export function InsightBuilder({
               </div>
 
               {isQuerying && (
-                <div className="flex items-center gap-1.5 text-xs text-neutral-400">
-                  <div className="h-2 w-2 animate-ping rounded-full bg-blue-500" />
-                  Calculating...
-                </div>
+                <span className="text-xs text-neutral-400">Calculating...</span>
               )}
             </div>
 

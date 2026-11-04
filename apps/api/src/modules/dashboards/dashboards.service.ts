@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
+import { memberEmailSql, rememberMemberEmail } from '../projects/member-email';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { SavedInsightView, SavedInsightsService } from '../insights/saved-insights.service';
 
@@ -39,7 +40,7 @@ export interface DashboardView {
   name: string;
   description: string | null;
   ownerId: string;
-  ownerEmail?: string;
+  ownerEmail?: string | null;
   isShared: boolean;
   isPinned: boolean;
   tags: string[];
@@ -442,7 +443,7 @@ type DashboardRow = {
   name: string;
   description: string | null;
   ownerId: string;
-  ownerEmail?: string;
+  ownerEmail?: string | null;
   isShared: boolean;
   isPinned: boolean;
   tags: string[] | null;
@@ -608,6 +609,7 @@ export class DashboardsService {
           d.name,
           d.description,
           d.owner_id AS "ownerId",
+          ${memberEmailSql('d.owner_id', 'd.project_id')} AS "ownerEmail",
           d.is_shared AS "isShared",
           d.is_pinned AS "isPinned",
           d.tags,
@@ -624,7 +626,15 @@ export class DashboardsService {
       params
     );
 
-    return { project, dashboards: result.rows.map(mapDashboardRow) };
+    if (user.email && result.rows.some((row) => row.ownerId === user.id && !row.ownerEmail)) {
+      await rememberMemberEmail(this.database, project.organizationId, user.id, user.email);
+    }
+
+    const dashboards = result.rows.map((row) =>
+      mapDashboardRow({ ...row, ownerEmail: row.ownerEmail ?? (row.ownerId === user.id ? user.email : undefined) })
+    );
+
+    return { project, dashboards };
   }
 
   async get(user: DashboardUser, id: string, projectId?: string): Promise<DashboardView> {
@@ -637,6 +647,7 @@ export class DashboardsService {
           d.name,
           d.description,
           d.owner_id AS "ownerId",
+          ${memberEmailSql('d.owner_id', 'd.project_id')} AS "ownerEmail",
           d.is_shared AS "isShared",
           d.is_pinned AS "isPinned",
           d.tags,
@@ -694,7 +705,10 @@ export class DashboardsService {
       [id]
     );
 
-    const dashboard = mapDashboardRow(row);
+    const dashboard = mapDashboardRow({
+      ...row,
+      ownerEmail: row.ownerEmail ?? (row.ownerId === user.id ? user.email : undefined)
+    });
     dashboard.widgets = widgetsResult.rows.map(mapWidgetRow);
     return dashboard;
   }

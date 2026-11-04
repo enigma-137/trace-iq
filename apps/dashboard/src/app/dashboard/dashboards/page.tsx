@@ -12,7 +12,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default async function DashboardsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ projectId?: string; tag?: string; tab?: string }>;
+  searchParams?: Promise<{ projectId?: string }>;
 }) {
   const resolvedParams = await searchParams;
   const projectId = firstParam(resolvedParams?.projectId);
@@ -22,8 +22,6 @@ export default async function DashboardsPage({
 
   const queryParams = new URLSearchParams();
   if (projectId) queryParams.set('projectId', projectId);
-  if (resolvedParams?.tag) queryParams.set('tag', resolvedParams.tag);
-  if (resolvedParams?.tab) queryParams.set('tab', resolvedParams.tab);
 
   const { data } = await dashboardGet<{ dashboards: DashboardView[] }>(
     `/v1/dashboard/dashboards?${queryParams.toString()}`,

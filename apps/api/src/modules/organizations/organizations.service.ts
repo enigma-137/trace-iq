@@ -869,12 +869,12 @@ export class OrganizationsService {
 
     await client.query(
       `
-        INSERT INTO organization_members (organization_id, user_id, role)
-        VALUES ($1, $2, 'owner')
+        INSERT INTO organization_members (organization_id, user_id, role, email)
+        VALUES ($1, $2, 'owner', $3)
         ON CONFLICT (organization_id, user_id)
-        DO UPDATE SET role = 'owner', updated_at = now();
+        DO UPDATE SET role = 'owner', email = COALESCE(organization_members.email, EXCLUDED.email), updated_at = now();
       `,
-      [organization.id, user.id]
+      [organization.id, user.id, user.email?.trim().toLowerCase() ?? null]
     );
 
     return {
