@@ -141,6 +141,11 @@ export async function fetchEventNames(projectId?: string) {
   );
 }
 
+export async function fetchFunnels(projectId?: string) {
+  const q = projectId ? `?projectId=${projectId}` : '';
+  return clientFetch<{ funnels: Array<{ id: string; name: string; stepCount: number }> }>(`/v1/dashboard/funnels${q}`);
+}
+
 export async function fetchEventProperties(event?: string, projectId?: string) {
   const params = new URLSearchParams();
   if (event) params.set('event', event);

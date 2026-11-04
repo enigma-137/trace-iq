@@ -47,6 +47,7 @@ export default async function DashboardWorkspacePage({
       <DashboardEditor
         projectId={projectId}
         initialDashboard={dashboard}
+        currentUserId={session.user.id}
       />
     </DashboardShell>
   );

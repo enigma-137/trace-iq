@@ -98,14 +98,12 @@ export function InsightChartRenderer({
         className={`flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-neutral-50/30 p-6 text-center dark:border-neutral-800 dark:bg-neutral-900/20 ${className}`}
         style={{ minHeight: height }}
       >
-        <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 4h18l-6.5 8.5v6.5l-5-2.5v-4L3 4z" />
-          </svg>
-        </div>
-        <p className="text-xs font-semibold text-neutral-900 dark:text-white">This chart needs configuration</p>
+        <svg className="mb-2 h-5 w-5 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 4h18l-6.5 8.5v6.5l-5-2.5v-4L3 4z" />
+        </svg>
+        <p className="text-xs font-semibold text-neutral-900 dark:text-white">No funnel selected</p>
         <p className="mt-1 max-w-xs text-[11px] text-neutral-500 dark:text-neutral-400">
-          Choose the event(s) that represent this metric for your product.
+          Choose a saved funnel to show its conversion here.
         </p>
         {onConfigure && (
           <button
@@ -113,7 +111,7 @@ export function InsightChartRenderer({
             onClick={onConfigure}
             className="mt-3 rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
           >
-            Configure
+            Choose funnel
           </button>
         )}
       </div>

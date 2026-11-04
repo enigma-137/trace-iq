@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
+import { memberEmailSql, rememberMemberEmail } from '../projects/member-email';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { FunnelsService } from '../funnels/funnels.service';
 import { ErrorsService } from '../errors/errors.service';
@@ -99,7 +100,7 @@ type InsightRow = {
   tags: string[] | null;
   isPinned: boolean;
   createdByUserId: string;
-  createdByUserEmail?: string;
+  createdByUserEmail?: string | null;
   usedInDashboardsCount?: number | string;
   createdAt: string;
   updatedAt: string;
@@ -119,11 +120,16 @@ function mapRow(row: InsightRow): SavedInsightView {
     tags: Array.isArray(row.tags) ? row.tags : [],
     isPinned: Boolean(row.isPinned),
     createdByUserId: row.createdByUserId,
-    createdByUserEmail: row.createdByUserEmail,
+    createdByUserEmail: row.createdByUserEmail ?? undefined,
     usedInDashboardsCount: Number(row.usedInDashboardsCount || 0),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
+}
+
+function withViewerEmail(insight: SavedInsightView, user: DashboardUser): SavedInsightView {
+  if (insight.createdByUserEmail || insight.createdByUserId !== user.id) return insight;
+  return { ...insight, createdByUserEmail: user.email };
 }
 
 @Injectable()
@@ -193,6 +199,7 @@ export class SavedInsightsService {
           i.tags,
           i.is_pinned AS "isPinned",
           i.created_by_user_id AS "createdByUserId",
+          ${memberEmailSql('i.created_by_user_id', 'i.project_id')} AS "createdByUserEmail",
           i.created_at AS "createdAt",
           i.updated_at AS "updatedAt",
           (SELECT COUNT(DISTINCT w.dashboard_id) FROM dashboard_widgets w WHERE w.insight_id = i.id) AS "usedInDashboardsCount"
@@ -204,9 +211,13 @@ export class SavedInsightsService {
       params
     );
 
+    if (user.email && result.rows.some((row) => row.createdByUserId === user.id && !row.createdByUserEmail)) {
+      await rememberMemberEmail(this.database, project.organizationId, user.id, user.email);
+    }
+
     return {
       project,
-      insights: result.rows.map(mapRow),
+      insights: result.rows.map((row) => withViewerEmail(mapRow(row), user)),
       total: result.rowCount ?? result.rows.length
     };
   }
@@ -228,6 +239,7 @@ export class SavedInsightsService {
           i.tags,
           i.is_pinned AS "isPinned",
           i.created_by_user_id AS "createdByUserId",
+          ${memberEmailSql('i.created_by_user_id', 'i.project_id')} AS "createdByUserEmail",
           i.created_at AS "createdAt",
           i.updated_at AS "updatedAt",
           (SELECT COUNT(DISTINCT w.dashboard_id) FROM dashboard_widgets w WHERE w.insight_id = i.id) AS "usedInDashboardsCount"
@@ -241,7 +253,7 @@ export class SavedInsightsService {
     if (!row) {
       throw new NotFoundException('Insight not found.');
     }
-    return mapRow(row);
+    return withViewerEmail(mapRow(row), user);
   }
 
   async create(user: DashboardUser, body: CreateInsightRequest): Promise<SavedInsightView> {

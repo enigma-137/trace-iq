@@ -21,17 +21,16 @@ import type {
 import { InsightTypeIcon } from '@/components/insights/InsightTypeIcon';
 import { InsightChartRenderer } from '@/components/charts/InsightChartRenderer';
 import { EmptyDashboardBuilder } from '../EmptyDashboardBuilder';
-import { NewDashboardModal } from '../NewDashboardModal';
 import { DashboardDialog } from '../../DashboardDialog';
 import { toast } from '@/lib/toast';
 
 interface DashboardEditorProps {
   projectId?: string;
   initialDashboard: DashboardView;
+  currentUserId: string;
 }
 
-export function DashboardEditor({ projectId, initialDashboard }: DashboardEditorProps) {
-  const router = useRouter();
+export function DashboardEditor({ projectId, initialDashboard, currentUserId }: DashboardEditorProps) {
   const [dashboard, setDashboard] = useState<DashboardView>(initialDashboard);
   const [widgets, setWidgets] = useState<DashboardWidgetView[]>(initialDashboard.widgets || []);
   const [globalDays, setGlobalDays] = useState<string>(
@@ -44,7 +43,6 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Modals state
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
   const [availableInsights, setAvailableInsights] = useState<SavedInsightView[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -233,20 +231,22 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
             <span className="text-base font-semibold text-neutral-900 dark:text-white">
               {dashboard.name}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                setEditName(dashboard.name);
-                setEditDesc(dashboard.description || '');
-                setIsEditDetailsOpen(true);
-              }}
-              className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              title="Edit dashboard details"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
+            {dashboard.ownerId === currentUserId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditName(dashboard.name);
+                  setEditDesc(dashboard.description || '');
+                  setIsEditDetailsOpen(true);
+                }}
+                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                title="Edit dashboard details"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            )}
           </div>
           {dashboard.description && (
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{dashboard.description}</p>
@@ -302,17 +302,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
           dashboardId={dashboard.id}
           projectId={projectId}
           onAddExistingChart={() => setIsAddChartOpen(true)}
-          onBrowseTemplates={() => setIsTemplateModalOpen(true)}
           onWidgetAdded={(w) => setWidgets((prev) => [...prev, w])}
-          onCreateNewInsight={(starterQuestion) => {
-            const query = starterQuestion ? `&goal=${encodeURIComponent(starterQuestion)}` : '';
-            router.push(
-              withProjectId(
-                `/dashboard/insights/new?returnDashboardId=${dashboard.id}${query}`,
-                projectId
-              )
-            );
-          }}
         />
       ) : (
         <div className="grid grid-cols-12 gap-4">
@@ -335,7 +325,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                 key={widget.id}
                 className={`${colClass} transition-all duration-150 ${
                   isDraggingThis ? 'opacity-40 scale-[0.98]' : ''
-                } ${isDragOverThis ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-neutral-900' : ''}`}
+                } ${isDragOverThis ? 'ring-2 ring-neutral-400 ring-offset-2 dark:ring-neutral-600 dark:ring-offset-neutral-900' : ''}`}
                 onDragOver={(e) => handleDragOver(e, idx)}
                 onDrop={() => handleDrop(idx)}
               >
@@ -369,7 +359,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
           isOpen={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
           title="Add chart to dashboard"
-          description="Choose an existing saved insight or create a new one."
+          description="Choose a saved insight, or create a new one."
           maxWidthClass="max-w-lg"
         >
           <div className="space-y-4 pt-2">
@@ -379,7 +369,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                 value={insightSearch}
                 onChange={(e) => setInsightSearch(e.target.value)}
                 placeholder="Search insights..."
-                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                 autoFocus
               />
             </div>
@@ -398,12 +388,14 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                 availableInsights
                   .filter((i) => i.name.toLowerCase().includes(insightSearch.toLowerCase()))
                   .map((insight) => (
-                    <div
+                    <button
+                      type="button"
                       key={insight.id}
                       onClick={() => handleAddExistingInsight(insight)}
-                      className="flex cursor-pointer items-center justify-between rounded-md border border-neutral-200 bg-white p-2.5 text-xs transition hover:border-blue-500/40 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-850"
+                      className="flex w-full items-center gap-2.5 rounded-md border border-neutral-200 p-2.5 text-left text-xs transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
                     >
-                      <div className="min-w-0 pr-2">
+                      <InsightTypeIcon type={insight.type} size="md" />
+                      <div className="min-w-0 flex-1">
                         <div className="truncate font-medium text-neutral-900 dark:text-white">
                           {insight.name}
                         </div>
@@ -413,15 +405,8 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                           </div>
                         )}
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] uppercase text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                          {insight.type}
-                        </span>
-                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                          + Add
-                        </span>
-                      </div>
-                    </div>
+                      <span className="shrink-0 font-medium text-neutral-500 dark:text-neutral-400">Add</span>
+                    </button>
                   ))
               )}
             </div>
@@ -432,9 +417,9 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                   `/dashboard/insights/new?dashboardId=${dashboard.id}`,
                   projectId
                 )}
-                className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                className="text-xs font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
               >
-                + Create new insight
+                Create a new insight
               </Link>
 
               <button
@@ -465,7 +450,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                 autoFocus
               />
             </div>
@@ -475,7 +460,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
                 rows={2}
-                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -513,7 +498,7 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
               type="text"
               value={widgetTitle}
               onChange={(e) => setWidgetTitle(e.target.value)}
-              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               autoFocus
             />
             <div className="flex justify-end gap-2 pt-2">
@@ -537,14 +522,6 @@ export function DashboardEditor({ projectId, initialDashboard }: DashboardEditor
         </DashboardDialog>
       )}
 
-      {/* Browse / Instantiate Templates Dialog */}
-      {isTemplateModalOpen && (
-        <NewDashboardModal
-          isOpen={isTemplateModalOpen}
-          onClose={() => setIsTemplateModalOpen(false)}
-          projectId={projectId}
-        />
-      )}
     </div>
   );
 }
@@ -668,8 +645,8 @@ function DashboardWidgetCard({
   return (
     <div
       ref={cardRef}
-      className={`group relative flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 ${
-        isResizing ? 'ring-2 ring-blue-500' : ''
+      className={`group relative flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 ${
+        isResizing ? 'ring-2 ring-neutral-400 dark:ring-neutral-600' : ''
       }`}
     >
       {/* Widget Header */}
@@ -702,7 +679,7 @@ function DashboardWidgetCard({
                     projectId
                   )}
                   title="Open underlying insight in builder"
-                  className="text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-blue-600 dark:hover:text-blue-400"
+                  className="text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-neutral-700 dark:hover:text-neutral-200"
                 >
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

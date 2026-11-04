@@ -12,7 +12,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default async function InsightsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ projectId?: string; tag?: string; type?: string }>;
+  searchParams?: Promise<{ projectId?: string }>;
 }) {
   const resolvedParams = await searchParams;
   const projectId = firstParam(resolvedParams?.projectId);
@@ -22,8 +22,6 @@ export default async function InsightsPage({
 
   const queryParams = new URLSearchParams();
   if (projectId) queryParams.set('projectId', projectId);
-  if (resolvedParams?.tag) queryParams.set('tag', resolvedParams.tag);
-  if (resolvedParams?.type) queryParams.set('type', resolvedParams.type);
 
   const { data } = await dashboardGet<{ insights: SavedInsightView[] }>(
     `/v1/dashboard/insights?${queryParams.toString()}`,
@@ -40,6 +38,7 @@ export default async function InsightsPage({
       <InsightsLibraryView
         projectId={projectId}
         initialInsights={data?.insights || []}
+        userId={session.user.id}
       />
     </DashboardShell>
   );

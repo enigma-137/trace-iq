@@ -184,14 +184,14 @@ export function AddToDashboardModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                Select Dashboard
+                Choose a dashboard
               </label>
               <button
                 type="button"
                 onClick={() => setIsCreatingNew(true)}
-                className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                className="text-xs font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
               >
-                + New dashboard
+                New dashboard
               </button>
             </div>
 
@@ -201,7 +201,7 @@ export function AddToDashboardModal({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search dashboards..."
-                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               />
             )}
 
@@ -219,7 +219,7 @@ export function AddToDashboardModal({
                   <button
                     type="button"
                     onClick={() => setIsCreatingNew(true)}
-                    className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                    className="font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
                   >
                     Create a new dashboard
                   </button>
@@ -235,8 +235,8 @@ export function AddToDashboardModal({
                       onClick={() => setSelectedDashboardId(dash.id)}
                       className={`flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-xs transition ${
                         isSelected
-                          ? 'border-blue-500/40 bg-blue-50/50 text-blue-900 shadow-sm dark:border-blue-500/50 dark:bg-blue-950/30 dark:text-blue-200'
-                          : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-850'
+                          ? 'border-neutral-900 text-neutral-900 dark:border-white dark:text-white'
+                          : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800/50'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
@@ -247,16 +247,15 @@ export function AddToDashboardModal({
                           </div>
                         )}
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                          {dash.widgetsCount ?? 0} widgets
-                        </span>
+                      <div className="flex shrink-0 items-center gap-2.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <span>{dash.widgetsCount ?? 0} charts</span>
                         <input
                           type="radio"
                           name="selectedDashboard"
                           checked={isSelected}
                           onChange={() => setSelectedDashboardId(dash.id)}
-                          className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
+                          aria-label={`Select ${dash.name}`}
+                          className="h-3.5 w-3.5 accent-neutral-700 dark:accent-neutral-300"
                         />
                       </div>
                     </div>
@@ -269,7 +268,7 @@ export function AddToDashboardModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                New Dashboard Name
+                New dashboard name
               </label>
               {dashboards.length > 0 && (
                 <button
@@ -286,7 +285,7 @@ export function AddToDashboardModal({
               value={newDashboardName}
               onChange={(e) => setNewDashboardName(e.target.value)}
               placeholder="e.g., Product Health, Growth Metrics"
-              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-blue-500 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               autoFocus
             />
           </div>
