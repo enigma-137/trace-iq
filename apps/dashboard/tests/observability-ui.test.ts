@@ -30,13 +30,13 @@ describe('Logs & Observability UI', () => {
     expect(source).toContain('AI requests');
     expect(source).toContain('Alerts');
     expect(source).toContain('Errors');
-    expect(source).toContain('Auth & Security');
-    expect(source).toContain('Jobs & Triggers');
+    expect(source).toContain('Auth & security');
+    expect(source).toContain('Jobs & triggers');
     expect(source).toContain('App logs (SDK)');
     expect(source).toContain('User actions');
     expect(source).toContain('Live');
-    expect(source).toContain('All levels');
-    expect(source).toContain('All status');
+    expect(source).toContain('label="Level"');
+    expect(source).toContain('label="Status"');
   });
 
   it('ObservabilityChart calculates and displays activity summary metrics', () => {
@@ -45,15 +45,15 @@ describe('Logs & Observability UI', () => {
       'utf8'
     );
 
-    expect(source).toContain('Total Activity');
-    expect(source).toContain('>Healthy<');
-    expect(source).toContain('>Errors<');
-    expect(source).toContain('>Warnings<');
+    expect(source).toContain('Activity over time');
+    expect(source).toContain('label="Healthy"');
+    expect(source).toContain('label="Errors"');
+    expect(source).toContain('label="Warnings"');
     // App logs are info/warn/error, so health is "not a warning or an error".
     expect(source).toContain('summary.total - summary.error - summary.warning');
     expect(source).not.toContain('(5xx)');
-    expect(source).toContain('Avg Latency');
-    expect(source).toContain('p95 Latency');
+    expect(source).toContain('summary.avgDuration');
+    expect(source).toContain('summary.p95Duration');
     expect(source).toContain('onSelectBucket');
   });
 
@@ -63,11 +63,12 @@ describe('Logs & Observability UI', () => {
       'utf8'
     );
 
-    expect(source).toContain('Time');
+    expect(source).toContain('Timestamp');
     expect(source).toContain('Level');
     expect(source).toContain('Source');
-    expect(source).toContain('Service / Target');
-    expect(source).toContain('Message / Operation');
+    expect(source).toContain('Method');
+    expect(source).toContain('Target');
+    expect(source).toContain('Message');
     expect(source).toContain('Latency');
     expect(source).toContain('Status');
     expect(source).toContain('onSelectLog');
@@ -84,7 +85,7 @@ describe('Logs & Observability UI', () => {
     expect(source).toContain('Metadata & Headers');
     expect(source).toContain('Error Details');
     expect(source).toContain('AI Execution Telemetry');
-    expect(source).toContain('Sensitive tokens, keys and headers automatically redacted');
+    expect(source).toContain('Sensitive tokens, keys and headers are redacted automatically');
     expect(source).toContain('View Session Replay');
     expect(source).toContain('View User Profile');
   });

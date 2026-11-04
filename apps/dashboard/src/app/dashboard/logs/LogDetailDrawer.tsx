@@ -399,8 +399,12 @@ export function LogDetailDrawer({
         {activeTab === 'payload' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-neutral-500 dark:text-slate-400">
-                🔒 Sensitive tokens, keys and headers automatically redacted
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-slate-400">
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <rect x="3.5" y="7" width="9" height="6.5" rx="1.2" />
+                  <path strokeLinecap="round" d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                </svg>
+                Sensitive tokens, keys and headers are redacted automatically
               </span>
               <button
                 type="button"
