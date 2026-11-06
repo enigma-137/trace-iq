@@ -1,0 +1,473 @@
+/* Billing success page. Rendered inside landing-light.module.css's .site, so its
+   tokens (--blue, --orange, --orange-paper, --ink, --muted, --line, --mono) apply.
+   Selectors use two classes where needed to beat .site's element resets. */
+.poster {
+  position: relative;
+  background: var(--blue);
+  color: var(--paper);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+/* Same film grain as the landing footer. */
+.poster::before,
+.receipt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath filter='url(%23n)' opacity='.7' d='M0 0h160v160H0z'/%3E%3C/svg%3E");
+}
+.poster::before {
+  opacity: 0.09;
+}
+/* A faint box grid, fading out toward the copy. */
+.poster::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--white-rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--white-rule) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(100deg, transparent 30%, #000 85%);
+  -webkit-mask-image: linear-gradient(100deg, transparent 30%, #000 85%);
+  opacity: 0.6;
+}
+.posterInner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+  gap: 48px;
+  align-items: center;
+  padding: 72px 24px 76px;
+  border-color: var(--white-rule);
+}
+.posterCopy .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--white-soft);
+}
+.posterCopy .eyebrow::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  background: var(--orange);
+}
+.poster .posterCopy h1 {
+  margin-top: 18px;
+  font-size: clamp(44px, 6.2vw, 84px);
+  font-weight: 780;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+.posterCopy h1 span {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0 10px 4px;
+  background: var(--paper);
+  color: var(--blue);
+}
+.posterCopy .lead {
+  margin-top: 24px;
+  max-width: 520px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--white-soft);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+.actions a.whiteButton {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--blue);
+}
+.actions a.whiteButton:hover {
+  background: var(--orange-paper);
+  border-color: var(--orange-paper);
+}
+.actions a.ghostButton {
+  background: transparent;
+  border-color: var(--white-soft);
+  color: var(--paper);
+}
+.actions a.ghostButton:hover {
+  background: #ffffff1a;
+  border-color: var(--paper);
+}
+
+.receipt {
+  position: relative;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 22px 24px 20px;
+  box-shadow:
+    10px 10px 0 var(--orange),
+    0 24px 60px #0b1d5c55;
+}
+.receipt::before {
+  opacity: 0.05;
+}
+.receiptHead {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--line);
+  font: 600 11px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+}
+.receiptHead span:last-child {
+  color: var(--muted);
+}
+.receipt .stamp {
+  position: absolute;
+  top: 54px;
+  right: 22px;
+  padding: 4px 12px;
+  border: 2px solid var(--orange);
+  color: var(--orange-ink);
+  font: 700 15px/1.2 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transform: rotate(-9deg);
+}
+.receipt dl {
+  margin: 0;
+}
+.receipt dl > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.receipt dt {
+  font: 500 11px/1.7 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.receipt dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.receipt dd.mono {
+  font: 500 12px/1.7 var(--mono);
+}
+.receipt .receiptFoot {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.activation {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.activationMark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--orange);
+  transform: translateY(-1px);
+}
+.activation[data-state="checking"] .activationMark {
+  animation: blink 1.1s steps(2, start) infinite;
+}
+.activation[data-state="active"] {
+  color: var(--green);
+}
+.activation[data-state="active"] .activationMark {
+  background: var(--green);
+}
+.activation[data-state="signed_out"] .activationMark,
+.activation[data-state="error"] .activationMark {
+  background: var(--muted);
+}
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.sectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+.sectionHeading h2,
+.steps h2 {
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+.limits .sectionHeading p {
+  margin-top: 6px;
+  font: 10px/1.7 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.limits {
+  padding: 52px 24px 56px;
+}
+.limits ul {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 30px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+}
+.limits li {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 150px;
+  padding: 20px 18px;
+  background: var(--paper);
+  transition: background 150ms;
+}
+.limits li + li {
+  border-left: 1px solid var(--line);
+}
+.limits li:first-child {
+  background: var(--orange-paper);
+}
+.limits li:hover {
+  background: var(--sky);
+}
+.limits strong {
+  font-size: clamp(40px, 4.4vw, 58px);
+  font-weight: 780;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: var(--blue);
+}
+.limits li:first-child strong {
+  color: var(--orange-ink);
+}
+.limits span {
+  margin-top: auto;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.steps {
+  padding: 52px 24px 56px;
+  border-top: 1px solid var(--line);
+}
+.steps ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 30px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.steps li {
+  display: flex;
+  flex-direction: column;
+  padding: 0 22px;
+  border-left: 1px solid var(--line);
+}
+.steps li:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.stepNumber {
+  font: 500 13px/1.5 var(--mono);
+  color: var(--blue);
+}
+.steps li h3 {
+  margin-top: 14px;
+  font-size: 16px;
+  font-weight: 680;
+  letter-spacing: -0.4px;
+}
+.steps li p {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.steps li a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--blue);
+}
+.steps li a:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+}
+
+.help {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 10px;
+  padding: 24px;
+  background: var(--orange-paper);
+  border-block: 1px solid var(--line);
+}
+.help h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.help div p {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+div.help > a {
+  flex: none;
+  padding: 11px 16px;
+  border: 1px solid var(--orange-ink);
+  color: var(--orange-ink);
+  font-size: 13px;
+  font-weight: 650;
+  transition:
+    background 150ms,
+    color 150ms;
+}
+div.help > a:hover {
+  background: var(--orange-ink);
+  color: var(--paper);
+}
+
+@media (max-width: 1150px) {
+  .posterInner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
+  }
+  .receipt {
+    max-width: 520px;
+  }
+  .limits ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .limits li + li {
+    border-left: 0;
+  }
+  .limits li {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .limits li:nth-child(3n) {
+    border-right: 0;
+  }
+  .limits li:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+  .steps ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 32px;
+  }
+  .steps li:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+@media (max-width: 600px) {
+  .posterInner {
+    padding: 48px 16px 56px;
+  }
+  .posterCopy .lead {
+    font-size: 16px;
+  }
+  .actions a {
+    flex: 1 1 100%;
+  }
+  .receipt {
+    margin-right: 10px;
+    padding: 18px 18px 16px;
+  }
+  .receipt .stamp {
+    top: 50px;
+    right: 14px;
+    font-size: 13px;
+  }
+  .receipt dl > div {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+  .sectionHeading {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .limits .sectionHeading p {
+    order: -1;
+    margin-top: 0;
+  }
+  .limits,
+  .steps {
+    padding: 40px 16px 44px;
+  }
+  .limits ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .limits li {
+    min-height: 120px;
+    padding: 16px 14px;
+  }
+  .limits li,
+  .limits li:nth-child(3n),
+  .limits li:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .limits li:nth-child(odd) {
+    border-right: 1px solid var(--line);
+  }
+  .limits li:last-child {
+    grid-column: 1 / -1;
+    border-right: 0;
+    border-bottom: 0;
+  }
+  .steps ol {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 26px;
+  }
+  .steps li,
+  .steps li:nth-child(3) {
+    padding: 0 0 0 16px;
+    border-left: 2px solid var(--line);
+  }
+  .steps li:first-child {
+    padding-left: 16px;
+    border-left: 2px solid var(--line);
+  }
+  .help {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activation[data-state="checking"] .activationMark {
+    animation: none;
+  }
+}
