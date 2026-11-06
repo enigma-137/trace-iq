@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { LandingSiteChrome } from '@/components/landing/LandingSiteChrome';
 import landing from '../../landing-light.module.css';
 import styles from './success.module.css';
-import { BillingActivationStatus } from './BillingActivationStatus';
+import { SuccessHero } from './SuccessHero';
 
 export const metadata: Metadata = {
   title: 'Welcome to TraceIQ Pro',
@@ -35,58 +35,8 @@ export default function BillingSuccessPage({
   ];
 
   return (
-    <LandingSiteChrome>
-      <section className={styles.poster} aria-labelledby="welcome-title">
-        <div className={`${landing.frame} ${styles.posterInner}`}>
-          <div className={styles.posterCopy}>
-            <p className={styles.eyebrow}>Payment received · Cloud Pro</p>
-            <h1 id="welcome-title">
-              Welcome to <span>TraceIQ Pro.</span>
-            </h1>
-            <p className={styles.lead}>
-              Your payment is complete. We are confirming the subscription with Bachs and raising your
-              organization’s limits.
-            </p>
-            <div className={styles.actions}>
-              <a className={`${landing.button} ${styles.whiteButton}`} href={withProject('/dashboard')}>
-                Go to dashboard <ArrowRight size={16} aria-hidden="true" />
-              </a>
-              <a className={`${landing.button} ${styles.ghostButton}`} href="/docs?page=quickstart">
-                <BookOpen size={16} aria-hidden="true" /> Read the docs
-              </a>
-            </div>
-          </div>
-
-          <aside className={styles.receipt} aria-label="Subscription summary">
-            <div className={styles.receiptHead}>
-              <span>TraceIQ</span>
-              <span>Receipt</span>
-            </div>
-            <p className={styles.stamp} aria-hidden="true">Paid</p>
-            <dl>
-              <div>
-                <dt>Plan</dt>
-                <dd>Cloud Pro</dd>
-              </div>
-              <div>
-                <dt>Applies to</dt>
-                <dd>Your active organization</dd>
-              </div>
-              {checkoutId ? (
-                <div>
-                  <dt>Reference</dt>
-                  <dd className={styles.mono}>{checkoutId.slice(0, 24)}</dd>
-                </div>
-              ) : null}
-              <div>
-                <dt>Status</dt>
-                <dd><BillingActivationStatus projectId={projectId} /></dd>
-              </div>
-            </dl>
-            <p className={styles.receiptFoot}>Invoices and payment details live in Settings → Billing.</p>
-          </aside>
-        </div>
-      </section>
+    <LandingSiteChrome cta={{ label: 'Go to dashboard', href: withProject('/dashboard') }}>
+      <SuccessHero projectId={projectId} checkoutId={checkoutId} />
 
       <section className={`${landing.frame} ${styles.limits}`} aria-labelledby="limits-title">
         <div className={styles.sectionHeading}>
