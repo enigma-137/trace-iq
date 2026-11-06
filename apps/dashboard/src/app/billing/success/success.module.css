@@ -42,7 +42,10 @@
   gap: 48px;
   align-items: center;
   padding: 72px 24px 76px;
-  border-color: var(--white-rule);
+}
+/* The landing frame's side rules would cut through the blue band. */
+.poster .posterInner {
+  border-inline: 0;
 }
 .posterCopy .eyebrow {
   display: inline-flex;
