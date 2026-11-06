@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import landing from '../../landing-light.module.css';
 import styles from './success.module.css';
@@ -12,38 +12,29 @@ const RETRY_MS = 2_000;
 
 type ActivationState = 'checking' | 'active' | 'pending' | 'signed_out' | 'error';
 
-// Every visible message comes from the same verified state, so the page never
-// says "Welcome to Pro" before the API confirms the organization is on Pro.
-const COPY: Record<ActivationState, { eyebrow: string; title: ReactNode; lead: string; status: string }> = {
+const SUBSCRIBED = {
+  eyebrow: 'Payment successful',
+  title: <>Welcome to <span>TraceIQ Pro.</span></>,
+  lead: 'Your payment went through and your organization is on Pro. Head to your dashboard to start using your higher limits.'
+};
+
+// "Welcome to Pro" shows once the API confirms Pro, or when we can't check
+// (no session in this browser, or the request failed): the dashboard checks
+// the session itself and will show the plan there. While the API still reports
+// the free plan, the copy says activation is in progress instead.
+const COPY: Record<ActivationState, { eyebrow: string; title: ReactNode; lead: string }> = {
   checking: {
     eyebrow: 'Payment received',
     title: <>Activating <span>TraceIQ Pro.</span></>,
-    lead: 'Your payment went through. We’re switching your organization to Pro, which usually takes a few seconds.',
-    status: 'Activating'
+    lead: 'Your payment went through. We’re switching your organization to Pro, which usually takes a few seconds.'
   },
-  active: {
-    eyebrow: 'Payment successful',
-    title: <>Welcome to <span>TraceIQ Pro.</span></>,
-    lead: 'Your Pro plan is active. Your organization’s higher limits apply now.',
-    status: 'Active'
-  },
+  active: SUBSCRIBED,
+  signed_out: SUBSCRIBED,
+  error: SUBSCRIBED,
   pending: {
     eyebrow: 'Payment received',
     title: <>Pro is <span>almost ready.</span></>,
-    lead: 'Your payment went through. Activation is taking longer than usual; your limits will update automatically within a few minutes.',
-    status: 'Still activating'
-  },
-  signed_out: {
-    eyebrow: 'Payment received',
-    title: <>Thanks for <span>upgrading.</span></>,
-    lead: 'Your payment went through. Sign in to see your Pro plan and its new limits.',
-    status: 'Sign in to check'
-  },
-  error: {
-    eyebrow: 'Payment received',
-    title: <>Thanks for <span>upgrading.</span></>,
-    lead: 'Your payment went through. We couldn’t check your plan just now; Billing settings will show when Pro is active.',
-    status: 'Couldn’t check'
+    lead: 'Your payment went through. Activation is taking longer than usual; your limits will update automatically within a few minutes.'
   }
 };
 
@@ -51,11 +42,8 @@ export function SuccessHero({ projectId, checkoutId }: { projectId?: string; che
   const state = useProActivation(projectId);
   const copy = COPY[state];
   const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  const primary = state === 'signed_out'
-    ? { label: 'Sign in', href: `/auth/login?next=${encodeURIComponent(`/dashboard/settings/billing${query}`)}` }
-    : state === 'error'
-      ? { label: 'Open billing settings', href: `/dashboard/settings/billing${query}` }
-      : { label: 'Go to dashboard', href: `/dashboard${query}` };
+  const dashboardHref = `/dashboard${query}`;
+  const subscribed = state !== 'checking' && state !== 'pending';
 
   return (
     <section className={styles.poster} aria-labelledby="welcome-title">
@@ -65,8 +53,8 @@ export function SuccessHero({ projectId, checkoutId }: { projectId?: string; che
           <h1 id="welcome-title">{copy.title}</h1>
           <p className={styles.lead} aria-live="polite">{copy.lead}</p>
           <div className={styles.actions}>
-            <a className={`${landing.button} ${styles.whiteButton}`} href={primary.href}>
-              {primary.label} <ArrowRight size={16} aria-hidden="true" />
+            <a className={`${landing.button} ${styles.whiteButton}`} href={dashboardHref}>
+              Go to dashboard <ArrowRight size={16} aria-hidden="true" />
             </a>
             <a className={`${landing.button} ${styles.ghostButton}`} href="/docs?page=quickstart">
               <BookOpen size={16} aria-hidden="true" /> Read the docs
@@ -98,10 +86,17 @@ export function SuccessHero({ projectId, checkoutId }: { projectId?: string; che
             <div>
               <dt>Pro status</dt>
               <dd>
-                <span className={styles.activation} data-state={state}>
-                  <span className={styles.activationMark} aria-hidden="true" />
-                  {copy.status}
-                </span>
+                {subscribed ? (
+                  <span className={styles.proBadge}>
+                    <CircleCheck size={30} strokeWidth={2.25} aria-hidden="true" />
+                    Pro
+                  </span>
+                ) : (
+                  <span className={styles.activation} data-state={state}>
+                    <span className={styles.activationMark} aria-hidden="true" />
+                    Activating
+                  </span>
+                )}
               </dd>
             </div>
           </dl>
