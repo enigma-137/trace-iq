@@ -197,15 +197,30 @@
 .proBadge {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 22px;
   font-weight: 750;
   letter-spacing: -0.4px;
   line-height: 1;
   color: var(--green);
 }
-.proBadge svg {
+.proCheck {
   flex: none;
+  width: 44px;
+  height: 40px;
+  margin: -10px 0 -8px;
+  overflow: visible;
+  transform: rotate(-9deg);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.proCheck circle {
+  stroke-width: 2.5;
+}
+.proCheck path {
+  stroke-width: 4.5;
 }
 @keyframes blink {
   to {
