@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react';
+import { ArrowRight, BookOpen } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import landing from '../../landing-light.module.css';
 import styles from './success.module.css';
@@ -88,8 +88,12 @@ export function SuccessHero({ projectId, checkoutId }: { projectId?: string; che
               <dd>
                 {subscribed ? (
                   <span className={styles.proBadge}>
-                    <CircleCheck size={30} strokeWidth={2.25} aria-hidden="true" />
-                    Pro
+                    Active
+                    {/* Hand-stamped check: the tick overshoots its circle, tilted like the PAID stamp. */}
+                    <svg className={styles.proCheck} viewBox="0 0 44 40" aria-hidden="true">
+                      <circle cx="18" cy="22" r="14" />
+                      <path d="M9 21.5 L17 30 L39 4" />
+                    </svg>
                   </span>
                 ) : (
                   <span className={styles.activation} data-state={state}>
