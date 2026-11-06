@@ -1,12 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowUpRight01Icon from '@hugeicons/core-free-icons/ArrowUpRight01Icon';
-import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
-import HelpCircleIcon from '@hugeicons/core-free-icons/HelpCircleIcon';
-import Rocket01Icon from '@hugeicons/core-free-icons/Rocket01Icon';
-import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
-import { PublicPage } from '@/components/PublicSiteChrome';
+import { ArrowRight, BookOpen } from 'lucide-react';
+import { LandingSiteChrome } from '@/components/landing/LandingSiteChrome';
+import landing from '../../landing-light.module.css';
+import styles from './success.module.css';
 import { BillingActivationStatus } from './BillingActivationStatus';
 
 export const metadata: Metadata = {
@@ -14,12 +10,13 @@ export const metadata: Metadata = {
   description: 'Your TraceIQ Pro subscription is ready. Review your benefits and finish setup.'
 };
 
-const benefits = [
-  '1M events every month',
-  'Up to 10 projects',
-  'Up to 5 team members',
-  '365-day data retention',
-  '100 AI insights every month'
+// Mirrors CLOUD_PLAN_CATALOG.pro.limits in the API.
+const limits = [
+  { value: '1M', label: 'events every month' },
+  { value: '10', label: 'projects' },
+  { value: '5', label: 'team members' },
+  { value: '365', label: 'days of data retention' },
+  { value: '100', label: 'Ask TraceIQ investigations a month' }
 ];
 
 export default function BillingSuccessPage({
@@ -28,68 +25,108 @@ export default function BillingSuccessPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const projectId = firstParam(searchParams.projectId);
-  const dashboardHref = projectId ? `/dashboard?projectId=${encodeURIComponent(projectId)}` : '/dashboard';
+  const checkoutId = firstParam(searchParams.checkout_id);
+  const withProject = (path: string) => projectId ? `${path}?projectId=${encodeURIComponent(projectId)}` : path;
+  const steps = [
+    { title: 'Confirm your SDK setup', body: 'Check that production events are arriving in the right project.', href: '/docs?page=quickstart', cta: 'Open the quickstart' },
+    { title: 'Invite your team', body: 'Add up to five members and give each the right role.', href: withProject('/dashboard/settings/team'), cta: 'Manage team' },
+    { title: 'Build your core views', body: 'Create funnels, retention reports, alerts and public dashboards.', href: withProject('/dashboard/funnels'), cta: 'Create a funnel' },
+    { title: 'Ask TraceIQ', body: 'Summarize patterns and investigate the journeys that matter.', href: withProject('/dashboard'), cta: 'Open the dashboard' }
+  ];
 
   return (
-    <PublicPage>
-      <main>
-        <section className="mx-auto max-w-5xl px-5 pb-20 pt-16 sm:px-8 sm:pt-24">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-full border border-emerald-400/30  text-emerald-300">
-              <HugeiconsIcon icon={Tick02Icon} size={28} strokeWidth={2.5} />
-            </div>
-            <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-emerald-300">Payment successful</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-6xl">Welcome to TraceIQ Pro.</h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-zinc-400">
-              Your payment is complete. We are confirming the subscription with Bachs and preparing your organization’s Pro limits.
+    <LandingSiteChrome>
+      <section className={styles.poster} aria-labelledby="welcome-title">
+        <div className={`${landing.frame} ${styles.posterInner}`}>
+          <div className={styles.posterCopy}>
+            <p className={styles.eyebrow}>Payment received · Cloud Pro</p>
+            <h1 id="welcome-title">
+              Welcome to <span>TraceIQ Pro.</span>
+            </h1>
+            <p className={styles.lead}>
+              Your payment is complete. We are confirming the subscription with Bachs and raising your
+              organization’s limits.
             </p>
-            <BillingActivationStatus projectId={projectId} />
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link href={dashboardHref} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-500 px-5 text-sm font-semibold text-white transition hover:bg-blue-400">
-                Go to dashboard <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} />
-              </Link>
-              <Link href="/docs?page=setup" className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-white/15 px-5 text-sm font-semibold text-zinc-100 transition hover:border-white/30 hover:bg-white/5">
-                <HugeiconsIcon icon={BookOpen02Icon} size={16} /> Read the docs
-              </Link>
+            <div className={styles.actions}>
+              <a className={`${landing.button} ${styles.whiteButton}`} href={withProject('/dashboard')}>
+                Go to dashboard <ArrowRight size={16} aria-hidden="true" />
+              </a>
+              <a className={`${landing.button} ${styles.ghostButton}`} href="/docs?page=quickstart">
+                <BookOpen size={16} aria-hidden="true" /> Read the docs
+              </a>
             </div>
           </div>
 
-          <div className="mt-14 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-            <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-6 sm:p-8">
-              <p className="font-mono text-xs uppercase tracking-[0.16em] text-blue-300">Your Pro plan</p>
-              <h2 className="mt-3 text-2xl font-semibold text-white">More room to understand and grow your product</h2>
-              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                {benefits.map((benefit) => (
-                  <li key={benefit} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-300"><HugeiconsIcon icon={Tick02Icon} size={14} /></span>
-                    {benefit}
-                  </li>
-                ))}
-              </ul>
-            </article>
-
-            <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-6 sm:p-8">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-blue-500/15 text-blue-300"><HugeiconsIcon icon={Rocket01Icon} size={20} /></div>
-              <h2 className="mt-4 text-2xl font-semibold text-white">Getting started with Pro</h2>
-              <ol className="mt-5 grid gap-4 text-sm leading-6 text-zinc-400">
-                <li><strong className="text-zinc-100">1. Confirm your SDK setup.</strong> Check that production events are arriving in the correct project.</li>
-                <li><strong className="text-zinc-100">2. Invite your team.</strong> Add up to five members and assign the right organization roles.</li>
-                <li><strong className="text-zinc-100">3. Build your core views.</strong> Create funnels, retention reports, alerts, and public dashboards.</li>
-                <li><strong className="text-zinc-100">4. Use AI insights.</strong> Ask TraceIQ to summarize patterns and investigate important journeys.</li>
-              </ol>
-            </article>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.025] p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <HugeiconsIcon icon={HelpCircleIcon} size={20} className="mt-0.5 shrink-0 text-zinc-300" />
-              <div><h2 className="font-semibold text-white">Need help with setup?</h2><p className="mt-1 text-sm text-zinc-400">Email us and include the project you are configuring. We’ll help you get Pro running.</p></div>
+          <aside className={styles.receipt} aria-label="Subscription summary">
+            <div className={styles.receiptHead}>
+              <span>TraceIQ</span>
+              <span>Receipt</span>
             </div>
-            <a href="mailto:traceiq.run@gmail.com?subject=TraceIQ%20Pro%20setup%20help" className="shrink-0 text-sm font-semibold text-blue-300 hover:text-blue-200">traceiq.run@gmail.com</a>
-          </div>
-        </section>
-      </main>
-    </PublicPage>
+            <p className={styles.stamp} aria-hidden="true">Paid</p>
+            <dl>
+              <div>
+                <dt>Plan</dt>
+                <dd>Cloud Pro</dd>
+              </div>
+              <div>
+                <dt>Applies to</dt>
+                <dd>Your active organization</dd>
+              </div>
+              {checkoutId ? (
+                <div>
+                  <dt>Reference</dt>
+                  <dd className={styles.mono}>{checkoutId.slice(0, 24)}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>Status</dt>
+                <dd><BillingActivationStatus projectId={projectId} /></dd>
+              </div>
+            </dl>
+            <p className={styles.receiptFoot}>Invoices and payment details live in Settings → Billing.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section className={`${landing.frame} ${styles.limits}`} aria-labelledby="limits-title">
+        <div className={styles.sectionHeading}>
+          <h2 id="limits-title">More room to understand your product.</h2>
+          <p>Pro limits / per organization</p>
+        </div>
+        <ul>
+          {limits.map((limit) => (
+            <li key={limit.label}>
+              <strong>{limit.value}</strong>
+              <span>{limit.label}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className={`${landing.frame} ${styles.steps}`} aria-labelledby="steps-title">
+        <h2 id="steps-title">Getting started with Pro</h2>
+        <ol>
+          {steps.map((step, index) => (
+            <li key={step.title}>
+              <span className={styles.stepNumber}>0{index + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+              <a href={step.href}>
+                {step.cta} <ArrowRight size={13} aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <div className={`${landing.frame} ${styles.help}`}>
+        <div>
+          <h2>Need help with setup?</h2>
+          <p>Email us with the project you are configuring and we’ll help you get Pro running.</p>
+        </div>
+        <a href="mailto:traceiq.run@gmail.com?subject=TraceIQ%20Pro%20setup%20help">traceiq.run@gmail.com</a>
+      </div>
+    </LandingSiteChrome>
   );
 }
 

@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import styles from './success.module.css';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 type State = 'checking' | 'active' | 'pending' | 'signed_out' | 'error';
@@ -53,13 +51,17 @@ export function BillingActivationStatus({ projectId }: { projectId?: string }) {
   }, [projectId, supabase]);
 
   const content = {
-    checking: <><HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> Confirming Pro activation…</>,
-    active: <><HugeiconsIcon icon={Tick02Icon} size={16} /> TraceIQ Pro is active</>,
-    pending: <><HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> Payment confirmed; activation is still processing. You can continue to the dashboard.</>,
-    signed_out: <>Payment confirmed. Sign in to the dashboard to view the active organization plan.</>,
-    error: <>Payment confirmed. We couldn’t refresh the plan status, but the webhook will continue processing.</>
+    checking: 'Confirming Pro activation…',
+    active: 'Pro is active',
+    pending: 'Payment confirmed. Activation is still processing; you can continue to the dashboard.',
+    signed_out: 'Payment confirmed. Sign in to see your organization’s plan.',
+    error: 'Payment confirmed. We couldn’t refresh the plan status, but activation will continue.'
   }[state];
-  const active = state === 'active';
 
-  return <div aria-live="polite" className={`mx-auto mt-6 flex max-w-xl items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm ${active ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-white/5 text-zinc-300'}`}>{content}</div>;
+  return (
+    <span aria-live="polite" className={styles.activation} data-state={state}>
+      <span className={styles.activationMark} aria-hidden="true" />
+      {content}
+    </span>
+  );
 }
