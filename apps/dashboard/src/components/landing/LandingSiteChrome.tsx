@@ -14,7 +14,19 @@ const navigation = [
 ] as const;
 
 /** White public-site header and cobalt footer shared by the landing and pricing pages. */
-export function LandingSiteChrome({ children }: { children: ReactNode }) {
+const defaultCta = { label: "Get started free", href: "/auth/login?mode=signup" };
+
+/**
+ * `cta` replaces the header and footer "Get started free" button, e.g. with a
+ * dashboard link on pages only signed-in customers reach.
+ */
+export function LandingSiteChrome({
+  children,
+  cta = defaultCta,
+}: {
+  children: ReactNode;
+  cta?: { label: string; href: string };
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const featuresRef = useRef<HTMLDivElement>(null);
@@ -97,9 +109,9 @@ export function LandingSiteChrome({ children }: { children: ReactNode }) {
           </nav>
           <a
             className={`${styles.button} ${styles.headerCta}`}
-            href="/auth/login?mode=signup"
+            href={cta.href}
           >
-            Get started free <ArrowRight size={14} aria-hidden="true" />
+            {cta.label} <ArrowRight size={14} aria-hidden="true" />
           </a>
           <button
             className={styles.menuButton}
@@ -157,9 +169,9 @@ export function LandingSiteChrome({ children }: { children: ReactNode }) {
             <h2>Make complexity legible.</h2>
             <a
               className={`${styles.button} ${styles.whiteButton}`}
-              href="/auth/login?mode=signup"
+              href={cta.href}
             >
-              Get started free <ArrowRight size={16} aria-hidden="true" />
+              {cta.label} <ArrowRight size={16} aria-hidden="true" />
             </a>
           </div>
           <div className={styles.footerMiddle}>

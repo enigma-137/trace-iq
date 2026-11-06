@@ -30,9 +30,9 @@
     linear-gradient(var(--white-rule) 1px, transparent 1px),
     linear-gradient(90deg, var(--white-rule) 1px, transparent 1px);
   background-size: 56px 56px;
-  mask-image: linear-gradient(100deg, transparent 30%, #000 85%);
-  -webkit-mask-image: linear-gradient(100deg, transparent 30%, #000 85%);
-  opacity: 0.6;
+  mask-image: linear-gradient(100deg, transparent 40%, #000 95%);
+  -webkit-mask-image: linear-gradient(100deg, transparent 40%, #000 95%);
+  opacity: 0.3;
 }
 .posterInner {
   position: relative;
@@ -51,10 +51,10 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font: 500 11px/1.6 var(--mono);
+  font: 500 12px/1.6 var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.9px;
-  color: var(--white-soft);
+  color: var(--paper);
 }
 .posterCopy .eyebrow::before {
   content: "";
@@ -64,9 +64,9 @@
 }
 .poster .posterCopy h1 {
   margin-top: 18px;
-  font-size: clamp(44px, 6.2vw, 84px);
-  font-weight: 780;
-  line-height: 0.98;
+  font-size: clamp(38px, 4.8vw, 64px);
+  font-weight: 760;
+  line-height: 1;
   letter-spacing: -0.06em;
 }
 .posterCopy h1 span {
@@ -149,31 +149,31 @@
 }
 .receipt dl > div {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 108px minmax(0, 1fr);
   gap: 12px;
   padding: 13px 0;
   border-bottom: 1px dashed var(--line);
 }
 .receipt dt {
-  font: 500 11px/1.7 var(--mono);
+  font: 500 12px/1.6 var(--mono);
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--muted);
+  letter-spacing: 0.5px;
+  color: #3f4b49;
 }
 .receipt dd {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .receipt dd.mono {
-  font: 500 12px/1.7 var(--mono);
+  font: 500 13px/1.6 var(--mono);
 }
 .receipt .receiptFoot {
   margin-top: 14px;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 13px;
+  color: #3f4b49;
 }
 
 .activation {
@@ -198,7 +198,8 @@
   background: var(--green);
 }
 .activation[data-state="signed_out"] .activationMark,
-.activation[data-state="error"] .activationMark {
+.activation[data-state="error"] .activationMark,
+.activation[data-state="pending"] .activationMark {
   background: var(--muted);
 }
 @keyframes blink {
@@ -222,7 +223,7 @@
 }
 .limits .sectionHeading p {
   margin-top: 6px;
-  font: 10px/1.7 var(--mono);
+  font: 11px/1.7 var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.7px;
   color: var(--muted);
@@ -269,9 +270,9 @@
 }
 .limits span {
   margin-top: auto;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.4;
-  color: var(--muted);
+  color: #3f4b49;
 }
 
 .steps {
@@ -307,7 +308,7 @@
 }
 .steps li p {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
   color: var(--muted);
 }
@@ -415,7 +416,7 @@ div.help > a:hover {
     font-size: 13px;
   }
   .receipt dl > div {
-    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
   }
   .sectionHeading {
     flex-direction: column;
