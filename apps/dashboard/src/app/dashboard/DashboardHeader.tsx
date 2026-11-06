@@ -12,6 +12,7 @@ import { MobileNav } from './MobileNav';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { DashboardDialog } from './DashboardDialog';
 import { toast } from '@/lib/toast';
+import { type ProjectHealth, healthLogsHref, useProjectHealth } from '@/lib/health';
 
 interface AlertsSummary {
   total: number;
@@ -48,8 +49,10 @@ export function DashboardHeader({
   const displayOrg = organizationName || null;
   const displayProject = projectName || null;
 
-  const hasFiringAlerts = alertsSummary && alertsSummary.firing > 0;
-  const hasAlerts = alertsSummary && alertsSummary.total > 0;
+  // The pill follows the data, not only alert rules: a project with no rules must not
+  // read "All systems operational" while its users can't sign in.
+  const health = useProjectHealth(projectId);
+  const pill = headerPill(health, alertsSummary ?? null);
 
   async function copyProjectId() {
     if (!projectId) return;
@@ -103,25 +106,15 @@ export function DashboardHeader({
           <div className="flex items-center gap-2.5">
             {headerActions}
 
-            {/* 1. Alerts rules status indicator (beeping/pulsing dot) */}
-            <div
-              className={`hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${hasFiringAlerts
-                ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
-                : 'border-neutral-200 bg-neutral-50/70 text-neutral-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300'
-                }`}
+            {/* 1. Health from recent data and alert rules (pulsing dot) */}
+            <Link
+              href={pill.href(projectId)}
+              title={pill.title}
+              className={`hidden sm:inline-flex max-w-[22rem] items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition hover:opacity-90 ${PILL_TONE[pill.tone]}`}
             >
-              <span
-                className={`size-2 rounded-full ${hasFiringAlerts ? 'bg-rose-500 animate-ping' : 'bg-emerald-500 animate-pulse'
-                  }`}
-              />
-              <span>
-                {hasFiringAlerts
-                  ? `${alertsSummary.firing} alert firing`
-                  : hasAlerts
-                    ? 'All alert rules healthy'
-                    : 'All systems operational'}
-              </span>
-            </div>
+              <span className={`size-2 shrink-0 rounded-full ${PILL_DOT[pill.tone]}`} />
+              <span className="truncate">{pill.label}</span>
+            </Link>
 
             {/* 2. Manage monitors button */}
             <Link
@@ -224,4 +217,76 @@ export function DashboardHeader({
       ) : null}
     </>
   );
+}
+
+type PillTone = 'outage' | 'degraded' | 'ok' | 'neutral';
+
+const PILL_TONE: Record<PillTone, string> = {
+  outage: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
+  degraded: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+  ok: 'border-neutral-200 bg-neutral-50/70 text-neutral-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300',
+  neutral: 'border-neutral-200 bg-neutral-50/70 text-neutral-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400'
+};
+
+const PILL_DOT: Record<PillTone, string> = {
+  outage: 'bg-rose-500 animate-ping',
+  degraded: 'bg-amber-500 animate-pulse',
+  ok: 'bg-emerald-500 animate-pulse',
+  neutral: 'bg-neutral-400 dark:bg-slate-500'
+};
+
+interface HeaderPill {
+  tone: PillTone;
+  label: string;
+  title: string;
+  href: (projectId?: string | null) => string;
+}
+
+const alertsHref = (projectId?: string | null) =>
+  projectId ? `/dashboard/alerts?projectId=${encodeURIComponent(projectId)}` : '/dashboard/alerts';
+
+/**
+ * The worst of what the data says and what alert rules say. Failures in the data win
+ * over "all alert rules healthy", because rules only cover what someone thought to set up.
+ */
+function headerPill(health: ProjectHealth | null, alerts: AlertsSummary | null): HeaderPill {
+  const firing = alerts?.firing ?? 0;
+  if (health && (health.status === 'outage' || health.status === 'degraded')) {
+    const outage = health.status === 'outage';
+    const extra = firing > 0 ? ` · ${firing} alert${firing === 1 ? '' : 's'} firing` : '';
+    return {
+      tone: outage ? 'outage' : 'degraded',
+      label: `${outage ? 'Outage' : 'Degraded'}: ${shortFailureLabel(health)}${extra}`,
+      title: health.summary,
+      href: healthLogsHref
+    };
+  }
+  if (firing > 0) {
+    return { tone: 'outage', label: `${firing} alert${firing === 1 ? '' : 's'} firing`, title: 'Open alerts', href: alertsHref };
+  }
+  if (!health) {
+    // Not loaded yet, or the API is unreachable: say nothing rather than "operational".
+    return { tone: 'neutral', label: 'Checking status…', title: 'Checking recent errors and failed requests', href: alertsHref };
+  }
+  if (health.status === 'idle') {
+    return { tone: 'neutral', label: 'No traffic in the last hour', title: health.summary, href: alertsHref };
+  }
+  const rules = (alerts?.total ?? 0) > 0;
+  return {
+    tone: 'ok',
+    label: 'All systems operational',
+    title: rules ? 'No failures in the last hour, and all alert rules are healthy' : 'No failures in the last hour. Set up alert rules to get notified.',
+    href: alertsHref
+  };
+}
+
+/** The single most important number, short enough for the header. */
+function shortFailureLabel(health: ProjectHealth): string {
+  const f = health.failures;
+  if (f.networkErrors > 0) return `${f.networkErrors} request${f.networkErrors === 1 ? '' : 's'} got no response`;
+  if (f.serverErrors > 0) return `${f.serverErrors} server error${f.serverErrors === 1 ? '' : 's'}`;
+  if (f.failedRequests > 0) return `${f.failedRequests} failed request${f.failedRequests === 1 ? '' : 's'}`;
+  if (f.exceptions > 0) return `${f.exceptions} error${f.exceptions === 1 ? '' : 's'}`;
+  if (f.topFailedAction) return `${f.topFailedAction.name} × ${f.topFailedAction.count}`;
+  return health.summary;
 }

@@ -334,7 +334,7 @@ function ResponseTab({ request }: { request: RequestDetail }) {
 }
 
 function entryTone(entry: TimelineEntry): StatusTone {
-  if (entry.statusCode) return statusTone(entry.statusCode);
+  if (entry.statusCode !== null && entry.statusCode !== undefined) return statusTone(entry.statusCode);
   if (entry.status === 'error') return 'server';
   if (entry.status === 'warning') return 'client';
   return entry.status === 'success' ? 'success' : 'none';
@@ -345,6 +345,7 @@ const barTone: Record<StatusTone, string> = {
   redirect: 'bg-neutral-400 dark:bg-slate-400',
   client: 'bg-amber-500',
   server: 'bg-red-500',
+  network: 'bg-red-600',
   none: 'bg-neutral-300 dark:bg-slate-600'
 };
 

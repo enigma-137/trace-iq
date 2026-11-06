@@ -5,6 +5,7 @@ import { ProjectsService, ResolvedProject } from '../projects/projects.service';
 import { RequestSource, clientRequestSql, parseRequestSource } from '../requests/request-capture';
 import { DIMENSION_SOURCES, FilterCondition, buildFilterClause, parseFiltersParam } from '../../common/filters';
 import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
+import { failedStatusSql } from '../../common/failures';
 import { RevenueTotals, loadRevenueSettings, queryRevenueTotals, revenueActive } from '../revenue/revenue.util';
 
 type TrendInterval = 'hour' | 'day' | 'week';
@@ -68,6 +69,7 @@ type ApiSummaryRow = {
   [column: string]: unknown;
   total: number;
   errors: number;
+  network_errors: number;
   avg: number;
   p50: number;
   p95: number;
@@ -105,14 +107,17 @@ export interface ApiTelemetryOverview {
   p95: number;
   p99: number;
   avgDuration: number;
-  /** Percentage of requests that got an HTTP status of 400 or above. */
+  /** Percentage of requests that failed: status 400 or above, or no response at all. */
   errorRate: number;
-  /** Requests with a status of 400 or above (4xx and 5xx). */
+  /** Requests that failed: 4xx, 5xx, or no response (status 0). */
   failedRequests: number;
   /** Requests with a 5xx status. */
   serverErrors: number;
+  /** Requests that got no response at all (status 0): the backend was unreachable. */
+  networkErrors: number;
   statusBreakdown: {
     ok200: number;
+    networkError: number;
     rateLimit429: number;
     error500: number;
     other: number;
@@ -400,7 +405,7 @@ export class AnalyticsService {
           count(*) FILTER (WHERE event_name = '$api_request')::int AS api_calls,
           count(*) FILTER (
             WHERE event_name = '$api_request'
-              AND (CASE WHEN properties->>'status' ~ '^[0-9]+$' THEN (properties->>'status')::int ELSE 0 END) >= 400
+              AND ${failedStatusSql("(CASE WHEN properties->>'status' ~ '^[0-9]+$' THEN (properties->>'status')::int END)")}
           )::int AS failed_requests,
           count(*) FILTER (
             WHERE event_name = '$exception' OR event_name = '$error'
@@ -482,6 +487,7 @@ export class AnalyticsService {
         this.database.query<{
           total_requests: number;
           http_errors: number;
+          network_errors: number;
           avg_duration: number;
           p50: number;
           p90: number;
@@ -507,7 +513,8 @@ export class AnalyticsService {
             )
             SELECT
               count(*)::int AS total_requests,
-              count(*) FILTER (WHERE status >= 400)::int AS http_errors,
+              count(*) FILTER (WHERE ${failedStatusSql('status')})::int AS http_errors,
+              count(*) FILTER (WHERE status = 0)::int AS network_errors,
               COALESCE(round(avg(duration), 1)::float, 0) AS avg_duration,
               COALESCE(round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p50,
               COALESCE(round((percentile_cont(0.90) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float, 0) AS p90,
@@ -516,7 +523,7 @@ export class AnalyticsService {
               count(*) FILTER (WHERE status IS NULL OR status = 200 OR (status >= 200 AND status < 300))::int AS ok_200,
               count(*) FILTER (WHERE status = 429)::int AS rate_limit_429,
               count(*) FILTER (WHERE status >= 500)::int AS error_500,
-              count(*) FILTER (WHERE status IS NOT NULL AND (status < 200 OR status >= 300) AND status <> 429 AND status < 500)::int AS other_status
+              count(*) FILTER (WHERE status IS NOT NULL AND status <> 0 AND (status < 200 OR status >= 300) AND status <> 429 AND status < 500)::int AS other_status
             FROM base
           `,
           [project.id]
@@ -558,7 +565,7 @@ export class AnalyticsService {
           `
             SELECT
               count(*)::int AS total_requests,
-              count(*) FILTER (WHERE (properties->>'status')::int >= 400)::int AS http_errors,
+              count(*) FILTER (WHERE ${failedStatusSql("(properties->>'status')::int")})::int AS http_errors,
               count(*) FILTER (WHERE (properties->>'status')::int >= 500)::int AS server_errors,
               COALESCE(round((percentile_cont(0.95) WITHIN GROUP (ORDER BY (properties->>'durationMs')::numeric))::numeric, 1)::float, 0) AS p95
             FROM events
@@ -819,8 +826,10 @@ export class AnalyticsService {
         errorRate,
         failedRequests: errCount,
         serverErrors: apiTel?.error_500 || 0,
+        networkErrors: apiTel?.network_errors || 0,
         statusBreakdown: {
           ok200: apiTel?.ok_200 || 0,
+          networkError: apiTel?.network_errors || 0,
           rateLimit429: apiTel?.rate_limit_429 || 0,
           error500: apiTel?.error_500 || 0,
           other: apiTel?.other_status || 0
@@ -1888,7 +1897,7 @@ export class AnalyticsService {
     const project = await this.projects.resolveActiveProject(user, projectId);
     const days = this.clampApiDays(daysParam);
 
-    const emptySummary = { totalRequests: 0, errorCount: 0, errorRate: 0, p50: 0, p95: 0, avg: 0 };
+    const emptySummary = { totalRequests: 0, errorCount: 0, networkErrorCount: 0, errorRate: 0, p50: 0, p95: 0, avg: 0 };
     if (!project) {
       return {
         project: null,
@@ -1945,7 +1954,7 @@ export class AnalyticsService {
            round(avg(duration), 1)::float AS avg,
            round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p95,
            mode() WITHIN GROUP (ORDER BY status) AS status,
-           count(*) FILTER (WHERE status >= 400)::int AS errors
+           count(*) FILTER (WHERE ${failedStatusSql('status')})::int AS errors
          FROM base GROUP BY method, path
          ORDER BY count DESC LIMIT 500`,
         [project.id, days]
@@ -1953,7 +1962,7 @@ export class AnalyticsService {
       this.database.query<ApiErrorRow>(
         `${base}
          SELECT method, path, status, count(*)::int AS count
-         FROM base WHERE status >= 400
+         FROM base WHERE ${failedStatusSql('status')}
          GROUP BY method, path, status
          ORDER BY count DESC LIMIT 8`,
         [project.id, days]
@@ -1961,7 +1970,8 @@ export class AnalyticsService {
       this.database.query<ApiSummaryRow>(
         `${base}
          SELECT count(*)::int AS total,
-           count(*) FILTER (WHERE status >= 400)::int AS errors,
+           count(*) FILTER (WHERE ${failedStatusSql('status')})::int AS errors,
+           count(*) FILTER (WHERE status = 0)::int AS network_errors,
            round(avg(duration), 1)::float AS avg,
            round((percentile_cont(0.50) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p50,
            round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 1)::float AS p95
@@ -1983,6 +1993,7 @@ export class AnalyticsService {
       summary: {
         totalRequests: total,
         errorCount,
+        networkErrorCount: s?.network_errors ?? 0,
         errorRate: total > 0 ? Math.round((errorCount / total) * 1000) / 10 : 0,
         p50: s?.p50 ?? 0,
         p95: s?.p95 ?? 0,

@@ -3,6 +3,7 @@ import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
 import { createHash, randomUUID } from 'node:crypto';
+import { isFailureEventName, isNetworkFailureMessage } from '../../common/failures';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 export type LogStatus = 'success' | 'warning' | 'error' | 'info' | 'pending';
@@ -204,6 +205,28 @@ const MIRRORED_SYSTEM_EVENTS = new Set(['$exception', '$error']);
 const MAX_SUMMARY_PROPS = 4;
 
 /**
+ * Severity for a mirrored event, by its impact on the user rather than by whether
+ * the app happened to catch it:
+ * - an uncaught exception is an error;
+ * - a caught exception is still an error when the request behind it got no response
+ *   (`Failed to fetch` and friends), because the user's action failed. Apps catch
+ *   these to show a toast, and treating that as "handled, so a warning" is how a
+ *   whole backend outage used to show up with zero errors;
+ * - other caught exceptions are warnings;
+ * - a tracked failure event (`login_failed`, `payment_declined`) is a warning, so it
+ *   stands out from page views without counting a wrong password as an error.
+ */
+export function eventLogLevel(name: string, isException: boolean, props: Record<string, unknown>): LogLevel {
+  if (isException) {
+    if (props.handled !== true) return 'error';
+    const type = typeof props.type === 'string' ? props.type : undefined;
+    const message = typeof props.message === 'string' ? props.message : undefined;
+    return isNetworkFailureMessage(message, type && message ? `${type}: ${message}` : undefined) ? 'error' : 'warn';
+  }
+  return isFailureEventName(name) ? 'warn' : 'info';
+}
+
+/**
  * Turns a tracked app event (`traceiq.track('challenge_sent', …)`) or an exception
  * into a log line so what users did shows up in Logs next to explicit log() calls,
  * correlated by session, user and request. Returns null for events that aren't
@@ -234,7 +257,7 @@ export function eventToLog(input: EventLogInput): (Partial<ObservabilityLogEntry
 
   return normalizeSdkLog({
     timestamp: input.occurredAt.toISOString(),
-    level: isException ? (props.handled === true ? 'warn' : 'error') : 'info',
+    level: eventLogLevel(name, isException, props),
     source: 'event',
     service: cap(props.service, 128) ?? 'app',
     message,

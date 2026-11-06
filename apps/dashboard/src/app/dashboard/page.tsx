@@ -27,6 +27,7 @@ import { ActiveAlertsBanner } from '@/components/charts/ActiveAlertsBanner';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
 import { TodayStoryCard } from './TodayStoryCard';
+import { HealthBanner } from './HealthBanner';
 import { NowActivityPanel } from './NowActivityPanel';
 import { RecentLogsPanel } from './RecentLogsPanel';
 import { alpha2ToName } from '@/lib/country-codes';
@@ -48,9 +49,11 @@ interface ApiTelemetryOverview {
   p99: number;
   avgDuration: number;
   errorRate: number;
-  /** 4xx and 5xx responses. Missing from APIs older than the field. */
+  /** 4xx, 5xx and no-response requests. Missing from APIs older than the field. */
   failedRequests?: number;
   serverErrors?: number;
+  /** Requests that got no response (status 0). */
+  networkErrors?: number;
   statusBreakdown: {
     ok200: number;
     rateLimit429: number;
@@ -270,6 +273,7 @@ export default async function DashboardPage({
   const failedSparkline = observabilitySeries.map((p) => ('failedRequests' in p ? Number(p.failedRequests ?? 0) : 0));
   const failedRequests = overview?.apiTelemetry?.failedRequests;
   const serverErrors = overview?.apiTelemetry?.serverErrors ?? 0;
+  const networkErrors = overview?.apiTelemetry?.networkErrors ?? 0;
   const usersSparkline: number[] = [];
   const apiSparkline = observabilitySeries.map((p) => p.apiCalls ?? 0);
   // The project's chosen successful-payment events; the card only shows once revenue is set up.
@@ -298,6 +302,8 @@ export default async function DashboardPage({
             {error}
           </section>
         ) : null}
+
+        {overview?.project ? <HealthBanner projectId={canonicalProjectId} /> : null}
 
         {hasNoProject ? (
           <PageBanner
@@ -417,8 +423,10 @@ export default async function DashboardPage({
               failedRequests === undefined
                 ? undefined
                 : changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate)
-                  ? `${failedRequests.toLocaleString()} failed · ${serverErrors.toLocaleString()} 5xx`
-                  : `${serverErrors.toLocaleString()} server errors (5xx)`
+                  ? `${failedRequests.toLocaleString()} failed · ${networkErrors > 0 ? `${networkErrors.toLocaleString()} no response · ` : ''}${serverErrors.toLocaleString()} 5xx`
+                  : networkErrors > 0
+                    ? `${networkErrors.toLocaleString()} got no response · ${serverErrors.toLocaleString()} 5xx`
+                    : `${serverErrors.toLocaleString()} server errors (5xx)`
             }
             color="rose"
             sparklineData={failedSparkline}

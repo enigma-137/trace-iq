@@ -14,6 +14,7 @@ import {
   parseRequestSource,
   rowToCaptureSettings
 } from './request-capture';
+import { NETWORK_FAILURE_STATUS, requestTraceStatus } from '../../common/failures';
 
 export interface RequestsQuery {
   projectId?: string;
@@ -324,6 +325,9 @@ export class RequestsService {
     const empty = {
       total: 0,
       serverErrors: 0,
+      networkErrors: 0,
+      clientErrors: 0,
+      failed: 0,
       errorRate: 0,
       p95: 0,
       captures: { captured: 0, redacted: 0, metadataOnly: 0, unavailable: 0 }
@@ -335,6 +339,8 @@ export class RequestsService {
       db.query<{
         total: number;
         server_errors: number;
+        network_errors: number;
+        client_errors: number;
         p95: number | null;
         captured: number;
         redacted: number;
@@ -344,6 +350,8 @@ export class RequestsService {
         `SELECT
           count(*)::int AS total,
           count(*) FILTER (WHERE status_code >= 500)::int AS server_errors,
+          count(*) FILTER (WHERE status_code = ${NETWORK_FAILURE_STATUS})::int AS network_errors,
+          count(*) FILTER (WHERE status_code >= 400 AND status_code < 500)::int AS client_errors,
           percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95,
           count(*) FILTER (WHERE capture_state = 'captured')::int AS captured,
           count(*) FILTER (WHERE capture_state = 'redacted')::int AS redacted,
@@ -358,13 +366,21 @@ export class RequestsService {
     if (!row) return { project: { id: project.id, name: project.name }, summary: empty };
     const total = Number(row.total) || 0;
     const serverErrors = Number(row.server_errors) || 0;
+    const networkErrors = Number(row.network_errors) || 0;
+    const clientErrors = Number(row.client_errors) || 0;
+    // The error rate is what users felt: the server failed (5xx) or never answered (status 0).
+    // 4xx are reported separately since many are expected (expired tokens, validation).
+    const failed = serverErrors + networkErrors;
     return {
       project: { id: project.id, name: project.name },
       window: { from: window.from.toISOString(), to: window.to.toISOString() },
       summary: {
         total,
         serverErrors,
-        errorRate: total > 0 ? Math.round((serverErrors / total) * 10_000) / 100 : 0,
+        networkErrors,
+        clientErrors,
+        failed,
+        errorRate: total > 0 ? Math.round((failed / total) * 10_000) / 100 : 0,
         p95: row.p95 === null || row.p95 === undefined ? 0 : Math.round(Number(row.p95) * 10) / 10,
         captures: {
           captured: Number(row.captured) || 0,
@@ -429,7 +445,7 @@ export class RequestsService {
       startedAt: request.occurredAt,
       offsetMs: 0,
       durationMs: request.durationMs,
-      status: request.statusCode >= 500 ? 'error' : request.statusCode >= 400 ? 'warning' : 'success',
+      status: requestTraceStatus(request.statusCode),
       statusCode: request.statusCode,
       current: true,
       matchedBy: 'self',
@@ -484,7 +500,7 @@ export class RequestsService {
         startedAt: peer.occurredAt,
         offsetMs: 0,
         durationMs: peer.durationMs,
-        status: peer.statusCode >= 500 ? 'error' : peer.statusCode >= 400 ? 'warning' : 'success',
+        status: requestTraceStatus(peer.statusCode),
         statusCode: peer.statusCode,
         current: false,
         matchedBy: 'trace_id',
@@ -772,7 +788,8 @@ export class RequestsService {
         params.push(floor);
         where.push(`status_code >= $${params.length} AND status_code < $${params.length} + 100`);
       } else if (status === 'error') {
-        where.push('status_code >= 500');
+        // Errors include requests that never got a response, not only 5xx.
+        where.push(`(status_code >= 500 OR status_code = ${NETWORK_FAILURE_STATUS})`);
       } else if (status === 'failed') {
         where.push('status_code = 0');
       } else if (/^\d{1,3}$/.test(status)) {

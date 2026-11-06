@@ -1,7 +1,7 @@
 import { CAPTURE_LABELS, type CaptureState, type StatusTone, statusTone } from '@/lib/requests';
 
 // Status codes are the one place the explorer breaks the neutral palette, matching
-// API Performance: green = success, amber = client error, red = server error.
+// API Performance: green = success, amber = client error, red = server error or no response.
 
 const methodTone: Record<string, string> = {
   GET: 'text-neutral-700 dark:text-slate-200',
@@ -28,6 +28,7 @@ const statusClasses = {
   redirect: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
   client: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
   server: 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300',
+  network: 'border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300',
   none: 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
 };
 
@@ -35,9 +36,9 @@ export function StatusBadge({ status }: { status: number }) {
   return (
     <span
       className={`inline-flex min-w-[38px] justify-center rounded border px-1.5 py-px font-mono text-[11px] font-semibold tabular-nums ${statusClasses[statusTone(status)]}`}
-      title={status === 0 ? 'No response (network error or aborted)' : undefined}
+      title={status === 0 ? 'No response: the request never reached the server or got no answer (network error, CORS, backend down, or aborted)' : undefined}
     >
-      {status || '—'}
+      {status === 0 ? 'ERR' : status || '—'}
     </span>
   );
 }
@@ -70,6 +71,7 @@ const pillClasses = {
   redirect: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
   client: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/60 dark:text-amber-300',
   server: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300',
+  network: 'border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-950/70 dark:text-red-300',
   none: 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
 };
 
