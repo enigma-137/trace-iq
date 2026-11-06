@@ -56,6 +56,11 @@ export interface RequestDetail extends RequestListItem {
 export interface RequestsSummary {
   total: number;
   serverErrors: number;
+  /** Requests that got no response (status 0). Older API versions omit it. */
+  networkErrors?: number;
+  clientErrors?: number;
+  /** serverErrors + networkErrors: what the error rate is based on. */
+  failed?: number;
   errorRate: number;
   p95: number;
   captures: { captured: number; redacted: number; metadataOnly: number; unavailable: number };
@@ -148,7 +153,8 @@ export const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '3xx', label: '3xx redirect' },
   { value: '4xx', label: '4xx client error' },
   { value: '5xx', label: '5xx server error' },
-  { value: 'failed', label: 'No response (0)' }
+  { value: 'error', label: 'All failures (5xx + no response)' },
+  { value: 'failed', label: 'No response (network error)' }
 ];
 
 export const CAPTURE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -323,9 +329,11 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export type StatusTone = 'success' | 'redirect' | 'client' | 'server' | 'none';
+export type StatusTone = 'success' | 'redirect' | 'client' | 'server' | 'network' | 'none';
 
+/** Status 0 means no response arrived (CORS, DNS, connection refused): the worst failure, shown in red. */
 export function statusTone(status: number): StatusTone {
+  if (status === 0) return 'network';
   if (status >= 500) return 'server';
   if (status >= 400) return 'client';
   if (status >= 300) return 'redirect';
@@ -338,7 +346,8 @@ export const STATUS_LABELS: Record<StatusTone, string> = {
   redirect: 'Redirect',
   client: 'Client error',
   server: 'Server error',
-  none: 'No response'
+  network: 'No response',
+  none: 'Unknown'
 };
 
 /** Deep link into the existing Errors issue view for a correlated exception. */

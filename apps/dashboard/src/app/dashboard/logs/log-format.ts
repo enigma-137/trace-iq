@@ -31,6 +31,7 @@ export type StatusTone = 'ok' | 'warn' | 'error' | 'neutral';
 
 /** "200 OK" for an HTTP entry, or a plain word for one without a status code. */
 export function statusLabel(status: LogStatus, code?: number | null): { text: string; tone: StatusTone } {
+  if (code === 0) return { text: 'No response', tone: 'error' };
   if (code) {
     const tone: StatusTone = code >= 500 ? 'error' : code >= 400 ? 'warn' : 'ok';
     const name = HTTP_STATUS_TEXT[code];

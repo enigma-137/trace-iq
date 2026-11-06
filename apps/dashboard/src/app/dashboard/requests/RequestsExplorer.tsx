@@ -317,8 +317,8 @@ export function RequestsExplorer({ projectId, canEditCapture }: { projectId: str
         <Metric
           label="Error rate"
           value={summary ? `${summary.errorRate}%` : '—'}
-          hint={summary ? `${summary.serverErrors.toLocaleString()} server errors (5xx)` : ''}
-          tone={summary && summary.serverErrors > 0 ? 'bad' : undefined}
+          hint={summary ? errorRateHint(summary) : ''}
+          tone={summary && (summary.failed ?? summary.serverErrors) > 0 ? 'bad' : undefined}
         />
         <Metric label="P95 latency" value={summary && summary.total > 0 ? formatDuration(summary.p95) : '—'} hint="95% of requests were faster" />
         <Metric
@@ -464,4 +464,13 @@ function EmptyState({ filtered }: { filtered: boolean }) {
       )}
     </div>
   );
+}
+
+/** "3 got no response · 1 server error (5xx)": no-response failures first, they mean the backend is unreachable. */
+function errorRateHint(summary: RequestsSummary): string {
+  const parts: string[] = [];
+  const network = summary.networkErrors ?? 0;
+  if (network > 0) parts.push(`${network.toLocaleString()} got no response`);
+  parts.push(`${summary.serverErrors.toLocaleString()} server error${summary.serverErrors === 1 ? '' : 's'} (5xx)`);
+  return parts.join(' · ');
 }

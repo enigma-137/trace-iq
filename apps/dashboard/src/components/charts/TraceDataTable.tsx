@@ -30,7 +30,7 @@ export function TraceDataTable({
   className = ''
 }: TraceDataTableProps) {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | '2xx' | '4xx' | '429' | '5xx'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | '2xx' | '4xx' | '429' | '5xx' | 'no response'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, e: React.MouseEvent) => {
@@ -53,12 +53,23 @@ export function TraceDataTable({
       (statusFilter === '2xx' && trace.status >= 200 && trace.status < 300) ||
       (statusFilter === '4xx' && trace.status >= 400 && trace.status < 500 && trace.status !== 429) ||
       (statusFilter === '429' && trace.status === 429) ||
-      (statusFilter === '5xx' && trace.status >= 500);
+      (statusFilter === '5xx' && trace.status >= 500) ||
+      (statusFilter === 'no response' && trace.status === 0);
 
     return matchesSearch && matchesStatus;
   });
 
   const getStatusBadge = (status: number) => {
+    if (status === 0) {
+      return (
+        <span
+          className="inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-600 dark:text-rose-400"
+          title="The request got no response: network error, CORS block, or the backend is down"
+        >
+          No response
+        </span>
+      );
+    }
     if (status >= 200 && status < 300) {
       return (
         <span className="inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
@@ -156,7 +167,7 @@ export function TraceDataTable({
 
         <div className="flex items-center gap-1 text-xs">
           <span className="text-neutral-500 dark:text-slate-400 mr-1 font-medium">Status:</span>
-          {(['all', '2xx', '4xx', '429', '5xx'] as const).map((s) => (
+          {(['all', '2xx', '4xx', '429', '5xx', 'no response'] as const).map((s) => (
             <button
               key={s}
               type="button"

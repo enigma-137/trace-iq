@@ -35,7 +35,7 @@ interface ApiPerformanceResponse {
   days: number;
   source?: TimingSource;
   sources?: { server: number; client: number };
-  summary: { totalRequests: number; errorCount: number; errorRate: number; p50?: number; p95: number; avg: number };
+  summary: { totalRequests: number; errorCount: number; networkErrorCount?: number; errorRate: number; p50?: number; p95: number; avg: number };
   highestLatency: EndpointRow[];
   highestError: ErrorRow[];
   mostRequests: EndpointRow[];
@@ -169,7 +169,9 @@ export default async function ApiPerformancePage({
                 {
                   label: 'Error rate',
                   value: `${summary?.errorRate ?? 0}%`,
-                  hint: `${(summary?.errorCount ?? 0).toLocaleString()} 4xx/5xx responses`
+                  hint: summary?.networkErrorCount
+                    ? `${(summary.errorCount ?? 0).toLocaleString()} failed · ${summary.networkErrorCount.toLocaleString()} got no response`
+                    : `${(summary?.errorCount ?? 0).toLocaleString()} failed (4xx/5xx or no response)`
                 },
                 { label: 'Median latency', value: formatMs(summary?.p50 ?? 0), hint: 'Half of requests are faster' },
                 { label: 'p95 latency', value: formatMs(summary?.p95 ?? 0), hint: '95% of requests are faster' },
@@ -330,7 +332,7 @@ function StatusDot({ status }: { status: number }) {
   // Status codes are the one place we break the monochrome palette: green = success,
   // red = failure, since that convention reads instantly.
   const color =
-    status >= 400
+    status >= 400 || status === 0
       ? 'bg-red-500'
       : status >= 200
         ? 'bg-emerald-500'
@@ -338,7 +340,7 @@ function StatusDot({ status }: { status: number }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-neutral-400 dark:text-slate-500">
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${color}`} aria-hidden />
-      {status || '—'}
+      {status === 0 ? 'No response' : status || '—'}
     </span>
   );
 }

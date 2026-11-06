@@ -401,10 +401,10 @@ describe('RequestsService queries', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('computes summary metrics: server-error rate and p95', async () => {
+  it('computes summary metrics: failure rate (5xx + no response) and p95', async () => {
     const db = mockDatabase((text) =>
       text.includes('percentile_cont')
-        ? rows([{ total: 400, server_errors: 7, p95: 812.345, captured: 10, redacted: 5, metadata_only: 380, unavailable: 5 }])
+        ? rows([{ total: 400, server_errors: 7, network_errors: 3, client_errors: 12, p95: 812.345, captured: 10, redacted: 5, metadata_only: 380, unavailable: 5 }])
         : empty()
     );
     const service = new RequestsService(db as never, projectsFor() as never);
@@ -412,12 +412,16 @@ describe('RequestsService queries', () => {
     expect(summary).toEqual({
       total: 400,
       serverErrors: 7,
-      errorRate: 1.75,
+      networkErrors: 3,
+      clientErrors: 12,
+      failed: 10,
+      errorRate: 2.5,
       p95: 812.3,
       captures: { captured: 10, redacted: 5, metadataOnly: 380, unavailable: 5 }
     });
     const call = db.queryCalls(/percentile_cont/)[0];
     expect(call.text).toContain('status_code >= 500');
+    expect(call.text).toContain('status_code = 0');
     expect(call.values).toContain('api');
   });
 

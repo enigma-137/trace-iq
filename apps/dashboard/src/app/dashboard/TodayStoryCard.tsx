@@ -7,6 +7,7 @@ import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
 import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
+import type { FailureFacts } from '@/lib/health';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -18,6 +19,8 @@ interface StoryFacts {
   topEvent: { name: string; count: number } | null;
   topCountry: { name: string; count: number; pct: number } | null;
   activeNow: number;
+  /** Missing from older API versions. */
+  failures?: FailureFacts;
 }
 
 interface TodayStoryResponse {
@@ -89,7 +92,14 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   const isUp = delta !== null && delta !== undefined && delta > 0;
   const isDown = delta !== null && delta !== undefined && delta < 0;
 
-  const headline = story
+  const failures = story?.facts.failures;
+  const failedCount = failures ? failures.failedRequests + failures.exceptions + failures.failedActions : 0;
+  // Failures lead the headline: nobody should read "activity is up" during an outage.
+  const headline = story && failures && failedCount > 0
+    ? failures.networkErrors > 0
+      ? `${failures.networkErrors} request${failures.networkErrors === 1 ? '' : 's'} got no response on ${projectName} today`
+      : `${failedCount} failure${failedCount === 1 ? '' : 's'} on ${projectName} today`
+    : story
     ? isUp
       ? `Activity is up ${delta}% on ${projectName}`
       : isDown
@@ -171,6 +181,12 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
 
           {story ? (
             <div className="mt-3.5 flex flex-wrap items-center gap-2">
+              {failures && failedCount > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+                  {failures.failedRequests > 0 ? `${failures.failedRequests.toLocaleString()} failed requests` : `${failedCount.toLocaleString()} failures`}
+                  {failures.affectedUsers > 0 ? ` · ${failures.affectedUsers.toLocaleString()} users affected` : ''}
+                </span>
+              ) : null}
               {delta !== null && delta !== undefined ? (
                 <span className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                   Today {delta > 0 ? `+${delta}%` : `${delta}%`}
