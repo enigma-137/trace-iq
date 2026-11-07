@@ -4,6 +4,18 @@ import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
 import { AiService } from '../ai/ai.service';
 import { DigestService, DigestPayload, buildDigestEmail } from './digest.service';
+import {
+  FAILURE_KIND_SQL,
+  FailureFacts,
+  ProjectHealthResponse,
+  STATUS_INT,
+  classifyHealth,
+  describeFailures,
+  emptyFailureFacts,
+  failureNarrative
+} from './failure-facts';
+
+export * from './failure-facts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -22,6 +34,8 @@ export interface TodayStoryFacts {
   topDevice: { name: string; count: number } | null;
   activeNow: number;
   lastEventAt: string | null;
+  /** What went wrong in the same window. Leads the story whenever anything did. */
+  failures: FailureFacts;
 }
 
 export interface TodayStoryResponse {
@@ -199,6 +213,142 @@ export class InsightsService {
     };
   }
 
+  /** Project health from the last `minutes` of data, for the header pill and the overview banner. */
+  async getHealth(user: DashboardUser, projectId?: string, minutesParam?: string): Promise<ProjectHealthResponse> {
+    const project = await this.projects.resolveActiveProject(user, projectId);
+    const parsed = minutesParam ? Number(minutesParam) : NaN;
+    const windowMinutes = Number.isFinite(parsed) ? Math.min(Math.max(Math.trunc(parsed), 5), 24 * 60) : 60;
+    const checkedAt = new Date().toISOString();
+    if (!project) {
+      return { project: null, status: 'idle', summary: 'No project selected', windowMinutes, failures: emptyFailureFacts(), checkedAt };
+    }
+
+    const since = new Date(Date.now() - windowMinutes * 60_000);
+    const [failures, eventCount] = await Promise.all([
+      this.computeFailures(project.id, since),
+      this.database
+        .query<{ count: number }>(`SELECT count(*)::int AS count FROM events WHERE project_id = $1 AND occurred_at >= $2`, [
+          project.id,
+          since.toISOString()
+        ])
+        .then((result) => result.rows[0]?.count ?? 0)
+        .catch(() => 0)
+    ]);
+    const status = classifyHealth(failures, eventCount);
+    const window = windowMinutes % 60 === 0 ? `${windowMinutes / 60}h` : `${windowMinutes}m`;
+    const summary =
+      status === 'idle'
+        ? `No traffic in the last ${window}`
+        : status === 'operational'
+          ? 'All systems operational'
+          : `${status === 'outage' ? 'Outage' : 'Degraded'}: ${describeFailures(failures)} in the last ${window}`;
+    return { project: { id: project.id, name: project.name }, status, summary, windowMinutes, failures, checkedAt };
+  }
+
+  /** Failures since `since`, counted with the shared rules in common/failures.ts. */
+  private async computeFailures(projectId: string, since: Date): Promise<FailureFacts> {
+    const params = [projectId, since.toISOString()];
+    const scoped = `
+      SELECT event_name, properties, occurred_at, COALESCE(user_id::text, anonymous_id) AS actor, ${FAILURE_KIND_SQL} AS kind
+      FROM events
+      WHERE project_id = $1 AND occurred_at >= $2
+    `;
+    const none = (error: unknown): { rows: never[] } => {
+      this.logger.warn(`Failure facts query failed: ${error instanceof Error ? error.message : String(error)}`);
+      return { rows: [] };
+    };
+    const [totals, topError, topRequest, topAction] = await Promise.all([
+      this.database
+        .query<{
+          exceptions: number;
+          failed_requests: number;
+          network_errors: number;
+          server_errors: number;
+          total_requests: number;
+          failed_actions: number;
+          affected_users: number;
+          first_at: string | Date | null;
+          last_at: string | Date | null;
+        }>(
+          `
+            WITH f AS (${scoped})
+            SELECT
+              count(*) FILTER (WHERE kind = 'exception')::int AS exceptions,
+              count(*) FILTER (WHERE kind = 'request')::int AS failed_requests,
+              count(*) FILTER (WHERE kind = 'request' AND ${STATUS_INT} = 0)::int AS network_errors,
+              count(*) FILTER (WHERE kind = 'request' AND ${STATUS_INT} >= 500)::int AS server_errors,
+              count(*) FILTER (WHERE event_name = '$api_request')::int AS total_requests,
+              count(*) FILTER (WHERE kind = 'action')::int AS failed_actions,
+              count(DISTINCT actor) FILTER (WHERE kind IS NOT NULL)::int AS affected_users,
+              min(occurred_at) FILTER (WHERE kind IS NOT NULL) AS first_at,
+              max(occurred_at) FILTER (WHERE kind IS NOT NULL) AS last_at
+            FROM f
+          `,
+          params
+        )
+        .catch(none),
+      this.database
+        .query<{ type: string; message: string; count: number; users: number }>(
+          `
+            WITH f AS (${scoped})
+            SELECT
+              COALESCE(NULLIF(properties->>'type', ''), 'Error') AS type,
+              COALESCE(NULLIF(properties->>'message', ''), '(no message)') AS message,
+              count(*)::int AS count,
+              count(DISTINCT actor)::int AS users
+            FROM f WHERE kind = 'exception'
+            GROUP BY 1, 2 ORDER BY count DESC LIMIT 1
+          `,
+          params
+        )
+        .catch(none),
+      this.database
+        .query<{ method: string; path: string; status: number; count: number }>(
+          `
+            WITH f AS (${scoped})
+            SELECT
+              COALESCE(NULLIF(properties->>'method', ''), 'GET') AS method,
+              COALESCE(NULLIF(properties->>'path', ''), '/') AS path,
+              ${STATUS_INT} AS status,
+              count(*)::int AS count
+            FROM f WHERE kind = 'request'
+            GROUP BY 1, 2, 3 ORDER BY count DESC LIMIT 1
+          `,
+          params
+        )
+        .catch(none),
+      this.database
+        .query<{ name: string; count: number; users: number }>(
+          `
+            WITH f AS (${scoped})
+            SELECT event_name AS name, count(*)::int AS count, count(DISTINCT actor)::int AS users
+            FROM f WHERE kind = 'action'
+            GROUP BY 1 ORDER BY count DESC LIMIT 1
+          `,
+          params
+        )
+        .catch(none)
+    ]);
+
+    const row = totals.rows[0];
+    if (!row) return emptyFailureFacts();
+    const iso = (value: string | Date | null) => (value ? new Date(value).toISOString() : null);
+    return {
+      exceptions: row.exceptions ?? 0,
+      failedRequests: row.failed_requests ?? 0,
+      networkErrors: row.network_errors ?? 0,
+      serverErrors: row.server_errors ?? 0,
+      totalRequests: row.total_requests ?? 0,
+      failedActions: row.failed_actions ?? 0,
+      affectedUsers: row.affected_users ?? 0,
+      topError: topError.rows[0] ?? null,
+      topFailedRequest: topRequest.rows[0] ?? null,
+      topFailedAction: topAction.rows[0] ?? null,
+      firstAt: iso(row.first_at),
+      lastAt: iso(row.last_at)
+    };
+  }
+
   /** `eventsToday` / `eventsYesterday` are the latest window and the one before it, whatever its length. */
   private async computeFacts(projectId: string, windowDays: number | 'all' = 1): Promise<TodayStoryFacts> {
     const now = Date.now();
@@ -207,7 +357,7 @@ export class InsightsService {
     const todayStart = windowDays === 'all' ? new Date(0) : new Date(now - windowDays * DAY_MS);
     const yesterdayStart = windowDays === 'all' ? new Date(0) : new Date(now - 2 * windowDays * DAY_MS);
 
-    const [totals, topEvent, topCountry, topDevice, lastEvent] = await Promise.all([
+    const [totals, topEvent, topCountry, topDevice, lastEvent, failures] = await Promise.all([
       this.database.query<{ today: number; yesterday: number; uniques_today: number; active_now: number }>(
         `
           SELECT
@@ -256,7 +406,8 @@ export class InsightsService {
       this.database.query<{ value: string }>(
         `SELECT max(occurred_at) AS value FROM events WHERE project_id = $1`,
         [projectId]
-      )
+      ),
+      this.computeFailures(projectId, todayStart)
     ]);
 
     const row = totals.rows[0];
@@ -283,7 +434,8 @@ export class InsightsService {
       topCountry: topCountryFact,
       topDevice: topDevice.rows[0] ?? null,
       activeNow: row?.active_now ?? 0,
-      lastEventAt: lastEvent.rows[0]?.value ?? null
+      lastEventAt: lastEvent.rows[0]?.value ?? null,
+      failures
     };
   }
 
@@ -310,6 +462,10 @@ export class InsightsService {
     }
 
     const parts: string[] = [];
+
+    // Failures lead: someone reading the story should learn about an outage first.
+    const failureLine = failureNarrative(facts.failures, span.last);
+    if (failureLine) parts.push(failureLine);
 
     if (allTime) {
       parts.push(`Your project has recorded ${facts.eventsToday.toLocaleString()} events ${span.last}.`);
@@ -353,7 +509,8 @@ export class InsightsService {
       topCountry: null,
       topDevice: null,
       activeNow: 0,
-      lastEventAt: null
+      lastEventAt: null,
+      failures: emptyFailureFacts()
     };
   }
 

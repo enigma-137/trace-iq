@@ -32,6 +32,18 @@ export class InsightsController {
     return this.insightsService.getNowActivity(user, projectId, minutes);
   }
 
+  /** Health from recent data (failed requests, errors, failed actions), for the header and overview. */
+  @Get('health')
+  async health(
+    @Headers('authorization') authorization?: string,
+    @Query('minutes') minutes?: string,
+    @Query('projectId') projectId?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'insights:read');
+    return this.insightsService.getHealth(user, projectId, minutes);
+  }
+
   @Get('digest')
   async digest(
     @Headers('authorization') authorization?: string,
