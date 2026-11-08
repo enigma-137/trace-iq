@@ -215,9 +215,6 @@ export default async function DashboardPage({
       : Promise.resolve(null)
   ]);
 
-  // A project with no events yet gets the getting-started checklist instead of an Overview full of empty charts.
-  // If the status can't be loaded the checklist still works from what the Overview itself knows.
-  const isBrandNew = hasNoProject || (Boolean(overview?.project) && !overview?.lastEventAt);
   const onboardingSteps: OnboardingSteps | null =
     onboardingResponse?.data?.steps ?? (overview?.project ? { ...EMPTY_ONBOARDING, firstEvent: Boolean(overview.lastEventAt) } : null);
   const showStarter = Boolean(overview?.project) && onboardingSteps !== null && starterMode(onboardingSteps) !== 'none';
@@ -294,6 +291,11 @@ export default async function DashboardPage({
       organizationId={activeOrganizationId}
       alertsSummary={overview?.alertsSummary ?? null}
       userEmail={user.email}
+      headerActions={
+        showStarter && overview?.project && onboardingSteps ? (
+          <StarterChecklist projectId={overview.project.id} projectName={overview.project.name} steps={onboardingSteps} />
+        ) : null
+      }
     >
       {/* Centered layout container */}
       <div className="max-w-[1360px] mx-auto w-full space-y-5 sm:space-y-6">
@@ -335,12 +337,7 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
-        {/* Getting started: the whole page until the first event arrives, then a small card until the rest is done. */}
-        {showStarter && overview?.project && onboardingSteps ? (
-          <StarterChecklist projectId={overview.project.id} projectName={overview.project.name} steps={onboardingSteps} />
-        ) : null}
-
-        {!isBrandNew ? (
+        {!hasNoProject ? (
           <>
         {/* Highlighted Insight Banner: Today's Story */}
         {overview?.project ? <TodayStoryCard projectId={canonicalProjectId} /> : null}

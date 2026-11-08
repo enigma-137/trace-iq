@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
 import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
+import { DashboardDialog } from '@/app/dashboard/DashboardDialog';
 import {
   buildStarterSteps,
   nextStarterStep,
@@ -29,6 +30,27 @@ function ProgressBar({ percent, label }: { percent: number; label: string }) {
   );
 }
 
+function ProgressRing({ percent }: { percent: number }) {
+  const radius = 7;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className="shrink-0 -rotate-90">
+      <circle cx="9" cy="9" r={radius} fill="none" strokeWidth="2.5" className="stroke-neutral-200 dark:stroke-slate-700" />
+      <circle
+        cx="9"
+        cy="9"
+        r={radius}
+        fill="none"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - percent / 100)}
+        className="stroke-emerald-500 transition-all"
+      />
+    </svg>
+  );
+}
+
 function StepMark({ done }: { done: boolean }) {
   return done ? (
     <HugeiconsIcon icon={CheckmarkCircle02Icon} size={20} strokeWidth={1.8} className="shrink-0 text-emerald-500" aria-hidden="true" />
@@ -37,7 +59,7 @@ function StepMark({ done }: { done: boolean }) {
   );
 }
 
-function StepRow({ step, isNext }: { step: StarterStep; isNext: boolean }) {
+function StepRow({ step, isNext, onNavigate }: { step: StarterStep; isNext: boolean; onNavigate: () => void }) {
   return (
     <li className="flex items-start gap-3 py-3">
       <span className="mt-0.5">
@@ -52,6 +74,7 @@ function StepRow({ step, isNext }: { step: StarterStep; isNext: boolean }) {
       {!step.done ? (
         <Link
           href={step.href}
+          onClick={onNavigate}
           className={
             isNext
               ? 'inline-flex h-8 shrink-0 items-center rounded-lg bg-neutral-900 px-3 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200'
@@ -66,8 +89,9 @@ function StepRow({ step, isNext }: { step: StarterStep; isNext: boolean }) {
 }
 
 /**
- * The getting-started card on the Overview. With no events yet it is the whole page ("hero");
- * once events flow it shrinks to a card above the Overview that can be hidden per project.
+ * The getting-started checklist. It never takes over the page: a small progress pill sits in the
+ * header and opens the checklist as a closable dialog. For a project that has not seen it yet, the
+ * dialog opens once on its own so new users find it, and stays out of the way after being closed.
  */
 export function StarterChecklist({
   projectId,
@@ -82,90 +106,57 @@ export function StarterChecklist({
   const steps = buildStarterSteps(status, projectId, projectName);
   const progress = starterProgress(steps);
   const next = nextStarterStep(steps);
-  const [dismissed, setDismissed] = useState<boolean | null>(null);
+  const [open, setOpen] = useState(false);
 
+  // Open automatically the first time a project is seen; remember that it was shown.
   useEffect(() => {
     try {
-      setDismissed(window.localStorage.getItem(starterDismissKey(projectId)) === '1');
+      if (window.localStorage.getItem(starterDismissKey(projectId)) !== '1') setOpen(true);
     } catch {
-      setDismissed(false); // storage blocked: just show it
+      // Storage blocked: leave it closed, the pill is still there.
     }
   }, [projectId]);
 
-  function hide() {
-    setDismissed(true);
+  function close() {
+    setOpen(false);
     try {
       window.localStorage.setItem(starterDismissKey(projectId), '1');
     } catch {
-      // Storage unavailable: it hides for this visit only.
+      // Storage unavailable: it only stays closed for this visit.
     }
   }
 
   if (mode === 'none') return null;
 
-  if (mode === 'hero') {
-    return (
-      <section
-        aria-labelledby="starter-title"
-        className="mx-auto w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:p-8"
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-label={`Setup progress: ${progress.done} of ${progress.total} done. Open checklist`}
+        className="inline-flex h-8 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
       >
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">
-          {progress.done} of {progress.total} done
-        </p>
-        <h2 id="starter-title" className="mt-1 text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          Get {projectName} sending data
-        </h2>
-        <p className="mt-1.5 text-sm leading-6 text-neutral-500 dark:text-slate-400">
-          Your charts, funnels and errors fill in the moment the first event arrives. Start with that one; the rest can wait.
-        </p>
-        <div className="mt-4">
-          <ProgressBar percent={progress.percent} label="Setup progress" />
-        </div>
+        <ProgressRing percent={progress.percent} />
+        <span>
+          Setup {progress.done}/{progress.total}
+        </span>
+      </button>
+
+      <DashboardDialog
+        open={open}
+        onClose={close}
+        title={`Get ${projectName} sending data`}
+        description="Your charts, funnels and errors fill in the moment the first event arrives. Start with that one; the rest can wait."
+        maxWidthClass="max-w-xl"
+      >
+        <ProgressBar percent={progress.percent} label="Setup progress" />
         <ul className="mt-2 divide-y divide-neutral-100 dark:divide-slate-800">
           {steps.map((step) => (
-            <StepRow key={step.id} step={step} isNext={step.id === next?.id} />
+            <StepRow key={step.id} step={step} isNext={step.id === next?.id} onNavigate={close} />
           ))}
         </ul>
-      </section>
-    );
-  }
-
-  // Compact: events are flowing. Wait for the stored choice before showing, so a hidden card never flashes.
-  if (dismissed !== false) return null;
-  const remaining = steps.filter((step) => !step.done);
-
-  return (
-    <section
-      aria-labelledby="starter-title"
-      className="rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 sm:p-5"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 id="starter-title" className="text-sm font-semibold text-neutral-900 dark:text-white">
-            Finish setting up
-          </h2>
-          <p className="text-xs text-neutral-500 dark:text-slate-400">
-            {progress.done} of {progress.total} done · {remaining.length} to go
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden w-32 sm:block">
-            <ProgressBar percent={progress.percent} label="Setup progress" />
-          </div>
-          <button
-            type="button"
-            onClick={hide}
-            className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-          >
-            Hide
-          </button>
-        </div>
-      </div>
-      <ul className="mt-1 divide-y divide-neutral-100 dark:divide-slate-800">
-        {remaining.map((step) => (
-          <StepRow key={step.id} step={step} isNext={step.id === next?.id} />
-        ))}
-      </ul>
-    </section>
+      </DashboardDialog>
+    </>
   );
 }
