@@ -3007,3 +3007,88 @@ input {
   .status-badge-img { width: 92px; height: 92px; }
   .status-check-meta { font-size: 0.68rem; }
 }
+
+/* Dashboard tour (driver.js), themed to match the dashboard */
+.driver-popover.traceiq-tour {
+  border: 1px solid rgb(229 229 229);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  max-width: 20rem;
+  box-shadow: 0 20px 40px -12px rgb(0 0 0 / 0.25);
+  font-family: inherit;
+}
+.driver-popover.traceiq-tour .driver-popover-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.driver-popover.traceiq-tour .driver-popover-description {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgb(82 82 82);
+}
+.driver-popover.traceiq-tour .driver-popover-progress-text {
+  font-size: 0.7rem;
+  color: rgb(115 115 115);
+}
+.driver-popover.traceiq-tour .driver-popover-footer button {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(229 229 229);
+  background: white;
+  color: rgb(38 38 38);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  text-shadow: none;
+}
+.driver-popover.traceiq-tour .driver-popover-close-btn {
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(115 115 115);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.driver-popover.traceiq-tour .driver-popover-close-btn:hover {
+  background: rgb(245 245 245);
+  color: rgb(23 23 23);
+}
+.driver-popover.traceiq-tour .driver-popover-footer .driver-popover-next-btn {
+  background: rgb(23 23 23);
+  border-color: rgb(23 23 23);
+  color: white;
+}
+.dark .driver-popover.traceiq-tour {
+  background: rgb(23 23 23);
+  border-color: rgb(64 64 64);
+  color: white;
+}
+.dark .driver-popover.traceiq-tour .driver-popover-description,
+.dark .driver-popover.traceiq-tour .driver-popover-progress-text {
+  color: rgb(163 163 163);
+}
+.dark .driver-popover.traceiq-tour .driver-popover-footer button {
+  background: rgb(38 38 38);
+  border-color: rgb(64 64 64);
+  color: white;
+}
+.dark .driver-popover.traceiq-tour .driver-popover-footer .driver-popover-next-btn {
+  background: white;
+  border-color: white;
+  color: rgb(10 10 10);
+}
+.dark .driver-popover.traceiq-tour .driver-popover-close-btn {
+  background: transparent;
+  border: 0;
+  color: rgb(163 163 163);
+}
+.dark .driver-popover.traceiq-tour .driver-popover-close-btn:hover {
+  background: rgb(38 38 38);
+  color: white;
+}
+.dark .driver-popover.traceiq-tour .driver-popover-arrow-side-right { border-right-color: rgb(23 23 23); }
+.dark .driver-popover.traceiq-tour .driver-popover-arrow-side-left { border-left-color: rgb(23 23 23); }

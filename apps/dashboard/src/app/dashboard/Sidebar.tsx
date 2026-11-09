@@ -199,6 +199,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
       {expanded ? (
         <button
           type="button"
+          data-tour="ask"
           onClick={() => openAsk()}
           className="mt-5 flex w-full items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50/50 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 dark:border-slate-800/90 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
         >
@@ -213,6 +214,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
       ) : (
         <button
           type="button"
+          data-tour="ask"
           onClick={() => openAsk()}
           className="mt-5 flex size-9 items-center justify-center self-center rounded-lg border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
           title="Ask TraceIQ (⌘ K)"
@@ -230,6 +232,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
             return (
               <Link
                 key={item.key}
+                data-tour={`nav-${item.key}`}
                 className={`${navLinkClass(isActive, true)} ${expanded ? '' : 'justify-center px-0'}`}
                 href={withProjectId(item.href, projectId)}
                 title={expanded ? undefined : item.label}
@@ -255,6 +258,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.key)}
+                      data-tour={`group-${group.key}`}
                       aria-expanded={isOpen}
                       aria-controls={`sidebar-group-${group.key}`}
                       className={`flex min-w-0 flex-1 items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition select-none ${
@@ -356,6 +360,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
           return (
             <Link
               key={item.key}
+              data-tour={`nav-${item.key}`}
               className={`${navLinkClass(isActive)} relative ${expanded ? '' : 'justify-center px-0'}`}
               href={withProjectId(item.href, projectId)}
               title={expanded ? undefined : item.label}
