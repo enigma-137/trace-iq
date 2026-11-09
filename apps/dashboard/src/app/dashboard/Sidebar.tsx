@@ -230,7 +230,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
             return (
               <Link
                 key={item.key}
-                className={`${navLinkClass(isActive)} ${expanded ? '' : 'justify-center px-0'}`}
+                className={`${navLinkClass(isActive, true)} ${expanded ? '' : 'justify-center px-0'}`}
                 href={withProjectId(item.href, projectId)}
                 title={expanded ? undefined : item.label}
               >
