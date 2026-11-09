@@ -154,6 +154,14 @@ export function StarterChecklist({
     }
   }
 
+  // Close the dialog first so the tour highlights the real page, then start it.
+  function takeTour() {
+    close();
+    window.setTimeout(() => {
+      void import('@/lib/dashboard-tour').then((tour) => tour.startDashboardTour());
+    }, 200);
+  }
+
   if (mode === 'none') return null;
 
   const firstEventStep = steps.find((step) => step.id === 'firstEvent')!;
@@ -219,6 +227,16 @@ export function StarterChecklist({
         <div className="mt-4">
           <ProgressBar percent={progress.percent} label="Setup progress" />
         </div>
+
+        {status.firstEvent || celebrating ? (
+          <button
+            type="button"
+            onClick={takeTour}
+            className="mt-4 inline-flex h-9 items-center rounded-lg bg-neutral-900 px-4 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+          >
+            Take a 1-minute tour
+          </button>
+        ) : null}
 
         {waitingForEvent ? (
           <div className="mt-4 rounded-xl border border-neutral-200 p-4 dark:border-slate-700">
