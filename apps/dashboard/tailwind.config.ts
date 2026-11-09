@@ -19,6 +19,12 @@ const config: Config = {
         foreground: '#f4f4f5',
         border: 'rgba(255, 255, 255, 0.07)'
       },
+      keyframes: {
+        'trace-float': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } }
+      },
+      animation: {
+        'trace-float': 'trace-float 3.2s ease-in-out infinite'
+      },
       fontFamily: {
         sans: ['var(--font-dm-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['var(--font-ibm-plex-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace']
