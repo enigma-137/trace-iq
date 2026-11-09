@@ -7,6 +7,7 @@ import AiBrain02Icon from '@hugeicons/core-free-icons/AiBrain02Icon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import SidebarLeftIcon from '@hugeicons/core-free-icons/SidebarLeftIcon';
 import SidebarRightIcon from '@hugeicons/core-free-icons/SidebarRightIcon';
+import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
 import { NavIcon } from './NavIcon';
 import { ThemeToggle } from './ThemeToggle';
 import { SignOutButton } from './SignOutButton';
@@ -32,6 +33,7 @@ interface SidebarProps {
 }
 
 const STORAGE_KEY = 'traceiq-sidebar-groups';
+const HIDDEN_KEY = 'traceiq-sidebar-hidden-groups';
 
 export function Sidebar({ active, userEmail, projectId, organizationId }: SidebarProps) {
   const { openAsk } = useAskTraceIQ();
@@ -39,6 +41,8 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
   const [isHovering, setIsHovering] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [hiddenGroups, setHiddenGroups] = useState<string[]>([]);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
   const { enrolled } = useMfaStatus();
   const showMfaWarning = mounted && enrolled === false;
 
@@ -82,6 +86,13 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
     }
 
     setOpenGroups(initialGroups);
+
+    try {
+      const storedHidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '[]');
+      if (Array.isArray(storedHidden)) setHiddenGroups(storedHidden.filter((key): key is string => typeof key === 'string'));
+    } catch {
+      // Ignore parse/storage errors: show everything
+    }
   }, []);
 
   // Ensure active route group automatically opens whenever active changes
@@ -107,6 +118,21 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
       return next;
     });
     setIsHovering(false);
+  };
+
+  // The group holding the current page always stays visible so the user never loses their place.
+  const visibleGroups = navGroups.filter((group) => group.key === activeGroup || !hiddenGroups.includes(group.key));
+
+  const toggleGroupVisibility = (groupKey: string) => {
+    setHiddenGroups((prev) => {
+      const next = prev.includes(groupKey) ? prev.filter((key) => key !== groupKey) : [...prev, groupKey];
+      try {
+        localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
   };
 
   const toggleGroup = (groupKey: string) => {
@@ -207,7 +233,57 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
         {/* Collapsible Groups */}
         {expanded ? (
           <div className="space-y-2 pt-1">
-            {navGroups.map((group) => {
+            <div className="relative flex items-center justify-between px-3 pt-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">Products</span>
+              <button
+                type="button"
+                onClick={() => setVisibilityOpen((prev) => !prev)}
+                aria-haspopup="true"
+                aria-expanded={visibilityOpen}
+                aria-label="Choose which products show in the sidebar"
+                title="Show in sidebar"
+                className="flex size-6 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+              >
+                <HugeiconsIcon icon={Settings02Icon} size={15} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+              {visibilityOpen ? (
+                <>
+                  <div className="fixed inset-0 z-40" onMouseDown={() => setVisibilityOpen(false)} aria-hidden="true" />
+                  <div
+                    role="group"
+                    aria-label="Show in sidebar"
+                    className="absolute left-3 right-0 top-full z-50 mt-1 rounded-lg border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p className="px-2 py-1 text-[11px] font-medium text-neutral-500 dark:text-slate-400">Show in sidebar</p>
+                    {navGroups.map((group) => {
+                      const locked = group.key === activeGroup;
+                      const shown = locked || !hiddenGroups.includes(group.key);
+                      return (
+                        <button
+                          key={group.key}
+                          type="button"
+                          role="switch"
+                          aria-checked={shown}
+                          disabled={locked}
+                          title={locked ? 'You are on a page in this group' : undefined}
+                          onClick={() => toggleGroupVisibility(group.key)}
+                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-medium text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          <span>{group.label}</span>
+                          <span
+                            className={`relative h-4 w-7 rounded-full transition ${shown ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-slate-700'}`}
+                            aria-hidden="true"
+                          >
+                            <span className={`absolute top-0.5 size-3 rounded-full bg-white transition-all ${shown ? 'left-3.5' : 'left-0.5'}`} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : null}
+            </div>
+            {visibleGroups.map((group) => {
               const isOpen = openGroups[group.key] ?? false;
               const hasActiveChild = group.items.some((item) => item.key === active);
 
@@ -268,7 +344,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
         ) : (
           /* Mini Sidebar: render icons with dividers between groups */
           <div className="space-y-2 pt-1">
-            {navGroups.map((group) => (
+            {visibleGroups.map((group) => (
               <div key={group.key} className="grid gap-0.5 border-t border-neutral-100 pt-1.5 dark:border-slate-900">
                 {group.items.map((item) => {
                   const isActive = item.key === active;
