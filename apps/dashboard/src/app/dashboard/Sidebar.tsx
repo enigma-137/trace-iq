@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
 import AiBrain02Icon from '@hugeicons/core-free-icons/AiBrain02Icon';
@@ -8,6 +9,7 @@ import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import SidebarLeftIcon from '@hugeicons/core-free-icons/SidebarLeftIcon';
 import SidebarRightIcon from '@hugeicons/core-free-icons/SidebarRightIcon';
 import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import { NavIcon } from './NavIcon';
 import { ThemeToggle } from './ThemeToggle';
 import { SignOutButton } from './SignOutButton';
@@ -15,6 +17,7 @@ import { OrganizationSwitcher } from './OrganizationSwitcher';
 import {
   topNavItems,
   navGroups,
+  type NavGroup,
   bottomNavItems,
   navLinkClass,
   childNavLinkClass,
@@ -33,7 +36,7 @@ interface SidebarProps {
 }
 
 const STORAGE_KEY = 'traceiq-sidebar-groups';
-const HIDDEN_KEY = 'traceiq-sidebar-hidden-groups';
+const HIDDEN_ITEMS_KEY = 'traceiq-sidebar-hidden-items';
 
 export function Sidebar({ active, userEmail, projectId, organizationId }: SidebarProps) {
   const { openAsk } = useAskTraceIQ();
@@ -41,8 +44,9 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
   const [isHovering, setIsHovering] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const [hiddenGroups, setHiddenGroups] = useState<string[]>([]);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  // Child links the user has switched off. Parent sections are never in here: they always show.
+  const [hiddenItems, setHiddenItems] = useState<string[]>([]);
+  const [customizing, setCustomizing] = useState<{ groupKey: string; top: number; left: number } | null>(null);
   const { enrolled } = useMfaStatus();
   const showMfaWarning = mounted && enrolled === false;
 
@@ -88,8 +92,8 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
     setOpenGroups(initialGroups);
 
     try {
-      const storedHidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '[]');
-      if (Array.isArray(storedHidden)) setHiddenGroups(storedHidden.filter((key): key is string => typeof key === 'string'));
+      const storedHidden = JSON.parse(localStorage.getItem(HIDDEN_ITEMS_KEY) ?? '[]');
+      if (Array.isArray(storedHidden)) setHiddenItems(storedHidden.filter((key): key is string => typeof key === 'string'));
     } catch {
       // Ignore parse/storage errors: show everything
     }
@@ -120,19 +124,26 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
     setIsHovering(false);
   };
 
-  // The group holding the current page always stays visible so the user never loses their place.
-  const visibleGroups = navGroups.filter((group) => group.key === activeGroup || !hiddenGroups.includes(group.key));
+  // Saved as soon as it changes. The page you are on always stays visible so you never lose your place.
+  const isItemHidden = (key: string) => key !== active && hiddenItems.includes(key);
+  const visibleItems = (group: NavGroup) => group.items.filter((item) => !isItemHidden(item.key));
 
-  const toggleGroupVisibility = (groupKey: string) => {
-    setHiddenGroups((prev) => {
-      const next = prev.includes(groupKey) ? prev.filter((key) => key !== groupKey) : [...prev, groupKey];
-      try {
-        localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore storage errors
-      }
-      return next;
-    });
+  const saveHiddenItems = (next: string[]) => {
+    setHiddenItems(next);
+    try {
+      localStorage.setItem(HIDDEN_ITEMS_KEY, JSON.stringify(next));
+    } catch {
+      // Ignore storage errors: applies for this visit only
+    }
+  };
+
+  const toggleItemVisibility = (itemKey: string) => {
+    saveHiddenItems(hiddenItems.includes(itemKey) ? hiddenItems.filter((key) => key !== itemKey) : [...hiddenItems, itemKey]);
+  };
+
+  const resetGroup = (group: NavGroup) => {
+    const keys = group.items.map((item) => item.key);
+    saveHiddenItems(hiddenItems.filter((key) => !keys.includes(key)));
   };
 
   const toggleGroup = (groupKey: string) => {
@@ -233,88 +244,57 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
         {/* Collapsible Groups */}
         {expanded ? (
           <div className="space-y-2 pt-1">
-            <div className="relative flex items-center justify-between px-3 pt-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">Products</span>
-              <button
-                type="button"
-                onClick={() => setVisibilityOpen((prev) => !prev)}
-                aria-haspopup="true"
-                aria-expanded={visibilityOpen}
-                aria-label="Choose which products show in the sidebar"
-                title="Show in sidebar"
-                className="flex size-6 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
-              >
-                <HugeiconsIcon icon={Settings02Icon} size={15} strokeWidth={1.8} aria-hidden="true" />
-              </button>
-              {visibilityOpen ? (
-                <>
-                  <div className="fixed inset-0 z-40" onMouseDown={() => setVisibilityOpen(false)} aria-hidden="true" />
-                  <div
-                    role="group"
-                    aria-label="Show in sidebar"
-                    className="absolute left-3 right-0 top-full z-50 mt-1 rounded-lg border border-neutral-200 bg-white p-1.5 shadow-lg dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <p className="px-2 py-1 text-[11px] font-medium text-neutral-500 dark:text-slate-400">Show in sidebar</p>
-                    {navGroups.map((group) => {
-                      const locked = group.key === activeGroup;
-                      const shown = locked || !hiddenGroups.includes(group.key);
-                      return (
-                        <button
-                          key={group.key}
-                          type="button"
-                          role="switch"
-                          aria-checked={shown}
-                          disabled={locked}
-                          title={locked ? 'You are on a page in this group' : undefined}
-                          onClick={() => toggleGroupVisibility(group.key)}
-                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-medium text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                          <span>{group.label}</span>
-                          <span
-                            className={`relative h-4 w-7 rounded-full transition ${shown ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-slate-700'}`}
-                            aria-hidden="true"
-                          >
-                            <span className={`absolute top-0.5 size-3 rounded-full bg-white transition-all ${shown ? 'left-3.5' : 'left-0.5'}`} />
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : null}
-            </div>
-            {visibleGroups.map((group) => {
+            {navGroups.map((group) => {
               const isOpen = openGroups[group.key] ?? false;
               const hasActiveChild = group.items.some((item) => item.key === active);
 
               return (
                 <div key={group.key} className="space-y-0.5">
-                  {/* Group Header Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.key)}
-                    aria-expanded={isOpen}
-                    aria-controls={`sidebar-group-${group.key}`}
-                    className={`flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition select-none ${
-                      hasActiveChild
-                        ? 'text-neutral-900 dark:text-slate-200 font-bold'
-                        : 'text-neutral-500 hover:bg-neutral-100/70 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    <span>{group.label}</span>
-                    <svg
-                      className={`size-3 text-neutral-400 transition-transform duration-150 ease-in-out dark:text-slate-500 ${
-                        isOpen ? 'rotate-90' : ''
+                  {/* Group Header Toggle + per-section customize gear */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.key)}
+                      aria-expanded={isOpen}
+                      aria-controls={`sidebar-group-${group.key}`}
+                      className={`flex min-w-0 flex-1 items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition select-none ${
+                        hasActiveChild
+                          ? 'text-neutral-900 dark:text-slate-200 font-bold'
+                          : 'text-neutral-500 hover:bg-neutral-100/70 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-200'
                       }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.2}
-                      aria-hidden="true"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+                      <span>{group.label}</span>
+                      <svg
+                        className={`size-3 text-neutral-400 transition-transform duration-150 ease-in-out dark:text-slate-500 ${
+                          isOpen ? 'rotate-90' : ''
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.2}
+                        aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        const asideRight = event.currentTarget.closest('aside')?.getBoundingClientRect().right ?? rect.right;
+                        setCustomizing((current) =>
+                          current?.groupKey === group.key ? null : { groupKey: group.key, top: rect.top, left: asideRight + 8 }
+                        );
+                      }}
+                      aria-haspopup="dialog"
+                      aria-expanded={customizing?.groupKey === group.key}
+                      aria-label={`Customize ${group.label}`}
+                      title={`Customize ${group.label}`}
+                      className="flex size-6 shrink-0 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+                    >
+                      <HugeiconsIcon icon={Settings02Icon} size={15} strokeWidth={1.8} aria-hidden="true" />
+                    </button>
+                  </div>
 
                   {/* Child Items */}
                   {isOpen && (
@@ -322,7 +302,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
                       id={`sidebar-group-${group.key}`}
                       className="ml-2.5 grid gap-0.5 border-l border-neutral-200/80 pl-2 my-0.5 dark:border-slate-800/80"
                     >
-                      {group.items.map((item) => {
+                      {visibleItems(group).map((item) => {
                         const isActive = item.key === active;
                         return (
                           <Link
@@ -344,9 +324,9 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
         ) : (
           /* Mini Sidebar: render icons with dividers between groups */
           <div className="space-y-2 pt-1">
-            {visibleGroups.map((group) => (
+            {navGroups.map((group) => (
               <div key={group.key} className="grid gap-0.5 border-t border-neutral-100 pt-1.5 dark:border-slate-900">
-                {group.items.map((item) => {
+                {visibleItems(group).map((item) => {
                   const isActive = item.key === active;
                   return (
                     <Link
@@ -417,7 +397,133 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
           </div>
         )}
       </div>
+      {customizing ? (
+        <CustomizePanel
+          group={navGroups.find((group) => group.key === customizing.groupKey)!}
+          top={customizing.top}
+          left={customizing.left}
+          activeKey={active}
+          hiddenItems={hiddenItems}
+          onToggle={toggleItemVisibility}
+          onReset={resetGroup}
+          onClose={() => setCustomizing(null)}
+        />
+      ) : null}
     </aside>
+  );
+}
+
+/** Rendered in a portal on the page body, so it opens beside the sidebar instead of inside (and clipped by) it. */
+function CustomizePanel({
+  group,
+  top,
+  left,
+  activeKey,
+  hiddenItems,
+  onToggle,
+  onReset,
+  onClose
+}: {
+  group: NavGroup;
+  top: number;
+  left: number;
+  activeKey: string;
+  hiddenItems: string[];
+  onToggle: (itemKey: string) => void;
+  onReset: (group: NavGroup) => void;
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as Element | null;
+      // The gear toggles the panel itself, so a press on it must not also close it first.
+      if (panelRef.current?.contains(target as Node) || target?.closest('[aria-haspopup="dialog"]')) return;
+      onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('mousedown', onPointerDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('mousedown', onPointerDown);
+    };
+  }, [onClose]);
+
+  // Keep the panel on screen when the gear is near the bottom of the window.
+  const maxTop = typeof window === 'undefined' ? top : Math.max(8, window.innerHeight - 40 - (group.items.length * 40 + 150));
+  const hasHidden = group.items.some((item) => hiddenItems.includes(item.key));
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-label={`Customize ${group.label}`}
+      style={{ top: Math.min(top, maxTop), left }}
+      className="fixed z-50 w-80 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xl shadow-neutral-950/15 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-neutral-950 dark:text-white">Customize {group.label}</h2>
+          <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-slate-400">Choose which items appear in this section.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      </div>
+
+      <ul className="mt-3 grid gap-0.5">
+        {group.items.map((item) => {
+          const locked = item.key === activeKey;
+          const shown = locked || !hiddenItems.includes(item.key);
+          return (
+            <li key={item.key}>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={shown}
+                disabled={locked}
+                title={locked ? 'You are on this page' : undefined}
+                onClick={() => onToggle(item.key)}
+                className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-sm text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <NavIcon name={item.key} />
+                  <span className="truncate">{item.label}</span>
+                </span>
+                <span
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition ${shown ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-slate-700'}`}
+                  aria-hidden="true"
+                >
+                  <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${shown ? 'left-[18px]' : 'left-0.5'}`} />
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-200 pt-3 text-xs dark:border-slate-800">
+        <button
+          type="button"
+          onClick={() => onReset(group)}
+          disabled={!hasHidden}
+          className="font-medium text-blue-600 transition hover:text-blue-700 disabled:cursor-default disabled:text-neutral-400 dark:text-blue-400 dark:disabled:text-slate-600"
+        >
+          Reset to default
+        </button>
+        <span className="text-neutral-500 dark:text-slate-400">Changes save automatically</span>
+      </div>
+    </div>,
+    document.body
   );
 }
 

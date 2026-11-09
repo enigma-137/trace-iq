@@ -5,6 +5,7 @@ import AnalyticsUpIcon from '@hugeicons/core-free-icons/AnalyticsUpIcon';
 import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
 import ChampionIcon from '@hugeicons/core-free-icons/ChampionIcon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
+import DashboardBrowsingIcon from '@hugeicons/core-free-icons/DashboardBrowsingIcon';
 import DashboardSpeed01Icon from '@hugeicons/core-free-icons/DashboardSpeed01Icon';
 import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01Icon';
 import ArrowDataTransferHorizontalIcon from '@hugeicons/core-free-icons/ArrowDataTransferHorizontalIcon';
@@ -25,7 +26,7 @@ import VideoReplayIcon from '@hugeicons/core-free-icons/VideoReplayIcon';
 import WebhookIcon from '@hugeicons/core-free-icons/WebhookIcon';
 
 const ICONS: Record<string, IconSvgElement> = {
-  overview: Home01Icon,
+  overview: DashboardBrowsingIcon,
   web: Globe02Icon,
   insights: AnalyticsUpIcon,
   dashboards: DashboardSquare01Icon,
