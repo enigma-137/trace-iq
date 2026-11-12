@@ -379,7 +379,7 @@ val traceiq = TraceIQ(
   {
     id: 'mcp',
     label: 'MCP',
-    blurb: 'Point Claude Desktop, Cursor, or any MCP client at your trace data',
+    blurb: 'Connect Claude, ChatGPT, Cursor or any MCP client to your TraceIQ data',
     install: 'npx -y traceiq-mcp-server',
     init: `{
   "mcpServers": {
@@ -394,9 +394,8 @@ val traceiq = TraceIQ(
   }
 }`,
     steps: [
-      'Create a personal access token (Settings → Personal access tokens) and choose scopes.',
-      'Read-only copilot: projects:read, analytics:read, insights:read, funnels:read, users:read, errors:read.',
-      'Add write scopes (flags:write, funnels:write, alerts:write) only if the assistant may make changes.',
+      'Easiest: add __API_BASE_URL__/mcp as a custom connector (Claude: Settings → Connectors), sign in to TraceIQ and click Allow access. No token needed.',
+      'Local alternative: create a personal access token (Settings → Personal access tokens) with the MCP read-only or MCP full preset.',
       'Add the server block above to Claude Desktop or Cursor and restart.',
       'The token value is shown once — store it in your environment.'
     ],
@@ -513,7 +512,7 @@ export function buildAiPrompt(
     init,
     '',
     '3. SETUP STEPS',
-    ...language.steps.map((step, i) => `${i + 1}. ${step}`),
+    ...language.steps.map((step, i) => `${i + 1}. ${step.split('__API_BASE_URL__').join(apiBaseUrl)}`),
     '',
     'FEATURE IMPLEMENTATION',
     featureSections.join('\n\n'),

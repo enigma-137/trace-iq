@@ -135,7 +135,9 @@ export function buildInstallPrompt({ language, projectId, projectName, writeKey,
 
   // The docs' own notes for this SDK, for reference. Install and "create a project" repeat the
   // steps above, so they are left out rather than competing with them.
-  const notes = language.steps.filter((text) => !/^(Install the SDK|Create a project)/.test(text));
+  const notes = language.steps
+    .filter((text) => !/^(Install the SDK|Create a project)/.test(text))
+    .map((text) => text.split('__API_BASE_URL__').join(apiUrl));
   if (notes.length > 0) lines.push('', 'SDK NOTES (reference)', ...notes.map((text) => `- ${text}`));
 
   lines.push(
