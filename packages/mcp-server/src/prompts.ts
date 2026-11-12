@@ -81,6 +81,24 @@ export const prompts: Prompt[] = [
       ].join('\n')
   },
   {
+    name: 'experiment-readout',
+    title: 'Experiment readout',
+    description: 'Read out an A/B experiment: which variant is winning, by how much, and whether to ship it.',
+    arguments: [
+      projectArgument,
+      { name: 'experiment', description: 'Experiment name, key or id. Leave empty to pick from the running ones.' }
+    ],
+    render: (args) =>
+      [
+        args.experiment ? `Read out the "${args.experiment}" experiment in TraceIQ.` : 'Read out the running A/B experiments in TraceIQ.',
+        projectLine(args),
+        '1. Find it with list_experiments (if none is named, use the running ones and ask which matters if there are several).',
+        '2. Get the numbers with get_experiment_results.',
+        '3. Check list_error_issues with days 7 for errors that could skew one variant.',
+        'Write: the hypothesis and primary metric, exposures and conversion per variant, lift against control, whether the result is statistically significant, and a recommendation (ship, keep running, or stop). Say plainly when there is not enough data yet. Do not change the experiment status unless I ask.'
+      ].join('\n')
+  },
+  {
     name: 'funnel-audit',
     title: 'Funnel audit',
     description: 'Find where users drop out of a funnel and who they are.',

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+- `run_insight_query`: ad-hoc trends (count, unique, sum or average, with breakdowns and filters), top
+  events, retention, funnels, and web, API and error reports through the dashboard insight engine.
+- Dashboards: `list_dashboards`, `get_dashboard`, `create_dashboard`, `add_dashboard_widget`.
+- Experiments: `list_experiments`, `get_experiment_results`, `create_experiment`, `set_experiment_status`.
+- Surveys: `list_surveys`, `get_survey_results`, `set_survey_status`.
+- Cohorts: `list_cohorts`, `create_cohort`, `delete_cohort`.
+- Synthetic monitors: `list_synthetic_monitors`, `get_synthetic_monitor_runs`, `run_synthetic_monitor`,
+  `set_synthetic_monitor_paused`.
+- Webhooks: `list_webhooks`, `list_webhook_deliveries`, `retry_webhook_delivery`, `test_webhook`.
+- New prompt: `experiment-readout`.
+
 ## 0.3.0
 
 - New incident and debugging tools: `get_today_story`, `get_project_health`, `investigate_incident`,
