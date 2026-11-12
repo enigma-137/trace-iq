@@ -80,6 +80,12 @@ Examples:
 | `flags:write` | Toggle feature flags |
 | `errors:write` | Resolve, ignore or reopen error issues |
 | `replays:read` | List session replays |
+| `dashboards:read` / `dashboards:write` | View dashboards / create dashboards and widgets |
+| `experiments:read` / `experiments:write` | Experiment results / create, start, pause or finish experiments |
+| `surveys:read` / `surveys:write` | Survey results / publish, pause or close surveys |
+| `cohorts:read` / `cohorts:write` | View / create and delete cohorts |
+| `synthetic_monitors:read` / `synthetic_monitors:write` | Monitor runs / run, pause and resume monitors |
+| `webhooks:read` / `webhooks:write` | Webhook deliveries / retry deliveries and send test events |
 
 Read-only tokens cannot perform mutations.
 
@@ -183,6 +189,46 @@ Rather than returning raw API payloads, these tools generate concise, structured
 
 ---
 
+## Ad-hoc queries
+
+- `run_insight_query`: any trend (count, unique, sum or average of an event, broken down by a property), top events, retention, funnel, web, API or error report, with filters and a custom window
+
+---
+
+## Dashboards
+
+- `list_dashboards`, `get_dashboard`
+- `create_dashboard`, `add_dashboard_widget` (from a saved insight or a new one)
+
+---
+
+## Experiments and surveys
+
+- `list_experiments`, `get_experiment_results`, `create_experiment`, `set_experiment_status`
+- `list_surveys`, `get_survey_results`, `set_survey_status`
+
+---
+
+## Cohorts
+
+- `list_cohorts`, `create_cohort`, `delete_cohort`
+
+---
+
+## Synthetic monitors
+
+- `list_synthetic_monitors`, `get_synthetic_monitor_runs`
+- `run_synthetic_monitor`, `set_synthetic_monitor_paused`
+
+---
+
+## Webhooks
+
+- `list_webhooks`, `list_webhook_deliveries`
+- `retry_webhook_delivery`, `test_webhook`
+
+---
+
 ## Prompts
 
 The server also ships prompts, which clients such as Claude show as slash commands:
@@ -192,6 +238,7 @@ The server also ships prompts, which clients such as Claude show as slash comman
 | `incident-review` | Finds what is broken (or was), who it hit, the likely cause and next actions |
 | `daily-standup` | A short summary of the last 24 hours for the team standup |
 | `weekly-report` | Usage, conversion, retention, reliability and errors for the week |
+| `experiment-readout` | Which variant is winning, by how much, and whether to ship it |
 | `funnel-audit` | Where users drop out of a funnel, who they are, and what to fix |
 
 ---
