@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ProxyAwareThrottlerGuard } from './common/throttler.guard';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { OAuthModule } from './modules/oauth/oauth.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { EventsModule } from './modules/events/events.module';
@@ -53,6 +54,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     ]),
     DatabaseModule,
     AuthModule,
+    OAuthModule,
     OrganizationsModule,
     ProjectsModule,
     EventsModule,

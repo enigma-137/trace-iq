@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0
+
+- Remote MCP over Streamable HTTP: `traceiq-mcp-http`, hosted at `https://api.traceiq.run/mcp`.
+  Every request carries the caller's own token, and each tool call runs with it.
+- OAuth sign-in: the server publishes protected resource metadata and answers 401 with a
+  `resource_metadata` challenge, so clients such as Claude and ChatGPT can connect with a click. The
+  TraceIQ API is the authorization server (dynamic client registration, PKCE S256), and the access
+  token it issues is an ordinary personal access token that lasts 90 days.
+- Personal access tokens can now carry the `experiments`, `surveys` and `replays` scopes. The API
+  checked them but did not allow them on tokens, so the experiment, survey and replay tools always
+  failed with a permission error.
+
 ## 0.5.0
 
 - Resources: `traceiq://projects`, `traceiq://me`, `traceiq://tools`, and per-project templates for

@@ -44,13 +44,11 @@ type CreateTokenResponse = TokenRecord & {
 };
 
 /**
- * Mirrors ALLOWED_SCOPES in
- * apps/api/src/modules/auth/personal-access-tokens.service.ts.
+ * Mirrors ALLOWED_SCOPES in apps/api/src/modules/auth/scopes.ts.
  * Keep the two lists in sync — the API rejects anything it does not recognise.
  *
- * `mcp: false` marks scopes the API enforces but that no MCP tool consumes yet
- * (cohort and webhook management were deferred; raw export is too large for
- * model context). They remain valid for direct API clients.
+ * `mcp: false` marks scopes the API enforces but that no MCP tool uses (raw export
+ * is too large for model context; source maps are uploaded by build tools).
  */
 type ScopeGroup = {
   key: string;
@@ -62,30 +60,34 @@ type ScopeGroup = {
 
 const SCOPE_GROUPS: ScopeGroup[] = [
   { key: 'projects', label: 'Projects', read: 'projects:read', mcp: true },
-  { key: 'analytics', label: 'Analytics', read: 'analytics:read', mcp: true },
-  { key: 'insights', label: 'Insights', read: 'insights:read', mcp: true },
+  { key: 'analytics', label: 'Analytics', read: 'analytics:read', write: 'analytics:write', mcp: true },
+  { key: 'insights', label: 'Insights', read: 'insights:read', write: 'insights:write', mcp: true },
   { key: 'funnels', label: 'Funnels', read: 'funnels:read', write: 'funnels:write', mcp: true },
   { key: 'users', label: 'Users', read: 'users:read', mcp: true },
   { key: 'errors', label: 'Errors', read: 'errors:read', write: 'errors:write', mcp: true },
   { key: 'flags', label: 'Feature flags', read: 'flags:read', write: 'flags:write', mcp: true },
   { key: 'alerts', label: 'Alerts', read: 'alerts:read', write: 'alerts:write', mcp: true },
   { key: 'links', label: 'Short links', read: 'links:read', write: 'links:write', mcp: true },
-  { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: false },
-  { key: 'dashboards', label: 'Dashboards', read: 'dashboards:read', write: 'dashboards:write', mcp: false },
-  { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: false },
-  { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false },
-  { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false },
+  { key: 'dashboards', label: 'Dashboards', read: 'dashboards:read', write: 'dashboards:write', mcp: true },
+  { key: 'experiments', label: 'Experiments', read: 'experiments:read', write: 'experiments:write', mcp: true },
+  { key: 'surveys', label: 'Surveys', read: 'surveys:read', write: 'surveys:write', mcp: true },
+  { key: 'cohorts', label: 'Cohorts', read: 'cohorts:read', write: 'cohorts:write', mcp: true },
+  { key: 'replays', label: 'Session replays', read: 'replays:read', write: 'replays:write', mcp: true },
+  { key: 'webhooks', label: 'Webhooks', read: 'webhooks:read', write: 'webhooks:write', mcp: true },
   {
     key: 'synthetic',
     label: 'Synthetic monitors',
     read: 'synthetic_monitors:read',
     write: 'synthetic_monitors:write',
-    mcp: false
-  }
+    mcp: true
+  },
+  { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false },
+  { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false }
 ];
 
 const ALL_SCOPES = SCOPE_GROUPS.flatMap((group) => [group.read, group.write].filter(Boolean) as string[]);
 
+/** Mirrors MCP_READ_SCOPES / MCP_WRITE_SCOPES in apps/api/src/modules/auth/scopes.ts. */
 const MCP_READ_SCOPES = [
   'projects:read',
   'analytics:read',
@@ -95,29 +97,48 @@ const MCP_READ_SCOPES = [
   'errors:read',
   'flags:read',
   'alerts:read',
-  'links:read'
+  'links:read',
+  'cohorts:read',
+  'dashboards:read',
+  'experiments:read',
+  'surveys:read',
+  'replays:read',
+  'webhooks:read',
+  'synthetic_monitors:read'
 ];
 
-const MCP_WRITE_SCOPES = ['funnels:write', 'flags:write', 'alerts:write', 'links:write'];
+const MCP_WRITE_SCOPES = [
+  'funnels:write',
+  'errors:write',
+  'flags:write',
+  'alerts:write',
+  'links:write',
+  'cohorts:write',
+  'dashboards:write',
+  'experiments:write',
+  'surveys:write',
+  'webhooks:write',
+  'synthetic_monitors:write'
+];
 
 const presets = [
   {
     id: 'mcp-read',
     label: 'MCP read-only',
     scopes: MCP_READ_SCOPES,
-    hint: 'Every read tool the MCP server exposes (23 of 30). No mutations.'
+    hint: 'Every read tool the MCP server exposes. No changes.'
   },
   {
     id: 'mcp-full',
     label: 'MCP full',
     scopes: [...MCP_READ_SCOPES, ...MCP_WRITE_SCOPES],
-    hint: 'All 30 MCP tools, including funnel, flag, and alert mutations.'
+    hint: 'Every MCP tool, including ones that create, change or delete things.'
   },
   {
     id: 'flags',
     label: 'Flags only',
     scopes: ['projects:read', 'flags:read', 'flags:write'],
-    hint: 'Feature-flag assistant only. Drives 3 of the 30 MCP tools.'
+    hint: 'Feature-flag assistant only.'
   }
 ];
 

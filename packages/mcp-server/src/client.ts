@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { HttpMethod, JsonObject, JsonValue } from './types.js';
 
 const API_KEY = process.env.TRACEIQ_API_KEY;
@@ -20,6 +21,20 @@ function defaultDashboardUrl(apiUrl: string): string {
   } catch {
     return 'https://traceiq.run';
   }
+}
+
+/**
+ * The token for the current request. Over stdio there is one user and TRACEIQ_API_KEY is it;
+ * the HTTP server runs each request inside withToken() with that caller's bearer token.
+ */
+const tokenContext = new AsyncLocalStorage<string>();
+
+export function withToken<T>(token: string, run: () => T): T {
+  return tokenContext.run(token, run);
+}
+
+export function currentToken(): string | undefined {
+  return tokenContext.getStore() ?? API_KEY;
 }
 
 export class ApiError extends Error {
@@ -70,7 +85,7 @@ export async function request<T extends JsonValue = JsonValue>(
       const response = await fetch(url, {
         method,
         headers: {
-          Authorization: `Bearer ${API_KEY}`,
+          Authorization: `Bearer ${currentToken()}`,
           ...(options.body !== undefined ? { 'content-type': 'application/json' } : {})
         },
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

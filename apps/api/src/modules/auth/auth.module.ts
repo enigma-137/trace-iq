@@ -6,7 +6,7 @@ import { PersonalAccessTokensService } from './personal-access-tokens.service';
 @Module({
   controllers: [PersonalAccessTokensController],
   providers: [AuthService, PersonalAccessTokensService],
-  exports: [AuthService]
+  exports: [AuthService, PersonalAccessTokensService]
 })
 export class AuthModule {}
 

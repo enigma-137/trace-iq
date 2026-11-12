@@ -23,7 +23,44 @@ The server provides secure, scope-based access to your analytics and includes in
 
 ---
 
-## Installation
+## Remote server (no install)
+
+TraceIQ hosts the server at:
+
+```
+https://api.traceiq.run/mcp
+```
+
+Add it as a custom connector (Claude: Settings → Connectors → Add custom connector; ChatGPT,
+Cursor and VS Code have the same option). The app opens TraceIQ, you sign in and choose whether it
+may only read or also make changes, and you're connected. No token to copy.
+
+The connection is a personal access token named after the app (for example "Claude (connected
+app)"). It lasts 90 days and you can revoke it any time under Settings → Personal access tokens.
+
+Clients that only take a URL plus a header can also send an existing token:
+`Authorization: Bearer tiq_pat_...`.
+
+### Self-hosting the remote server
+
+`traceiq-mcp-http` (or `node dist/http.js`) serves Streamable HTTP. Put it behind your proxy at
+`/mcp` and `/.well-known/oauth-protected-resource*` on the API's host; the TraceIQ API is the OAuth
+authorization server.
+
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Port to listen on (default `8787`) |
+| `TRACEIQ_API_URL` | The API, as the MCP server reaches it (e.g. `http://api:4000`) |
+| `TRACEIQ_MCP_PUBLIC_URL` | Public URL of the endpoint (e.g. `https://api.traceiq.run/mcp`) |
+| `TRACEIQ_OAUTH_ISSUER` | Public URL of the API (defaults to the endpoint's origin) |
+| `TRACEIQ_DASHBOARD_URL` | Dashboard for "Open in TraceIQ" links |
+
+The API needs `TRACEIQ_PUBLIC_API_URL` (its public URL, the OAuth issuer) and `DASHBOARD_URL`
+(where the consent page lives).
+
+---
+
+## Installation (local, stdio)
 
 ```bash
 npm install -g traceiq-mcp-server
