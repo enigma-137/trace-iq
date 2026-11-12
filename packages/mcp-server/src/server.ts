@@ -17,7 +17,7 @@ import { tools } from './tools.js';
 import { JsonObject, Tool } from './types.js';
 import { validateArgs } from './validate.js';
 
-export const SERVER_VERSION = '0.5.0';
+export const SERVER_VERSION = '0.6.0';
 
 export const SERVER_INSTRUCTIONS = [
   'TraceIQ is product analytics plus API and error monitoring.',

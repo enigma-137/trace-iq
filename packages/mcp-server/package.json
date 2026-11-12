@@ -1,6 +1,6 @@
 {
   "name": "traceiq-mcp-server",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -10,7 +10,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "traceiq-mcp": "dist/index.js"
+    "traceiq-mcp": "dist/index.js",
+    "traceiq-mcp-http": "dist/http.js"
   },
   "files": [
     "dist",

@@ -2,35 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from './auth.service';
+import { ALLOWED_SCOPE_SET } from './scopes';
 
 const DEFAULT_SCOPES = ['projects:read', 'flags:read'];
-const ALLOWED_SCOPES = new Set([
-  'projects:read',
-  'flags:read',
-  'flags:write',
-  'links:read',
-  'links:write',
-  'analytics:read',
-  'analytics:write',
-  'insights:read',
-  'funnels:read',
-  'funnels:write',
-  'users:read',
-  'cohorts:read',
-  'cohorts:write',
-  'dashboards:read',
-  'dashboards:write',
-  'errors:read',
-  'errors:write',
-  'alerts:read',
-  'alerts:write',
-  'webhooks:read',
-  'webhooks:write',
-  'exports:read',
-  'sourcemaps:write',
-  'synthetic_monitors:read',
-  'synthetic_monitors:write'
-]);
 
 export interface CreatePersonalAccessTokenRequest {
   name?: string;
@@ -46,7 +20,8 @@ export class PersonalAccessTokensService {
     const result = await this.database.query(
       `
         SELECT id, name, token_prefix AS "tokenPrefix", scopes, created_at AS "createdAt",
-          last_used_at AS "lastUsedAt", expires_at AS "expiresAt", revoked_at AS "revokedAt"
+          last_used_at AS "lastUsedAt", expires_at AS "expiresAt", revoked_at AS "revokedAt",
+          oauth_client_id AS "oauthClientId"
         FROM personal_access_tokens
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -58,19 +33,32 @@ export class PersonalAccessTokensService {
   }
 
   async create(user: DashboardUser, body: CreatePersonalAccessTokenRequest) {
-    const name = this.cleanName(body.name);
-    const scopes = this.cleanScopes(body.scopes);
-    const expiresAt = this.cleanExpiresAt(body.expiresAt);
+    return this.issue(user.id, {
+      name: this.cleanName(body.name),
+      scopes: this.cleanScopes(body.scopes),
+      expiresAt: this.cleanExpiresAt(body.expiresAt)
+    });
+  }
+
+  /**
+   * Mints a token for a user. Used by the token form and by OAuth, whose access tokens
+   * are ordinary personal access tokens so they show up (and can be revoked) in Settings.
+   */
+  async issue(
+    userId: string,
+    options: { name: string; scopes: string[]; expiresAt: string | null; oauthClientId?: string | null }
+  ) {
+    const { name, scopes, expiresAt } = options;
     const value = `tiq_pat_${randomBytes(32).toString('base64url')}`;
     const tokenHash = createHash('sha256').update(value).digest('hex');
     const id = `pat_${randomUUID()}`;
 
     await this.database.query(
       `
-        INSERT INTO personal_access_tokens (id, user_id, name, token_prefix, token_hash, scopes, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO personal_access_tokens (id, user_id, name, token_prefix, token_hash, scopes, expires_at, oauth_client_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `,
-      [id, user.id, name, value.slice(0, 16), tokenHash, scopes, expiresAt]
+      [id, userId, name, value.slice(0, 16), tokenHash, scopes, expiresAt, options.oauthClientId ?? null]
     );
 
     return {
@@ -125,7 +113,7 @@ export class PersonalAccessTokensService {
       throw new BadRequestException('At least one scope is required.');
     }
 
-    const invalid = scopes.find((scope) => !ALLOWED_SCOPES.has(scope));
+    const invalid = scopes.find((scope) => !ALLOWED_SCOPE_SET.has(scope));
     if (invalid) {
       throw new BadRequestException(`Unsupported scope "${invalid}".`);
     }

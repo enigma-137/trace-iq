@@ -2,7 +2,7 @@ import './config/env';
 import { NestFactory } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
-import { json, raw } from 'express';
+import { json, raw, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { activeProjectMiddleware } from './common/active-project';
 import { MAX_SOURCE_MAP_BYTES } from './modules/sourcemaps/sourcemaps.service';
@@ -42,6 +42,9 @@ function parseOrigins(value: string | undefined, fallback: string[]): string[] {
   return origins.length > 0 ? origins : fallback;
 }
 
+// OAuth endpoints browser-based MCP clients (for example the MCP Inspector) call directly.
+const PUBLIC_OAUTH_PATHS = ['/.well-known/oauth-authorization-server', '/oauth/register', '/oauth/token'];
+
 function isIngestPath(pathname: string): boolean {
   return PUBLIC_INGEST_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
@@ -72,6 +75,9 @@ async function bootstrap() {
     }
   }));
 
+  // OAuth token requests are form-encoded (RFC 6749).
+  app.use('/oauth/token', urlencoded({ extended: false, limit: '16kb' }));
+
   // CORS is path-aware: ingestion endpoints stay open for browser SDKs running
   // on any customer site, while dashboard/setup APIs are restricted to the
   // configured dashboard origins. Requests without an Origin header (server
@@ -84,7 +90,9 @@ async function bootstrap() {
   ]);
 
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const corsMiddleware = isIngestPath(req.path)
+    const corsMiddleware = PUBLIC_OAUTH_PATHS.includes(req.path)
+      ? cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'mcp-protocol-version'], maxAge: 86400 })
+      : isIngestPath(req.path)
       ? cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-traceiq-write-key', 'x-traceiq-replay-token', 'x-traceiq-environment'], maxAge: 86400 })
       : cors({ origin: corsOrigins, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'x-traceiq-write-key', 'x-traceiq-environment', 'x-traceiq-project-id'], maxAge: 86400 });
     corsMiddleware(req, res, next);

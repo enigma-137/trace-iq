@@ -99,6 +99,7 @@ services:
 
       CORS_ORIGINS: ${CORS_ORIGINS:-https://traceiq.run}
       DASHBOARD_URL: https://traceiq.run
+      TRACEIQ_PUBLIC_API_URL: ${TRACEIQ_PUBLIC_API_URL:-https://api.traceiq.run}
       BILLING_DASHBOARD_RETURN_URL: ${BILLING_DASHBOARD_RETURN_URL:-}
       BILLING_PUBLIC_API_URL: ${BILLING_PUBLIC_API_URL:-https://api.traceiq.run}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.traceiq.run}
@@ -107,6 +108,24 @@ services:
     volumes:
       - replay_data:/var/lib/traceiq/session-replays
       - synthetic_data:/var/lib/traceiq/synthetic-artifacts
+
+  mcp:
+    # Remote MCP server for Claude, ChatGPT, Cursor and other AI apps. Served at
+    # https://api.traceiq.run/mcp; the API is its OAuth authorization server.
+    build:
+      context: .
+      dockerfile: packages/mcp-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      PORT: 8787
+      TRACEIQ_API_URL: http://api:4000
+      TRACEIQ_MCP_PUBLIC_URL: ${TRACEIQ_MCP_PUBLIC_URL:-https://api.traceiq.run/mcp}
+      TRACEIQ_OAUTH_ISSUER: ${TRACEIQ_PUBLIC_API_URL:-https://api.traceiq.run}
+      TRACEIQ_DASHBOARD_URL: https://traceiq.run
+    ports:
+      - "127.0.0.1:8787:8787"
 
   sandbox-api:
     build:
