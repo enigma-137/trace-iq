@@ -35,6 +35,15 @@ Add it as a custom connector (Claude: Settings → Connectors → Add custom con
 Cursor and VS Code have the same option). The app opens TraceIQ, you sign in and choose whether it
 may only read or also make changes, and you're connected. No token to copy.
 
+Codex (desktop app, CLI and IDE extension share one config):
+
+```bash
+codex mcp add traceiq --url https://api.traceiq.run/mcp
+```
+
+Approve the sign-in link Codex shows (run `codex mcp login traceiq` if it doesn't), then start a new
+Codex chat; chats that were already open don't load the new tools.
+
 The connection is a personal access token named after the app (for example "Claude (connected
 app)"). It lasts 90 days and you can revoke it any time under Settings → Personal access tokens.
 
