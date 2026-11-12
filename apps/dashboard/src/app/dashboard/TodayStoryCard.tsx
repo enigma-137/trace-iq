@@ -1,9 +1,6 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import RefreshIcon from '@hugeicons/core-free-icons/RefreshIcon';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Skeleton } from '@/components/Skeleton';
 import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
@@ -32,9 +29,8 @@ interface TodayStoryResponse {
 }
 
 /**
- * Today's Story — Highlighted insight banner matching the modern TraceIQ workspace.
- * Features dynamic headline, key factual chips, and a "View more" action that
- * opens the AskTraceIQ AI chat panel.
+ * Today's story as one column of the Overview hero: a headline, the narrative cut to
+ * a few lines, and a link that opens the full story in Ask TraceIQ.
  */
 export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -42,7 +38,7 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   const [story, setStory] = useState<TodayStoryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   async function load() {
     setIsLoading(true);
@@ -85,29 +81,25 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  if (isDismissed) return null;
-
   const projectName = story?.project?.name ?? 'your project';
   const delta = story?.facts.deltaPct;
-  const isUp = delta !== null && delta !== undefined && delta > 0;
-  const isDown = delta !== null && delta !== undefined && delta < 0;
-
   const failures = story?.facts.failures;
   const failedCount = failures ? failures.failedRequests + failures.exceptions + failures.failedActions : 0;
   // The backend went unreachable earlier but has answered since: the outage is history.
   const recovered = !!failures && failures.networkErrors > 0 && !!failures.recoveredAt;
   // Ongoing failures lead the headline: nobody should read "activity is up" during an outage.
-  const headline = story && failures && failedCount > 0 && !recovered
-    ? failures.networkErrors > 0
-      ? `${failures.networkErrors} request${failures.networkErrors === 1 ? '' : 's'} got no response on ${projectName} today`
-      : `${failedCount} failure${failedCount === 1 ? '' : 's'} on ${projectName} today`
-    : story
-    ? isUp
-      ? `Activity is up ${delta}% on ${projectName}`
-      : isDown
-        ? `Activity decreased by ${Math.abs(delta)}% on ${projectName}`
-        : `Daily activity overview on ${projectName}`
-    : `Analyzing activity on ${projectName}…`;
+  const ongoing = Boolean(failures && failedCount > 0 && !recovered);
+  const headline = !story
+    ? 'Reading today…'
+    : ongoing && failures
+      ? failures.networkErrors > 0
+        ? `${failures.networkErrors} request${failures.networkErrors === 1 ? '' : 's'} got no response`
+        : `${failedCount} failure${failedCount === 1 ? '' : 's'} today`
+      : delta !== null && delta !== undefined && delta > 0
+        ? `Activity is up ${delta}%`
+        : delta !== null && delta !== undefined && delta < 0
+          ? `Activity is down ${Math.abs(delta)}%`
+          : 'A steady day';
 
   function handleOpenAi() {
     openAsk({
@@ -118,120 +110,46 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   }
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-neutral-200/85 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] transition hover:border-neutral-300 dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-700 sm:p-6">
-      {/* Top right actions: Dismiss & Refresh */}
-      <div className="absolute right-4 top-4 flex items-center gap-1.5 z-10">
+    <div className="flex h-full flex-col">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900 dark:text-white">
+        {ongoing ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
+        {headline}
+      </p>
+
+      {error ? (
+        <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
+      ) : isLoading && !story ? (
+        <div className="mt-2 space-y-1.5">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-11/12" />
+          <Skeleton className="h-3 w-3/4" />
+        </div>
+      ) : (
+        <p
+          className={`mt-1.5 text-[13px] leading-relaxed text-neutral-600 dark:text-slate-300 ${expanded ? '' : 'line-clamp-4'}`}
+        >
+          {story?.narrative}
+        </p>
+      )}
+
+      <div className="mt-auto flex items-center gap-3 pt-3 text-xs font-medium">
+        {story && !error ? (
+          <button type="button" onClick={() => setExpanded((value) => !value)} className="text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
+            {expanded ? 'Show less' : 'Read all'}
+          </button>
+        ) : null}
+        <button type="button" onClick={handleOpenAi} className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+          Ask about today →
+        </button>
         <button
           type="button"
           onClick={() => void load()}
           disabled={isLoading}
-          title="Regenerate story"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-50 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+          className="ml-auto text-neutral-400 hover:text-neutral-700 disabled:opacity-50 dark:text-slate-500 dark:hover:text-slate-300"
         >
-          <HugeiconsIcon icon={RefreshIcon} size={13} className={isLoading ? 'animate-spin' : ''} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsDismissed(true)}
-          title="Temporarily dismiss banner"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300 text-sm font-semibold"
-        >
-          ×
+          {isLoading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
-
-      <div className="flex flex-col gap-5 md:flex-row md:items-center">
-        {/* Left: Sleek Brand Visual Anchor */}
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-blue-600 shadow-sm relative overflow-hidden sm:h-24 sm:w-24">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.22),transparent)]" />
-          <div className="relative flex flex-col items-center justify-center text-white">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white/20 backdrop-blur-xs border border-white/30 flex items-center justify-center shadow-xs p-2">
-              <Image
-                src="/brand/logo-white-no-bg.png"
-                alt="TraceIQ"
-                width={28}
-                height={28}
-                className="h-full w-full object-contain"
-                priority
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Middle: Content */}
-        <div className="min-w-0 flex-1 pr-6 md:pr-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-            TODAY&apos;S STORY
-          </p>
-
-          <h3 className="mt-1 text-base font-bold text-neutral-900 dark:text-white sm:text-lg">
-            {headline}
-          </h3>
-
-          {error ? (
-            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
-          ) : isLoading && !story ? (
-            <div className="mt-2 space-y-2">
-              <Skeleton className="h-3.5 w-full max-w-xl" />
-              <Skeleton className="h-3.5 w-4/5 max-w-lg" />
-            </div>
-          ) : (
-            <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-neutral-600 dark:text-slate-300 sm:text-sm">
-              {story?.narrative}
-            </p>
-          )}
-
-          {story ? (
-            <div className="mt-3.5 flex flex-wrap items-center gap-2">
-              {failures && failedCount > 0 ? (
-                <span
-                  className={
-                    recovered
-                      ? 'inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1 text-xs font-medium text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
-                      : 'inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
-                  }
-                >
-                  {recovered
-                    ? `Recovered · ${failures.networkErrors.toLocaleString()} request${failures.networkErrors === 1 ? '' : 's'} went unanswered earlier`
-                    : (
-                      <>
-                        {failures.failedRequests > 0 ? `${failures.failedRequests.toLocaleString()} failed requests` : `${failedCount.toLocaleString()} failures`}
-                        {failures.affectedUsers > 0 ? ` · ${failures.affectedUsers.toLocaleString()} users affected` : ''}
-                      </>
-                    )}
-                </span>
-              ) : null}
-              {delta !== null && delta !== undefined ? (
-                <span className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                  Today {delta > 0 ? `+${delta}%` : `${delta}%`}
-                </span>
-              ) : null}
-
-              <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1 text-xs font-normal text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                Users today <span className="font-medium text-neutral-800 dark:text-slate-200">{story.facts.uniquesToday.toLocaleString()}</span>
-              </span>
-
-              {story.facts.topEvent ? (
-                <span className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1 text-xs font-normal text-neutral-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                  Top event: <span className="font-mono text-neutral-700 dark:text-slate-300">{story.facts.topEvent.name}</span>
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Right: "View more" CTA Button */}
-        <div className="flex shrink-0 items-center md:self-center">
-          <button
-            type="button"
-            onClick={handleOpenAi}
-            className="inline-flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 sm:px-5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          >
-            <span>View more</span>
-            <span aria-hidden>&rarr;</span>
-          </button>
-        </div>
-      </div>
-    </section>
+    </div>
   );
 }

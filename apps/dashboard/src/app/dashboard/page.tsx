@@ -23,10 +23,10 @@ import { RatioDistributionCard } from '@/components/charts/RatioDistributionCard
 import { TraceDataTable } from '@/components/charts/TraceDataTable';
 import { TopErrorsList } from '@/components/charts/TopErrorsList';
 import { UXFrictionCard } from '@/components/charts/UXFrictionCard';
-import { ActiveAlertsBanner } from '@/components/charts/ActiveAlertsBanner';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { TopEventsList } from '@/components/charts/TopEventsList';
-import { TodayStoryCard } from './TodayStoryCard';
+import { OverviewHero, type OverviewSignal } from './overview/OverviewHero';
+import { OverviewWorkspace, type OverviewWidget } from './overview/OverviewWorkspace';
 import { HealthBanner } from './HealthBanner';
 import { NowActivityPanel } from './NowActivityPanel';
 import { RecentLogsPanel } from './RecentLogsPanel';
@@ -162,6 +162,9 @@ interface TrendResponse {
   }>;
 }
 
+/** What a new visitor sees before customizing: the essentials, not every card. */
+const DEFAULT_WIDGETS = ['kpi-events', 'kpi-failure', 'kpi-api', 'kpi-visitors', 'trends', 'errors', 'logs'];
+
 const cardClass =
   'relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
@@ -282,6 +285,452 @@ export default async function DashboardPage({
     ? `${revenue.transactions.toLocaleString()} paid${revenue.failed ? ` · ${revenue.failed.toLocaleString()} failed` : ''}`
     : '';
 
+  const projectHref = (path: string) => withProjectId(path, canonicalProjectId);
+  const errorRate = overview?.apiTelemetry?.errorRate;
+  const firing = overview?.alertsSummary?.firing ?? 0;
+  const issueCount = overview?.topErrors?.length ?? 0;
+  const p95 = overview?.apiTelemetry?.p95 ?? 0;
+  const signals: OverviewSignal[] = [
+    {
+      label: 'Failure rate',
+      value: errorRate !== undefined ? `${errorRate}%` : '–',
+      href: projectHref('/dashboard/requests'),
+      tone: errorRate === undefined ? 'neutral' : errorRate >= 5 ? 'bad' : errorRate >= 1 ? 'warn' : 'good'
+    },
+    {
+      label: 'Error issues',
+      value: issueCount > 0 ? `${issueCount}${issueCount >= 5 ? '+' : ''} open` : 'None',
+      href: projectHref('/dashboard/errors'),
+      tone: issueCount > 0 ? 'warn' : 'good'
+    },
+    {
+      label: 'Alerts',
+      value: firing > 0 ? `${firing} firing` : overview?.alertsSummary?.total ? 'All healthy' : 'None set up',
+      href: projectHref('/dashboard/alerts'),
+      tone: firing > 0 ? 'bad' : overview?.alertsSummary?.total ? 'good' : 'neutral'
+    },
+    {
+      label: 'P95 latency',
+      value: p95 > 0 ? `${p95.toLocaleString()} ms` : '–',
+      href: projectHref('/dashboard/api-performance'),
+      tone: p95 >= 2000 ? 'warn' : 'neutral'
+    },
+    {
+      label: 'Last event',
+      value: overview?.lastEventAt ? lastEventAge(overview.lastEventAt) : 'Waiting',
+      href: projectHref('/dashboard/events'),
+      tone: 'neutral'
+    }
+  ];
+
+  const sectionCard = (title: string, body: ReactNode, action?: { label: string; href: string }) => (
+    <div className={cardClass}>
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-100 pb-3 dark:border-slate-800/70">
+        <p className="text-xs font-medium text-neutral-500 dark:text-slate-400">{title}</p>
+        {action ? (
+          <Link href={action.href} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+            {action.label} &rarr;
+          </Link>
+        ) : null}
+      </div>
+      <div className="mt-3">{body}</div>
+    </div>
+  );
+
+  const metric = (id: string, title: string, description: string, node: ReactNode): OverviewWidget => ({
+    id,
+    title,
+    description,
+    category: 'Metrics',
+    node,
+    defaultSize: 'sm',
+    sizes: ['sm', 'md']
+  });
+
+  const widgets: OverviewWidget[] = [
+    metric(
+      'kpi-events',
+      'Events',
+      'Everything your SDKs sent in the window, against the window before.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
+        title={appliedRange ? `Events (${appliedRange.label})` : 'Total Events'}
+        value={overview?.totals.events ?? 0}
+        delta={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
+        deltaTone={activityTone === 'red' ? 'red' : activityTone === 'neutral' && previousTotals ? 'neutral' : 'green'}
+        deltaDirection={activityTone === 'red' ? 'down' : 'up'}
+        deltaSubtext={
+          previousTotals
+            ? `vs previous ${appliedRange?.long ?? ''}`
+            : appliedRange?.value !== '24h' && overview?.totals.events24h
+              ? `${overview.totals.events24h.toLocaleString()} last 24h`
+              : undefined
+        }
+        comparison={eventsComparison}
+        color="blue"
+        sparklineData={sparkValues}
+      />
+    ),
+    metric(
+      'kpi-latency',
+      'P95 latency',
+      'How long your slowest API calls take.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
+        title="P95 Latency"
+        value={overview?.apiTelemetry?.p95 !== undefined && overview.apiTelemetry.p95 > 0 ? `${overview.apiTelemetry.p95.toLocaleString()} ms` : '-'}
+        {...(changeDelta(overview?.apiTelemetry?.p95, previousTotals?.p95, true) ?? {
+          delta: overview?.apiTelemetry?.p50 ? `Median ${overview.apiTelemetry.p50.toLocaleString()} ms` : undefined,
+          deltaTone: 'neutral' as const,
+          deltaDirection: 'up' as const
+        })}
+        deltaSubtext={
+          changeDelta(overview?.apiTelemetry?.p95, previousTotals?.p95) && overview?.apiTelemetry?.p50
+            ? `median ${overview.apiTelemetry.p50.toLocaleString()} ms`
+            : undefined
+        }
+        color="emerald"
+        sparklineData={latencySparkline}
+        comparison={compare(overview?.apiTelemetry?.p95, previousTotals?.p95, ms, { invert: true })}
+      />
+    ),
+    metric(
+      'kpi-failure',
+      'Failure rate',
+      'Share of API requests that failed or got no response.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.8} />}
+        title="Failure Rate"
+        value={overview?.apiTelemetry?.errorRate !== undefined ? `${overview.apiTelemetry.errorRate}%` : '0%'}
+        {...(changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, true) ?? {
+          delta: failedRequests !== undefined ? `${failedRequests.toLocaleString()} failed` : undefined,
+          deltaTone: failedRequests ? ('red' as const) : ('neutral' as const),
+          deltaDirection: failedRequests ? ('up' as const) : undefined
+        })}
+        deltaSubtext={
+          failedRequests === undefined
+            ? undefined
+            : changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate)
+              ? `${failedRequests.toLocaleString()} failed · ${networkErrors > 0 ? `${networkErrors.toLocaleString()} no response · ` : ''}${serverErrors.toLocaleString()} 5xx`
+              : networkErrors > 0
+                ? `${networkErrors.toLocaleString()} got no response · ${serverErrors.toLocaleString()} 5xx`
+                : `${serverErrors.toLocaleString()} server errors (5xx)`
+        }
+        color="rose"
+        sparklineData={failedSparkline}
+        comparison={compare(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, pct, { invert: true })}
+      />
+    ),
+    metric(
+      'kpi-visitors',
+      'Visitors',
+      'Unique visitors from web analytics.',
+      <Link href={projectHref('/dashboard/web')} className="block rounded-2xl transition-opacity hover:opacity-95">
+        <OverviewMetricCard
+          icon={<HugeiconsIcon icon={UserGroupIcon} size={16} strokeWidth={1.8} />}
+          title="Visitors"
+          value={overview?.totals.visitors ?? 0}
+          {...(changeDelta(overview?.totals.visitors, previousTotals?.visitors) ?? {
+            delta: overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : 'from web analytics',
+            deltaTone: 'neutral' as const,
+            deltaDirection: 'up' as const
+          })}
+          deltaSubtext={changeDelta(overview?.totals.visitors, previousTotals?.visitors) ? `vs previous ${appliedRange?.long ?? ''}` : undefined}
+          color="blue"
+          comparison={compare(overview?.totals.visitors, previousTotals?.visitors, count)}
+          comparisonAlign="right"
+        />
+      </Link>
+    ),
+    metric(
+      'kpi-profiles',
+      'Identified profiles',
+      'Signed-in users you identified with the SDK.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}
+        title="Identified Profiles"
+        value={overview?.totals.users ?? 0}
+        {...(changeDelta(overview?.totals.users, previousTotals?.users) ?? {
+          delta: overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : undefined,
+          deltaTone: 'blue' as const,
+          deltaDirection: 'up' as const
+        })}
+        deltaSubtext={
+          overview?.totals.sessions
+            ? changeDelta(overview?.totals.users, previousTotals?.users)
+              ? `${overview.totals.sessions.toLocaleString()} sessions`
+              : 'active sessions'
+            : undefined
+        }
+        color="purple"
+        sparklineData={usersSparkline}
+        comparison={
+          appliedRange ? compare(overview?.totals.users, previousTotals?.users, count, { labels: snapshotLabels(now, appliedRange.days) }) : undefined
+        }
+        comparisonAlign="right"
+      />
+    ),
+    metric(
+      'kpi-api',
+      'API requests',
+      'Requests your app made to its backend.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={DashboardSpeed01Icon} size={16} strokeWidth={1.8} />}
+        title="API Requests"
+        value={overview?.apiTelemetry?.totalRequests ?? (overview?.totals.events24h ?? 0)}
+        {...(changeDelta(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests) ?? {
+          delta: overview?.totals.events1h ? `${overview.totals.events1h.toLocaleString()} in 1h` : undefined,
+          deltaTone: 'neutral' as const,
+          deltaDirection: 'up' as const
+        })}
+        deltaSubtext={changeDelta(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests) ? `vs previous ${appliedRange?.long ?? ''}` : undefined}
+        color="cyan"
+        sparklineData={apiSparkline}
+        comparison={compare(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests, count)}
+        comparisonAlign="right"
+      />
+    ),
+    ...(showRevenue && revenue
+      ? [
+          metric(
+            'kpi-revenue',
+            'Revenue',
+            'Successful payments from your revenue events.',
+            <OverviewMetricCard
+              icon={<HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.8} />}
+              title="Revenue"
+              value={formatMoney(revenue.total, revenue.currency)}
+              {...(changeDelta(revenue.total, revenuePrevious) ?? {
+                delta: revenuePayments,
+                deltaTone: 'neutral' as const,
+                deltaDirection: 'up' as const
+              })}
+              deltaSubtext={changeDelta(revenue.total, revenuePrevious) ? revenuePayments : 'payments'}
+              color="emerald"
+              comparison={compare(revenue.total, revenuePrevious, (value) => formatMoney(value, revenue.currency))}
+              comparisonAlign="right"
+            />
+          )
+        ]
+      : []),
+    {
+      id: 'trends',
+      title: 'Traffic and errors',
+      description: 'Events, API requests and exceptions over time.',
+      category: 'Observability',
+      node: <OverviewTabbedChart data={tabbedPoints} windowLabel={appliedRange?.adjective ?? '14-day'} />,
+      defaultSize: 'lg',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'now',
+      title: 'Live activity',
+      description: 'Events arriving right now.',
+      category: 'Activity',
+      node: <NowActivityPanel projectId={canonicalProjectId} />,
+      defaultSize: 'md',
+      sizes: ['sm', 'md', 'lg']
+    },
+    {
+      id: 'errors',
+      title: 'Top errors',
+      description: 'The exceptions hitting the most users.',
+      category: 'Observability',
+      node: <TopErrorsList errors={overview?.topErrors ?? []} projectId={canonicalProjectId} />,
+      defaultSize: 'md',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'logs',
+      title: 'Recent logs',
+      description: 'The latest log lines, errors and warnings first.',
+      category: 'Observability',
+      node: <RecentLogsPanel projectId={canonicalProjectId} />,
+      defaultSize: 'md',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'top-events',
+      title: 'Top events',
+      description: 'Which events your app sends most.',
+      category: 'Activity',
+      node: sectionCard(`Top events (${windowLabel})`, <TopEventsList events={overview?.topEvents ?? []} windowLabel={windowLabel} />, {
+        label: 'All events',
+        href: projectHref('/dashboard/events')
+      }),
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'latency',
+      title: 'Latency timeline',
+      description: 'P50, P90 and P99 latency over time.',
+      category: 'Observability',
+      node: (
+        <LatencyTimelineCard
+          data={overview?.apiTelemetry?.latencySeries ?? []}
+          currentP99={overview?.apiTelemetry?.p99}
+          currentP90={overview?.apiTelemetry?.p90}
+          currentP50={overview?.apiTelemetry?.p50}
+        />
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md', 'lg']
+    },
+    {
+      id: 'status',
+      title: 'Response status',
+      description: 'How API responses split across status codes.',
+      category: 'Observability',
+      node: (
+        <RequestStatusCard
+          breakdown={overview?.apiTelemetry?.statusBreakdown ?? { ok200: 0, rateLimit429: 0, error500: 0 }}
+          totalRequests={overview?.apiTelemetry?.totalRequests ?? 0}
+          windowLabel={appliedRange?.value ?? '14d'}
+        />
+      ),
+      defaultSize: 'sm',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'traces',
+      title: 'Recent requests',
+      description: 'The latest API calls with status and duration.',
+      category: 'Observability',
+      node: <TraceDataTable traces={overview?.recentTraces ?? []} projectId={canonicalProjectId} />,
+      defaultSize: 'lg',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'friction',
+      title: 'UX friction',
+      description: 'Rage clicks, dead clicks and sessions with errors.',
+      category: 'Activity',
+      node: (
+        <UXFrictionCard
+          rageClicks={overview?.uxFriction?.rageClicks ?? 0}
+          deadClicks={overview?.uxFriction?.deadClicks ?? 0}
+          errorSessions={overview?.uxFriction?.errorSessions ?? 0}
+          replaysAvailable={overview?.uxFriction?.replaysAvailable ?? 0}
+          projectId={canonicalProjectId}
+        />
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'pipeline',
+      title: 'Autocapture vs custom',
+      description: 'How much of your data is autocaptured, and ingestion health.',
+      category: 'Activity',
+      node: (
+        <RatioDistributionCard
+          title="Autocapture vs Custom"
+          leftLabel="Autocapture ($page)"
+          leftValue={overview?.funnelSummary?.steps[0]?.count ?? (overview?.totals.events ?? 0)}
+          rightLabel="Custom Telemetry"
+          rightValue={overview?.funnelSummary?.steps[1]?.count ?? 0}
+          stat1Label="Avg Session Duration"
+          stat1Value={
+            overview?.funnelSummary?.avgDurationSec && overview.funnelSummary.avgDurationSec > 0
+              ? `${Math.floor(overview.funnelSummary.avgDurationSec / 60)}m ${overview.funnelSummary.avgDurationSec % 60}s`
+              : '0s'
+          }
+          stat2Label="Pipeline Health"
+          stat2Value={(overview?.totals.events24h ?? 0) > 0 ? '100% Healthy' : 'Active'}
+          footerHighlight={overview?.lastEventAt ? `Last ingestion: ${lastEventAge(overview.lastEventAt)}` : 'Waiting for stream events'}
+        />
+      ),
+      defaultSize: 'sm',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'devices',
+      title: 'Devices',
+      description: 'Which devices and systems your users are on.',
+      category: 'Audience',
+      node: sectionCard(
+        `Devices (${windowLabel})`,
+        <DonutChart
+          items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total, icon: <BrandIcon label={d.name} size={14} /> }))}
+          centerValue={compactNumber((overview?.topDevices ?? []).reduce((sum, d) => sum + d.total, 0))}
+          centerLabel="events"
+          emptyLabel="No device data yet."
+        />
+      ),
+      defaultSize: 'sm',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'locations',
+      title: 'Locations',
+      description: 'Where your traffic comes from, on a globe.',
+      category: 'Audience',
+      node: sectionCard(
+        `Locations (${windowLabel})`,
+        (overview?.topCountries ?? []).length > 0 ? (
+          <>
+            <div className="aspect-[2/1] min-h-52 overflow-hidden rounded-md border border-neutral-100 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+              <OverviewGeographyGlobe data={overview?.topCountries ?? []} />
+            </div>
+            <CompactRanking
+              items={(overview?.topCountries ?? []).map((country) => ({
+                label: alpha2ToName(country.name.toUpperCase()) ?? country.name,
+                value: country.total,
+                icon: <CountryFlag country={country.name} />
+              }))}
+            />
+          </>
+        ) : (
+          <p className="py-10 text-center text-sm text-neutral-500">No location data yet (needs public-IP traffic).</p>
+        )
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md', 'lg']
+    },
+    {
+      id: 'referrers',
+      title: 'Referrers',
+      description: 'The sites sending you visitors.',
+      category: 'Audience',
+      node: sectionCard(
+        `Referrers (${windowLabel})`,
+        <CompactRanking
+          items={dashboardReferrers.map((referrer) => ({
+            label: referrer.domain,
+            value: referrer.views,
+            icon: <BrandIcon label={referrer.domain} />,
+            secondary: `${referrer.visitors.toLocaleString()} visitors`
+          }))}
+          emptyLabel="No page referrers yet."
+        />
+      ),
+      defaultSize: 'sm',
+      sizes: ['sm', 'md']
+    }
+  ];
+
+  const rangePicker = (
+    <nav aria-label="Time range" className="inline-flex h-8 items-center rounded-md border border-neutral-200 bg-white p-0.5 dark:border-slate-800 dark:bg-slate-950">
+      {OVERVIEW_RANGES.map((option) => (
+        <Link
+          key={option.value}
+          href={withParams('/dashboard', { projectId: canonicalProjectId ?? undefined, range: option.value })}
+          aria-current={option.value === range ? 'page' : undefined}
+          prefetch={false}
+          scroll={false}
+          className={
+            option.value === range
+              ? 'rounded-[5px] bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-900 dark:bg-slate-800 dark:text-white'
+              : 'rounded-[5px] px-2.5 py-1 text-xs font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+          }
+        >
+          {option.value === '24h' ? 'Last 24 hours' : `Last ${option.long}`}
+        </Link>
+      ))}
+    </nav>
+  );
+
   return (
     <DashboardShell
       active="overview"
@@ -297,8 +746,7 @@ export default async function DashboardPage({
         ) : null
       }
     >
-      {/* Centered layout container */}
-      <div className="max-w-[1360px] mx-auto w-full space-y-5 sm:space-y-6">
+      <div className="mx-auto w-full max-w-[1280px] space-y-8 sm:space-y-10">
         {error ? (
           <section className="rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             {error}
@@ -326,347 +774,10 @@ export default async function DashboardPage({
           />
         ) : null}
 
-        {/* Active Alerts Banner if alerts are firing */}
-        {overview?.alertsSummary && overview.alertsSummary.firing > 0 ? (
-          <div>
-            <ActiveAlertsBanner
-              firing={overview.alertsSummary.firing}
-              total={overview.alertsSummary.total}
-              projectId={canonicalProjectId}
-            />
-          </div>
-        ) : null}
-
-        {!hasNoProject ? (
-          <>
-        {/* Highlighted Insight Banner: Today's Story */}
-        {overview?.project ? <TodayStoryCard projectId={canonicalProjectId} /> : null}
-
         {overview?.project ? (
-          <nav aria-label="Time range" className="flex items-center justify-end gap-2">
-            <span className="text-xs text-neutral-500 dark:text-slate-400">Showing</span>
-            <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-slate-800 dark:bg-slate-950">
-              {OVERVIEW_RANGES.map((option) => (
-                <Link
-                  key={option.value}
-                  href={withParams('/dashboard', { projectId: canonicalProjectId ?? undefined, range: option.value })}
-                  aria-current={option.value === range ? 'page' : undefined}
-                  prefetch={false}
-                  className={
-                    option.value === range
-                      ? 'rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-950'
-                      : 'rounded-md px-3 py-1 text-xs font-medium text-neutral-600 transition hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-                  }
-                >
-                  {option.label}
-                </Link>
-              ))}
-            </div>
-          </nav>
-        ) : null}
-
-        {/* 5 KPI Metric Cards, plus Revenue when set up (Dynamic values only, '-' or 0 fallback) */}
-        <section
-          className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 ${showRevenue ? '2xl:grid-cols-4' : '2xl:grid-cols-6'}`}
-        >
-          <OverviewMetricCard
-            icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
-            title={appliedRange ? `Events (${appliedRange.label})` : 'Total Events'}
-            value={overview?.totals.events ?? 0}
-            delta={activityDelta && activityDelta !== 'flat' ? activityDelta : undefined}
-            deltaTone={activityTone === 'red' ? 'red' : activityTone === 'neutral' && previousTotals ? 'neutral' : 'green'}
-            deltaDirection={activityTone === 'red' ? 'down' : 'up'}
-            deltaSubtext={
-              previousTotals
-                ? `vs previous ${appliedRange?.long ?? ''}`
-                : appliedRange?.value !== '24h' && overview?.totals.events24h
-                  ? `${overview.totals.events24h.toLocaleString()} last 24h`
-                  : undefined
-            }
-            comparison={eventsComparison}
-            color="blue"
-            sparklineData={sparkValues}
-          />
-
-          <OverviewMetricCard
-            icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
-            title="P95 Latency"
-            value={overview?.apiTelemetry?.p95 !== undefined && overview.apiTelemetry.p95 > 0 ? `${overview.apiTelemetry.p95.toLocaleString()} ms` : '-'}
-            {...(changeDelta(overview?.apiTelemetry?.p95, previousTotals?.p95, true) ?? {
-              delta: overview?.apiTelemetry?.p50 ? `Median ${overview.apiTelemetry.p50.toLocaleString()} ms` : undefined,
-              deltaTone: 'neutral' as const,
-              deltaDirection: 'up' as const
-            })}
-            deltaSubtext={
-              changeDelta(overview?.apiTelemetry?.p95, previousTotals?.p95) && overview?.apiTelemetry?.p50
-                ? `median ${overview.apiTelemetry.p50.toLocaleString()} ms`
-                : undefined
-            }
-            color="emerald"
-            sparklineData={latencySparkline}
-            comparison={compare(overview?.apiTelemetry?.p95, previousTotals?.p95, ms, { invert: true })}
-          />
-
-          <OverviewMetricCard
-            icon={<HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.8} />}
-            title="Failure Rate"
-            value={overview?.apiTelemetry?.errorRate !== undefined ? `${overview.apiTelemetry.errorRate}%` : '0%'}
-            {...(changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, true) ?? {
-              delta: failedRequests !== undefined ? `${failedRequests.toLocaleString()} failed` : undefined,
-              deltaTone: failedRequests ? ('red' as const) : ('neutral' as const),
-              deltaDirection: failedRequests ? ('up' as const) : undefined
-            })}
-            deltaSubtext={
-              failedRequests === undefined
-                ? undefined
-                : changeDelta(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate)
-                  ? `${failedRequests.toLocaleString()} failed · ${networkErrors > 0 ? `${networkErrors.toLocaleString()} no response · ` : ''}${serverErrors.toLocaleString()} 5xx`
-                  : networkErrors > 0
-                    ? `${networkErrors.toLocaleString()} got no response · ${serverErrors.toLocaleString()} 5xx`
-                    : `${serverErrors.toLocaleString()} server errors (5xx)`
-            }
-            color="rose"
-            sparklineData={failedSparkline}
-            comparison={compare(overview?.apiTelemetry?.errorRate, previousTotals?.errorRate, pct, { invert: true })}
-          />
-
-          <Link href={withProjectId('/dashboard/web', canonicalProjectId)} className="block rounded-2xl transition-opacity hover:opacity-95">
-            <OverviewMetricCard
-              icon={<HugeiconsIcon icon={UserGroupIcon} size={16} strokeWidth={1.8} />}
-              title="Visitors"
-              value={overview?.totals.visitors ?? 0}
-              {...(changeDelta(overview?.totals.visitors, previousTotals?.visitors) ?? {
-                delta: overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : 'from web analytics',
-                deltaTone: 'neutral' as const,
-                deltaDirection: 'up' as const
-              })}
-              deltaSubtext={changeDelta(overview?.totals.visitors, previousTotals?.visitors) ? `vs previous ${appliedRange?.long ?? ''}` : undefined}
-              color="blue"
-              comparison={compare(overview?.totals.visitors, previousTotals?.visitors, count)}
-              comparisonAlign="right"
-            />
-          </Link>
-
-          <OverviewMetricCard
-            icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}
-            title="Identified Profiles"
-            value={overview?.totals.users ?? 0}
-            {...(changeDelta(overview?.totals.users, previousTotals?.users) ?? {
-              delta: overview?.totals.sessions ? `${overview.totals.sessions.toLocaleString()} sessions` : undefined,
-              deltaTone: 'blue' as const,
-              deltaDirection: 'up' as const
-            })}
-            deltaSubtext={
-              overview?.totals.sessions
-                ? changeDelta(overview?.totals.users, previousTotals?.users)
-                  ? `${overview.totals.sessions.toLocaleString()} sessions`
-                  : 'active sessions'
-                : undefined
-            }
-            color="purple"
-            sparklineData={usersSparkline}
-            comparison={
-              appliedRange
-                ? compare(overview?.totals.users, previousTotals?.users, count, { labels: snapshotLabels(now, appliedRange.days) })
-                : undefined
-            }
-            comparisonAlign="right"
-          />
-
-          <OverviewMetricCard
-            icon={<HugeiconsIcon icon={DashboardSpeed01Icon} size={16} strokeWidth={1.8} />}
-            title="API Requests"
-            value={overview?.apiTelemetry?.totalRequests ?? (overview?.totals.events24h ?? 0)}
-            {...(changeDelta(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests) ?? {
-              delta: overview?.totals.events1h ? `${overview.totals.events1h.toLocaleString()} in 1h` : undefined,
-              deltaTone: 'neutral' as const,
-              deltaDirection: 'up' as const
-            })}
-            deltaSubtext={changeDelta(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests) ? `vs previous ${appliedRange?.long ?? ''}` : undefined}
-            color="cyan"
-            sparklineData={apiSparkline}
-            comparison={compare(overview?.apiTelemetry?.totalRequests, previousTotals?.apiRequests, count)}
-            comparisonAlign="right"
-          />
-
-          {showRevenue && revenue ? (
-            <OverviewMetricCard
-              icon={<HugeiconsIcon icon={Coins01Icon} size={16} strokeWidth={1.8} />}
-              title="Revenue"
-              value={formatMoney(revenue.total, revenue.currency)}
-              {...(changeDelta(revenue.total, revenuePrevious) ?? {
-                delta: revenuePayments,
-                deltaTone: 'neutral' as const,
-                deltaDirection: 'up' as const
-              })}
-              deltaSubtext={changeDelta(revenue.total, revenuePrevious) ? revenuePayments : 'payments'}
-              color="emerald"
-              comparison={compare(revenue.total, revenuePrevious, (value) => formatMoney(value, revenue.currency))}
-              comparisonAlign="right"
-            />
-          ) : null}
-        </section>
-
-        {/* Row 1: Observability Tabbed Trends Chart & Allocation */}
-        <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.65fr_1fr]">
-          <div className="flex min-w-0 flex-col gap-4">
-            <OverviewTabbedChart data={tabbedPoints} windowLabel={appliedRange?.adjective ?? '14-day'} />
-            <RecentLogsPanel projectId={canonicalProjectId} />
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <NowActivityPanel projectId={canonicalProjectId} />
-
-            <div className={cardClass}>
-              <div className="flex items-center justify-between gap-2 pb-3 border-b border-neutral-100 dark:border-slate-800/70">
-                <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                  Event Volume Breakdown
-                </p>
-                <Link
-                  href={withProjectId('/dashboard/events', canonicalProjectId)}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                >
-                  View all events &rarr;
-                </Link>
-              </div>
-              <div className="mt-3">
-                <TopEventsList events={overview?.topEvents ?? []} windowLabel={windowLabel} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Row 2: Observability & Telemetry Row */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <RatioDistributionCard
-            title="Autocapture vs Custom"
-            leftLabel="Autocapture ($page)"
-            leftValue={overview?.funnelSummary?.steps[0]?.count ?? (overview?.totals.events ?? 0)}
-            rightLabel="Custom Telemetry"
-            rightValue={overview?.funnelSummary?.steps[1]?.count ?? 0}
-            stat1Label="Avg Session Duration"
-            stat1Value={
-              overview?.funnelSummary?.avgDurationSec && overview.funnelSummary.avgDurationSec > 0
-                ? `${Math.floor(overview.funnelSummary.avgDurationSec / 60)}m ${overview.funnelSummary.avgDurationSec % 60}s`
-                : '0s'
-            }
-            stat2Label="Pipeline Health"
-            stat2Value={(overview?.totals.events24h ?? 0) > 0 ? '100% Healthy' : 'Active'}
-            footerHighlight={
-              overview?.lastEventAt
-                ? `Last ingestion: ${lastEventAge(overview.lastEventAt)}`
-                : 'Waiting for stream events'
-            }
-          />
-
-          <LatencyTimelineCard
-            data={overview?.apiTelemetry?.latencySeries ?? []}
-            currentP99={overview?.apiTelemetry?.p99}
-            currentP90={overview?.apiTelemetry?.p90}
-            currentP50={overview?.apiTelemetry?.p50}
-          />
-
-          <RequestStatusCard
-            breakdown={
-              overview?.apiTelemetry?.statusBreakdown ?? {
-                ok200: 0,
-                rateLimit429: 0,
-                error500: 0
-              }
-            }
-            totalRequests={overview?.apiTelemetry?.totalRequests ?? 0}
-            windowLabel={appliedRange?.value ?? '14d'}
-          />
-        </section>
-
-        {/* Row 3: Exceptions Health & UX Friction Row */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <TopErrorsList
-            errors={overview?.topErrors ?? []}
-            projectId={canonicalProjectId}
-          />
-
-          <UXFrictionCard
-            rageClicks={overview?.uxFriction?.rageClicks ?? 0}
-            deadClicks={overview?.uxFriction?.deadClicks ?? 0}
-            errorSessions={overview?.uxFriction?.errorSessions ?? 0}
-            replaysAvailable={overview?.uxFriction?.replaysAvailable ?? 0}
-            projectId={canonicalProjectId}
-          />
-        </section>
-
-        {/* Row 4: Live Telemetry & API Traces Data Table */}
-        <section>
-          <TraceDataTable
-            traces={overview?.recentTraces ?? []}
-            projectId={canonicalProjectId}
-          />
-        </section>
-
-        {/* Row 5: Geography, Devices, and Referrers */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className={cardClass}>
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
-              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Devices ({windowLabel})
-              </p>
-            </div>
-            <div className="mt-3">
-              <DonutChart
-                items={(overview?.topDevices ?? []).map((d) => ({ label: d.name, value: d.total, icon: <BrandIcon label={d.name} size={14} /> }))}
-                centerValue={compactNumber((overview?.topDevices ?? []).reduce((sum, d) => sum + d.total, 0))}
-                centerLabel="events"
-                emptyLabel="No device data yet."
-              />
-            </div>
-          </div>
-
-          <div className={cardClass}>
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
-              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Locations ({windowLabel})
-              </p>
-            </div>
-            <div className="mt-3">
-              {(overview?.topCountries ?? []).length > 0 ? (
-                <>
-                  <div className="aspect-[2/1] min-h-52 overflow-hidden rounded-md border border-neutral-100 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-                    <OverviewGeographyGlobe data={overview?.topCountries ?? []} />
-                  </div>
-                  <CompactRanking
-                    items={(overview?.topCountries ?? []).map((country) => ({
-                      label: alpha2ToName(country.name.toUpperCase()) ?? country.name,
-                      value: country.total,
-                      icon: <CountryFlag country={country.name} />
-                    }))}
-                  />
-                </>
-              ) : (
-                <p className="py-10 text-center text-sm text-neutral-500">No location data yet (needs public-IP traffic).</p>
-              )}
-            </div>
-          </div>
-
-          <div className={cardClass}>
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-slate-800/70">
-              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">
-                Referrers ({windowLabel})
-              </p>
-            </div>
-            <div className="mt-3">
-              <CompactRanking
-                items={dashboardReferrers.map((referrer) => ({
-                  label: referrer.domain,
-                  value: referrer.views,
-                  icon: <BrandIcon label={referrer.domain} />,
-                  secondary: `${referrer.visitors.toLocaleString()} visitors`
-                }))}
-                emptyLabel="No page referrers yet."
-              />
-            </div>
-          </div>
-        </section>
-
+          <>
+            <OverviewHero projectId={canonicalProjectId} projectName={overview.project.name} signals={signals} />
+            <OverviewWorkspace widgets={widgets} defaultVisible={DEFAULT_WIDGETS} toolbar={rangePicker} />
           </>
         ) : null}
       </div>

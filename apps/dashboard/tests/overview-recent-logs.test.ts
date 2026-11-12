@@ -34,13 +34,13 @@ describe('Overview Recent logs panel', () => {
     expect(source).not.toMatch(/gradient|backdrop-blur|blur-|animate-|glow/);
   });
 
-  it('sits under the trends chart, and the Logs page opens a deep-linked entry', () => {
+  it('is a default Overview card after the trends chart, and the Logs page opens a deep-linked entry', () => {
     const page = read('../src/app/dashboard/page.tsx');
-    const chart = page.indexOf('<OverviewTabbedChart');
-    const panel = page.indexOf('<RecentLogsPanel');
-    expect(chart).toBeGreaterThan(-1);
-    expect(panel).toBeGreaterThan(chart);
-    expect(panel).toBeLessThan(page.indexOf('<NowActivityPanel'));
+    expect(page).toContain('<OverviewTabbedChart');
+    expect(page).toContain('<RecentLogsPanel');
+    const defaults = page.match(/const DEFAULT_WIDGETS = \[([^\]]*)\]/)?.[1] ?? '';
+    expect(defaults.indexOf("'trends'")).toBeGreaterThan(-1);
+    expect(defaults.indexOf("'logs'")).toBeGreaterThan(defaults.indexOf("'trends'"));
 
     const logsPage = read('../src/app/dashboard/logs/page.tsx');
     expect(logsPage).toContain('searchParams.logId');
