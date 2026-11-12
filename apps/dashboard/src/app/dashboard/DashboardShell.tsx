@@ -8,6 +8,7 @@ import { AskTraceIQDrawer } from '@/components/ai/AskTraceIQDrawer';
 import { FeatureSpotlightCard } from '@/components/FeatureSpotlightCard';
 import { readActiveProjectCookie } from '@/lib/dashboard';
 import { ActiveProjectFetch } from './ActiveProjectFetch';
+import { RecentVisitRecorder } from './RecentVisitRecorder';
 
 export interface DashboardShellProps {
   active?: string;
@@ -46,6 +47,7 @@ export function DashboardShell({
     <DashboardPlanProvider projectId={projectId}>
       <AskTraceIQProvider projectId={projectId}>
         <ActiveProjectFetch />
+        <RecentVisitRecorder active={effectiveActive} />
         <main className="min-h-screen bg-white text-neutral-900 dark:bg-slate-950 dark:text-slate-100">
           <div className="flex min-h-screen w-full">
             <Sidebar active={effectiveActive} userEmail={userEmail} projectId={projectId} organizationId={organizationId} />
