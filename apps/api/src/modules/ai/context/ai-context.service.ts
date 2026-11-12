@@ -5,7 +5,7 @@ import { FunnelResults } from '../../funnels/funnels.service';
 import { FunnelPromptData, FunnelPromptStepData } from '../prompts/funnel.prompt';
 import { StoryPromptData } from '../prompts/story.prompt';
 import { TodayStoryFacts } from '../../insights/insights.service';
-import { failureNarrative } from '../../insights/failure-facts';
+import { failureNarrative, hasRecovered } from '../../insights/failure-facts';
 
 interface CacheEntry {
   content: string;
@@ -104,7 +104,8 @@ export class AiContextService {
       activeNow: facts.activeNow,
       // Error messages and event names come from the customer's app, so sanitize the
       // sentence like any other user-supplied text before it reaches the prompt.
-      failures: facts.failures ? this.sanitizer.sanitizeText(failureNarrative(facts.failures) ?? '') || null : null
+      failures: facts.failures ? this.sanitizer.sanitizeText(failureNarrative(facts.failures) ?? '') || null : null,
+      failuresResolved: facts.failures ? hasRecovered(facts.failures) : false
     };
   }
 

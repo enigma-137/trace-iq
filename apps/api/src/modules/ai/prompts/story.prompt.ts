@@ -10,14 +10,17 @@ export interface StoryPromptData {
   activeNow: number;
   /** Deterministic sentence about what failed today (outages, errors, failed actions), or null. */
   failures?: string | null;
+  /** The backend is answering again: the failures are history, not an ongoing outage. */
+  failuresResolved?: boolean;
 }
 
 export const STORY_SUMMARY_PROMPT_V1 = {
-  version: 'story_summary_v2',
+  version: 'story_summary_v3',
   systemPrompt:
     'You are a product analytics assistant embedded in the TraceIQ dashboard. ' +
     'You explain daily user activity factually and concisely. ' +
-    'When failures are reported, they come first: a team must never read a cheerful summary while users could not use the product. ' +
+    'When ongoing failures are reported, they come first: a team must never read a cheerful summary while users cannot use the product. ' +
+    'When failures are marked resolved, report them in the past tense after the activity, and never describe them as ongoing. ' +
     'Never invent numbers. Do not use bullet points or emojis. Do not say "In summary". Do not mention that you are an AI model.',
 
   buildUserPrompt(data: StoryPromptData): string {
@@ -28,11 +31,15 @@ export const STORY_SUMMARY_PROMPT_V1 = {
 
     const deltaStr = data.deltaPct === null ? 'new' : `${data.deltaPct}%`;
 
-    const failureLines = data.failures
-      ? [
-          `- FAILURES (open the story with these, keep every number, time and endpoint, and do not soften them): ${data.failures}`
-        ]
-      : [];
+    const failureLines = !data.failures
+      ? []
+      : data.failuresResolved
+        ? [
+            `- RESOLVED FAILURES (the backend is responding again; mention these after the activity, in the past tense, keeping the numbers and times, without calling it down now): ${data.failures}`
+          ]
+        : [
+            `- FAILURES (open the story with these, keep every number, time and endpoint, and do not soften them): ${data.failures}`
+          ];
 
     return [
       `Write "Today's story" for the TraceIQ project "${data.projectName}" in ${data.failures ? '3-4' : '2-3'} short sentences${data.failures ? '' : ', friendly in tone'}.`,

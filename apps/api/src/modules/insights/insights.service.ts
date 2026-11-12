@@ -12,7 +12,8 @@ import {
   classifyHealth,
   describeFailures,
   emptyFailureFacts,
-  failureNarrative
+  failureNarrative,
+  hasRecovered
 } from './failure-facts';
 
 export * from './failure-facts';
@@ -269,9 +270,12 @@ export class InsightsService {
           affected_users: number;
           first_at: string | Date | null;
           last_at: string | Date | null;
+          last_network_at: string | Date | null;
+          recovered_at: string | Date | null;
         }>(
           `
-            WITH f AS (${scoped})
+            WITH f AS (${scoped}),
+            t AS (
             SELECT
               count(*) FILTER (WHERE kind = 'exception')::int AS exceptions,
               count(*) FILTER (WHERE kind = 'request')::int AS failed_requests,
@@ -281,8 +285,17 @@ export class InsightsService {
               count(*) FILTER (WHERE kind = 'action')::int AS failed_actions,
               count(DISTINCT actor) FILTER (WHERE kind IS NOT NULL)::int AS affected_users,
               min(occurred_at) FILTER (WHERE kind IS NOT NULL) AS first_at,
-              max(occurred_at) FILTER (WHERE kind IS NOT NULL) AS last_at
+              max(occurred_at) FILTER (WHERE kind IS NOT NULL) AS last_at,
+              max(occurred_at) FILTER (WHERE kind = 'request' AND ${STATUS_INT} = 0) AS last_network_at
             FROM f
+            )
+            SELECT t.*,
+              -- Any answer at all, even a 4xx, means the backend is reachable again.
+              (
+                SELECT min(occurred_at) FROM f
+                WHERE f.event_name = '$api_request' AND ${STATUS_INT} > 0 AND f.occurred_at > t.last_network_at
+              ) AS recovered_at
+            FROM t
           `,
           params
         )
@@ -345,7 +358,9 @@ export class InsightsService {
       topFailedRequest: topRequest.rows[0] ?? null,
       topFailedAction: topAction.rows[0] ?? null,
       firstAt: iso(row.first_at),
-      lastAt: iso(row.last_at)
+      lastAt: iso(row.last_at),
+      lastNetworkErrorAt: iso(row.last_network_at ?? null),
+      recoveredAt: iso(row.recovered_at ?? null)
     };
   }
 
@@ -463,9 +478,11 @@ export class InsightsService {
 
     const parts: string[] = [];
 
-    // Failures lead: someone reading the story should learn about an outage first.
+    // Failures lead while the backend is unreachable: someone reading the story should
+    // learn about an outage first. Once it answers again they follow the activity.
     const failureLine = failureNarrative(facts.failures, span.last);
-    if (failureLine) parts.push(failureLine);
+    const resolved = hasRecovered(facts.failures);
+    if (failureLine && !resolved) parts.push(failureLine);
 
     if (allTime) {
       parts.push(`Your project has recorded ${facts.eventsToday.toLocaleString()} events ${span.last}.`);
@@ -478,6 +495,8 @@ export class InsightsService {
     } else {
       parts.push(`Event volume is flat — ${facts.eventsToday.toLocaleString()} ${span.now}, the same as ${span.previous}.`);
     }
+
+    if (failureLine && resolved) parts.push(failureLine);
 
     if (facts.topEvent) {
       parts.push(`Top event: ${facts.topEvent.name} (${facts.topEvent.count.toLocaleString()}).`);

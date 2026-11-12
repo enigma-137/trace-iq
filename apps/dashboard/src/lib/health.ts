@@ -17,6 +17,10 @@ export interface FailureFacts {
   topFailedAction: { name: string; count: number; users: number } | null;
   firstAt: string | null;
   lastAt: string | null;
+  /** The last request that got no response. Older API versions omit it. */
+  lastNetworkErrorAt?: string | null;
+  /** First answered request after `lastNetworkErrorAt`: the backend is reachable again. */
+  recoveredAt?: string | null;
 }
 
 export type HealthStatus = 'operational' | 'degraded' | 'outage' | 'idle';
