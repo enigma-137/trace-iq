@@ -86,7 +86,8 @@ describe('tool registry', () => {
   it.each(tools.map((tool) => [tool.name, tool] as const))('%s has a consistent definition', (_name, tool) => {
     expect(tool.name).toMatch(/^[a-z][a-z0-9_]*$/);
     expect(tool.description.length).toBeGreaterThan(0);
-    expect(tool.requiredScopes.length).toBeGreaterThan(0);
+    // whoami reads only the token's own account, which needs no scope.
+    if (tool.name !== 'whoami') expect(tool.requiredScopes.length).toBeGreaterThan(0);
     for (const key of tool.schema.required ?? []) {
       expect(tool.schema.properties, `required "${key}" is not a declared property`).toHaveProperty(key);
     }

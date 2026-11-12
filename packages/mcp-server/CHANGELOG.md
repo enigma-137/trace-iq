@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0
+
+- Resources: `traceiq://projects`, `traceiq://me`, `traceiq://tools`, and per-project templates for
+  event names, funnels and dashboards.
+- Results now include `structuredContent` and, where a dashboard page exists, an "Open in TraceIQ"
+  `resource_link`. Set `TRACEIQ_DASHBOARD_URL` if the dashboard is not the API host without `api.`.
+- Confirmations: in clients with elicitation, deleting a funnel, alert or cohort, toggling a flag, or
+  changing an experiment or survey status asks the user first.
+- New `whoami` tool: account, scopes, projects, and the tools the token cannot use.
+- `TRACEIQ_PROJECT_ID` sets a default project for every tool that takes one.
+- 401 and 403 errors now say which scopes the tool needs and where to create a token.
+- Server setup moved into `createServer()` so other transports can reuse it. The server also sends
+  short usage instructions to clients.
+- The API's `/v1/dashboard/me` returns the token's `scopes` (null for browser sessions).
+
 ## 0.4.0
 
 - `run_insight_query`: ad-hoc trends (count, unique, sum or average, with breakdowns and filters), top

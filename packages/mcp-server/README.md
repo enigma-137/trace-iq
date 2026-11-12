@@ -46,6 +46,8 @@ TRACEIQ_API_KEY=tiq_pat_your_token_here
 TRACEIQ_API_URL=http://localhost:4000
 TRACEIQ_MCP_TIMEOUT_MS=30000
 TRACEIQ_MCP_RETRIES=2
+TRACEIQ_PROJECT_ID=
+TRACEIQ_DASHBOARD_URL=
 ```
 
 | Variable | Required | Description |
@@ -54,6 +56,8 @@ TRACEIQ_MCP_RETRIES=2
 | `TRACEIQ_API_URL` | No | TraceIQ API URL (defaults to `http://localhost:4000`) |
 | `TRACEIQ_MCP_TIMEOUT_MS` | No | Request timeout in milliseconds |
 | `TRACEIQ_MCP_RETRIES` | No | Number of retries for transient failures |
+| `TRACEIQ_PROJECT_ID` | No | Project used when a tool call names none (otherwise the token's first project) |
+| `TRACEIQ_DASHBOARD_URL` | No | Where "Open in TraceIQ" links point (defaults to the API URL without `api.`) |
 
 ---
 
@@ -93,9 +97,10 @@ Read-only tokens cannot perform mutations.
 
 # Available Tools
 
-## Projects
+## Projects and account
 
 - `list_projects`
+- `whoami`: who the token belongs to, its scopes, its projects, and the tools it cannot use
 
 ---
 
@@ -243,11 +248,41 @@ The server also ships prompts, which clients such as Claude show as slash comman
 
 ---
 
+## Resources
+
+Clients that support MCP resources can attach these as context without a tool call:
+
+| Resource | Contents |
+|----------|----------|
+| `traceiq://projects` | Projects the token can see |
+| `traceiq://me` | The same account summary as `whoami` |
+| `traceiq://tools` | Every tool and the scopes it needs |
+| `traceiq://projects/{projectId}/event-names` | Event names tracked in a project |
+| `traceiq://projects/{projectId}/funnels` | Saved funnels |
+| `traceiq://projects/{projectId}/dashboards` | Custom dashboards |
+
+---
+
+## Results and links
+
+Tool results come back as JSON text and as `structuredContent`. When there is a matching page in the
+TraceIQ dashboard, the result also carries an **Open in TraceIQ** `resource_link` (and
+`_links.dashboard` in the structured content), with the project kept selected.
+
+---
+
 ## Safety
 
 Mutating tools require explicit write scopes.
 
 Destructive operations are annotated so MCP clients can distinguish them from read-only tools.
+
+In clients that support elicitation, the server also asks you to confirm before it deletes a funnel,
+alert or cohort, toggles a feature flag, or changes an experiment's or survey's status. If you decline,
+nothing is changed.
+
+When a call fails for lack of a scope, the error names the scopes the tool needs and where to create a
+token that has them (Settings → Personal access tokens).
 
 Administrative operations such as:
 
