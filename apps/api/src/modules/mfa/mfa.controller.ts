@@ -19,7 +19,9 @@ export class MfaController {
       user: {
         id: user.id,
         email: user.email ?? null,
-        authMethod: user.authMethod ?? null
+        authMethod: user.authMethod ?? null,
+        // Only personal access tokens are scoped; browser sessions can do everything.
+        scopes: user.authMethod === 'pat' ? (user.scopes ?? []) : null
       },
       mfa: this.mfaService.status(user)
     };

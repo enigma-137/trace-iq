@@ -3,6 +3,7 @@ import { compactTimeline, shapeResponse } from './shape.js';
 import { Tool, JsonObject, JsonValue } from './types.js';
 import { incidentTools } from './incident-tools.js';
 import { productTools } from './product-tools.js';
+import { accountTools } from './account-tools.js';
 
 function withProject(projectId?: string): Record<string, JsonValue> {
   return projectId ? { projectId } : {};
@@ -889,7 +890,8 @@ export const tools: Tool[] = [
     }
   },
   ...incidentTools,
-  ...productTools
+  ...productTools,
+  ...accountTools
 ];
 
 

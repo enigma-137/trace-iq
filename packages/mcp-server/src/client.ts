@@ -2,8 +2,25 @@ import { HttpMethod, JsonObject, JsonValue } from './types.js';
 
 const API_KEY = process.env.TRACEIQ_API_KEY;
 const API_URL = (process.env.TRACEIQ_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+/** Where "open in TraceIQ" links point. Defaults to the API host without its "api." prefix. */
+const DASHBOARD_URL = (process.env.TRACEIQ_DASHBOARD_URL ?? defaultDashboardUrl(API_URL)).replace(/\/$/, '');
+/** Project used when a tool call names none. Unset: the API picks the token's first project. */
+const DEFAULT_PROJECT_ID = process.env.TRACEIQ_PROJECT_ID?.trim() || undefined;
 const DEFAULT_TIMEOUT_MS = Number(process.env.TRACEIQ_MCP_TIMEOUT_MS ?? 30_000);
 const DEFAULT_RETRIES = Number(process.env.TRACEIQ_MCP_RETRIES ?? 2);
+
+function defaultDashboardUrl(apiUrl: string): string {
+  try {
+    const url = new URL(apiUrl);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return `${url.protocol}//${url.hostname}:3000`;
+    url.hostname = url.hostname.replace(/^api\./, '');
+    url.port = '';
+    url.pathname = '';
+    return url.toString();
+  } catch {
+    return 'https://traceiq.run';
+  }
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -143,4 +160,4 @@ export function ensureConfigured(): void {
   }
 }
 
-export { API_KEY, API_URL };
+export { API_KEY, API_URL, DASHBOARD_URL, DEFAULT_PROJECT_ID };
