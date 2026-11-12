@@ -1,6 +1,7 @@
 import { request } from './client.js';
 import { compactTimeline, shapeResponse } from './shape.js';
 import { Tool, JsonObject, JsonValue } from './types.js';
+import { incidentTools } from './incident-tools.js';
 
 function withProject(projectId?: string): Record<string, JsonValue> {
   return projectId ? { projectId } : {};
@@ -313,7 +314,7 @@ export const tools: Tool[] = [
   {
     name: 'list_error_issues',
     title: 'Error issues',
-    description: `Aggregated error issues (grouped by type/message) with counts and a daily sparkline. Answers "what errors are increasing?" and "which exceptions are most common?".`,
+    description: `Aggregated error issues (grouped by type/message) with counts, status (open, regressed, resolved, ignored) and a daily sparkline. Each issue's "id" is what update_error_issue takes. Answers "what errors are increasing?" and "which exceptions are most common?".`,
     requiredScopes: ['errors:read'],
     annotations: { readOnlyHint: true },
     schema: {
@@ -885,7 +886,8 @@ export const tools: Tool[] = [
       }
       return request('POST', '/v1/dashboard/links', { body });
     }
-  }
+  },
+  ...incidentTools
 ];
 
 

@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListToolsRequestSchema
+} from '@modelcontextprotocol/sdk/types.js';
 import { API_URL, ensureConfigured } from './client.js';
+import { prompts } from './prompts.js';
 import { tools } from './tools.js';
 import { JsonObject, JsonValue } from './types.js';
 import { validateArgs } from './validate.js';
@@ -12,11 +18,12 @@ ensureConfigured();
 const server = new Server(
   {
     name: 'traceiq-mcp',
-    version: '0.2.2'
+    version: '0.3.0'
   },
   {
     capabilities: {
-      tools: {}
+      tools: {},
+      prompts: {}
     }
   }
 );
@@ -49,6 +56,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   } catch (error) {
     return errorResult(error instanceof Error ? error.message : 'Unknown TraceIQ MCP error.');
   }
+});
+
+const promptIndex = new Map(prompts.map((prompt) => [prompt.name, prompt]));
+
+server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  prompts: prompts.map((prompt) => ({
+    name: prompt.name,
+    title: prompt.title,
+    description: prompt.description,
+    arguments: prompt.arguments
+  }))
+}));
+
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const prompt = promptIndex.get(request.params.name);
+  if (!prompt) {
+    throw new Error(`Unknown prompt: ${request.params.name}`);
+  }
+  const args = request.params.arguments ?? {};
+  for (const argument of prompt.arguments) {
+    if (argument.required && !args[argument.name]) {
+      throw new Error(`Missing required argument "${argument.name}".`);
+    }
+  }
+  return {
+    description: prompt.description,
+    messages: [{ role: 'user' as const, content: { type: 'text' as const, text: prompt.render(args) } }]
+  };
 });
 
 const transport = new StdioServerTransport();

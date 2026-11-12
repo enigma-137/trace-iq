@@ -78,6 +78,8 @@ Examples:
 | `alerts:write` | Manage alerts |
 | `flags:read` | View feature flags |
 | `flags:write` | Toggle feature flags |
+| `errors:write` | Resolve, ignore or reopen error issues |
+| `replays:read` | List session replays |
 
 Read-only tokens cannot perform mutations.
 
@@ -129,6 +131,18 @@ Read-only tokens cannot perform mutations.
 
 - `list_error_issues`
 - `get_error_issue`
+- `update_error_issue` (resolve, ignore or reopen; needs `errors:write`)
+
+---
+
+## Incidents and debugging
+
+- `get_today_story`: the plain-English story of the last 24 hours, including whether the backend recovered
+- `get_project_health`: operational, degraded, outage or idle, from recent data
+- `investigate_incident`: health, failing endpoints, error logs, top issues and replays for one window, with next steps
+- `search_logs` / `get_log`: search log lines and follow a trace
+- `search_requests` / `get_request`: captured API requests, with timeline and related requests
+- `list_replays`: session replays for a user, visitor or session (needs `replays:read`)
 
 ---
 
@@ -166,6 +180,19 @@ These tools combine multiple TraceIQ endpoints to answer higher-level product qu
 - `find_users_who_failed_checkout`
 
 Rather than returning raw API payloads, these tools generate concise, structured summaries designed for AI assistants.
+
+---
+
+## Prompts
+
+The server also ships prompts, which clients such as Claude show as slash commands:
+
+| Prompt | What it does |
+|--------|--------------|
+| `incident-review` | Finds what is broken (or was), who it hit, the likely cause and next actions |
+| `daily-standup` | A short summary of the last 24 hours for the team standup |
+| `weekly-report` | Usage, conversion, retention, reliability and errors for the week |
+| `funnel-audit` | Where users drop out of a funnel, who they are, and what to fix |
 
 ---
 
