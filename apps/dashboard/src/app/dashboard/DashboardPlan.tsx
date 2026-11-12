@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Crown } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -62,9 +63,20 @@ export function DashboardPlanBadge({ className = '' }: { className?: string }) {
   const title = plan === 'pro' && billingPeriod
     ? `TraceIQ Pro · ${billingPeriod} billing`
     : `TraceIQ ${label}`;
-  const tone = plan === 'pro'
-    ? 'border-blue-400/30 bg-blue-500/15 text-blue-600 dark:text-blue-300'
-    : 'border-neutral-300 bg-neutral-100 text-neutral-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400';
+  if (plan === 'pro') {
+    return (
+      <span className={`inline-flex shrink-0 items-center ${className}`} title={title} aria-label={title} role="img">
+        <Crown
+          aria-hidden
+          className="size-[18px] rotate-[18deg] fill-amber-400 text-amber-500 drop-shadow-[0_1px_0_rgba(180,83,9,0.25)] dark:fill-amber-300 dark:text-amber-400"
+          strokeWidth={1.75}
+        />
+      </span>
+    );
+  }
+
+  const tone =
+    'border-neutral-300 bg-neutral-100 text-neutral-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400';
 
   return (
     <span
