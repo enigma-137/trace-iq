@@ -22,6 +22,13 @@ export interface FailureFacts {
   topFailedAction: { name: string; count: number; users: number } | null;
   firstAt: string | null;
   lastAt: string | null;
+  /** The last request that got no response. Older API versions omit it. */
+  lastNetworkErrorAt?: string | null;
+  /**
+   * The first request the backend answered (any status) after `lastNetworkErrorAt`: the
+   * backend is reachable again. Null while it is still unreachable or never was.
+   */
+  recoveredAt?: string | null;
 }
 
 export type HealthStatus = 'operational' | 'degraded' | 'outage' | 'idle';
@@ -89,7 +96,9 @@ export function emptyFailureFacts(): FailureFacts {
     topFailedRequest: null,
     topFailedAction: null,
     firstAt: null,
-    lastAt: null
+    lastAt: null,
+    lastNetworkErrorAt: null,
+    recoveredAt: null
   };
 }
 
@@ -97,27 +106,68 @@ export function hasFailures(f: FailureFacts): boolean {
   return f.exceptions + f.failedRequests + f.failedActions > 0;
 }
 
-function shortTime(iso: string | null): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : `${date.toISOString().slice(11, 16)} UTC`;
+/**
+ * The backend stopped answering at some point in the window but has answered since.
+ * The story then reports the outage as history instead of leading with it.
+ */
+export function hasRecovered(f: FailureFacts): boolean {
+  return f.networkErrors > 0 && !!f.recoveredAt;
 }
 
-/** The failure sentences that open the story, or null when nothing failed. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function parse(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function clock(date: Date): string {
+  return `${date.toISOString().slice(11, 16)} UTC`;
+}
+
+function dayClock(date: Date): string {
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${clock(date)}`;
+}
+
+/** " between 18:38 UTC and 19:34 UTC", with dates when the span crosses midnight UTC. */
+function span(firstAt: string | null, lastAt: string | null): string {
+  const first = parse(firstAt);
+  const last = parse(lastAt);
+  if (!first || !last) return '';
+  const sameDay = first.toISOString().slice(0, 10) === last.toISOString().slice(0, 10);
+  const from = sameDay ? clock(first) : dayClock(first);
+  const to = sameDay ? clock(last) : dayClock(last);
+  return from === to ? ` at ${from}` : ` between ${from} and ${to}`;
+}
+
+/**
+ * The failure sentences for the story, or null when nothing failed. While the backend is
+ * unreachable they open the story; once it answers again they read as resolved history.
+ */
 export function failureNarrative(f: FailureFacts, window = 'the last 24 hours'): string | null {
   if (!hasFailures(f)) return null;
   const sentences: string[] = [];
-  const from = shortTime(f.firstAt);
-  const to = shortTime(f.lastAt);
-  const when = from && to ? (from === to ? ` at ${from}` : ` between ${from} and ${to}`) : '';
+  const when = span(f.firstAt, f.lastAt);
   const affecting = f.affectedUsers > 0 ? `, affecting ${plural(f.affectedUsers, 'user')}` : '';
+  const recovered = hasRecovered(f);
 
   if (f.networkErrors > 0) {
     const top = f.topFailedRequest;
     const where = top && top.status === 0 ? ` (${top.method} ${top.path})` : '';
-    sentences.push(
-      `Heads up: ${plural(f.networkErrors, 'request')} got no response from your backend${where}${when}${affecting}. Your API may have been down or unreachable.`
-    );
+    if (recovered) {
+      const lastDown = parse(f.lastNetworkErrorAt);
+      const back = parse(f.recoveredAt);
+      const until = lastDown ? `, the last at ${clock(lastDown)}` : '';
+      const since = back ? ` since ${clock(back)}` : '';
+      sentences.push(
+        `Earlier, ${plural(f.networkErrors, 'request')} got no response from your backend${where}${until}${affecting}. It has been responding again${since}.`
+      );
+    } else {
+      sentences.push(
+        `Heads up: ${plural(f.networkErrors, 'request')} got no response from your backend${where}${when}${affecting}. Your API may be down or unreachable.`
+      );
+    }
   } else if (f.failedRequests > 0) {
     const top = f.topFailedRequest;
     const where = top ? `, most often ${top.method} ${top.path} (${top.status})` : '';

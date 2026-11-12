@@ -160,6 +160,36 @@ describe('story', () => {
     expect(line).toContain('2 errors were captured, most often TypeError: Failed to fetch.');
   });
 
+  it('reports an outage the backend has recovered from as history', () => {
+    const line = failureNarrative({ ...OUTAGE, lastNetworkErrorAt: '2026-11-06T19:34:26.000Z', recoveredAt: '2026-11-06T19:52:10.000Z' });
+    expect(line).toMatch(/^Earlier, 3 requests got no response from your backend \(POST \/api\/user\/login\/\), the last at 19:34 UTC, affecting 2 users\. It has been responding again since 19:52 UTC\./);
+    expect(line).not.toContain('Heads up');
+  });
+
+  it('dates a failure span that crosses midnight UTC', () => {
+    const line = failureNarrative({ ...OUTAGE, firstAt: '2026-11-11T07:23:00.000Z', lastAt: '2026-11-12T03:40:00.000Z' });
+    expect(line).toContain('between Nov 11, 07:23 UTC and Nov 12, 03:40 UTC');
+  });
+
+  it('puts a recovered outage after the activity in the template narrative', async () => {
+    const db = mockDatabase((text) => {
+      if (/AS today/.test(text)) return rows([{ today: 120, yesterday: 100, uniques_today: 34, active_now: 3 }]);
+      if (/AS exceptions/.test(text)) {
+        return rows([{ exceptions: 2, failed_requests: 4, network_errors: 3, server_errors: 0, total_requests: 6, failed_actions: 2, affected_users: 2, first_at: OUTAGE.firstAt, last_at: OUTAGE.lastAt, last_network_at: OUTAGE.lastAt, recovered_at: '2026-11-06T19:52:10.000Z' }]);
+      }
+      return empty();
+    });
+    const projects = { resolveActiveProject: async () => PROJECT };
+    const ai = { generateStoryNarrative: async () => null };
+    const service = new InsightsService(db as never, projects as never, ai as never, {} as never);
+
+    const story = await service.getTodayStory({ id: 'u', email: 'u@example.com' });
+
+    expect(story.narrative).toMatch(/^Events are up/);
+    expect(story.narrative).toContain('It has been responding again since 19:52 UTC.');
+    expect(story.facts.failures.recoveredAt).toBe('2026-11-06T19:52:10.000Z');
+  });
+
   it('says nothing about failures when there were none', () => {
     expect(failureNarrative(emptyFailureFacts())).toBeNull();
   });
