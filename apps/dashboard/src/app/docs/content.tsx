@@ -1878,6 +1878,13 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
             <strong>Claude Code</strong>: <Mono>{`claude mcp add --transport http traceiq ${mcpUrl}`}</Mono>
           </li>
           <li>
+            <strong>Codex</strong> (desktop app, CLI and IDE extension share one config): run{' '}
+            <Mono>{`codex mcp add traceiq --url ${mcpUrl}`}</Mono> in a terminal. Codex prints a sign-in link (or opens
+            your browser); approve it on the same computer so the browser can hand the sign-in back to Codex. If it
+            doesn&apos;t, run <Mono>codex mcp login traceiq</Mono>. Then start a new Codex chat and ask{' '}
+            <Mono>Use TraceIQ to list my projects</Mono>; chats that were already open don&apos;t load the new tools.
+          </li>
+          <li>
             <strong>Cursor</strong>: add <Mono>{`"traceiq": { "url": "${mcpUrl}" }`}</Mono> under <Mono>mcpServers</Mono> in{' '}
             <Mono>~/.cursor/mcp.json</Mono>.
           </li>
