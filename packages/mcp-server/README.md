@@ -308,6 +308,24 @@ TraceIQ dashboard, the result also carries an **Open in TraceIQ** `resource_link
 
 ---
 
+## Inline charts (MCP Apps)
+
+In hosts that support [MCP Apps](https://github.com/modelcontextprotocol/ext-apps), these tools show an
+interactive view under the answer instead of only text:
+
+| Tool | View |
+|------|------|
+| `get_project_health` | Status (operational, degraded, outage), requests, failures, top error and failing request |
+| `get_trends` | Line chart with hover values, or totals per value when broken down |
+| `get_funnel_results` | Users per step, with the biggest drop highlighted |
+| `get_experiment_results` | Conversion rate per variant, lift, confidence and the winner |
+
+Each view has an **Open in TraceIQ** button and follows the host's light or dark theme. The view is the
+`ui://traceiq/view.html` resource (`text/html;profile=mcp-app`). It makes no network requests and draws
+only `structuredContent._view` from the tool result. Hosts without MCP Apps show the usual text.
+
+---
+
 ## Safety
 
 Mutating tools require explicit write scopes.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- Inline charts with MCP Apps: `get_project_health`, `get_trends`, `get_funnel_results` and
+  `get_experiment_results` declare `_meta.ui.resourceUri` and render in the `ui://traceiq/view.html`
+  view (status and stat tiles, a line chart with hover, ranked bars). It follows the host theme, resizes
+  itself, and opens the matching dashboard page.
+- Those tools' `structuredContent` includes `_view`, the summarized data the view draws.
+
 ## 0.6.0
 
 - Remote MCP over Streamable HTTP: `traceiq-mcp-http`, hosted at `https://api.traceiq.run/mcp`.

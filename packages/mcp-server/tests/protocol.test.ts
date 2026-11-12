@@ -101,7 +101,7 @@ describe('tool calls over MCP', () => {
     stubApi({ '/v1/dashboard/funnels': [{ id: 'f1' }] });
     const client = await connect();
     const { resources } = await client.listResources();
-    expect(resources.map((resource) => resource.uri)).toEqual(['traceiq://projects', 'traceiq://me', 'traceiq://tools']);
+    expect(resources.map((resource) => resource.uri)).toEqual(['traceiq://projects', 'traceiq://me', 'traceiq://tools', 'ui://traceiq/view.html']);
     const { resourceTemplates } = await client.listResourceTemplates();
     expect(resourceTemplates.map((template) => template.uriTemplate)).toContain('traceiq://projects/{projectId}/funnels');
     const read = await client.readResource({ uri: 'traceiq://projects/p1/funnels' });

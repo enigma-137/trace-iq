@@ -1,6 +1,7 @@
 import { request } from './client.js';
 import { shapeResponse } from './shape.js';
 import { Tool } from './types.js';
+import { WIDGET_HTML, WIDGET_MIME_TYPE, WIDGET_URI } from './widget.js';
 
 /**
  * MCP resources: read-only context a client can attach to a conversation without a
@@ -14,7 +15,11 @@ export interface StaticResource {
   title: string;
   description: string;
   mimeType: string;
+  _meta?: Record<string, unknown>;
 }
+
+/** MCP Apps resource metadata: no network access needed, and a border looks right inline. */
+const WIDGET_META = { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } } };
 
 export interface ResourceTemplate {
   uriTemplate: string;
@@ -45,6 +50,14 @@ export const staticResources: StaticResource[] = [
     title: 'TraceIQ tools and scopes',
     description: 'Every TraceIQ tool with the token scopes it needs.',
     mimeType: 'text/markdown'
+  },
+  {
+    uri: WIDGET_URI,
+    name: 'view',
+    title: 'TraceIQ results view',
+    description: 'Interactive chart view for health, trends, funnels and experiments (MCP Apps).',
+    mimeType: WIDGET_MIME_TYPE,
+    _meta: WIDGET_META
   }
 ];
 
@@ -80,6 +93,7 @@ export interface ResourceContents {
   uri: string;
   mimeType: string;
   text: string;
+  _meta?: Record<string, unknown>;
 }
 
 /** Reads a traceiq:// resource. Throws for unknown URIs. */
@@ -92,6 +106,7 @@ export async function readResource(uri: string, tools: Tool[]): Promise<Resource
     return json(await whoami(tools));
   }
   if (uri === 'traceiq://tools') return { uri, mimeType: 'text/markdown', text: toolsMarkdown(tools) };
+  if (uri === WIDGET_URI) return { uri, mimeType: WIDGET_MIME_TYPE, text: WIDGET_HTML, _meta: WIDGET_META };
 
   const match = /^traceiq:\/\/projects\/([^/]+)\/([a-z-]+)$/.exec(uri);
   const collection = match ? PROJECT_COLLECTIONS[match[2]] : undefined;

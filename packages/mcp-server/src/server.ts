@@ -16,8 +16,12 @@ import { readResource, resourceTemplates, staticResources } from './resources.js
 import { tools } from './tools.js';
 import { JsonObject, Tool } from './types.js';
 import { validateArgs } from './validate.js';
+import { buildView, widgetTools } from './views.js';
+import { WIDGET_URI } from './widget.js';
 
-export const SERVER_VERSION = '0.6.0';
+const WIDGET_TOOLS = new Set(widgetTools);
+
+export const SERVER_VERSION = '0.7.0';
 
 export const SERVER_INSTRUCTIONS = [
   'TraceIQ is product analytics plus API and error monitoring.',
@@ -45,7 +49,11 @@ export function createServer(): Server {
       description: `${tool.description}\n\nRequired scopes: ${tool.requiredScopes.length ? tool.requiredScopes.join(', ') : 'none'}.`,
       inputSchema: tool.schema,
       annotations: { ...tool.annotations, title: tool.title },
-      _meta: { requiredScopes: tool.requiredScopes.join(', ') }
+      _meta: {
+        requiredScopes: tool.requiredScopes.join(', '),
+        // MCP Apps: hosts that support it draw these results inline with the TraceIQ widget.
+        ...(WIDGET_TOOLS.has(tool.name) ? { ui: { resourceUri: WIDGET_URI } } : {})
+      }
     }))
   }));
 
@@ -65,7 +73,7 @@ export function createServer(): Server {
       }
 
       const result = await tool.handler(args);
-      return textResult(result, dashboardLink(tool.name, args, result));
+      return textResult(result, dashboardLink(tool.name, args, result), buildView(tool.name, args, result));
     } catch (error) {
       return errorResult(describeError(error, tool));
     }
@@ -127,7 +135,7 @@ export function describeError(error: unknown, tool: Tool, dashboardUrl = DASHBOA
   return message;
 }
 
-function textResult(value: unknown, link: string | null) {
+function textResult(value: unknown, link: string | null, view: unknown = null) {
   const structured =
     value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : { result: value ?? null };
   return {
@@ -137,7 +145,11 @@ function textResult(value: unknown, link: string | null) {
         ? [{ type: 'resource_link' as const, uri: link, name: 'Open in TraceIQ', description: 'The TraceIQ dashboard page for this result.', mimeType: 'text/html' }]
         : [])
     ],
-    structuredContent: link ? { ...structured, _links: { dashboard: link } } : structured
+    structuredContent: {
+      ...structured,
+      ...(link ? { _links: { dashboard: link } } : {}),
+      ...(view ? { _view: view } : {})
+    }
   };
 }
 
