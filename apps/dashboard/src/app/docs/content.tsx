@@ -1851,28 +1851,70 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
   }
 
   if (id === 'mcp') {
+    const h3 = 'pt-2 text-base font-semibold text-neutral-900 dark:text-white';
+    const link = 'font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white';
+    const steps = 'grid list-decimal gap-1.5 pl-5 text-sm leading-6 text-neutral-600 dark:text-slate-400';
+    const mcpUrl = `${apiBaseUrl}/mcp`;
     return (
       <Section id="mcp" title="MCP server">
         <P>
-          TraceIQ's MCP server is an analytics copilot for AI clients. Through a local stdio process it can read
-          analytics, funnels, retention, errors, users, API health, and feature flags — and, with a write-scoped token,
-          toggle flags and manage funnels and alerts. The client talks to the <Mono>traceiq-mcp-server</Mono> npm package,
-          and the MCP server talks to your TraceIQ API using a personal access token.
+          Connect Claude, ChatGPT, Cursor, VS Code or any other MCP client to TraceIQ and ask about your product in plain
+          language: what is broken right now, why conversion dropped, which experiment variant is winning, who a user is
+          and what they did. With your permission the assistant can also make changes, such as toggling a flag, creating
+          a dashboard or resolving an error.
+        </P>
+        <P>There are two ways to connect. Use the remote server unless your client only supports local servers.</P>
+
+        <h3 className={h3}>Remote server (recommended)</h3>
+        <P>
+          Nothing to install and no token to copy. Add this URL as a custom connector in your AI app:
+        </P>
+        <Code lang="text">{mcpUrl}</Code>
+        <ol className={steps}>
+          <li>
+            <strong>Claude</strong> (web and desktop): Settings → Connectors → Add custom connector, then paste the URL.
+          </li>
+          <li>
+            <strong>Claude Code</strong>: <Mono>{`claude mcp add --transport http traceiq ${mcpUrl}`}</Mono>
+          </li>
+          <li>
+            <strong>Cursor</strong>: add <Mono>{`"traceiq": { "url": "${mcpUrl}" }`}</Mono> under <Mono>mcpServers</Mono> in{' '}
+            <Mono>~/.cursor/mcp.json</Mono>.
+          </li>
+          <li>
+            <strong>VS Code</strong>: add <Mono>{`"traceiq": { "type": "http", "url": "${mcpUrl}" }`}</Mono> under{' '}
+            <Mono>servers</Mono> in <Mono>.vscode/mcp.json</Mono>.
+          </li>
+          <li>
+            <strong>ChatGPT and other clients</strong>: add it wherever the app lets you connect a remote MCP server.
+          </li>
+        </ol>
+        <P>
+          The app opens TraceIQ, you sign in, and a consent page shows what the app will be able to read. It is read-only
+          unless you tick <Mono>Also allow changes</Mono>. Click <Mono>Allow access</Mono> and you are connected.
         </P>
         <P>
-          Create the token from{' '}
-          <a className="font-semibold text-neutral-900 underline-offset-4 hover:underline dark:text-white" href="/dashboard/settings">
+          Behind the scenes the connection is a personal access token named after the app, for example{' '}
+          <Mono>Claude (connected app)</Mono>. It lasts 90 days and you can revoke it any time under{' '}
+          <a className={link} href="/dashboard/settings">
             Settings
-          </a>
-          . In <Mono>Personal access tokens</Mono>, choose a name such as <Mono>Claude Desktop</Mono>, then select the
-          scopes the assistant should have. For a read-only copilot use <Mono>projects:read</Mono>,{' '}
-          <Mono>analytics:read</Mono>, <Mono>insights:read</Mono>, <Mono>funnels:read</Mono>, <Mono>users:read</Mono>,
-          and <Mono>errors:read</Mono>. Add write scopes (<Mono>flags:write</Mono>, <Mono>funnels:write</Mono>,{' '}
-          <Mono>alerts:write</Mono>) only if the assistant may make changes. Read-only tokens cannot mutate anything.
+          </a>{' '}
+          → Personal access tokens. Connecting an app needs the owner or admin role, and asks for your second factor if
+          you use two-factor authentication.
         </P>
         <P>
-          The dashboard shows the full <Mono>tiq_pat_...</Mono> value once and generates a ready-to-copy Claude
-          Desktop config. TraceIQ stores only a SHA-256 hash after creation.
+          Clients that take a URL plus headers instead of signing in can send an existing token:{' '}
+          <Mono>Authorization: Bearer tiq_pat_...</Mono>.
+        </P>
+
+        <h3 className={h3}>Local server (npm)</h3>
+        <P>
+          Run the <Mono>traceiq-mcp-server</Mono> npm package on your machine. Create a personal access token in{' '}
+          <a className={link} href="/dashboard/settings">
+            Settings
+          </a>{' '}
+          → Personal access tokens (the <Mono>MCP read-only</Mono> and <Mono>MCP full</Mono> presets pick the right
+          scopes), then add it to your client. The dashboard shows the token once and stores only a SHA-256 hash.
         </P>
         <P>Claude Desktop config:</P>
         <Code lang="json">{`{
@@ -1887,46 +1929,55 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
     }
   }
 }`}</Code>
-        <P>Cursor can use the same command as an MCP server:</P>
+        <P>Cursor and other clients can run the same command:</P>
         <Code lang="bash">{`npx -y traceiq-mcp-server`}</Code>
         <OptionsTable
           rows={[
             ['TRACEIQ_API_KEY', 'required', 'A personal access token that starts with tiq_pat_.'],
             ['TRACEIQ_API_URL', `'${apiBaseUrl}'`, 'TraceIQ API base URL.'],
+            ['TRACEIQ_PROJECT_ID', 'first project', 'Project used when a request does not name one.'],
+            ['TRACEIQ_DASHBOARD_URL', 'API host without api.', 'Where "Open in TraceIQ" links point.'],
             ['TRACEIQ_MCP_TIMEOUT_MS', '30000', 'Per-request timeout in milliseconds.'],
             ['TRACEIQ_MCP_RETRIES', '2', 'Retries for 408/429/5xx responses (exponential backoff).']
           ]}
         />
-        <P>The server currently exposes these tools:</P>
+
+        <h3 className={h3}>What the assistant can do</h3>
+        <P>
+          The server has 66 tools. Each one needs the matching scope (for example <Mono>funnels:read</Mono> or{' '}
+          <Mono>flags:write</Mono>); ask the assistant to run <Mono>whoami</Mono> to see which tools your connection can
+          use.
+        </P>
         <Bullets
           items={[
-            ['list_projects', 'List projects available to the token. Requires projects:read.'],
-            ['get_analytics_overview', 'Headline totals, revenue, top events/devices/countries. Requires analytics:read.'],
-            ['get_web_analytics', 'Visitors, pageviews, sessions, bounce rate (current vs previous). Requires analytics:read.'],
-            ['get_api_performance', 'Endpoint p95/avg latency, error rate, busiest and slowest routes. Requires analytics:read.'],
-            ['list_event_names', 'Tracked events with counts. Requires insights:read.'],
-            ['get_trends', 'Event counts over time with period-over-period change. Requires insights:read.'],
-            ['get_retention', 'Weekly cohort retention table and averages. Requires insights:read.'],
-            ['list_funnels / get_funnel / get_funnel_results / get_funnel_step_users', 'Funnel definitions, conversion and drop-off, and the users behind each step. Requires funnels:read.'],
-            ['summarize_funnel_dropoff', 'A plain-language (LLM) explanation of why a funnel drops off. Requires funnels:read.'],
-            ['list_error_issues / get_error_issue', 'Aggregated error issues and deep-dive detail. Requires errors:read.'],
-            ['list_users / get_user / get_user_timeline', 'Users, full profiles, and a concise chronological timeline. Requires users:read.'],
-            ['list_feature_flags', 'List feature flags. Requires flags:read.'],
-            ['list_alerts', 'List alerts and recent fires. Requires alerts:read.'],
-            ['explain_conversion_drop', 'Funnel + traffic analysis with the biggest drop-off and a data-backed interpretation. Requires funnels:read and analytics:read.'],
-            ['summarize_api_health', 'API health verdict: error rate and slowest/error-prone/busiest endpoints. Requires analytics:read.'],
-            ['show_retention_changes', 'Retention cohorts with a plain-language note. Requires insights:read.'],
-            ['find_users_who_failed_checkout', 'Users who dropped at the final funnel step. Requires funnels:read and users:read.'],
-            ['toggle_feature_flag', 'Enable or disable a feature flag. Requires flags:write.'],
-            ['create_funnel / update_funnel / delete_funnel', 'Manage funnels. Requires funnels:write (delete is destructive).'],
-            ['create_alert / set_alert_enabled / delete_alert', 'Manage alerts. Requires alerts:write (delete is destructive).'],
-            ['list_links / get_link_stats', 'Short links with click counts, and daily clicks with top referrers, countries and devices. Requires links:read.'],
-            ['create_link', 'Create a short link with an optional slug, UTM tags and expiry. Requires links:write.']
+            ['Incidents', 'investigate_incident, get_project_health, get_today_story, search_logs, get_log, search_requests, get_request, list_replays, update_error_issue'],
+            ['Analytics', 'get_analytics_overview, get_web_analytics, get_api_performance, summarize_api_health, get_trends, get_retention, show_retention_changes, list_event_names, run_insight_query'],
+            ['Funnels', 'list_funnels, get_funnel, get_funnel_results, get_funnel_step_users, summarize_funnel_dropoff, explain_conversion_drop, find_users_who_failed_checkout, create_funnel, update_funnel, delete_funnel'],
+            ['Users and errors', 'list_users, get_user, get_user_timeline, list_error_issues, get_error_issue'],
+            ['Experiments and surveys', 'list_experiments, get_experiment_results, create_experiment, set_experiment_status, list_surveys, get_survey_results, set_survey_status'],
+            ['Dashboards and cohorts', 'list_dashboards, get_dashboard, create_dashboard, add_dashboard_widget, list_cohorts, create_cohort, delete_cohort'],
+            ['Flags, alerts and links', 'list_feature_flags, toggle_feature_flag, list_alerts, create_alert, set_alert_enabled, delete_alert, list_links, get_link_stats, create_link'],
+            ['Monitors and webhooks', 'list_synthetic_monitors, get_synthetic_monitor_runs, run_synthetic_monitor, set_synthetic_monitor_paused, list_webhooks, list_webhook_deliveries, retry_webhook_delivery, test_webhook'],
+            ['Account', 'list_projects, whoami']
           ]}
         />
+
+        <h3 className={h3}>Prompts, charts and context</h3>
+        <Bullets
+          items={[
+            ['Prompts', 'Ready-made workflows that clients show as slash commands: incident-review, daily-standup, weekly-report, experiment-readout and funnel-audit.'],
+            ['Inline charts', 'In apps that support MCP Apps, project health, trends, funnel results and experiment results appear as interactive charts under the answer.'],
+            ['Dashboard links', 'Results include an Open in TraceIQ link to the matching dashboard page.'],
+            ['Resources', 'Attach your projects, account, event names, funnels or dashboards as context (traceiq://projects, traceiq://me, traceiq://projects/{projectId}/funnels and more).']
+          ]}
+        />
+
+        <h3 className={h3}>Safety</h3>
         <P>
-          Revoke a token from Settings at any time. For automation, the same dashboard endpoint is available at
-          <Mono>POST /v1/dashboard/personal-access-tokens</Mono>, but the Settings flow is the recommended path.
+          Reads never change anything. Tools that change data say so, and in apps that support it the server asks you to
+          confirm before it deletes a funnel, alert or cohort, toggles a feature flag, or changes an experiment or survey
+          status. If you decline, nothing changes. Organization settings, write keys and personal access tokens are not
+          available through MCP. When a call fails for lack of a scope, the error names the scopes the tool needs.
         </P>
       </Section>
     );
@@ -2522,7 +2573,7 @@ def verify_webhook(raw_body: bytes, signature_header: str, timestamp_header: str
             ['Experiments', 'A/B and multivariate tests: weighted, sticky variant assignment from the SDK, exposure tracking, and per-variant conversion, uplift and significance against a goal event.'],
             ['Surveys', 'In-app NPS, rating, choice and text questions, targeted to everyone, a user property or an event, with per-question results.'],
             ['Synthetic monitors', 'Scheduled Playwright journeys that report which step failed, with console logs, network failures and a screenshot; can also run on pull-request previews.'],
-            ['MCP server', 'Connect Claude Desktop, Cursor, or another MCP client to TraceIQ as an analytics copilot — read funnels, retention, errors, users, and API health, and toggle flags with a personal access token.'],
+            ['MCP server', 'Connect Claude, ChatGPT, Cursor or any MCP client with one URL and a sign-in, or run it locally from npm. Investigate incidents, read funnels, experiments, retention, errors and users, and make changes when you allow it.'],
             ['Revenue', 'Opt-in revenue from the payment events you choose: total, successful and failed payments, and success rate.'],
             ['Short links', 'Branded /l/<slug> redirects that record each click with referrer, country and device, plus UTM tagging.'],
             ['Webhooks', 'Forward matching events to an external URL in real time, optionally HMAC-signed.'],
@@ -2578,7 +2629,7 @@ export function PathCardsGrid({ basePath }: { basePath: string }) {
     },
     {
       title: 'MCP Copilot Server',
-      desc: 'Connect Claude Desktop or Cursor to TraceIQ as an analytics copilot.',
+      desc: 'Connect Claude, ChatGPT or Cursor to TraceIQ with one URL.',
       href: `${basePath}?page=mcp`
     }
   ];
