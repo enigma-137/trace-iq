@@ -75,7 +75,7 @@ export function AdminActivityFeed() {
 
   return (
     <ul className="relative divide-y divide-neutral-100 dark:divide-slate-800/80">
-      {items.slice(0, 25).map((item) => (
+      {items.slice(0, 10).map((item) => (
         <li key={item.id} className="flex items-start gap-3 px-0.5 py-2.5">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">

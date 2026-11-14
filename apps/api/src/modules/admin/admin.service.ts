@@ -118,7 +118,7 @@ const ACTIVITY_SQL = `
   JOIN projects p ON p.id = e.project_id
   JOIN organizations o ON o.id = p.organization_id
   ORDER BY e.received_at DESC
-  LIMIT 50
+  LIMIT 10
 `;
 
 // Unified "system log" stream: alert deliveries, monthly digests, achievement

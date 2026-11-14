@@ -52,6 +52,15 @@ describe('OrganizationsService.renameOrganization', () => {
     expect(updates[0].values).toEqual(['org_1', 'New Name']);
   });
 
+  it('accepts { name } from clients that send it', async () => {
+    const { db, service } = makeService(makeOrg());
+
+    const result = await service.renameOrganization(user, { name: 'Funaab Live' });
+
+    expect(result.organization.name).toBe('Funaab Live');
+    expect(db.queryCalls(/UPDATE organizations/)[0].values).toEqual(['org_1', 'Funaab Live']);
+  });
+
   it('allows admins to rename the organization', async () => {
     const { service } = makeService(makeOrg({ role: 'admin' }));
 

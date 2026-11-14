@@ -38,6 +38,7 @@ import {
   secondaryButton
 } from './settings/SettingsUI';
 import { retryAfterStepUp } from '@/lib/step-up';
+import { ORGANIZATIONS_CHANGED } from '@/lib/organization';
 
 interface SetupResponse {
   hasSetup: boolean;
@@ -290,33 +291,39 @@ export function SetupPanel({
         toast.error('Session expired. Sign in again.', { title: 'Rename failed' });
         return;
       }
-      const response = await fetch(`${apiBaseUrl}/v1/setup/organization`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: trimmed })
-      });
+      // The API reads `organizationName` and renames the organization named in the query,
+      // not whichever one the user joined first.
+      const response = await fetch(
+        `${apiBaseUrl}/v1/setup/organization?organizationId=${encodeURIComponent(setup.organization.id)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ organizationName: trimmed })
+        }
+      );
       if (!response.ok) {
         toast.error(await readApiError(response), { title: 'Rename failed' });
         return;
       }
-      const updated = await response.json();
+      const updated = (await response.json()) as { organization?: { name?: string; slug?: string } };
       setSetup((current) =>
         current && current.organization
           ? {
             ...current,
             organization: {
               ...current.organization,
-              name: updated.name ?? trimmed,
-              slug: updated.slug ?? current.organization.slug
+              name: updated.organization?.name ?? trimmed,
+              slug: updated.organization?.slug ?? current.organization.slug
             }
           }
           : current
       );
       setIsEditingOrgName(false);
       toast.success(`Organization renamed to "${trimmed}".`, { title: 'Organization updated' });
+      window.dispatchEvent(new Event(ORGANIZATIONS_CHANGED));
       router.refresh();
     } catch (error) {
       toast.error(await readApiError(error, 'Could not rename organization.'), {

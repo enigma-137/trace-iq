@@ -437,8 +437,8 @@ export class AccountLifecycleService implements OnApplicationBootstrap, OnApplic
             await this.auth.deleteSupabaseUser(request.target_id);
             await client.query('DELETE FROM organization_members WHERE user_id = $1', [request.target_id]);
             await client.query('DELETE FROM personal_access_tokens WHERE user_id = $1', [request.target_id]);
-            // Card requests keep the requester's email, so they go with the account.
-            await client.query('DELETE FROM card_requests WHERE user_id = $1', [request.target_id]);
+            // Feedback keeps the sender's email, so it goes with the account.
+            await client.query('DELETE FROM feedback WHERE user_id = $1', [request.target_id]);
             await client.query(
               `UPDATE account_lifecycle_requests SET status = 'completed', completed_at = now(), last_error = NULL WHERE id = $1`,
               [request.id]
