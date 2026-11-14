@@ -10,11 +10,12 @@ import { InsightsController } from './insights.controller';
 import { InsightsService } from './insights.service';
 import { DigestService } from './digest.service';
 import { SavedInsightsService } from './saved-insights.service';
+import { CardRequestsService } from './card-requests.service';
 
 @Module({
   imports: [AuthModule, ProjectsModule, AiModule, EmailsModule, AnalyticsModule, FunnelsModule, ErrorsModule],
   controllers: [InsightsController],
-  providers: [InsightsService, DigestService, SavedInsightsService],
+  providers: [InsightsService, DigestService, SavedInsightsService, CardRequestsService],
   exports: [DigestService, InsightsService, SavedInsightsService]
 })
 export class InsightsModule {}

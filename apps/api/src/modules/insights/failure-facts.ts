@@ -114,6 +114,44 @@ export function hasRecovered(f: FailureFacts): boolean {
   return f.networkErrors > 0 && !!f.recoveredAt;
 }
 
+/**
+ * How loudly the story should talk about failures. A busy app always has a few: expired
+ * sessions answering 401, a phone going offline mid-request, a validation error. Those are
+ * normal, so they get a calm line at the end instead of opening the story.
+ * - serious: the backend looks unreachable right now, or requests are mostly failing; leads;
+ * - notable: worth a factual sentence after the activity (5xx, a recovered outage, a high
+ *   failure rate, many exceptions or failed actions);
+ * - minor: the background noise of a working product; one short line at the end;
+ * - none: nothing failed.
+ */
+export type StoryFailureSeverity = 'none' | 'minor' | 'notable' | 'serious';
+
+export function storyFailureSeverity(f: FailureFacts): StoryFailureSeverity {
+  if (!hasFailures(f)) return 'none';
+  const recovered = hasRecovered(f);
+  const rate = f.totalRequests > 0 ? f.failedRequests / f.totalRequests : 0;
+  const serverRate = f.totalRequests > 0 ? f.serverErrors / f.totalRequests : 0;
+  if (f.networkErrors >= 3 && !recovered) return 'serious';
+  if ((f.failedRequests >= 5 && rate >= 0.25) || (f.serverErrors >= 5 && serverRate >= 0.05)) return 'serious';
+  if (
+    f.networkErrors > 0 ||
+    f.serverErrors > 0 ||
+    (f.failedRequests >= 3 && rate >= 0.1) ||
+    f.exceptions >= 5 ||
+    (f.exceptions > 0 && f.topError !== null && f.topError.users >= 3) ||
+    f.failedActions >= 10
+  ) {
+    return 'notable';
+  }
+  return 'minor';
+}
+
+/** "2.9%" under 10%, "14%" above; one decimal is enough to tell 0.4% from 4%. */
+function percent(part: number, whole: number): string {
+  const value = (part / whole) * 100;
+  return `${value < 10 ? Number(value.toFixed(1)) : Math.round(value)}%`;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function parse(iso: string | null | undefined): Date | null {
@@ -146,7 +184,9 @@ function span(firstAt: string | null, lastAt: string | null): string {
  * unreachable they open the story; once it answers again they read as resolved history.
  */
 export function failureNarrative(f: FailureFacts, window = 'the last 24 hours'): string | null {
-  if (!hasFailures(f)) return null;
+  const severity = storyFailureSeverity(f);
+  if (severity === 'none') return null;
+  if (severity === 'minor') return minorFailureLine(f);
   const sentences: string[] = [];
   const when = span(f.firstAt, f.lastAt);
   const affecting = f.affectedUsers > 0 ? `, affecting ${plural(f.affectedUsers, 'user')}` : '';
@@ -163,15 +203,19 @@ export function failureNarrative(f: FailureFacts, window = 'the last 24 hours'):
       sentences.push(
         `Earlier, ${plural(f.networkErrors, 'request')} got no response from your backend${where}${until}${affecting}. It has been responding again${since}.`
       );
-    } else {
+    } else if (severity === 'serious') {
       sentences.push(
         `Heads up: ${plural(f.networkErrors, 'request')} got no response from your backend${where}${when}${affecting}. Your API may be down or unreachable.`
       );
+    } else {
+      // One or two unanswered requests: often a device that went offline, not an outage.
+      sentences.push(`${plural(f.networkErrors, 'request')} got no response from your backend${where}${when}${affecting}.`);
     }
   } else if (f.failedRequests > 0) {
     const top = f.topFailedRequest;
     const where = top ? `, most often ${top.method} ${top.path} (${top.status})` : '';
-    sentences.push(`${plural(f.failedRequests, 'request')} failed in ${window}${where}${when}${affecting}.`);
+    const share = f.totalRequests > 0 ? ` (${percent(f.failedRequests, f.totalRequests)} of ${f.totalRequests.toLocaleString()})` : '';
+    sentences.push(`${plural(f.failedRequests, 'request')}${share} failed in ${window}${where}${when}${affecting}.`);
   }
   if (f.topFailedAction) {
     const action = f.topFailedAction;
@@ -183,6 +227,26 @@ export function failureNarrative(f: FailureFacts, window = 'the last 24 hours'):
     sentences.push(`${plural(f.exceptions, 'error')} ${f.exceptions === 1 ? 'was' : 'were'} captured${lead}${top}.`);
   }
   return sentences.join(' ');
+}
+
+/**
+ * Background noise in one calm sentence: "Minor hiccups: 12 of 419 requests (2.9%) returned
+ * an error, mostly 401 on GET /api/user/profile/; water_log_failed happened 2 times."
+ */
+function minorFailureLine(f: FailureFacts): string {
+  const parts: string[] = [];
+  if (f.failedRequests > 0) {
+    const top = f.topFailedRequest;
+    const mostly = top && f.failedRequests > 1 ? `, mostly ${top.status} on ${top.method} ${top.path}` : top ? ` (${top.status} on ${top.method} ${top.path})` : '';
+    parts.push(
+      f.totalRequests > 0
+        ? `${f.failedRequests.toLocaleString()} of ${plural(f.totalRequests, 'request')} (${percent(f.failedRequests, f.totalRequests)}) returned an error${mostly}`
+        : `${plural(f.failedRequests, 'request')} returned an error${mostly}`
+    );
+  }
+  if (f.topFailedAction) parts.push(`${f.topFailedAction.name} happened ${plural(f.topFailedAction.count, 'time')}`);
+  if (f.exceptions > 0) parts.push(`${plural(f.exceptions, 'error')} ${f.exceptions === 1 ? 'was' : 'were'} captured`);
+  return `Minor hiccups: ${parts.join('; ')}.`;
 }
 
 // Numeric status or NULL, so a malformed value is "unknown", never a fake network error.

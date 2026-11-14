@@ -2,14 +2,27 @@ import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query } from 
 import { AuthService } from '../auth/auth.service';
 import { InsightsService } from './insights.service';
 import { CreateInsightRequest, ExecuteInsightQueryRequest, SavedInsightsService, UpdateInsightRequest } from './saved-insights.service';
+import { CardRequestsService } from './card-requests.service';
 
 @Controller('v1/dashboard/insights')
 export class InsightsController {
   constructor(
     private readonly authService: AuthService,
     private readonly insightsService: InsightsService,
-    private readonly savedInsightsService: SavedInsightsService
+    private readonly savedInsightsService: SavedInsightsService,
+    private readonly cardRequestsService: CardRequestsService
   ) {}
+
+  /** "Request a card" in the Overview's + menu: stores the request and emails the TraceIQ inbox. */
+  @Post('card-requests')
+  async requestCard(
+    @Body() body: { request?: string; projectId?: string },
+    @Headers('authorization') authorization?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'insights:write');
+    return this.cardRequestsService.create(user, body ?? {});
+  }
 
   @Get('story')
   async todayStory(

@@ -1,6 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  CUSTOM_PREFIX,
+  CardRequestForm,
+  CustomCardBuilder,
+  CustomCardView,
+  readCustomCards,
+  writeCustomCards,
+  type CustomCard
+} from './CustomCards';
 
 export type WidgetSize = 'sm' | 'md' | 'lg';
 
@@ -9,7 +18,7 @@ export interface OverviewWidget {
   id: string;
   title: string;
   description: string;
-  category: 'Metrics' | 'Observability' | 'Activity' | 'Audience';
+  category: 'Metrics' | 'Observability' | 'Activity' | 'Audience' | 'Your cards';
   node: ReactNode;
   defaultSize: WidgetSize;
   /** Sizes the card still reads well at. */
@@ -54,15 +63,41 @@ function writeLayout(layout: Layout | null): void {
 }
 
 export function OverviewWorkspace({
-  widgets,
+  widgets: builtIn,
   defaultVisible,
-  toolbar
+  toolbar,
+  projectId,
+  days,
+  windowLabel,
+  cardClass
 }: {
   widgets: OverviewWidget[];
   defaultVisible: string[];
   /** Controls shown left of the customize buttons, such as the time range. */
   toolbar?: ReactNode;
+  /** What custom cards query: the Overview's project and range. */
+  projectId?: string | null;
+  days: number;
+  windowLabel: string;
+  cardClass: string;
 }) {
+  // Cards people built themselves live in this browser, next to the layout.
+  const [customCards, setCustomCards] = useState<CustomCard[]>([]);
+  const widgets = useMemo<OverviewWidget[]>(
+    () => [
+      ...builtIn,
+      ...customCards.map((card) => ({
+        id: `${CUSTOM_PREFIX}${card.id}`,
+        title: card.title,
+        description: `${card.measure === 'unique' ? 'Unique people' : 'Count'} · ${card.display === 'trend' ? 'number and trend' : 'number'}`,
+        category: 'Your cards' as const,
+        node: <CustomCardView card={card} projectId={projectId} days={days} windowLabel={windowLabel} cardClass={cardClass} />,
+        defaultSize: 'sm' as const,
+        sizes: ['sm', 'md', 'lg'] as WidgetSize[]
+      }))
+    ],
+    [builtIn, customCards, projectId, days, windowLabel, cardClass]
+  );
   const byId = useMemo(() => new Map(widgets.map((widget) => [widget.id, widget])), [widgets]);
   const fallback = useMemo<Layout>(
     () => ({ visible: defaultVisible.filter((id) => byId.has(id)), sizes: {} }),
@@ -77,10 +112,13 @@ export function OverviewWorkspace({
   const [dragging, setDragging] = useState<string | null>(null);
 
   useEffect(() => {
+    const custom = readCustomCards();
+    setCustomCards(custom);
+    const known = new Set([...builtIn.map((widget) => widget.id), ...custom.map((card) => `${CUSTOM_PREFIX}${card.id}`)]);
     const saved = readLayout();
-    if (saved) setLayout({ visible: saved.visible.filter((id) => byId.has(id)), sizes: saved.sizes });
+    if (saved) setLayout({ visible: saved.visible.filter((id) => known.has(id)), sizes: saved.sizes });
     setReady(true);
-  }, [byId]);
+  }, [builtIn]);
 
   const update = useCallback((next: (current: Layout) => Layout) => {
     setLayout((current) => {
@@ -123,6 +161,19 @@ export function OverviewWorkspace({
     writeLayout(null);
     setLayout(fallback);
   };
+  const createCustom = (card: Omit<CustomCard, 'id'>) => {
+    const id = Math.random().toString(36).slice(2, 10);
+    const next = [...customCards, { ...card, id }];
+    setCustomCards(next);
+    writeCustomCards(next);
+    add(`${CUSTOM_PREFIX}${id}`);
+  };
+  const deleteCustom = (widgetId: string) => {
+    const next = customCards.filter((card) => `${CUSTOM_PREFIX}${card.id}` !== widgetId);
+    setCustomCards(next);
+    writeCustomCards(next);
+    remove(widgetId);
+  };
 
   const visible = layout.visible.map((id) => byId.get(id)).filter((widget): widget is OverviewWidget => Boolean(widget));
   const hidden = widgets.filter((widget) => !layout.visible.includes(widget.id));
@@ -142,9 +193,15 @@ export function OverviewWorkspace({
             {adding ? (
               <AddCardMenu
                 hidden={hidden}
+                projectId={projectId}
                 onAdd={(id) => {
                   add(id);
                 }}
+                onCreate={(card) => {
+                  createCustom(card);
+                  setAdding(false);
+                }}
+                onDelete={deleteCustom}
                 onReset={() => {
                   reset();
                   setAdding(false);
@@ -340,16 +397,23 @@ function IconButton({ label, onClick, active, children }: { label: string; onCli
 
 function AddCardMenu({
   hidden,
+  projectId,
   onAdd,
+  onCreate,
+  onDelete,
   onReset,
   onClose
 }: {
   hidden: OverviewWidget[];
+  projectId?: string | null;
   onAdd: (id: string) => void;
+  onCreate: (card: Omit<CustomCard, 'id'>) => void;
+  onDelete: (id: string) => void;
   onReset: () => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<'list' | 'build' | 'request'>('list');
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -380,39 +444,82 @@ function AddCardMenu({
       className="absolute right-0 top-10 z-30 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950"
     >
       <div className="border-b border-neutral-100 px-3 py-2.5 dark:border-slate-800">
-        <p className="text-xs font-semibold text-neutral-900 dark:text-white">Add a card</p>
-        <p className="text-[11px] text-neutral-500 dark:text-slate-400">Pick what shows on your Overview.</p>
+        <p className="text-xs font-semibold text-neutral-900 dark:text-white">
+          {view === 'build' ? 'Build a card' : view === 'request' ? 'Request a card' : 'Add a card'}
+        </p>
+        <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+          {view === 'build'
+            ? "Track any event over the Overview's time range."
+            : view === 'request'
+              ? "Tell us about a card TraceIQ doesn't have yet."
+              : 'Pick what shows on your Overview.'}
+        </p>
       </div>
-      <div className="max-h-80 overflow-y-auto py-1">
-        {hidden.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-neutral-500 dark:text-slate-400">Every card is already on your Overview.</p>
-        ) : (
-          Object.entries(groups).map(([category, items]) => (
-            <div key={category} className="py-1">
-              <p className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-slate-500">{category}</p>
-              {items.map((widget) => (
-                <button
-                  key={widget.id}
-                  type="button"
-                  onClick={() => onAdd(widget.id)}
-                  className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left transition hover:bg-neutral-50 dark:hover:bg-slate-900"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-xs font-medium text-neutral-800 dark:text-slate-200">{widget.title}</span>
-                    <span className="block text-[11px] leading-snug text-neutral-500 dark:text-slate-400">{widget.description}</span>
-                  </span>
-                  <span aria-hidden className="mt-0.5 text-sm leading-none text-neutral-400">+</span>
-                </button>
-              ))}
-            </div>
-          ))
-        )}
-      </div>
-      <div className="border-t border-neutral-100 px-3 py-2 dark:border-slate-800">
-        <button type="button" onClick={onReset} className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
-          Reset to default layout
-        </button>
-      </div>
+      {view === 'build' ? (
+        <CustomCardBuilder projectId={projectId} onSave={onCreate} onBack={() => setView('list')} />
+      ) : view === 'request' ? (
+        <CardRequestForm projectId={projectId} onBack={() => setView('list')} />
+      ) : (
+        <>
+          <div className="max-h-80 overflow-y-auto py-1">
+            {hidden.length === 0 ? (
+              <p className="px-3 py-6 text-center text-xs text-neutral-500 dark:text-slate-400">Every card is already on your Overview.</p>
+            ) : (
+              Object.entries(groups).map(([category, items]) => (
+                <div key={category} className="border-t border-neutral-100 py-1 first:border-t-0 dark:border-slate-800/70">
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-neutral-950 dark:text-slate-400">{category}</p>
+                  {items.map((widget) => (
+                    <div key={widget.id} className="flex items-start transition hover:bg-neutral-50 dark:hover:bg-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => onAdd(widget.id)}
+                        className="flex min-w-0 flex-1 items-start justify-between gap-3 py-2 pl-3 pr-2 text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-xs font-medium text-neutral-700 dark:text-slate-200">{widget.title}</span>
+                          <span className="block text-[11px] leading-snug text-neutral-500 dark:text-slate-400">{widget.description}</span>
+                        </span>
+                        <span aria-hidden className="mt-0.5 text-sm leading-none text-neutral-400">+</span>
+                      </button>
+                      {widget.id.startsWith(CUSTOM_PREFIX) ? (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(widget.id)}
+                          title={`Delete ${widget.title}`}
+                          aria-label={`Delete ${widget.title}`}
+                          className="mr-2 mt-1.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-xs text-neutral-400 hover:bg-neutral-200 hover:text-rose-600 dark:hover:bg-slate-800"
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="space-y-2 border-t border-neutral-100 px-3 py-2.5 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setView('build')}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-300 py-1.5 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <span aria-hidden>+</span> Build your own card
+            </button>
+            <p className="text-center text-[11px] text-neutral-500 dark:text-slate-400">
+              Need something else?{' '}
+              <button type="button" onClick={() => setView('request')} className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                Request a card
+              </button>
+            </p>
+          </div>
+          <div className="border-t border-neutral-100 px-3 py-2 dark:border-slate-800">
+            <button type="button" onClick={onReset} className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
+              Reset to default layout
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
