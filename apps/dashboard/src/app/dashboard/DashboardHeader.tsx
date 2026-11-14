@@ -11,6 +11,7 @@ import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
 import { MobileNav } from './MobileNav';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { DashboardDialog } from './DashboardDialog';
+import { FeedbackButton } from './FeedbackButton';
 import { toast } from '@/lib/toast';
 import { type ProjectHealth, healthLogsHref, useProjectHealth } from '@/lib/health';
 
@@ -116,7 +117,10 @@ export function DashboardHeader({
               <span className="truncate">{pill.label}</span>
             </Link>
 
-            {/* 2. Manage monitors button */}
+            {/* 2. Feedback to the TraceIQ team */}
+            <FeedbackButton projectId={projectId} />
+
+            {/* 3. Manage monitors button */}
             <Link
               href={projectId ? `/dashboard/alerts?projectId=${encodeURIComponent(projectId)}` : '/dashboard/alerts'}
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-2xs transition hover:bg-neutral-50 hover:text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"

@@ -18,6 +18,8 @@ import { getPreferredProjectId } from '../../common/active-project';
 export interface BootstrapSetupRequest {
   organizationName?: string;
   projectName?: string;
+  /** Accepted by rename for clients that send `{ name }`. */
+  name?: string;
 }
 
 export interface CreateProjectRequest {
@@ -356,7 +358,7 @@ export class OrganizationsService {
   }
 
   async renameOrganization(user: DashboardUser, input: BootstrapSetupRequest, organizationId?: string) {
-    const organizationName = this.cleanName(input.organizationName, '');
+    const organizationName = this.cleanName(input.organizationName ?? input.name, '');
 
     if (!organizationName) {
       throw new BadRequestException('Organization name is required.');

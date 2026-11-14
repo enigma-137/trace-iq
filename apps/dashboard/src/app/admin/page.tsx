@@ -6,6 +6,8 @@ import { DonutChart } from '@/components/charts/DonutChart';
 import { RankedList } from '@/components/charts/RankedList';
 import { AdminActivityFeed } from './AdminActivityFeed';
 import { AdminActivationSection } from './AdminActivation';
+import { AdminFeedbackInbox } from './AdminFeedbackInbox';
+import { AdminNotificationBell } from './AdminNotificationBell';
 
 export const metadata = { title: 'Admin · TraceIQ' };
 
@@ -53,12 +55,15 @@ export default async function AdminPage() {
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">Platform admin</h1>
           </div>
-          <Link
-            href="/dashboard"
-            className="inline-flex h-9 shrink-0 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            Dashboard
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <AdminNotificationBell />
+            <Link
+              href="/dashboard"
+              className="inline-flex h-9 shrink-0 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Dashboard
+            </Link>
+          </div>
         </header>
 
         {/* Key numbers */}
@@ -68,6 +73,8 @@ export default async function AdminPage() {
           <StatTile label="Events (24h)" value={overview.events24h} hint={`${overview.eventsTotal.toLocaleString()} all time`} tone="green" />
           <StatTile label="Tracked users" value={overview.trackedUsers} hint={`${totalMembers} workspace members`} tone="blue" />
         </section>
+
+        <AdminFeedbackInbox />
 
         {access.activation ? <AdminActivationSection activation={access.activation} /> : null}
 
@@ -206,7 +213,7 @@ export default async function AdminPage() {
               </p>
             ) : (
               <ul className="divide-y divide-neutral-100 dark:divide-slate-800/80">
-                {logs.slice(0, 12).map((log, index) => (
+                {logs.slice(0, 10).map((log, index) => (
                   <li key={`${log.occurredAt}-${index}`} className="flex items-start gap-3 px-0.5 py-2.5">
                     <span className="mt-0.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-slate-800 dark:text-slate-400">
                       {LOG_KIND_LABELS[log.kind] ?? log.kind}

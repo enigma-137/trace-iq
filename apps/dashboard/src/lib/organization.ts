@@ -133,6 +133,9 @@ export function useOrganization(projectId?: string | null, organizationId?: stri
  * Lists every organization the user belongs to (with the first project of each)
  * from GET /v1/organizations, for the sidebar organization switcher.
  */
+/** Fired after an organization is renamed, so every switcher on the page reloads its list. */
+export const ORGANIZATIONS_CHANGED = 'traceiq:organizations-changed';
+
 export function useOrganizations() {
   const supabase = useMemo(() => {
     try {
@@ -186,6 +189,10 @@ export function useOrganizations() {
 
   useEffect(() => {
     void refresh();
+    // A rename elsewhere on the page (Settings) refreshes the switcher too.
+    const onChange = () => void refresh();
+    window.addEventListener(ORGANIZATIONS_CHANGED, onChange);
+    return () => window.removeEventListener(ORGANIZATIONS_CHANGED, onChange);
   }, [refresh]);
 
   return { organizations, loading, refresh };

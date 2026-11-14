@@ -65,9 +65,9 @@ export function CardRequestForm({ projectId, onBack }: { projectId?: string | nu
     if (trimmed.length < 5 || state === 'sending') return;
     setState('sending');
     setError(null);
-    const { error: message } = await clientFetch<{ id: string }>('/v1/dashboard/insights/card-requests', {
+    const { error: message } = await clientFetch<{ id: string }>('/v1/feedback', {
       method: 'POST',
-      body: JSON.stringify({ request: trimmed, projectId: projectId ?? undefined })
+      body: JSON.stringify({ kind: 'card_request', message: trimmed, projectId: projectId ?? undefined, page: window.location.pathname })
     });
     if (message) {
       // Our own messages (too short, daily limit) help; framework ones ("Cannot POST …",
