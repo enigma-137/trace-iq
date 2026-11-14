@@ -5,42 +5,80 @@ import {
   FEEDBACK_CHANGED,
   KIND_LABEL,
   KIND_TONE,
+  STATUS_LABEL,
   feedbackSource,
   fetchInbox,
   markAllFeedbackRead,
   timeAgo,
   updateFeedback,
-  type FeedbackItem
+  type FeedbackInbox,
+  type FeedbackKind,
+  type FeedbackStatus
 } from './feedback';
 
 const POLL_MS = 60_000;
 
-/** The admin header's bell: unread feedback and card requests, with the latest few in a dropdown. */
+type Filter = 'unread' | 'all' | FeedbackKind;
+
+const FILTERS: Array<{ value: Filter; label: string }> = [
+  { value: 'unread', label: 'Unread' },
+  { value: 'all', label: 'All' },
+  { value: 'card_request', label: 'Cards' },
+  { value: 'idea', label: 'Ideas' },
+  { value: 'problem', label: 'Problems' },
+  { value: 'other', label: 'Other' }
+];
+
+const STATUSES: FeedbackStatus[] = ['new', 'planned', 'done', 'declined'];
+
+/** The admin header's bell: feedback and card requests from every workspace, read and triaged in place. */
 export function AdminNotificationBell() {
   const [unread, setUnread] = useState(0);
-  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [inbox, setInbox] = useState<FeedbackInbox | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('unread');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
-    const { data } = await fetchInbox({ unread: true, limit: 6 });
-    if (data) {
-      setUnread(data.unread);
-      setItems(data.items);
-    }
+  const loadCount = useCallback(async () => {
+    const { data } = await fetchInbox({ unread: true, limit: 1 });
+    if (data) setUnread(data.unread);
   }, []);
 
+  const loadList = useCallback(async () => {
+    const { data, error: message } = await fetchInbox({
+      unread: filter === 'unread',
+      kind: filter === 'all' || filter === 'unread' ? null : filter,
+      limit: 50
+    });
+    if (data) {
+      setInbox(data);
+      setUnread(data.unread);
+      setError(null);
+    } else {
+      setError(message ?? 'Could not load notifications.');
+    }
+  }, [filter]);
+
+  // The badge stays current while the panel is closed.
   useEffect(() => {
-    void load();
+    void loadCount();
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void load();
+      if (document.visibilityState === 'visible') void loadCount();
     }, POLL_MS);
-    window.addEventListener(FEEDBACK_CHANGED, load);
+    window.addEventListener(FEEDBACK_CHANGED, loadCount);
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener(FEEDBACK_CHANGED, load);
+      window.removeEventListener(FEEDBACK_CHANGED, loadCount);
     };
-  }, [load]);
+  }, [loadCount]);
+
+  // The list loads when the panel opens or the filter changes. Items marked read stay put until then,
+  // so the one being worked on doesn't vanish from the Unread tab mid-triage.
+  useEffect(() => {
+    if (open) void loadList();
+  }, [open, loadList]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,12 +96,34 @@ export function AdminNotificationBell() {
     };
   }, [open]);
 
-  function openInbox() {
-    setOpen(false);
-    document.getElementById('inbox')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  async function patch(id: string, body: { read?: boolean; status?: FeedbackStatus }) {
+    const { data } = await updateFeedback(id, body);
+    if (!data) return;
+    setInbox((current) =>
+      current
+        ? { ...current, items: current.items.map((item) => (item.id === id ? { ...item, status: data.status, readAt: data.readAt } : item)) }
+        : current
+    );
+  }
+
+  async function markAll() {
+    const { error: message } = await markAllFeedbackRead();
+    if (!message) void loadList();
+  }
+
+  function toggle(id: string, wasUnread: boolean) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    if (wasUnread) void patch(id, { read: true });
   }
 
   const label = unread > 0 ? `Notifications, ${unread} unread` : 'Notifications';
+  const emptyText =
+    filter === 'unread' ? "You're all caught up." : filter === 'all' ? 'No feedback yet.' : `No ${FILTERS.find((f) => f.value === filter)?.label.toLowerCase()} yet.`;
 
   return (
     <div ref={ref} className="relative">
@@ -90,54 +150,104 @@ export function AdminNotificationBell() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-11 z-30 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950"
+          className="absolute right-0 top-11 z-30 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950"
         >
-          <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2.5 dark:border-slate-800">
-            <p className="text-xs font-semibold text-neutral-900 dark:text-white">
-              Notifications{unread > 0 ? ` · ${unread} unread` : ''}
-            </p>
-            {unread > 0 ? (
-              <button
-                type="button"
-                onClick={() => void markAllFeedbackRead()}
-                className="text-[11px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
-              >
-                Mark all read
-              </button>
-            ) : null}
+          <div className="border-b border-neutral-100 px-3 pb-2 pt-2.5 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-neutral-900 dark:text-white">
+                Notifications{unread > 0 ? ` · ${unread} unread` : ''}
+              </p>
+              {unread > 0 ? (
+                <button type="button" onClick={() => void markAll()} className="text-[11px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                  Mark all read
+                </button>
+              ) : null}
+            </div>
+            <div role="tablist" aria-label="Filter notifications" className="mt-2 flex flex-wrap gap-1">
+              {FILTERS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === option.value}
+                  onClick={() => setFilter(option.value)}
+                  className={
+                    filter === option.value
+                      ? 'h-6 rounded px-2 text-[11px] font-medium text-white bg-neutral-900 dark:bg-white dark:text-slate-950'
+                      : 'h-6 rounded px-2 text-[11px] font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                  }
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {items.length === 0 ? (
-            <p className="px-3 py-8 text-center text-xs text-neutral-500 dark:text-slate-400">You&apos;re all caught up.</p>
+          {error ? (
+            <p className="px-3 py-8 text-center text-xs text-red-600 dark:text-red-400">{error}</p>
+          ) : !inbox ? (
+            <div className="space-y-2 p-3">
+              <div className="h-12 animate-pulse rounded bg-neutral-100 dark:bg-slate-800" />
+              <div className="h-12 animate-pulse rounded bg-neutral-100 dark:bg-slate-800" />
+            </div>
+          ) : inbox.items.length === 0 ? (
+            <p className="px-3 py-8 text-center text-xs text-neutral-500 dark:text-slate-400">{emptyText}</p>
           ) : (
-            <ul className="max-h-96 divide-y divide-neutral-100 overflow-y-auto dark:divide-slate-800/80">
-              {items.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void updateFeedback(item.id, { read: true });
-                      openInbox();
-                    }}
-                    className="block w-full px-3 py-2.5 text-left transition hover:bg-neutral-50 dark:hover:bg-slate-900"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${KIND_TONE[item.kind]}`}>{KIND_LABEL[item.kind]}</span>
-                      <span className="ml-auto text-[11px] text-neutral-400 dark:text-slate-500">{timeAgo(item.createdAt)}</span>
-                    </span>
-                    <span className="mt-1 line-clamp-2 block text-xs text-neutral-800 dark:text-slate-200">{item.message}</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-neutral-500 dark:text-slate-400">{feedbackSource(item)}</span>
-                  </button>
-                </li>
-              ))}
+            <ul className="max-h-[28rem] divide-y divide-neutral-100 overflow-y-auto dark:divide-slate-800/80">
+              {inbox.items.map((item) => {
+                const isUnread = !item.readAt;
+                const isOpen = expanded.has(item.id);
+                return (
+                  <li key={item.id} className="px-3 py-2.5">
+                    <button type="button" onClick={() => toggle(item.id, isUnread)} className="block w-full text-left">
+                      <span className="flex items-center gap-2">
+                        <span aria-label={isUnread ? 'Unread' : undefined} className={`h-1.5 w-1.5 shrink-0 rounded-full ${isUnread ? 'bg-blue-600' : 'bg-transparent'}`} />
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${KIND_TONE[item.kind]}`}>{KIND_LABEL[item.kind]}</span>
+                        <span className="ml-auto text-[11px] text-neutral-400 dark:text-slate-500" title={new Date(item.createdAt).toLocaleString()}>
+                          {timeAgo(item.createdAt)}
+                        </span>
+                      </span>
+                      <span
+                        className={`mt-1 block whitespace-pre-wrap break-words text-xs leading-relaxed ${isUnread ? 'font-medium text-neutral-950 dark:text-white' : 'text-neutral-700 dark:text-slate-300'} ${isOpen ? '' : 'line-clamp-2'}`}
+                      >
+                        {item.message}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] text-neutral-500 dark:text-slate-400">{feedbackSource(item)}</span>
+                    </button>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px]">
+                      <select
+                        aria-label="Status"
+                        value={item.status}
+                        onChange={(event) => void patch(item.id, { status: event.target.value as FeedbackStatus })}
+                        className="h-6 rounded border border-neutral-200 bg-white px-1 text-[11px] text-neutral-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      >
+                        {STATUSES.map((status) => (
+                          <option key={status} value={status}>
+                            {STATUS_LABEL[status]}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => void patch(item.id, { read: isUnread })}
+                        className="font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white"
+                      >
+                        {isUnread ? 'Mark read' : 'Mark unread'}
+                      </button>
+                      {item.userEmail ? (
+                        <a
+                          href={`mailto:${item.userEmail}?subject=${encodeURIComponent('Re: your TraceIQ feedback')}`}
+                          className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                        >
+                          Reply by email
+                        </a>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
-
-          <div className="border-t border-neutral-100 px-3 py-2 dark:border-slate-800">
-            <button type="button" onClick={openInbox} className="text-[11px] font-medium text-neutral-600 hover:text-neutral-900 dark:text-slate-300 dark:hover:text-white">
-              Open inbox →
-            </button>
-          </div>
         </div>
       ) : null}
     </div>
