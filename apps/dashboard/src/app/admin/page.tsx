@@ -6,7 +6,6 @@ import { DonutChart } from '@/components/charts/DonutChart';
 import { RankedList } from '@/components/charts/RankedList';
 import { AdminActivityFeed } from './AdminActivityFeed';
 import { AdminActivationSection } from './AdminActivation';
-import { AdminFeedbackInbox } from './AdminFeedbackInbox';
 import { AdminNotificationBell } from './AdminNotificationBell';
 
 export const metadata = { title: 'Admin · TraceIQ' };
@@ -57,12 +56,16 @@ export default async function AdminPage() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <AdminNotificationBell />
-            <Link
-              href="/dashboard"
-              className="inline-flex h-9 shrink-0 items-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            <a
+              href="https://monitor.traceiq.run"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="CPU, memory, disk and Docker usage on the VPS (Beszel)"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-              Dashboard
-            </Link>
+              <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-500" />
+              Server monitor
+            </a>
           </div>
         </header>
 
@@ -73,8 +76,6 @@ export default async function AdminPage() {
           <StatTile label="Events (24h)" value={overview.events24h} hint={`${overview.eventsTotal.toLocaleString()} all time`} tone="green" />
           <StatTile label="Tracked users" value={overview.trackedUsers} hint={`${totalMembers} workspace members`} tone="blue" />
         </section>
-
-        <AdminFeedbackInbox />
 
         {access.activation ? <AdminActivationSection activation={access.activation} /> : null}
 
