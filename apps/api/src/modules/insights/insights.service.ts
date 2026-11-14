@@ -13,7 +13,8 @@ import {
   describeFailures,
   emptyFailureFacts,
   failureNarrative,
-  hasRecovered
+  StoryFailureSeverity,
+  storyFailureSeverity
 } from './failure-facts';
 
 export * from './failure-facts';
@@ -31,12 +32,15 @@ export interface TodayStoryFacts {
   deltaPct: number | null;
   uniquesToday: number;
   topEvent: { name: string; count: number } | null;
+  /** The country most visitors came from: `count` visitors, `pct` of today's visitors. */
   topCountry: { name: string; count: number; pct: number } | null;
   topDevice: { name: string; count: number } | null;
   activeNow: number;
   lastEventAt: string | null;
-  /** What went wrong in the same window. Leads the story whenever anything did. */
+  /** What went wrong in the same window. */
   failures: FailureFacts;
+  /** How prominently the story reports `failures`; only 'serious' leads it. */
+  failureSeverity: StoryFailureSeverity;
 }
 
 export interface TodayStoryResponse {
@@ -396,7 +400,7 @@ export class InsightsService {
       ),
       this.database.query<{ name: string; count: number }>(
         `
-          SELECT network_info->>'country' AS name, count(*)::int AS count
+          SELECT network_info->>'country' AS name, count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS count
           FROM events
           WHERE project_id = $1 AND occurred_at >= $2
             AND NULLIF(network_info->>'country', '') IS NOT NULL
@@ -436,7 +440,8 @@ export class InsightsService {
       ? {
           name: topCountry.rows[0].name,
           count: topCountry.rows[0].count,
-          pct: today > 0 ? Math.round((topCountry.rows[0].count / today) * 100) : 0
+          // Visitors, like Web Analytics, so one busy user can't make their country "lead".
+          pct: (row?.uniques_today ?? 0) > 0 ? Math.round((topCountry.rows[0].count / row!.uniques_today) * 100) : 0
         }
       : null;
 
@@ -450,7 +455,8 @@ export class InsightsService {
       topDevice: topDevice.rows[0] ?? null,
       activeNow: row?.active_now ?? 0,
       lastEventAt: lastEvent.rows[0]?.value ?? null,
-      failures
+      failures,
+      failureSeverity: storyFailureSeverity(failures)
     };
   }
 
@@ -478,11 +484,11 @@ export class InsightsService {
 
     const parts: string[] = [];
 
-    // Failures lead while the backend is unreachable: someone reading the story should
-    // learn about an outage first. Once it answers again they follow the activity.
+    // Only serious failures lead: someone reading the story should learn about an outage
+    // first. Notable ones follow the activity; the minor noise of a working app goes last.
     const failureLine = failureNarrative(facts.failures, span.last);
-    const resolved = hasRecovered(facts.failures);
-    if (failureLine && !resolved) parts.push(failureLine);
+    const severity = storyFailureSeverity(facts.failures);
+    if (failureLine && severity === 'serious') parts.push(failureLine);
 
     if (allTime) {
       parts.push(`Your project has recorded ${facts.eventsToday.toLocaleString()} events ${span.last}.`);
@@ -496,14 +502,14 @@ export class InsightsService {
       parts.push(`Event volume is flat — ${facts.eventsToday.toLocaleString()} ${span.now}, the same as ${span.previous}.`);
     }
 
-    if (failureLine && resolved) parts.push(failureLine);
+    if (failureLine && severity === 'notable') parts.push(failureLine);
 
     if (facts.topEvent) {
       parts.push(`Top event: ${facts.topEvent.name} (${facts.topEvent.count.toLocaleString()}).`);
     }
 
     if (facts.topCountry && facts.topCountry.name !== 'unknown') {
-      parts.push(`${facts.topCountry.pct}% of activity came from ${facts.topCountry.name}.`);
+      parts.push(`${facts.topCountry.pct}% of visitors came from ${facts.topCountry.name}.`);
     }
 
     if (facts.topDevice && facts.topDevice.name !== 'unknown') {
@@ -513,6 +519,8 @@ export class InsightsService {
     if (facts.activeNow > 0) {
       parts.push(`${facts.activeNow} ${facts.activeNow === 1 ? 'actor is' : 'actors are'} active right now.`);
     }
+
+    if (failureLine && severity === 'minor') parts.push(failureLine);
 
     return parts.join(' ');
   }
@@ -529,7 +537,8 @@ export class InsightsService {
       topDevice: null,
       activeNow: 0,
       lastEventAt: null,
-      failures: emptyFailureFacts()
+      failures: emptyFailureFacts(),
+      failureSeverity: 'none'
     };
   }
 

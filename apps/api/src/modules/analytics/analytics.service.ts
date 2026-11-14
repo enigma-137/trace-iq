@@ -432,7 +432,9 @@ export class AnalyticsService {
 
     const topCountriesQuery = this.database.query<{ name: string; total: number }>(
       `
-        SELECT network_info->>'country' AS name, count(*)::int AS total
+        -- Visitors per country, as Web Analytics counts them: by events, one busy user
+        -- would make their country look like it leads.
+        SELECT network_info->>'country' AS name, count(DISTINCT COALESCE(user_id::text, anonymous_id))::int AS total
         FROM events
         WHERE project_id = $1 AND occurred_at >= ${since}
           AND NULLIF(network_info->>'country', '') IS NOT NULL

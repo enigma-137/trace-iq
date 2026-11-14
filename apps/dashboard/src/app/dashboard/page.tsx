@@ -777,7 +777,15 @@ export default async function DashboardPage({
         {overview?.project ? (
           <>
             <OverviewHero projectId={canonicalProjectId} projectName={overview.project.name} signals={signals} />
-            <OverviewWorkspace widgets={widgets} defaultVisible={DEFAULT_WIDGETS} toolbar={rangePicker} />
+            <OverviewWorkspace
+              widgets={widgets}
+              defaultVisible={DEFAULT_WIDGETS}
+              toolbar={rangePicker}
+              projectId={canonicalProjectId}
+              days={appliedRange?.days ?? 7}
+              windowLabel={windowLabel}
+              cardClass={cardClass}
+            />
           </>
         ) : null}
       </div>

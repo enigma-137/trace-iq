@@ -12,7 +12,8 @@ import {
   classifyHealth,
   describeFailures,
   emptyFailureFacts,
-  failureNarrative
+  failureNarrative,
+  storyFailureSeverity
 } from '../src/modules/insights/failure-facts';
 import { InsightsService } from '../src/modules/insights/insights.service';
 import { AnalyticsService } from '../src/modules/analytics/analytics.service';
@@ -188,6 +189,55 @@ describe('story', () => {
     expect(story.narrative).toMatch(/^Events are up/);
     expect(story.narrative).toContain('It has been responding again since 19:52 UTC.');
     expect(story.facts.failures.recoveredAt).toBe('2026-11-06T19:52:10.000Z');
+  });
+
+  // A normal day: a few expired sessions answering 401 and a couple of failed actions.
+  const ROUTINE: FailureFacts = {
+    ...emptyFailureFacts(),
+    failedRequests: 12,
+    totalRequests: 419,
+    failedActions: 2,
+    affectedUsers: 3,
+    topFailedRequest: { method: 'GET', path: '/api/user/profile/', status: 401, count: 3 },
+    topFailedAction: { name: 'water_log_failed', count: 2, users: 1 },
+    firstAt: '2026-11-13T13:46:07.081Z',
+    lastAt: '2026-11-14T03:20:02.642Z'
+  };
+
+  it('grades failures by how much they matter', () => {
+    expect(storyFailureSeverity(emptyFailureFacts())).toBe('none');
+    expect(storyFailureSeverity(ROUTINE)).toBe('minor');
+    expect(storyFailureSeverity(OUTAGE)).toBe('serious');
+    expect(storyFailureSeverity({ ...OUTAGE, recoveredAt: '2026-11-06T19:52:10.000Z' })).toBe('notable');
+    expect(storyFailureSeverity({ ...ROUTINE, serverErrors: 1 })).toBe('notable');
+    expect(storyFailureSeverity({ ...ROUTINE, failedRequests: 60 })).toBe('notable');
+    expect(storyFailureSeverity({ ...ROUTINE, failedRequests: 200 })).toBe('serious');
+    expect(storyFailureSeverity({ ...ROUTINE, networkErrors: 1, failedRequests: 13 })).toBe('notable');
+  });
+
+  it('keeps routine failures calm and at the end of the story', async () => {
+    expect(failureNarrative(ROUTINE)).toBe(
+      'Minor hiccups: 12 of 419 requests (2.9%) returned an error, mostly 401 on GET /api/user/profile/; water_log_failed happened 2 times.'
+    );
+    const db = mockDatabase((text) => {
+      if (/AS today/.test(text)) return rows([{ today: 1212, yesterday: 1457, uniques_today: 14, active_now: 0 }]);
+      if (/AS exceptions/.test(text)) {
+        return rows([{ exceptions: 0, failed_requests: 12, network_errors: 0, server_errors: 0, total_requests: 419, failed_actions: 2, affected_users: 3, first_at: ROUTINE.firstAt, last_at: ROUTINE.lastAt }]);
+      }
+      if (/network_info->>'country' AS name/.test(text)) return rows([{ name: 'US', count: 8 }]);
+      return empty();
+    });
+    const projects = { resolveActiveProject: async () => PROJECT };
+    const ai = { generateStoryNarrative: async () => null };
+    const service = new InsightsService(db as never, projects as never, ai as never, {} as never);
+
+    const story = await service.getTodayStory({ id: 'u', email: 'u@example.com' });
+
+    expect(story.narrative).toMatch(/^Events dipped 17%/);
+    expect(story.narrative).toMatch(/Minor hiccups: .*\.$/);
+    expect(story.narrative).toContain('57% of visitors came from US.');
+    expect(story.narrative).not.toContain('Heads up');
+    expect(story.facts.failureSeverity).toBe('minor');
   });
 
   it('says nothing about failures when there were none', () => {

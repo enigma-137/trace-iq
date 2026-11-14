@@ -18,6 +18,8 @@ interface StoryFacts {
   activeNow: number;
   /** Missing from older API versions. */
   failures?: FailureFacts;
+  /** Only 'serious' failures take over the headline. Missing from older API versions. */
+  failureSeverity?: 'none' | 'minor' | 'notable' | 'serious';
 }
 
 interface TodayStoryResponse {
@@ -87,8 +89,10 @@ export function TodayStoryCard({ projectId }: { projectId?: string | null }) {
   const failedCount = failures ? failures.failedRequests + failures.exceptions + failures.failedActions : 0;
   // The backend went unreachable earlier but has answered since: the outage is history.
   const recovered = !!failures && failures.networkErrors > 0 && !!failures.recoveredAt;
-  // Ongoing failures lead the headline: nobody should read "activity is up" during an outage.
-  const ongoing = Boolean(failures && failedCount > 0 && !recovered);
+  // Serious failures lead the headline: nobody should read "activity is up" during an outage.
+  // A few 401s or a failed action on a normal day don't.
+  const severity = story?.facts.failureSeverity;
+  const ongoing = severity ? severity === 'serious' : Boolean(failures && failedCount > 0 && !recovered);
   const headline = !story
     ? 'Reading today…'
     : ongoing && failures
