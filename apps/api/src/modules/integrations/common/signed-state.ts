@@ -15,6 +15,8 @@ export interface IntegrationStateClaims {
   userId: string;
   /** Project the person started from, used only to send them back to the right place. */
   projectId?: string;
+  /** Which dashboard page to return to (an allowlisted name, never a URL). */
+  returnTo?: string;
   nonce: string;
   issuedAt: number;
   expiresAt: number;
@@ -30,7 +32,7 @@ export const DEFAULT_STATE_TTL_SECONDS = 10 * 60;
 
 export function signIntegrationState(
   secret: string,
-  claims: { purpose: string; organizationId: string; userId: string; projectId?: string },
+  claims: { purpose: string; organizationId: string; userId: string; projectId?: string; returnTo?: string },
   ttlSeconds = DEFAULT_STATE_TTL_SECONDS,
   now = Date.now()
 ): string {

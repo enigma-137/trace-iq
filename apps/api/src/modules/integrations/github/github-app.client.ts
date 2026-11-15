@@ -358,6 +358,8 @@ export class GitHubAppClient {
         tree: files.map((file) => ({ path: file.path, mode: '100644', type: 'blob', content: file.content }))
       }
     });
+    // Same content as the branch already has: no new commit (keeps retries idempotent).
+    if (tree.sha === parent.tree.sha) return parent.sha;
     const commit = await this.request<{ sha: string }>(`${base}/git/commits`, {
       method: 'POST',
       token,

@@ -292,6 +292,18 @@ describe('GitHubService', () => {
       expect(db.query).not.toHaveBeenCalled();
     });
 
+    it('returns to the setup wizard when the install started there, and ignores unknown pages', async () => {
+      const fromWizard = await service.createInstallUrl(owner, {}, 'setup');
+      expect(verifyIntegrationState(STATE_KEY, fromWizard.state, 'github-install').returnTo).toBe('setup');
+      const url = new URL(service.forwardCallback({ installation_id: '77', code: 'c1', state: fromWizard.state }));
+      expect(url.pathname).toBe('/dashboard/setup');
+      expect(url.searchParams.get('github')).toBe('complete');
+
+      const elsewhere = await service.createInstallUrl(owner, {}, 'https://evil.test');
+      expect(verifyIntegrationState(STATE_KEY, elsewhere.state, 'github-install').returnTo).toBeUndefined();
+      expect(new URL(service.forwardCallback({ installation_id: '77', code: 'c1', state: elsewhere.state })).pathname).toBe('/dashboard/settings/integrations');
+    });
+
     it('reports pending approvals and missing values', () => {
       const flag = (u: string) => Object.fromEntries(new URL(u).searchParams);
       expect(flag(service.forwardCallback({ setup_action: 'request' }))).toMatchObject({ github: 'error', reason: 'pending_approval' });
@@ -481,7 +493,7 @@ describe('GitHubController authorization', () => {
       })
     };
     const githubService = { createInstallUrl: vi.fn(), completeInstall: vi.fn(), getStatus: vi.fn(), listRepos: vi.fn(), linkProjectRepo: vi.fn(), disconnect: vi.fn() };
-    const controller = new GitHubController(authService as never, githubService as never, {} as never);
+    const controller = new GitHubController(authService as never, githubService as never, {} as never, {} as never);
     await expect(controller.install(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.complete({}, undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.linkProject('proj_1', {}, undefined)).rejects.toBeInstanceOf(UnauthorizedException);

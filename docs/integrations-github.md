@@ -101,3 +101,52 @@ Error codes include `GITHUB_STATE_INVALID`, `GITHUB_STATE_EXPIRED`,
 - `GitHubAppClient` can list repositories, read files and trees, create a branch, commit
   files (one fast-forward commit, never forced) and open a pull request against the
   default branch. Phase 5 builds the setup PR on these.
+
+## Setup pull requests ("Connect GitHub → we set it up")
+
+In **Setup Wizard → Install**, the GitHub panel installs the app (returning to the
+wizard), lets the person pick the repository and app folder, shows what TraceIQ
+detected and which files it will change, and opens a pull request. The manual, CLI and
+"Install with AI" options stay below it.
+
+| Route | Who | What |
+| --- | --- | --- |
+| `GET /projects/:projectId/setup-preview` | owner/admin | Detected stack and the planned files and env vars. Writes nothing. Statuses: `ready`, `pick_folder`, `unsupported`, `already_installed`, `file_exists`, `invalid_output`, `pull_request_open` |
+| `POST /projects/:projectId/setup-pr` | owner/admin | Opens the PR, or returns the open one (`created: false`). Errors: `GITHUB_REPO_NOT_LINKED`, `SETUP_PICK_FOLDER` (with `candidates`), `SETUP_UNSUPPORTED`, `SETUP_ALREADY_INSTALLED`, `SETUP_FILE_EXISTS`, `SETUP_INVALID_OUTPUT` |
+
+**Detection** (`setup/stack-detection.ts`) reads the default branch's tree and a few
+manifests. Supported now: **Next.js** (App Router and Pages Router, `src/` or not, TS or JS),
+**React** (Vite, Create React App) and **Node.js** servers (Express, NestJS, Fastify, Koa,
+Hono, plain Node). Flutter, React Native, Swift, Android/Kotlin, Rust, Python, PHP, Go and
+Ruby are recognised and sent to the manual wizard. In a monorepo (workspaces, pnpm,
+Turborepo, Nx, Lerna, Rush), a single app folder is picked automatically. With several, the
+person chooses one, and it is saved as the project's app folder. The package manager comes
+from the nearest lockfile, then `packageManager`, then npm.
+
+**Generation** (`setup/setup-generator.ts`) uses deterministic templates, the same as the
+useTrace CLI and the install prompt:
+
+- Next.js: a `"use client"` `TraceIQProvider` that initializes once in `useEffect`, wrapped
+  around the JSX `{children}` of the root layout (never the function parameter), or around
+  `<Component {...pageProps} />` in `pages/_app`.
+- React: `src/traceiq.(ts|js)` imported first in the entry file.
+- Node: a shared `traceiq` client (`null` when the env vars are missing) and
+  `if (traceiq) app.use(traceiq.middleware())` after the single `const app = express()` /
+  `NestFactory.create(...)`.
+- `traceiq-sdk-js@^0.4.0` or `traceiq-node@^0.3.0` added to `package.json`, keeping its
+  indentation and key order.
+- `.env.example` gets the variable names, the project id and the API URL. The write key
+  value is always empty.
+
+Code reads the write key from an environment variable; the key is never committed. The PR
+body explains how to add it to the host and CI secrets, and that the lockfile must be
+updated on the branch (the API cannot run the package manager). Any edit that cannot be made
+safely (an unusual layout, no `const app = express()` line) becomes a "finish by hand" step
+in the PR instead of a guess. Every generated or edited file is parsed (TypeScript parser,
+`JSON.parse`), and nothing is opened if one does not parse.
+
+**Idempotency.** An open PR from `traceiq/setup` is returned as is. An existing
+`traceiq/setup` branch is reused. Identical content is not committed again. Two clicks at
+once end with one branch and one PR. The PR is recorded per project
+(`github_setup_pull_requests`, migration `0068`) and shown when the wizard is reopened. The
+wizard then waits on the existing first-event verification.

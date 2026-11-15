@@ -5,16 +5,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readActiveProjectIdFromDocument } from '@/lib/active-project';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import {
-  githubReturnMessage,
-  normalizeSubdirectoryInput,
-  readGitHubReturn,
-  stashInstallState,
-  stripGitHubReturn,
-  takeInstallState,
-  type GitHubRepoOption,
-  type GitHubStatusResponse
-} from '@/lib/github-integration';
+import { normalizeSubdirectoryInput, type GitHubRepoOption, type GitHubStatusResponse } from '@/lib/github-integration';
+import { GITHUB_INTEGRATION_API, completeGitHubReturn, startGitHubInstall } from './github-install';
 import { GitHubIcon } from '@/components/ProviderIcons';
 import { Skeleton } from '@/components/Skeleton';
 import { DashboardDialog } from '../../DashboardDialog';
@@ -30,8 +22,7 @@ import {
   secondaryButton
 } from '../SettingsUI';
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const GITHUB_API = `${apiBaseUrl}/v1/integrations/github`;
+const GITHUB_API = GITHUB_INTEGRATION_API;
 
 type Busy = 'install' | 'complete' | 'disconnect' | 'save' | null;
 
@@ -76,43 +67,12 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
   useEffect(() => {
     if (handledReturn.current) return;
     handledReturn.current = true;
-    const returned = readGitHubReturn(new URLSearchParams(window.location.search));
-    // Drop the code from the address bar before anything else, so it is never replayed.
-    if (returned) window.history.replaceState(null, '', stripGitHubReturn(window.location.href));
-
     void (async () => {
-      if (returned?.kind === 'error') {
-        takeInstallState(null);
-        toast.error(githubReturnMessage(returned.reason), { title: 'GitHub not connected' });
-      } else if (returned?.kind === 'complete') {
+      // Coming back from GitHub: finish with this session (shared with the Setup Wizard).
+      if (new URLSearchParams(window.location.search).has('github')) {
         setBusy('complete');
-        try {
-          const state = takeInstallState(returned.state);
-          const headers = await authHeaders();
-          if (!headers) {
-            toast.error('Your dashboard session expired. Sign in again, then install the GitHub App.');
-          } else if (!state) {
-            toast.error('This installation was not started from this browser. Start it again from this page.', { title: 'GitHub not connected' });
-          } else {
-            const response = await fetch(`${GITHUB_API}/complete`, {
-              method: 'POST',
-              headers: { ...headers, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ installationId: returned.installationId, code: returned.code, state })
-            });
-            if (response.ok) {
-              const body = (await response.json()) as { installation?: { accountLogin?: string } };
-              toast.success(`Installed on ${body.installation?.accountLogin ?? 'your GitHub account'}. Now choose this project’s repository.`, {
-                title: 'GitHub connected'
-              });
-            } else {
-              toast.error(await readApiError(response, 'Could not connect GitHub.'), { title: 'GitHub not connected' });
-            }
-          }
-        } catch (error) {
-          toast.error(await readApiError(error, 'Could not connect GitHub.'), { title: 'GitHub not connected' });
-        } finally {
-          setBusy(null);
-        }
+        await completeGitHubReturn(authHeaders);
+        setBusy(null);
       }
       await load();
     })();
@@ -145,21 +105,9 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
 
   async function install() {
     setBusy('install');
-    let leaving = false;
-    try {
-      const headers = await authHeaders();
-      if (!headers) return toast.error('Your dashboard session expired. Sign in again.');
-      const response = await fetch(`${GITHUB_API}/install${query}`, { headers });
-      if (!response.ok) return toast.error(await readApiError(response, 'Could not start the GitHub installation.'));
-      const { url, state } = (await response.json()) as { url: string; state: string };
-      stashInstallState(state);
-      leaving = true;
-      window.location.assign(url);
-    } catch (error) {
-      toast.error(await readApiError(error, 'Could not start the GitHub installation.'));
-    } finally {
-      if (!leaving) setBusy(null);
-    }
+    // On success the browser is on its way to GitHub; keep the button busy until it leaves.
+    const leaving = await startGitHubInstall(authHeaders, { projectId, returnTo: 'settings' });
+    if (!leaving) setBusy(null);
   }
 
   async function saveRepo() {

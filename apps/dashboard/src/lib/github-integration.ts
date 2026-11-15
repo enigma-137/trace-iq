@@ -104,3 +104,44 @@ export function normalizeSubdirectoryInput(value: string): string | null {
   const parts = trimmed.split('/');
   return parts.some((part) => !part || part === '.' || part === '..') ? null : parts.join('/');
 }
+
+export interface DetectedAppInfo {
+  folder: string;
+  framework: string;
+  label: string;
+  supported: boolean;
+  packageManager: string | null;
+}
+
+export interface SetupPlanSummary {
+  files: Array<{ path: string; action: 'create' | 'update' }>;
+  envVars: Array<{ name: string; secret: boolean; exampleValue: string; description: string }>;
+  manualSteps: string[];
+  installCommand: string;
+}
+
+export interface SetupPullRequestInfo {
+  number: number;
+  url: string;
+}
+
+export type SetupPreview =
+  | { status: 'ready'; app: DetectedAppInfo; plan: SetupPlanSummary }
+  | { status: 'pick_folder'; candidates: DetectedAppInfo[] }
+  | { status: 'unsupported' | 'already_installed' | 'file_exists' | 'invalid_output'; app: DetectedAppInfo; message: string }
+  | { status: 'pull_request_open'; pullRequest: SetupPullRequestInfo };
+
+/** One line for each stage of the GitHub path in the Setup Wizard. */
+export function setupStage(input: {
+  configured: boolean;
+  installed: boolean;
+  suspended: boolean;
+  repoLinked: boolean;
+  pullRequest: boolean;
+}): 'hidden' | 'install' | 'suspended' | 'pick_repo' | 'preview' | 'pull_request' {
+  if (!input.configured && !input.installed) return 'hidden';
+  if (!input.installed) return 'install';
+  if (input.suspended) return 'suspended';
+  if (!input.repoLinked) return 'pick_repo';
+  return input.pullRequest ? 'pull_request' : 'preview';
+}

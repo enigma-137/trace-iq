@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   GITHUB_STATE_STORAGE_KEY,
+  setupStage,
   githubReturnMessage,
   normalizeSubdirectoryInput,
   readGitHubReturn,
@@ -91,12 +92,19 @@ describe('app folder input', () => {
 describe('GitHub settings card', () => {
   const card = read('app/dashboard/settings/integrations/GitHubIntegrationCard.tsx');
 
-  it('finishes the installation with the signed-in session, once, after clearing the code from the URL', () => {
-    expect(card).toContain('`${GITHUB_API}/complete`');
+  it('finishes the installation once per load, through the shared helper', () => {
     expect(card).toContain('handledReturn.current = true');
-    expect(card.indexOf('window.history.replaceState')).toBeLessThan(card.indexOf('`${GITHUB_API}/complete`'));
-    expect(card).toContain('stashInstallState(state)');
-    expect(card).toContain('takeInstallState(returned.state)');
+    expect(card).toContain('await completeGitHubReturn(authHeaders)');
+    expect(card).toContain("startGitHubInstall(authHeaders, { projectId, returnTo: 'settings' })");
+  });
+
+  it('the shared helper clears the code from the URL before posting it with the session', () => {
+    const helper = read('app/dashboard/settings/integrations/github-install.ts');
+    expect(helper).toContain('`${GITHUB_INTEGRATION_API}/complete`');
+    expect(helper.indexOf('window.history.replaceState')).toBeLessThan(helper.indexOf('`${GITHUB_INTEGRATION_API}/complete`'));
+    expect(helper).toContain('stashInstallState(state)');
+    expect(helper).toContain('takeInstallState(returned.state)');
+    expect(helper).toContain("query.set('returnTo', options.returnTo)");
   });
 
   it('links a repository and folder, and confirms before uninstalling', () => {
@@ -110,5 +118,46 @@ describe('GitHub settings card', () => {
     const page = read('app/dashboard/settings/integrations/page.tsx');
     expect(page).toContain('<GitHubIntegrationCard');
     expect(page).toContain('<LinearIntegrationCard');
+  });
+});
+
+describe('Setup Wizard GitHub path', () => {
+  const base = { configured: true, installed: true, suspended: false, repoLinked: true, pullRequest: false };
+
+  it('walks install → repository → preview → pull request', () => {
+    expect(setupStage({ ...base, configured: false, installed: false })).toBe('hidden');
+    expect(setupStage({ ...base, installed: false })).toBe('install');
+    expect(setupStage({ ...base, suspended: true })).toBe('suspended');
+    expect(setupStage({ ...base, repoLinked: false })).toBe('pick_repo');
+    expect(setupStage(base)).toBe('preview');
+    expect(setupStage({ ...base, pullRequest: true })).toBe('pull_request');
+    // Already installed on a server without the app configured: still shown.
+    expect(setupStage({ ...base, configured: false })).toBe('preview');
+  });
+
+  const panel = read('app/dashboard/GitHubSetupPanel.tsx');
+  const wizard = read('app/dashboard/SetupWizard.tsx');
+
+  it('installs with a return to the wizard and finishes there', () => {
+    expect(panel).toContain("startGitHubInstall(authHeaders, { projectId, returnTo: 'setup' })");
+    expect(panel).toContain('await completeGitHubReturn(authHeaders)');
+    expect(wizard).toContain("if (new URLSearchParams(window.location.search).has('github')) setCurrentStep(2);");
+  });
+
+  it('previews, opens the PR, then hands over to the first-event verification', () => {
+    expect(panel).toContain('/setup-preview`');
+    expect(panel).toContain("/setup-pr`, { method: 'POST'");
+    expect(panel).toContain('Create setup PR');
+    expect(panel).toContain('Open pull request #{pullRequest.number}');
+    expect(wizard).toContain('<GitHubSetupPanel projectId={projectId} onWaitForEvent={() => setCurrentStep(4)} />');
+  });
+
+  it('handles monorepos and unsupported stacks, and keeps the manual path', () => {
+    expect(panel).toContain("preview?.status === 'pick_folder'");
+    expect(panel).toContain('onClick={() => void linkRepo(candidate.folder)}');
+    expect(panel).toContain('The options below still work.');
+    // The manual options are still in the wizard after the GitHub panel.
+    expect(wizard.indexOf('<GitHubSetupPanel')).toBeLessThan(wizard.indexOf('<InstallWithAiCard'));
+    expect(wizard).toContain('Option C: Manual Installation Tabs');
   });
 });

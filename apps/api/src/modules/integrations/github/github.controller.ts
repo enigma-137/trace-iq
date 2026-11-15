@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { AuthService } from '../../auth/auth.service';
 import { GitHubService } from './github.service';
 import { GitHubWebhookService, verifyGitHubWebhook } from './github-webhook.service';
+import { GitHubSetupService } from './setup/github-setup.service';
 
 /**
  * TraceIQ GitHub App (separate from GitHub sign-in). Dashboard routes need a session;
@@ -15,18 +16,37 @@ export class GitHubController {
   constructor(
     private readonly authService: AuthService,
     private readonly github: GitHubService,
-    private readonly webhooks: GitHubWebhookService
+    private readonly webhooks: GitHubWebhookService,
+    private readonly setup: GitHubSetupService
   ) {}
+
+  /** What the setup PR would contain: detected stack, files, env vars. Writes nothing. */
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Get('projects/:projectId/setup-preview')
+  async setupPreview(@Param('projectId') projectId: string, @Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.setup.preview(user, projectId);
+  }
+
+  /** Opens (or returns the open) TraceIQ setup pull request on the `traceiq/setup` branch. */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('projects/:projectId/setup-pr')
+  @HttpCode(200)
+  async setupPullRequest(@Param('projectId') projectId: string, @Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.setup.createSetupPullRequest(user, projectId);
+  }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('install')
   async install(
     @Headers('authorization') authorization?: string,
     @Query('organizationId') organizationId?: string,
-    @Query('projectId') projectId?: string
+    @Query('projectId') projectId?: string,
+    @Query('returnTo') returnTo?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
-    return this.github.createInstallUrl(user, { organizationId, projectId });
+    return this.github.createInstallUrl(user, { organizationId, projectId }, returnTo);
   }
 
   /** GitHub's "Callback URL" after installing. Forwards to the dashboard; stores nothing. */

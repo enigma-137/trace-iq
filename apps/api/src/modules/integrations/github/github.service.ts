@@ -31,6 +31,8 @@ import {
 const STATE_PURPOSE = 'github-install';
 const MANAGE_ROLES = ['owner', 'admin'];
 export const SETTINGS_PATH = '/dashboard/settings/integrations';
+/** Dashboard pages an install may return to. Anything else goes to settings. */
+export const RETURN_PATHS: Record<string, string> = { settings: SETTINGS_PATH, setup: '/dashboard/setup' };
 
 export type GitHubInstallationRow = {
   id: string;
@@ -59,6 +61,15 @@ export interface OrganizationScope {
   projectId?: string;
 }
 
+export type GitHubSetupPullRequest = {
+  repoFullName: string;
+  branch: string;
+  number: number;
+  url: string;
+  frameworkLabel: string | null;
+  createdAt: string;
+};
+
 const INSTALLATION_COLUMNS = `
   id,
   organization_id AS "organizationId",
@@ -83,8 +94,8 @@ const PROJECT_REPO_COLUMNS = `
 
 export const dashboardUrl = () => (process.env.DASHBOARD_URL ?? 'https://traceiq.run').replace(/\/+$/, '');
 
-export function settingsReturnUrl(params: Record<string, string | undefined>): string {
-  const url = new URL(`${dashboardUrl()}${SETTINGS_PATH}`);
+export function settingsReturnUrl(params: Record<string, string | undefined>, returnTo?: string): string {
+  const url = new URL(`${dashboardUrl()}${RETURN_PATHS[returnTo ?? ''] ?? SETTINGS_PATH}`);
   for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
   return url.toString();
 }
@@ -119,7 +130,7 @@ export class GitHubService {
   ) {}
 
   /** Step 1: the GitHub App installation URL with a signed state for this org and person. */
-  async createInstallUrl(user: DashboardUser, scope: OrganizationScope) {
+  async createInstallUrl(user: DashboardUser, scope: OrganizationScope, returnTo?: string) {
     this.requireInteractive(user);
     this.requireConfigured();
     const org = await this.resolveOrganization(user, scope);
@@ -128,7 +139,8 @@ export class GitHubService {
       purpose: STATE_PURPOSE,
       organizationId: org.organizationId,
       userId: user.id,
-      ...(org.projectId ? { projectId: org.projectId } : {})
+      ...(org.projectId ? { projectId: org.projectId } : {}),
+      ...(returnTo && RETURN_PATHS[returnTo] ? { returnTo } : {})
     });
     return {
       url: this.github.installUrl(state),
@@ -144,18 +156,18 @@ export class GitHubService {
    * values are forwarded to the dashboard, which finishes with the signed-in session.
    */
   forwardCallback(params: { installation_id?: string; setup_action?: string; code?: string; state?: string }): string {
-    const projectId = this.peekProjectId(params.state);
+    const { projectId, returnTo } = this.peekState(params.state);
+    const back = (query: Record<string, string | undefined>) => settingsReturnUrl({ ...query, projectId }, returnTo);
     if (!this.github.isConfigured) return settingsReturnUrl({ github: 'error', reason: 'not_configured' });
-    if (params.setup_action === 'request') return settingsReturnUrl({ github: 'error', reason: 'pending_approval', projectId });
+    if (params.setup_action === 'request') return back({ github: 'error', reason: 'pending_approval' });
     const installationId = parseInstallationId(params.installation_id);
-    if (!installationId) return settingsReturnUrl({ github: 'error', reason: 'missing_installation', projectId });
-    if (!params.code) return settingsReturnUrl({ github: 'error', reason: 'missing_code', projectId });
-    return settingsReturnUrl({
+    if (!installationId) return back({ github: 'error', reason: 'missing_installation' });
+    if (!params.code) return back({ github: 'error', reason: 'missing_code' });
+    return back({
       github: 'complete',
       github_installation_id: String(installationId),
       github_code: params.code,
-      github_state: params.state,
-      projectId
+      github_state: params.state
     });
   }
 
@@ -265,6 +277,7 @@ export class GitHubService {
     const project = await this.projects.resolveActiveProject(user, org.projectId, org.organizationId);
     const installation = await this.findInstallation(org.organizationId);
     const repo = project && installation ? await this.findProjectRepo(project.id) : null;
+    const setupPullRequest = project && installation ? await this.findSetupPullRequest(project.id) : null;
     return {
       configured: this.github.isConfigured,
       organizationId: org.organizationId,
@@ -272,7 +285,8 @@ export class GitHubService {
       project: project ? { id: project.id, name: project.name } : null,
       connected: Boolean(installation),
       installation: installation ? publicInstallation(installation) : null,
-      projectRepo: repo
+      projectRepo: repo,
+      setupPullRequest
     };
   }
 
@@ -367,13 +381,36 @@ export class GitHubService {
     return result.rows[0] ?? null;
   }
 
-  /** The project id inside a valid state, used only to build the return URL. */
-  private peekProjectId(state?: string): string | undefined {
-    if (!state || !this.github.isConfigured) return undefined;
+  async findSetupPullRequest(projectId: string): Promise<GitHubSetupPullRequest | null> {
+    const result = await this.database.query<GitHubSetupPullRequest>(
+      `SELECT repo_full_name AS "repoFullName", branch, pr_number AS "number", url, framework_label AS "frameworkLabel", created_at AS "createdAt"
+       FROM github_setup_pull_requests WHERE project_id = $1`,
+      [projectId]
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /** Owner/admin and an active installation with a linked repository, for setup PRs. */
+  async requireLinkedProject(user: DashboardUser, projectId: string) {
+    this.requireInteractive(user);
+    const project = await this.projects.requireWritableProject(user, projectId);
+    this.requireManager(project.role);
+    const installation = await this.requireActiveInstallation(project.organizationId);
+    const link = await this.findProjectRepo(project.id);
+    if (!link) {
+      throw new ConflictException({ code: 'GITHUB_REPO_NOT_LINKED', message: 'Choose this project’s GitHub repository first.' });
+    }
+    return { project, installation, link };
+  }
+
+  /** Project and return page from a valid state, used only to build the return URL. */
+  private peekState(state?: string): { projectId?: string; returnTo?: string } {
+    if (!state || !this.github.isConfigured) return {};
     try {
-      return verifyIntegrationState(this.stateKey(), state, STATE_PURPOSE).projectId;
+      const claims = verifyIntegrationState(this.stateKey(), state, STATE_PURPOSE);
+      return { projectId: claims.projectId, returnTo: claims.returnTo };
     } catch {
-      return undefined;
+      return {};
     }
   }
 
