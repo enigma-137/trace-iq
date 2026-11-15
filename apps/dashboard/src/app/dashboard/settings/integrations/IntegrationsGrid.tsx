@@ -205,7 +205,7 @@ function IntegrationDialog({ open, title, onClose, children }: { open: boolean; 
   return (
     <div
       // No backdrop-blur here: it would make this the containing block for the cards' own fixed confirm dialogs.
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-neutral-950/55 px-4 py-6 sm:py-12 dark:bg-black/75"
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-neutral-950/55 px-4 py-6 sm:py-12 dark:bg-black/75"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
