@@ -398,6 +398,42 @@ export class GitHubAppClient {
     return toPull(pull);
   }
 
+  /** A commit by SHA (full or short), or null when the repository has no such commit. */
+  async getCommit(installationId: number, fullName: string, ref: string): Promise<{ sha: string; url: string } | null> {
+    const token = await this.installationToken(installationId);
+    try {
+      const body = await this.request<{ sha: string; html_url: string }>(`/repos/${repoPath(fullName)}/commits/${encodeURIComponent(ref)}`, { token });
+      return { sha: body.sha, url: body.html_url };
+    } catch (error) {
+      if (error instanceof GitHubApiError && (error.status === 404 || error.status === 422)) return null;
+      throw error;
+    }
+  }
+
+  /** The commit a tag points at (following annotated tags), or null when there is no such tag. */
+  async getTagCommitSha(installationId: number, fullName: string, tag: string): Promise<string | null> {
+    const token = await this.installationToken(installationId);
+    try {
+      const ref = await this.request<{ object: { sha: string; type: string } }>(`/repos/${repoPath(fullName)}/git/ref/tags/${filePath(tag)}`, { token });
+      if (ref.object.type !== 'tag') return ref.object.sha;
+      const annotated = await this.request<{ object: { sha: string } }>(`/repos/${repoPath(fullName)}/git/tags/${ref.object.sha}`, { token });
+      return annotated.object.sha;
+    } catch (error) {
+      if (error instanceof GitHubApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
+  /** Pull requests that contain a commit (newest first, at most five). */
+  async pullRequestsForCommit(installationId: number, fullName: string, sha: string): Promise<Array<{ number: number; url: string; title: string; state: string; merged: boolean }>> {
+    const token = await this.installationToken(installationId);
+    const list = await this.request<Array<{ number: number; html_url: string; title: string; state: string; merged_at: string | null }>>(
+      `/repos/${repoPath(fullName)}/commits/${encodeURIComponent(sha)}/pulls?per_page=5`,
+      { token }
+    );
+    return list.map((pull) => ({ number: pull.number, url: pull.html_url, title: pull.title, state: pull.state, merged: Boolean(pull.merged_at) }));
+  }
+
   // ---------------------------------------------------------------- plumbing
 
   private appJwt(): string {

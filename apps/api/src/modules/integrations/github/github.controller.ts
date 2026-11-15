@@ -5,6 +5,7 @@ import { AuthService } from '../../auth/auth.service';
 import { GitHubService } from './github.service';
 import { GitHubWebhookService, verifyGitHubWebhook } from './github-webhook.service';
 import { GitHubSetupService } from './setup/github-setup.service';
+import { GitHubSourceContextService } from './source-context.service';
 
 /**
  * TraceIQ GitHub App (separate from GitHub sign-in). Dashboard routes need a session;
@@ -17,8 +18,35 @@ export class GitHubController {
     private readonly authService: AuthService,
     private readonly github: GitHubService,
     private readonly webhooks: GitHubWebhookService,
-    private readonly setup: GitHubSetupService
+    private readonly setup: GitHubSetupService,
+    private readonly sourceContext: GitHubSourceContextService
   ) {}
+
+  /** Paste a repository URL → link it and open the setup PR, in one step. */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('projects/:projectId/setup-pr-from-url')
+  @HttpCode(200)
+  async setupPullRequestFromUrl(
+    @Param('projectId') projectId: string,
+    @Body() body: { repoUrl?: unknown; subdirectory?: unknown },
+    @Headers('authorization') authorization?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.setup.createFromUrl(user, projectId, body ?? {});
+  }
+
+  /** The linked repository and the commit of `release`, for source links on error pages. */
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('projects/:projectId/source-context')
+  async source(
+    @Param('projectId') projectId: string,
+    @Query('release') release?: string,
+    @Headers('authorization') authorization?: string
+  ) {
+    const user = await this.authService.getDashboardUser(authorization);
+    this.authService.requireScope(user, 'errors:read');
+    return this.sourceContext.resolve(user, projectId, release);
+  }
 
   /** What the setup PR would contain: detected stack, files, env vars. Writes nothing. */
   @Throttle({ default: { limit: 30, ttl: 60_000 } })

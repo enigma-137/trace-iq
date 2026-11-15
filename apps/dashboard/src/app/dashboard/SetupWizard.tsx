@@ -10,6 +10,7 @@ import { retryAfterStepUp } from '@/lib/step-up';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { InstallWithAiCard } from './InstallWithAiCard';
 import { GitHubSetupPanel } from './GitHubSetupPanel';
+import { GitHubQuickSetup } from './GitHubQuickSetup';
 
 export interface SetupWizardProps {
   projectId: string;
@@ -410,6 +411,9 @@ function SetupWizardContent({
           })}
         </div>
       </div>
+
+      {/* Shortcut: paste a repository URL → setup PR, then straight to verification */}
+      {currentStep < 4 ? <GitHubQuickSetup projectId={projectId} onWaitForEvent={() => setCurrentStep(4)} /> : null}
 
       {/* STEP 1: PRODUCT SELECTION */}
       {currentStep === 1 ? (

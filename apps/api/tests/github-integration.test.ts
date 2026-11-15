@@ -493,7 +493,7 @@ describe('GitHubController authorization', () => {
       })
     };
     const githubService = { createInstallUrl: vi.fn(), completeInstall: vi.fn(), getStatus: vi.fn(), listRepos: vi.fn(), linkProjectRepo: vi.fn(), disconnect: vi.fn() };
-    const controller = new GitHubController(authService as never, githubService as never, {} as never, {} as never);
+    const controller = new GitHubController(authService as never, githubService as never, {} as never, {} as never, {} as never);
     await expect(controller.install(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.complete({}, undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.linkProject('proj_1', {}, undefined)).rejects.toBeInstanceOf(UnauthorizedException);

@@ -390,6 +390,22 @@ export class GitHubService {
     return result.rows[0] ?? null;
   }
 
+  /** Owner/admin with an active installation (no repository needed yet), for the paste-a-URL shortcut. */
+  async requireLinkedInstallation(user: DashboardUser, projectId: string) {
+    this.requireInteractive(user);
+    const project = await this.projects.requireWritableProject(user, projectId);
+    this.requireManager(project.role);
+    return publicInstallation(await this.requireActiveInstallation(project.organizationId));
+  }
+
+  /** For any project member (reads only): the active installation and linked repository, if any. */
+  async projectRepoForMember(user: DashboardUser, projectId: string) {
+    const project = await this.projects.requireActiveProject(user, projectId);
+    const installation = await this.findInstallation(project.organizationId);
+    const link = installation?.status === 'active' ? await this.findProjectRepo(project.id) : null;
+    return { project, installation: installation?.status === 'active' ? installation : null, link };
+  }
+
   /** Owner/admin and an active installation with a linked repository, for setup PRs. */
   async requireLinkedProject(user: DashboardUser, projectId: string) {
     this.requireInteractive(user);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LocalTime } from '@/components/LocalTime';
@@ -27,7 +27,8 @@ import { readApiError } from '@/lib/api-error';
 import { buildErrorFixPrompt } from '@/lib/error-fix-prompt';
 import { toast } from '@/lib/toast';
 import { integrationsSettingsHref, linearSyncNote, needsLinearSettings, readApiErrorCode, type ErrorLinearIssue } from '@/lib/linear';
-import { LinearIcon } from '@/components/ProviderIcons';
+import { GitHubIcon, LinearIcon } from '@/components/ProviderIcons';
+import { buildSourceLinks, shortSha, type SourceContext } from '@/lib/source-links';
 import { BrandIcon } from '@/components/icons/BrandIcon';
 import { EmptyState } from '@/components/EmptyState';
 
@@ -282,6 +283,37 @@ export function ErrorTrackingClientView({
     ? createdLinearIssues[activeIssue.id] ?? (detailMatches ? activeDetail?.issue.linearIssue ?? null : null)
     : null;
   const detailProjectId = activeDetail?.project?.id ?? null;
+  const sampleRelease = latestSample?.release ?? '';
+
+  // Linked GitHub repository + the release's commit, loaded when the stack tab opens.
+  const [sourceContext, setSourceContext] = useState<{ key: string; value: SourceContext } | null>(null);
+  const sourceKey = detailProjectId ? `${detailProjectId}:${sampleRelease}` : null;
+  useEffect(() => {
+    if (activeTab !== 'stack' || !sourceKey || !detailProjectId || sourceContext?.key === sourceKey) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const {
+          data: { session }
+        } = await createSupabaseBrowserClient().auth.getSession();
+        if (!session?.access_token) return;
+        const query = sampleRelease ? `?release=${encodeURIComponent(sampleRelease)}` : '';
+        const response = await fetch(`${apiBaseUrl}/v1/integrations/github/projects/${encodeURIComponent(detailProjectId)}/source-context${query}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        // No links is fine: GitHub may not be connected, or the API may be older.
+        const value = response.ok ? ((await response.json()) as SourceContext) : ({ linked: false } as SourceContext);
+        if (!cancelled) setSourceContext({ key: sourceKey, value });
+      } catch {
+        if (!cancelled) setSourceContext({ key: sourceKey, value: { linked: false } });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, sourceKey, detailProjectId, sampleRelease, sourceContext?.key]);
+  const activeSource = sourceContext && sourceContext.key === sourceKey ? sourceContext.value : null;
+  const sourceLinks = buildSourceLinks(latestSymbolicated?.stack ?? latestSample?.stack, activeSource);
   // A status change made here replaces whatever Linear last did.
   const syncNote = saved || !detailMatches
     ? null
@@ -1058,6 +1090,52 @@ export function ErrorTrackingClientView({
                               Copy Stack
                             </button>
                           </div>
+
+                          {activeSource?.linked ? (
+                            <div className="rounded-md border border-neutral-200 p-3 text-xs dark:border-slate-800">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="inline-flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-slate-200">
+                                  <GitHubIcon className="h-3.5 w-3.5" />
+                                  Source on GitHub
+                                </span>
+                                {activeSource.ref.exact ? (
+                                  <>
+                                    <a href={activeSource.ref.commitUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-700 hover:underline dark:text-blue-400">
+                                      {activeSource.repo.fullName}@{shortSha(activeSource.ref.sha)}
+                                    </a>
+                                    {activeSource.ref.source === 'tag' ? <span className="text-neutral-500">from tag {sampleRelease}</span> : null}
+                                    {activeSource.ref.pullRequests.map((pull) => (
+                                      <a key={pull.number} href={pull.url} target="_blank" rel="noopener noreferrer" title={pull.title} className="text-blue-700 hover:underline dark:text-blue-400">
+                                        PR #{pull.number}{pull.merged ? ' (merged)' : ''}
+                                      </a>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="text-amber-700 dark:text-amber-400">
+                                    {sampleRelease
+                                      ? `Release ${sampleRelease} is not a commit or tag in ${activeSource.repo.fullName}, so links point at ${activeSource.ref.branch} and lines may have moved.`
+                                      : `No release on this error, so links point at ${activeSource.ref.branch} and lines may have moved. Set release to the commit SHA for exact links.`}
+                                  </span>
+                                )}
+                              </div>
+                              {sourceLinks.length ? (
+                                <ul className="mt-2 space-y-1 font-mono">
+                                  {sourceLinks.map((link) => (
+                                    <li key={`${link.path}:${link.line}`}>
+                                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline dark:text-blue-400">
+                                        {link.path}:{link.line}
+                                      </a>
+                                      {link.fn ? <span className="ml-2 text-neutral-500">{link.fn}</span> : null}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="mt-2 text-neutral-500 dark:text-slate-400">
+                                  No frames in this stack point at files in the repository. Upload source maps for browser errors to get file links.
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="rounded-md border border-neutral-200 bg-neutral-50 py-8 text-center text-xs text-neutral-500 dark:border-slate-800 dark:bg-slate-950">

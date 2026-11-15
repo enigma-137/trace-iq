@@ -150,3 +150,51 @@ in the PR instead of a guess. Every generated or edited file is parsed (TypeScri
 once end with one branch and one PR. The PR is recorded per project
 (`github_setup_pull_requests`, migration `0068`) and shown when the wizard is reopened. The
 wizard then waits on the existing first-event verification.
+
+## Paste a repository URL → setup PR
+
+For organizations that already installed the app, the Setup Wizard shows **Already on
+GitHub?** above its steps. Pasting a repository URL links it to the project and opens
+the setup pull request in one step, then the wizard goes straight to verification.
+
+`POST /projects/:projectId/setup-pr-from-url` with `{ repoUrl, subdirectory? }` (owner/admin):
+
+- Accepts `https://github.com/o/r`, `github.com/o/r.git`, `git@github.com:o/r.git`, `o/r`,
+  and folder links such as `https://github.com/o/r/tree/main/apps/web`. The folder is used
+  when the link is on the default branch; `subdirectory` overrides it. Only github.com.
+- Errors: `GITHUB_REPO_URL_INVALID` (400), `GITHUB_REPO_NOT_VISIBLE` (404, with `manageUrl`
+  to add the repo to the app), `GITHUB_NOT_CONNECTED`, plus the setup-PR errors above.
+  `SETUP_PICK_FOLDER` returns `candidates`; the wizard shows them and sends the choice back
+  as `subdirectory`.
+
+## Source links on error pages
+
+The error page's **Stack trace** tab shows **Source on GitHub** when the project has a
+linked repository: the commit, the pull requests that contain it, and a link per in-app
+stack frame to `blob/<commit>/<path>#L<line>`.
+
+`GET /projects/:projectId/source-context?release=…` (any member; PATs need `errors:read`)
+resolves the error's release:
+
+1. A release that looks like a SHA (7–40 hex characters) is checked as a commit.
+2. Otherwise a tag with that name is tried, then with a `v` prefix (annotated tags are followed).
+3. Otherwise links point at the default branch and say that lines may have moved.
+
+Results are cached for ten minutes per project and release. Setting the SDK's `release`
+to the deployed commit SHA (for example `VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA`) gives exact
+links.
+
+Frames are mapped in the dashboard (`apps/dashboard/src/lib/source-links.ts`).
+Source-mapped paths (`src/App.tsx`, `webpack://…/./src/App.tsx`) are placed under the app
+folder. Absolute server paths are placed only from the repository name or the app folder.
+Bundle URLs, `node_modules`, `node:` internals and webpack runtime frames get no link
+rather than a wrong one. Browser errors need uploaded source maps to show file links.
+
+## Follow-ups (not built)
+
+- **Open fix PR**: propose a code fix for an error as a pull request on a `traceiq/fix-…`
+  branch, built on the same client (branch, commit, PR, never the default branch). Out of
+  scope for now.
+- GitHub Enterprise Server hosts for the URL shortcut and links.
+- Linking frames for apps whose stack paths have no recognisable anchor (for example a Docker
+  image at `/app/dist/...`), using the source map's `sourceRoot` or a configurable path prefix.

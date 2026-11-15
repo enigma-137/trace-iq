@@ -1,8 +1,9 @@
-import { ConflictException, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { DatabaseService } from '../../../../database/database.service';
 import { DashboardUser } from '../../../auth/auth.service';
 import { GitHubApiError, GitHubAppClient, GitHubPullRequest, GitHubRepo } from '../github-app.client';
 import { GitHubService, dashboardUrl, toHttpError } from '../github.service';
+import { parseRepoUrl, subdirectoryFromTreePath } from '../repo-url';
 import { SETUP_BRANCH, SetupGenerationError, SetupPlan, generateSetup } from './setup-generator';
 import { DetectedApp, Detection, RepoSnapshot, detectStack } from './stack-detection';
 
@@ -121,6 +122,35 @@ export class GitHubSetupService {
       this.logger.warn(`Setup PR failed for project ${project.id}: ${error instanceof Error ? error.name : 'unknown error'}`);
       throw toHttpError(error);
     }
+  }
+
+  /**
+   * Shortcut for organizations that already installed the app: paste a repository URL
+   * (optionally a /tree/<default-branch>/<folder> link), and TraceIQ links it to the
+   * project and opens the setup PR in one step. `subdirectory` overrides the URL's folder.
+   */
+  async createFromUrl(user: DashboardUser, projectId: string, body: { repoUrl?: unknown; subdirectory?: unknown }) {
+    const parsed = parseRepoUrl(body?.repoUrl);
+    if (!parsed) {
+      throw new BadRequestException({ code: 'GITHUB_REPO_URL_INVALID', message: 'Paste a GitHub repository URL, like https://github.com/acme/web.' });
+    }
+    const installation = await this.githubService.requireLinkedInstallation(user, projectId);
+    let repo: GitHubRepo;
+    try {
+      repo = await this.github.getRepo(Number(installation.installationId), parsed.fullName);
+    } catch (error) {
+      if (error instanceof GitHubApiError && error.status === 404) {
+        throw new NotFoundException({
+          code: 'GITHUB_REPO_NOT_VISIBLE',
+          message: `The TraceIQ app cannot see ${parsed.fullName}. Add it to the app’s repositories on GitHub, or check the URL.`,
+          manageUrl: installation.manageUrl
+        });
+      }
+      throw toHttpError(error);
+    }
+    const subdirectory = typeof body?.subdirectory === 'string' ? body.subdirectory : subdirectoryFromTreePath(parsed.treePath, repo.defaultBranch);
+    await this.githubService.linkProjectRepo(user, projectId, { repoFullName: repo.fullName, subdirectory });
+    return this.createSetupPullRequest(user, projectId);
   }
 
   private async plan(
