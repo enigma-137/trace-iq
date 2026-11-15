@@ -39,6 +39,7 @@ import { SyntheticMonitoringModule } from './modules/synthetic-monitoring/synthe
 import { SetupVerificationsModule } from './modules/setup-verifications/setup-verifications.module';
 import { StatusModule } from './modules/status/status.module';
 import { AccountLifecycleModule } from './modules/account-lifecycle/account-lifecycle.module';
+import { LinearModule } from './modules/integrations/linear/linear.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { ObservabilityInterceptor } from './common/interceptors/observability.interceptor';
@@ -90,7 +91,8 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     AdminModule,
     FeedbackModule,
     StatusModule,
-    AccountLifecycleModule
+    AccountLifecycleModule,
+    LinearModule
   ],
   controllers: [AppController],
   providers: [
