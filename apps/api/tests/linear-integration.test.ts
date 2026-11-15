@@ -391,6 +391,21 @@ describe('Linear integration', () => {
       expect(settings).toMatchObject({ projectId: 'proj_1', workspaceId: 'ws_1', teamId: 'team_1', teamName: 'Engineering', teamKey: 'ENG', labelId: 'lbl_1', labelName: 'Bug' });
     });
 
+    it('saves the auto-create rule when sent, and keeps it when omitted', async () => {
+      connection = makeConnection();
+      linearHas();
+      await service.saveProjectSettings(owner, 'proj_1', { teamId: 'team_1', autoCreate: { enabled: true, minOccurrences: 25, minUsers: null } });
+      const [withRule] = db.queryCalls('INSERT INTO linear_project_settings');
+      expect(withRule.values.slice(8)).toEqual([true, true, 25, null]);
+
+      await service.saveProjectSettings(owner, 'proj_1', { teamId: 'team_1' });
+      const [, withoutRule] = db.queryCalls('INSERT INTO linear_project_settings');
+      expect(withoutRule.values.slice(8)).toEqual([false, null, null, null]);
+      expect(withoutRule.text).toContain('CASE WHEN $9 THEN EXCLUDED.auto_create_linear_issues ELSE s.auto_create_linear_issues END');
+
+      await expect(service.saveProjectSettings(owner, 'proj_1', { teamId: 'team_1', autoCreate: { enabled: true } })).rejects.toThrow(/threshold/);
+    });
+
     it('rejects unknown teams and labels', async () => {
       connection = makeConnection();
       linearHas();

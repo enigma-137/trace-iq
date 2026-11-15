@@ -27,6 +27,9 @@ export interface LinearProjectSettings {
   teamKey: string | null;
   labelId: string | null;
   labelName: string | null;
+  autoCreate?: boolean;
+  autoCreateMinOccurrences?: number | null;
+  autoCreateMinUsers?: number | null;
 }
 
 export interface LinearStatusResponse {
@@ -117,4 +120,67 @@ export function statusLabel(status: LinearConnectionStatus): { tone: 'success' |
   if (status === 'active') return { tone: 'success', text: 'Connected' };
   if (status === 'needs_reconnect') return { tone: 'warning', text: 'Needs reconnect' };
   return { tone: 'neutral', text: 'Not connected' };
+}
+
+/** The auto-create form as typed: thresholds stay strings until saved. */
+export interface AutoCreateDraft {
+  enabled: boolean;
+  minOccurrences: string;
+  minUsers: string;
+}
+
+export interface AutoCreateRule {
+  enabled: boolean;
+  minOccurrences: number | null;
+  minUsers: number | null;
+}
+
+export const MAX_AUTO_CREATE_THRESHOLD = 1_000_000;
+
+export function autoCreateDraft(settings?: LinearProjectSettings | null): AutoCreateDraft {
+  return {
+    enabled: settings?.autoCreate ?? false,
+    minOccurrences: settings?.autoCreateMinOccurrences ? String(settings.autoCreateMinOccurrences) : '',
+    minUsers: settings?.autoCreateMinUsers ? String(settings.autoCreateMinUsers) : ''
+  };
+}
+
+/** Checks the form the same way the API does, so mistakes show before saving. */
+export function parseAutoCreateDraft(draft: AutoCreateDraft): { rule: AutoCreateRule } | { error: string } {
+  const parse = (raw: string, label: string): number | null | string => {
+    const value = raw.trim();
+    if (!value) return null;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_AUTO_CREATE_THRESHOLD) {
+      return `${label} must be a whole number from 1 to ${MAX_AUTO_CREATE_THRESHOLD.toLocaleString('en-US')}.`;
+    }
+    return parsed;
+  };
+  const minOccurrences = parse(draft.minOccurrences, 'Occurrences');
+  if (typeof minOccurrences === 'string') return { error: minOccurrences };
+  const minUsers = parse(draft.minUsers, 'Affected users');
+  if (typeof minUsers === 'string') return { error: minUsers };
+  if (draft.enabled && minOccurrences === null && minUsers === null) {
+    return { error: 'Set an occurrences or affected users threshold to turn on auto-create.' };
+  }
+  return { rule: { enabled: draft.enabled, minOccurrences, minUsers } };
+}
+
+export function sameAutoCreate(draft: AutoCreateDraft, settings?: LinearProjectSettings | null): boolean {
+  const saved = autoCreateDraft(settings);
+  return draft.enabled === saved.enabled && draft.minOccurrences.trim() === saved.minOccurrences && draft.minUsers.trim() === saved.minUsers;
+}
+
+/** "Synced from Linear" note for an error whose status a Linear webhook last changed. */
+export function linearSyncNote(
+  statusSource: string | null | undefined,
+  status: string,
+  identifier?: string | null
+): string | null {
+  if (statusSource !== 'linear') return null;
+  const issue = identifier ? ` ${identifier}` : '';
+  if (status === 'resolved') return `Resolved because Linear issue${issue} was closed. Synced from Linear.`;
+  // A regression comes from new occurrences, not from Linear, so it gets no note.
+  if (status === 'open') return `Reopened because Linear issue${issue} was reopened. Synced from Linear.`;
+  return null;
 }

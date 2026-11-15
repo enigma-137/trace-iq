@@ -11,6 +11,11 @@ import { LinearProjectSettings, LinearService, dashboardUrl, toHttpError } from 
 /** How far back the counts in the issue description look. */
 export const LINEAR_ISSUE_WINDOW_DAYS = 90;
 
+/** A claim older than this is treated as abandoned. Longer than any Linear request. */
+const CLAIM_TTL_SECONDS = 300;
+
+type CreateResult = { linearIssue: ErrorLinearIssue; created: boolean };
+
 export type ErrorLinearIssue = {
   linearIssueId: string;
   identifier: string;
@@ -37,14 +42,26 @@ export class LinearIssuesService {
 
   /**
    * Creates a Linear issue for the error issue `issueId` (its fingerprint) in the
-   * project's default team. Idempotent: an existing link is returned instead, and a
-   * per-issue lock stops two quick clicks from creating two Linear issues.
+   * project's default team, for a signed-in person. Idempotent: an existing link is
+   * returned instead of a second issue.
    */
-  async createForError(user: DashboardUser, issueId: string, projectId?: string): Promise<{ linearIssue: ErrorLinearIssue; created: boolean }> {
+  async createForError(user: DashboardUser, issueId: string, projectId?: string): Promise<CreateResult> {
     const project = await this.projects.requireWritableProject(user, projectId);
     const id = typeof issueId === 'string' ? issueId.trim() : '';
     if (!id || id.length > 200) throw new BadRequestException('id is required.');
+    return this.createLinked(project, id, { actorUserId: user.id, via: 'manual' });
+  }
 
+  /**
+   * Shared by the button and auto-create. Only one caller at a time (across requests
+   * and API instances) talks to Linear for an error: it holds a claim row, so no
+   * database connection or lock is held while Linear responds.
+   */
+  async createLinked(
+    project: { id: string; organizationId: string },
+    id: string,
+    options: { actorUserId: string | null; via: 'manual' | 'auto' }
+  ): Promise<CreateResult> {
     const existing = await this.findLink(this.database, project.id, id);
     if (existing) return { linearIssue: existing, created: false };
 
@@ -61,39 +78,47 @@ export class LinearIssuesService {
       });
     }
 
-    const detail = await this.errors.getIssue(user, { id, days: String(LINEAR_ISSUE_WINDOW_DAYS), projectId: project.id });
+    const detail = await this.errors.issueDetail(project, { id, days: String(LINEAR_ISSUE_WINDOW_DAYS) });
     if (!detail.totals?.occurrences) throw new NotFoundException('Error issue not found.');
-    const latest = detail.samples[0];
-    const environment = await this.latestEnvironment(project.id, id);
 
-    const title = buildLinearIssueTitle(detail.issue.type, detail.issue.message);
-    const description = buildLinearIssueDescription({
-      issueId: id,
-      projectId: project.id,
-      type: detail.issue.type,
-      message: detail.issue.message,
-      stack: latest?.symbolicated?.stack ?? latest?.stack ?? null,
-      occurrences: detail.totals.occurrences,
-      users: detail.totals.users,
-      firstSeen: detail.totals.firstSeen || null,
-      lastSeen: detail.totals.lastSeen || null,
-      environment,
-      release: detail.totals.lastRelease ?? null,
-      days: LINEAR_ISSUE_WINDOW_DAYS,
-      dashboardBaseUrl: dashboardUrl()
-    });
-
-    return this.database.transaction(async (client) => {
-      // Serialises creation per error issue across requests and API instances.
-      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`linear-issue:${project.id}:${id}`]);
-      const raced = await this.findLink(client, project.id, id);
+    if (!(await this.claim(project.id, id))) {
+      // Someone else is creating it right now; return their link if it just landed.
+      const raced = await this.findLink(this.database, project.id, id);
       if (raced) return { linearIssue: raced, created: false };
+      throw new ConflictException({
+        code: 'LINEAR_ISSUE_IN_PROGRESS',
+        message: 'A Linear issue is already being created for this error. Try again in a moment.'
+      });
+    }
+
+    try {
+      // A request that held the claim before us may have finished in between.
+      const raced = await this.findLink(this.database, project.id, id);
+      if (raced) return { linearIssue: raced, created: false };
+
+      const latest = detail.samples[0];
+      const environment = await this.latestEnvironment(project.id, id);
+      const description = buildLinearIssueDescription({
+        issueId: id,
+        projectId: project.id,
+        type: detail.issue.type,
+        message: detail.issue.message,
+        stack: latest?.symbolicated?.stack ?? latest?.stack ?? null,
+        occurrences: detail.totals.occurrences,
+        users: detail.totals.users,
+        firstSeen: detail.totals.firstSeen || null,
+        lastSeen: detail.totals.lastSeen || null,
+        environment,
+        release: detail.totals.lastRelease ?? null,
+        days: LINEAR_ISSUE_WINDOW_DAYS,
+        dashboardBaseUrl: dashboardUrl()
+      });
 
       let issue;
       try {
         issue = await this.linear.createIssue(connection, {
           teamId: team.teamId,
-          title,
+          title: buildLinearIssueTitle(detail.issue.type, detail.issue.message),
           description,
           labelIds: team.labelId ? [team.labelId] : []
         });
@@ -101,15 +126,39 @@ export class LinearIssuesService {
         throw toHttpError(error);
       }
 
-      const saved = await client.query<ErrorLinearIssue>(
+      const saved = await this.database.query<ErrorLinearIssue>(
         `INSERT INTO error_linear_issues
-           (project_id, fingerprint, workspace_id, linear_issue_id, identifier, url, team_id, created_by_user_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           (project_id, fingerprint, workspace_id, linear_issue_id, identifier, url, team_id, created_by_user_id, created_via)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (project_id, fingerprint) DO NOTHING
          RETURNING ${LINK_COLUMNS}`,
-        [project.id, id, connection.workspaceId, issue.id, issue.identifier, issue.url, team.teamId, user.id]
+        [project.id, id, connection.workspaceId, issue.id, issue.identifier, issue.url, team.teamId, options.actorUserId, options.via]
       );
-      return { linearIssue: saved.rows[0], created: true };
-    });
+      if (saved.rows[0]) return { linearIssue: saved.rows[0], created: true };
+      // Only reachable if a claim expired mid-request; keep the first link.
+      const kept = await this.findLink(this.database, project.id, id);
+      return { linearIssue: kept!, created: false };
+    } finally {
+      await this.release(project.id, id);
+    }
+  }
+
+  /** True when this caller now holds the claim. Abandoned claims expire after a few minutes. */
+  private async claim(projectId: string, fingerprint: string): Promise<boolean> {
+    const result = await this.database.query(
+      `INSERT INTO error_linear_issue_claims (project_id, fingerprint) VALUES ($1, $2)
+       ON CONFLICT (project_id, fingerprint) DO UPDATE SET claimed_at = now()
+       WHERE error_linear_issue_claims.claimed_at < now() - make_interval(secs => $3::int)
+       RETURNING claimed_at`,
+      [projectId, fingerprint, CLAIM_TTL_SECONDS]
+    );
+    return (result.rowCount ?? result.rows.length) > 0;
+  }
+
+  private async release(projectId: string, fingerprint: string): Promise<void> {
+    await this.database
+      .query(`DELETE FROM error_linear_issue_claims WHERE project_id = $1 AND fingerprint = $2`, [projectId, fingerprint])
+      .catch(() => undefined);
   }
 
   private async findLink(

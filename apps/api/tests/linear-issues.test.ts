@@ -100,7 +100,8 @@ describe('LinearIssuesService', () => {
   let linkAfterLock: Record<string, unknown> | null;
   let service: LinearIssuesService;
   const projects = { requireWritableProject: vi.fn(), requireActiveProject: vi.fn() };
-  const errors = { getIssue: vi.fn() };
+  const errors = { issueDetail: vi.fn() };
+  let claimHeld: boolean;
 
   const detail = {
     issue: { id: 'fp_1', type: 'TypeError', message: 'boom' },
@@ -125,10 +126,11 @@ describe('LinearIssuesService', () => {
     link = null;
     linkAfterLock = null;
     let locked = false;
+    claimHeld = false;
     db = mockDatabase((text, values) => {
-      if (text.includes('pg_advisory_xact_lock')) {
+      if (text.includes('INSERT INTO error_linear_issue_claims')) {
         locked = true;
-        return empty();
+        return claimHeld ? empty() : rows([{ claimed_at: '2026-11-15T00:00:00Z' }]);
       }
       if (text.includes('FROM error_linear_issues')) {
         const found = locked ? linkAfterLock ?? link : link;
@@ -143,7 +145,7 @@ describe('LinearIssuesService', () => {
       return empty();
     });
     projects.requireWritableProject.mockReset().mockResolvedValue({ id: 'proj_1', organizationId: 'org_1', role: 'member' });
-    errors.getIssue.mockReset().mockResolvedValue(detail);
+    errors.issueDetail.mockReset().mockResolvedValue(detail);
     const client = new LinearClient(db as never, cipher);
     const linearService = new LinearService(db as never, projects as never, client, cipher);
     service = new LinearIssuesService(db as never, projects as never, errors as never, linearService, client);
@@ -171,11 +173,14 @@ describe('LinearIssuesService', () => {
     expect(variables.input.description).not.toContain('minified stack');
     expect(variables.input.description).toContain('| Environment | `production` |');
     expect(variables.input.description).toContain('| Release | `1.2.0` |');
-    expect(errors.getIssue).toHaveBeenCalledWith(user, { id: 'fp_1', days: '90', projectId: 'proj_1' });
+    expect(errors.issueDetail).toHaveBeenCalledWith(expect.objectContaining({ id: 'proj_1' }), { id: 'fp_1', days: '90' });
 
     const insert = db.queryCalls('INSERT INTO error_linear_issues')[0];
-    expect(insert.values).toEqual(['proj_1', 'fp_1', 'ws_1', 'iss_1', 'ENG-123', 'https://linear.app/acme/issue/ENG-123', 'team_1', 'usr_1']);
-    expect(db.queryCalls('pg_advisory_xact_lock')[0].values).toEqual(['linear-issue:proj_1:fp_1']);
+    expect(insert.values).toEqual(['proj_1', 'fp_1', 'ws_1', 'iss_1', 'ENG-123', 'https://linear.app/acme/issue/ENG-123', 'team_1', 'usr_1', 'manual']);
+    // The claim is taken before Linear is called and released afterwards.
+    expect(db.queryCalls('INSERT INTO error_linear_issue_claims')[0].values).toEqual(['proj_1', 'fp_1', 300]);
+    expect(db.queryCalls('DELETE FROM error_linear_issue_claims')[0].values).toEqual(['proj_1', 'fp_1']);
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 
   it('omits labels when the project has none', async () => {
@@ -194,11 +199,32 @@ describe('LinearIssuesService', () => {
     expect(db.queryCalls('INSERT INTO error_linear_issues')).toHaveLength(0);
   });
 
-  it('returns the link another request created while this one waited for the lock', async () => {
+  it('returns the link another request finished just before this one took the claim', async () => {
     linkAfterLock = { linearIssueId: 'iss_9', identifier: 'ENG-9', url: 'https://linear.app/y', createdAt: '2026-11-15T00:00:00Z' };
     const result = await service.createForError(user, 'fp_1', 'proj_1');
     expect(result).toEqual({ created: false, linearIssue: linkAfterLock });
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(db.queryCalls('DELETE FROM error_linear_issue_claims')).toHaveLength(1);
+  });
+
+  it('reports in-progress when another request holds the claim', async () => {
+    claimHeld = true;
+    await expect(service.createForError(user, 'fp_1', 'proj_1')).rejects.toMatchObject({ response: { code: 'LINEAR_ISSUE_IN_PROGRESS' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Not ours, so not released.
+    expect(db.queryCalls('DELETE FROM error_linear_issue_claims')).toHaveLength(0);
+  });
+
+  it('returns the other request’s link when the claim is held and it has landed', async () => {
+    claimHeld = true;
+    linkAfterLock = { linearIssueId: 'iss_9', identifier: 'ENG-9', url: 'https://linear.app/y', createdAt: '2026-11-15T00:00:00Z' };
+    await expect(service.createForError(user, 'fp_1', 'proj_1')).resolves.toEqual({ created: false, linearIssue: linkAfterLock });
+  });
+
+  it('releases the claim when Linear fails', async () => {
+    fetchMock.mockRejectedValue(new Error('network down'));
+    await expect(service.createForError(user, 'fp_1', 'proj_1')).rejects.toMatchObject({ response: { code: 'LINEAR_ERROR' } });
+    expect(db.queryCalls('DELETE FROM error_linear_issue_claims')).toHaveLength(1);
   });
 
   it('reports when Linear is not connected, needs reconnecting, or has no default team', async () => {
@@ -230,7 +256,7 @@ describe('LinearIssuesService', () => {
   });
 
   it('refuses unknown error issues and bad ids', async () => {
-    errors.getIssue.mockResolvedValue({ ...detail, totals: { ...detail.totals, occurrences: 0 }, samples: [] });
+    errors.issueDetail.mockResolvedValue({ ...detail, totals: { ...detail.totals, occurrences: 0 }, samples: [] });
     await expect(service.createForError(user, 'fp_missing', 'proj_1')).rejects.toThrow('Error issue not found.');
     await expect(service.createForError(user, '  ', 'proj_1')).rejects.toThrow('id is required.');
     expect(fetchMock).not.toHaveBeenCalled();

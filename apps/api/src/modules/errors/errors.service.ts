@@ -67,7 +67,13 @@ export type ErrorSample = {
   symbolicated?: SymbolicatedStack | null;
 };
 
-type IssueStateRow = { status: StoredIssueStatus; assignee_user_id: string | null; resolved_at: string | null };
+type IssueStateRow = {
+  status: StoredIssueStatus;
+  assignee_user_id: string | null;
+  resolved_at: string | null;
+  /** 'linear' when a Linear webhook last changed the status. */
+  status_source?: string | null;
+};
 
 export interface UpdateIssueRequest {
   projectId?: string;
@@ -229,6 +235,17 @@ export class ErrorsService {
     params: { id?: string; type?: string; message?: string; days?: string; projectId?: string }
   ) {
     const project = await this.projects.requireActiveProject(user, params.projectId);
+    return this.issueDetail(project, params);
+  }
+
+  /**
+   * {@link getIssue} for a project the caller has already resolved. Used by system
+   * work (e.g. Linear auto-create) that has no dashboard user.
+   */
+  async issueDetail<P extends { id: string }>(
+    project: P,
+    params: { id?: string; type?: string; message?: string; days?: string }
+  ) {
     const days = this.clampDays(params.days);
     const id = typeof params.id === 'string' && params.id.trim() ? params.id.trim() : null;
 
@@ -350,6 +367,7 @@ export class ErrorsService {
         status: this.effectiveStatus(state, totals.rows[0]?.lastSeen ?? null),
         assigneeUserId: state?.assignee_user_id ?? null,
         resolvedAt: state?.resolved_at ?? null,
+        statusSource: state?.status_source ?? null,
         regressedInRelease,
         linearIssue
       },
@@ -402,6 +420,8 @@ export class ErrorsService {
           assignee_user_id = EXCLUDED.assignee_user_id,
           resolved_at = EXCLUDED.resolved_at,
           updated_by_user_id = EXCLUDED.updated_by_user_id,
+          -- A person changed it, so it is no longer "synced from Linear".
+          status_source = CASE WHEN EXCLUDED.status IS DISTINCT FROM error_issues.status THEN NULL ELSE error_issues.status_source END,
           updated_at = now()
         RETURNING status, assignee_user_id, resolved_at
       `,
@@ -421,7 +441,7 @@ export class ErrorsService {
 
   private async readState(projectId: string, issueId: string): Promise<IssueStateRow | null> {
     const result = await this.database.query<IssueStateRow>(
-      `SELECT status, assignee_user_id, resolved_at FROM error_issues WHERE project_id = $1 AND fingerprint = $2`,
+      `SELECT status, assignee_user_id, resolved_at, status_source FROM error_issues WHERE project_id = $1 AND fingerprint = $2`,
       [projectId, issueId]
     );
     return result.rows[0] ?? null;

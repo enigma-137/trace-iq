@@ -8,12 +8,14 @@ import { LinearClient } from './linear.client';
 import { LinearController } from './linear.controller';
 import { LinearIssuesController } from './linear-issues.controller';
 import { LinearIssuesService } from './linear-issues.service';
+import { LinearAutoCreateService } from './linear-auto-create.service';
+import { LinearWebhookService } from './linear-webhook.service';
 import { LinearService } from './linear.service';
 
 @Module({
   imports: [AuthModule, ProjectsModule, ErrorsModule],
   controllers: [LinearController, LinearIssuesController],
-  providers: [SyntheticCryptoService, TokenCipher, LinearClient, LinearService, LinearIssuesService],
-  exports: [LinearClient, LinearService, LinearIssuesService]
+  providers: [SyntheticCryptoService, TokenCipher, LinearClient, LinearService, LinearIssuesService, LinearWebhookService, LinearAutoCreateService],
+  exports: [LinearClient, LinearService, LinearIssuesService, LinearAutoCreateService]
 })
 export class LinearModule {}

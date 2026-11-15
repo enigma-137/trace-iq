@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Query, Redirect } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Query, Redirect, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '../../auth/auth.service';
 import { LinearService } from './linear.service';
+import { LinearWebhookService, verifyLinearWebhook } from './linear-webhook.service';
 
 /**
  * Linear integration. Every route except the OAuth callback needs a dashboard
@@ -12,8 +14,28 @@ import { LinearService } from './linear.service';
 export class LinearController {
   constructor(
     private readonly authService: AuthService,
-    private readonly linear: LinearService
+    private readonly linear: LinearService,
+    private readonly webhooks: LinearWebhookService
   ) {}
+
+  /**
+   * Linear posts issue changes here (configured on the OAuth app, signed with
+   * LINEAR_WEBHOOK_SECRET). Unknown or unlinked issues are acknowledged and ignored
+   * so Linear does not retry them.
+   */
+  @Throttle({ default: { limit: 600, ttl: 60_000 } })
+  @Post('webhook')
+  @HttpCode(200)
+  async webhook(
+    @Req() request: Request & { rawBody?: Buffer },
+    @Headers('linear-signature') signature?: string,
+    @Headers('linear-delivery') deliveryId?: string
+  ) {
+    const payload = verifyLinearWebhook(this.webhooks.secret, request.rawBody ?? Buffer.alloc(0), signature);
+    const outcome = await this.webhooks.handle(payload);
+    this.webhooks.logOutcome(outcome, deliveryId);
+    return { ok: true, outcome };
+  }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('connect')
@@ -82,7 +104,7 @@ export class LinearController {
   @Put('projects/:projectId')
   async saveProject(
     @Param('projectId') projectId: string,
-    @Body() body: { teamId?: unknown; labelId?: unknown },
+    @Body() body: { teamId?: unknown; labelId?: unknown; autoCreate?: unknown },
     @Headers('authorization') authorization?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);

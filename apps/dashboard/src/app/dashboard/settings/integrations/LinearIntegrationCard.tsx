@@ -6,7 +6,11 @@ import { readActiveProjectIdFromDocument } from '@/lib/active-project';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import {
+  autoCreateDraft,
   linearReturnMessage,
+  parseAutoCreateDraft,
+  sameAutoCreate,
+  type AutoCreateDraft,
   readLinearReturn,
   statusLabel,
   stripLinearReturn,
@@ -25,7 +29,8 @@ import {
   fieldLabelClass,
   inputClass,
   primaryButton,
-  secondaryButton
+  secondaryButton,
+  Switch
 } from '../SettingsUI';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -42,6 +47,7 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [teamId, setTeamId] = useState('');
   const [labelId, setLabelId] = useState('');
+  const [autoDraft, setAutoDraft] = useState<AutoCreateDraft>(() => autoCreateDraft(null));
   const [labels, setLabels] = useState<LinearLabel[] | null>(null);
   const [labelsError, setLabelsError] = useState<string | null>(null);
   const handledReturn = useRef(false);
@@ -65,6 +71,7 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
       const saved = body.projects?.find((item) => item.projectId === body.project?.id);
       setTeamId(saved?.teamId ?? '');
       setLabelId(saved?.labelId ?? '');
+      setAutoDraft(autoCreateDraft(saved));
     } catch (error) {
       setLoadError(await readApiError(error, 'Could not load the Linear connection.'));
     }
@@ -176,6 +183,8 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
 
   async function saveDefaults() {
     if (!status?.project || !teamId) return;
+    const parsed = parseAutoCreateDraft(autoDraft);
+    if ('error' in parsed) return toast.error(parsed.error, { title: 'Check the auto-create thresholds' });
     setBusy('save');
     try {
       const headers = await authHeaders();
@@ -183,7 +192,7 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
       const response = await fetch(`${LINEAR_API}/projects/${encodeURIComponent(status.project.id)}`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, labelId: labelId || null })
+        body: JSON.stringify({ teamId, labelId: labelId || null, autoCreate: parsed.rule })
       });
       if (!response.ok) return toast.error(await readApiError(response, 'Could not save the Linear defaults.'));
       toast.success(`New issues from ${status.project.name} go to this team.`, { title: 'Linear defaults saved' });
@@ -197,7 +206,11 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
 
   const pill = status ? statusLabel(status.status) : null;
   const saved = status?.projects?.find((item) => item.projectId === status.project?.id);
-  const dirty = teamId !== (saved?.teamId ?? '') || labelId !== (saved?.labelId ?? '');
+  const dirty = teamId !== (saved?.teamId ?? '') || labelId !== (saved?.labelId ?? '') || !sameAutoCreate(autoDraft, saved);
+  const draftError = autoDraft.enabled ? (() => {
+    const parsed = parseAutoCreateDraft(autoDraft);
+    return 'error' in parsed ? parsed.error : null;
+  })() : null;
   const canManage = status?.canManage ?? false;
 
   const headerActions = !status || !status.configured ? null : status.status === 'not_connected' ? (
@@ -275,7 +288,7 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
                 hint="Where “Create Linear issue” puts new issues for this project."
                 actions={
                   canManage ? (
-                    <button type="button" className={secondaryButton} disabled={busy !== null || !teamId || !dirty} onClick={() => void saveDefaults()}>
+                    <button type="button" className={secondaryButton} disabled={busy !== null || !teamId || !dirty || draftError !== null} onClick={() => void saveDefaults()}>
                       {busy === 'save' ? 'Saving…' : 'Save'}
                     </button>
                   ) : null
@@ -322,6 +335,55 @@ export function LinearIntegrationCard({ projectId: projectIdProp }: { projectId?
                 {!saved ? (
                   <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">Choose a team before creating issues from this project.</p>
                 ) : null}
+
+                <div className="mt-4 grid gap-3 rounded-lg border border-neutral-200 p-3 dark:border-slate-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white">Create issues automatically</p>
+                      <p className="mt-0.5 text-xs leading-5 text-neutral-500 dark:text-slate-400">
+                        Off by default. When an error reaches either threshold (last 90 days), TraceIQ creates one Linear issue for it.
+                        Ignored errors and errors that already have an issue are skipped.
+                      </p>
+                    </div>
+                    <Switch
+                      label="Create Linear issues automatically"
+                      checked={autoDraft.enabled}
+                      disabled={!canManage || busy !== null || !teamId}
+                      onChange={(enabled) => setAutoDraft((draft) => ({ ...draft, enabled }))}
+                    />
+                  </div>
+                  {autoDraft.enabled ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className={fieldLabelClass}>
+                        Occurrences at least
+                        <input
+                          className={inputClass}
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          placeholder="e.g. 50"
+                          value={autoDraft.minOccurrences}
+                          disabled={!canManage || busy !== null}
+                          onChange={(event) => setAutoDraft((draft) => ({ ...draft, minOccurrences: event.target.value }))}
+                        />
+                      </label>
+                      <label className={fieldLabelClass}>
+                        Or affected users at least
+                        <input
+                          className={inputClass}
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          placeholder="e.g. 10"
+                          value={autoDraft.minUsers}
+                          disabled={!canManage || busy !== null}
+                          onChange={(event) => setAutoDraft((draft) => ({ ...draft, minUsers: event.target.value }))}
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                  {draftError ? <p className="text-xs text-red-600 dark:text-red-400">{draftError}</p> : null}
+                </div>
               </SettingsRow>
             ) : (
               <SettingsRow label="Project defaults">

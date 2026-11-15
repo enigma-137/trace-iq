@@ -26,7 +26,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { buildErrorFixPrompt } from '@/lib/error-fix-prompt';
 import { toast } from '@/lib/toast';
-import { integrationsSettingsHref, needsLinearSettings, readApiErrorCode, type ErrorLinearIssue } from '@/lib/linear';
+import { integrationsSettingsHref, linearSyncNote, needsLinearSettings, readApiErrorCode, type ErrorLinearIssue } from '@/lib/linear';
 import { LinearIcon } from '@/components/ProviderIcons';
 import { BrandIcon } from '@/components/icons/BrandIcon';
 import { EmptyState } from '@/components/EmptyState';
@@ -83,6 +83,8 @@ export interface IssueDetailData {
     resolvedAt: string | null;
     /** Release of the first occurrence after the issue was resolved, when it regressed. */
     regressedInRelease?: string | null;
+    /** 'linear' when a Linear webhook last changed the status. */
+    statusSource?: string | null;
     /** The Linear issue created for this error issue, if any. */
     linearIssue?: ErrorLinearIssue | null;
   };
@@ -280,6 +282,10 @@ export function ErrorTrackingClientView({
     ? createdLinearIssues[activeIssue.id] ?? (detailMatches ? activeDetail?.issue.linearIssue ?? null : null)
     : null;
   const detailProjectId = activeDetail?.project?.id ?? null;
+  // A status change made here replaces whatever Linear last did.
+  const syncNote = saved || !detailMatches
+    ? null
+    : linearSyncNote(activeDetail?.issue.statusSource, activeStatus, linearIssue?.identifier);
 
   async function createLinearIssue(id: string) {
     setCreatingLinearIssue(true);
@@ -854,6 +860,13 @@ export function ErrorTrackingClientView({
                       )}
                     </div>
                   </div>
+
+                  {syncNote ? (
+                    <p className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-neutral-50 px-2.5 py-1.5 text-xs text-neutral-600 dark:bg-slate-800/60 dark:text-slate-300">
+                      <LinearIcon className="h-3.5 w-3.5 shrink-0" />
+                      {syncNote}
+                    </p>
+                  ) : null}
 
                   {/* Metadata Stats Bar */}
                   <div className="mt-5 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-4 sm:grid-cols-5 dark:border-slate-800/80">

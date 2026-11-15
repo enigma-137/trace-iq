@@ -50,8 +50,20 @@ export type LinearProjectSettings = {
   teamKey: string | null;
   labelId: string | null;
   labelName: string | null;
+  autoCreate: boolean;
+  autoCreateMinOccurrences: number | null;
+  autoCreateMinUsers: number | null;
   updatedAt: string;
 };
+
+export interface AutoCreateInput {
+  enabled?: unknown;
+  minOccurrences?: unknown;
+  minUsers?: unknown;
+}
+
+/** Highest threshold accepted; anything above is a typo rather than a real rule. */
+export const MAX_AUTO_CREATE_THRESHOLD = 1_000_000;
 
 export interface OrganizationScope {
   organizationId?: string;
@@ -88,6 +100,9 @@ const SETTINGS_COLUMNS = `
   s.team_key AS "teamKey",
   s.label_id AS "labelId",
   s.label_name AS "labelName",
+  s.auto_create_linear_issues AS "autoCreate",
+  s.auto_create_min_occurrences AS "autoCreateMinOccurrences",
+  s.auto_create_min_users AS "autoCreateMinUsers",
   s.updated_at AS "updatedAt"
 `;
 
@@ -340,7 +355,11 @@ export class LinearService {
   }
 
   /** Saves the project's default team (and optional label) for new Linear issues. */
-  async saveProjectSettings(user: DashboardUser, projectId: string, body: { teamId?: unknown; labelId?: unknown }) {
+  /**
+   * Saves the project's default team, optional label and, when `autoCreate` is sent,
+   * the auto-create rule. Omitting `autoCreate` keeps the current rule.
+   */
+  async saveProjectSettings(user: DashboardUser, projectId: string, body: { teamId?: unknown; labelId?: unknown; autoCreate?: unknown }) {
     this.requireInteractive(user);
     const project = await this.projects.requireWritableProject(user, projectId);
     this.requireManager(project.role);
@@ -351,6 +370,7 @@ export class LinearService {
       ? null
       : typeof body.labelId === 'string' ? body.labelId.trim() : undefined;
     if (labelId === undefined) throw new BadRequestException('labelId must be a string or null.');
+    const autoCreate = body?.autoCreate === undefined ? null : parseAutoCreate(body.autoCreate);
 
     const connection = await this.requireActiveConnection(project.organizationId);
     // Validate against Linear so the project never stores an id from another workspace.
@@ -367,8 +387,9 @@ export class LinearService {
 
     const saved = await this.database.query<LinearProjectSettings>(
       `INSERT INTO linear_project_settings AS s
-         (project_id, workspace_id, team_id, team_name, team_key, label_id, label_name, updated_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (project_id, workspace_id, team_id, team_name, team_key, label_id, label_name, updated_by_user_id,
+          auto_create_linear_issues, auto_create_min_occurrences, auto_create_min_users)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($10::boolean, false), $11, $12)
        ON CONFLICT (project_id) DO UPDATE SET
          workspace_id = EXCLUDED.workspace_id,
          team_id = EXCLUDED.team_id,
@@ -377,9 +398,16 @@ export class LinearService {
          label_id = EXCLUDED.label_id,
          label_name = EXCLUDED.label_name,
          updated_by_user_id = EXCLUDED.updated_by_user_id,
+         -- $9: whether this request set the auto-create rule.
+         auto_create_linear_issues = CASE WHEN $9 THEN EXCLUDED.auto_create_linear_issues ELSE s.auto_create_linear_issues END,
+         auto_create_min_occurrences = CASE WHEN $9 THEN EXCLUDED.auto_create_min_occurrences ELSE s.auto_create_min_occurrences END,
+         auto_create_min_users = CASE WHEN $9 THEN EXCLUDED.auto_create_min_users ELSE s.auto_create_min_users END,
          updated_at = now()
        RETURNING ${SETTINGS_COLUMNS}`,
-      [project.id, connection.workspaceId, team.id, team.name, team.key, label?.id ?? null, label?.name ?? null, user.id]
+      [
+        project.id, connection.workspaceId, team.id, team.name, team.key, label?.id ?? null, label?.name ?? null, user.id,
+        autoCreate !== null, autoCreate?.enabled ?? null, autoCreate?.minOccurrences ?? null, autoCreate?.minUsers ?? null
+      ]
     );
     return { settings: saved.rows[0] };
   }
@@ -468,6 +496,27 @@ export class LinearService {
   private stateKey() {
     return deriveStateKey(this.linear.stateSecret, STATE_PURPOSE);
   }
+}
+
+/** Validates the auto-create rule: off, or on with at least one positive whole-number threshold. */
+export function parseAutoCreate(value: unknown): { enabled: boolean; minOccurrences: number | null; minUsers: number | null } {
+  if (!value || typeof value !== 'object') throw new BadRequestException('autoCreate must be an object.');
+  const input = value as AutoCreateInput;
+  if (typeof input.enabled !== 'boolean') throw new BadRequestException('autoCreate.enabled must be true or false.');
+  const threshold = (raw: unknown, name: string) => {
+    if (raw === undefined || raw === null || raw === '') return null;
+    const parsed = typeof raw === 'string' ? Number(raw) : raw;
+    if (typeof parsed !== 'number' || !Number.isInteger(parsed) || parsed < 1 || parsed > MAX_AUTO_CREATE_THRESHOLD) {
+      throw new BadRequestException(`autoCreate.${name} must be a whole number from 1 to ${MAX_AUTO_CREATE_THRESHOLD.toLocaleString('en-US')}.`);
+    }
+    return parsed;
+  };
+  const minOccurrences = threshold(input.minOccurrences, 'minOccurrences');
+  const minUsers = threshold(input.minUsers, 'minUsers');
+  if (input.enabled && minOccurrences === null && minUsers === null) {
+    throw new BadRequestException('Set an occurrences or affected users threshold to turn on auto-create.');
+  }
+  return { enabled: input.enabled, minOccurrences, minUsers };
 }
 
 /**

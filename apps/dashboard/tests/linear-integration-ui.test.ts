@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  autoCreateDraft,
   integrationsSettingsHref,
+  linearSyncNote,
+  parseAutoCreateDraft,
+  sameAutoCreate,
   linearReturnMessage,
   needsLinearSettings,
   readApiErrorCode,
@@ -110,5 +114,60 @@ describe('Create Linear issue button', () => {
     expect(view).toContain('needsLinearSettings(code)');
     expect(view).toContain('router.push(integrationsSettingsHref(detailProjectId))');
     expect(view).toContain("creatingLinearIssue ? 'Creating…' : 'Create Linear issue'");
+  });
+});
+
+describe('auto-create settings', () => {
+  const saved = {
+    projectId: 'p', teamId: 't', teamName: null, teamKey: null, labelId: null, labelName: null,
+    autoCreate: true, autoCreateMinOccurrences: 50, autoCreateMinUsers: null
+  };
+
+  it('starts off by default and loads a saved rule', () => {
+    expect(autoCreateDraft(null)).toEqual({ enabled: false, minOccurrences: '', minUsers: '' });
+    expect(autoCreateDraft(saved)).toEqual({ enabled: true, minOccurrences: '50', minUsers: '' });
+  });
+
+  it('validates thresholds like the API', () => {
+    expect(parseAutoCreateDraft({ enabled: true, minOccurrences: '50', minUsers: '' })).toEqual({ rule: { enabled: true, minOccurrences: 50, minUsers: null } });
+    expect(parseAutoCreateDraft({ enabled: true, minOccurrences: '', minUsers: ' 5 ' })).toEqual({ rule: { enabled: true, minOccurrences: null, minUsers: 5 } });
+    expect(parseAutoCreateDraft({ enabled: false, minOccurrences: '', minUsers: '' })).toEqual({ rule: { enabled: false, minOccurrences: null, minUsers: null } });
+    expect(parseAutoCreateDraft({ enabled: true, minOccurrences: '', minUsers: '' })).toHaveProperty('error');
+    expect(parseAutoCreateDraft({ enabled: true, minOccurrences: '0', minUsers: '' })).toHaveProperty('error');
+    expect(parseAutoCreateDraft({ enabled: true, minOccurrences: '1.5', minUsers: '' })).toHaveProperty('error');
+    expect(parseAutoCreateDraft({ enabled: true, minOccurrences: '', minUsers: '2000000' })).toHaveProperty('error');
+  });
+
+  it('knows when the form differs from what is saved', () => {
+    expect(sameAutoCreate({ enabled: true, minOccurrences: '50', minUsers: '' }, saved)).toBe(true);
+    expect(sameAutoCreate({ enabled: true, minOccurrences: '60', minUsers: '' }, saved)).toBe(false);
+    expect(sameAutoCreate({ enabled: false, minOccurrences: '', minUsers: '' }, null)).toBe(true);
+  });
+
+  it('is in the Linear card and saved with the defaults', () => {
+    const card = read('app/dashboard/settings/integrations/LinearIntegrationCard.tsx');
+    expect(card).toContain('Create issues automatically');
+    expect(card).toContain('autoCreate: parsed.rule');
+    expect(card).toContain('Off by default.');
+  });
+});
+
+describe('synced from Linear note', () => {
+  it('explains resolves and reopens that came from Linear', () => {
+    expect(linearSyncNote('linear', 'resolved', 'ENG-1')).toBe('Resolved because Linear issue ENG-1 was closed. Synced from Linear.');
+    expect(linearSyncNote('linear', 'open', 'ENG-1')).toBe('Reopened because Linear issue ENG-1 was reopened. Synced from Linear.');
+    expect(linearSyncNote('linear', 'resolved', null)).toBe('Resolved because Linear issue was closed. Synced from Linear.');
+  });
+
+  it('says nothing for changes made in TraceIQ or for regressions', () => {
+    expect(linearSyncNote(null, 'resolved', 'ENG-1')).toBeNull();
+    expect(linearSyncNote('linear', 'regressed', 'ENG-1')).toBeNull();
+    expect(linearSyncNote('linear', 'ignored', 'ENG-1')).toBeNull();
+  });
+
+  it('is shown on the error page until someone changes the status here', () => {
+    const view = read('app/dashboard/errors/ErrorTrackingClientView.tsx');
+    expect(view).toContain('const syncNote = saved || !detailMatches');
+    expect(view).toContain('{syncNote}');
   });
 });
