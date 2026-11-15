@@ -112,7 +112,7 @@ describe('server stacks', () => {
   it('sets the endpoint explicitly, since the SDKs default to localhost', () => {
     for (const id of ['node', 'python', 'php', 'rust'] as const) {
       const text = prompt(id);
-      expect(text).toContain(`TRACEIQ_ENDPOINT (${API})`);
+      expect(text).toContain(`TRACEIQ_API_URL (${API})`);
       expect(text).toContain('TRACEIQ_WRITE_KEY');
     }
   });

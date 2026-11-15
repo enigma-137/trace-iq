@@ -19,7 +19,7 @@ describe('revenue setup prompt', () => {
 
   it('always sets the endpoint, since the SDKs default to localhost', () => {
     for (const { id } of REVENUE_BACKENDS) {
-      expect(buildRevenueSetupPrompt({ backend: id })).toContain('TRACEIQ_ENDPOINT (https://api.traceiq.run)');
+      expect(buildRevenueSetupPrompt({ backend: id })).toContain('TRACEIQ_API_URL (https://api.traceiq.run)');
     }
   });
 
