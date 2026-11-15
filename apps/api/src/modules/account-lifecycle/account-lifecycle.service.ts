@@ -439,6 +439,11 @@ export class AccountLifecycleService implements OnApplicationBootstrap, OnApplic
             await client.query('DELETE FROM personal_access_tokens WHERE user_id = $1', [request.target_id]);
             // Feedback keeps the sender's email, so it goes with the account.
             await client.query('DELETE FROM feedback WHERE user_id = $1', [request.target_id]);
+            // Admin growth stats keep the email too.
+            await client.query('DELETE FROM dashboard_sign_ins WHERE user_id = $1', [request.target_id]);
+            await client.query('DELETE FROM dashboard_user_activity WHERE user_id = $1', [request.target_id]);
+            await client.query('DELETE FROM dashboard_user_last_seen WHERE user_id = $1', [request.target_id]);
+            this.auth.forgetUserActivity(request.target_id);
             await client.query(
               `UPDATE account_lifecycle_requests SET status = 'completed', completed_at = now(), last_error = NULL WHERE id = $1`,
               [request.id]

@@ -68,6 +68,29 @@ export interface AdminActivation {
   stalled: Array<{ id: string; name: string; createdAt: string; stage: 'no_project' | 'no_events' }>;
 }
 
+export interface AdminGrowthLabelCount {
+  label: string;
+  total: number;
+}
+
+export interface AdminGrowth {
+  rangeDays: number;
+  daily: Array<{ day: string; visitors: number; pageviews: number; signUps: number; signIns: number; activeUsers: number }>;
+  totals: { visitors: number; pageviews: number; signUps: number; signIns: number; conversionRate: number | null };
+  active: { dau: number; wau: number; mau: number };
+  accounts: { total: number; confirmed: number } | null;
+  topPages: AdminGrowthLabelCount[];
+  topSources: AdminGrowthLabelCount[];
+  devices: AdminGrowthLabelCount[];
+  signUpMethods: AdminGrowthLabelCount[];
+  signInMethods: AdminGrowthLabelCount[];
+  recentSignUps: Array<{ email: string | null; provider: string | null; createdAt: string; confirmed: boolean }>;
+  recentSignIns: Array<{ email: string | null; method: string | null; signedInAt: string }>;
+  recentlyActive: Array<{ email: string | null; lastSeenAt: string }>;
+}
+
+export const GROWTH_RANGES = [7, 30, 90] as const;
+
 export interface AdminAccess {
   isAdmin: boolean;
   activation?: AdminActivation | null;
@@ -76,6 +99,7 @@ export interface AdminAccess {
   projects?: AdminProject[];
   logs?: AdminLogEntry[];
   timeline?: AdminTimelinePoint[];
+  growth?: AdminGrowth | null;
 }
 
 /**
@@ -84,17 +108,18 @@ export interface AdminAccess {
  * to login; authenticated non-admins get `isAdmin: false` so the /admin page can
  * render a clean denial screen (no hint that the console exists).
  */
-export async function requireAdminAccess(nextPath = '/admin'): Promise<AdminAccess> {
+export async function requireAdminAccess(nextPath = '/admin', growthDays = 30): Promise<AdminAccess> {
   const { token } = await requireDashboardSession(nextPath);
 
-  const [overview, organizations, projects, logs, timeline, activation] = await Promise.all([
+  const [overview, organizations, projects, logs, timeline, activation, growth] = await Promise.all([
     dashboardGet<AdminOverview>('/v1/admin/overview', token),
     dashboardGet<AdminOrganization[]>('/v1/admin/organizations', token),
     dashboardGet<AdminProject[]>('/v1/admin/projects', token),
     dashboardGet<AdminLogEntry[]>('/v1/admin/logs', token),
     dashboardGet<AdminTimelinePoint[]>('/v1/admin/timeline', token),
     // Newer than the other admin endpoints: an API that predates it just hides the section.
-    dashboardGet<AdminActivation>('/v1/admin/activation', token)
+    dashboardGet<AdminActivation>('/v1/admin/activation', token),
+    dashboardGet<AdminGrowth>(`/v1/admin/growth?days=${growthDays}`, token)
   ]);
 
   if (!overview.data) {
@@ -108,7 +133,8 @@ export async function requireAdminAccess(nextPath = '/admin'): Promise<AdminAcce
     projects: projects.data ?? [],
     logs: logs.data ?? [],
     timeline: timeline.data ?? [],
-    activation: activation.data ?? null
+    activation: activation.data ?? null,
+    growth: growth.data ?? null
   };
 }
 
