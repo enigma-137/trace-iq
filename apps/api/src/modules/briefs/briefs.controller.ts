@@ -39,10 +39,13 @@ export class BriefsController {
   }
 
   @Post('dashboard/briefs/slack/link')
-  async slackLink(@Body() body: { projectId?: string; timezone?: unknown }, @Headers('authorization') authorization?: string) {
+  async slackLink(
+    @Body() body: { projectId?: string; timezone?: unknown; returnTo?: unknown },
+    @Headers('authorization') authorization?: string
+  ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'analytics:write');
-    return this.briefs.createSlackLink(user, body?.projectId, body?.timezone);
+    return this.briefs.createSlackLink(user, body?.projectId, body?.timezone, body?.returnTo);
   }
 
   /** Slack sends the browser here after the person picks a channel; we send it on to the dashboard. */

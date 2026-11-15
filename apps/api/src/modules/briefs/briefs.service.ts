@@ -94,6 +94,29 @@ const CHANNEL_COLUMNS = `
 
 const dashboardUrl = () => (process.env.DASHBOARD_URL ?? 'https://traceiq.run').replace(/\/+$/, '');
 
+/** Where Slack's callback sends the browser, by the page "Add to Slack" was started from. */
+const SLACK_RETURN_PAGES = {
+  alerts: '/dashboard/alerts?tab=brief&',
+  integrations: '/dashboard/settings/integrations?'
+} as const;
+type SlackReturnPage = keyof typeof SLACK_RETURN_PAGES;
+
+/**
+ * The OAuth `state` for Slack: the one-time link code, plus `.integrations` when the person
+ * started on the Integrations page. Link codes are base64url, so they never contain a dot.
+ * Only a known page name is ever added, and only the code part is redeemed.
+ */
+export function slackState(code: string, returnTo?: unknown): string {
+  return returnTo === 'integrations' ? `${code}.integrations` : code;
+}
+
+export function readSlackState(state?: string): { code: string | null; page: SlackReturnPage } {
+  if (!state) return { code: null, page: 'alerts' };
+  const dot = state.lastIndexOf('.');
+  if (dot !== -1 && state.slice(dot + 1) === 'integrations') return { code: state.slice(0, dot) || null, page: 'integrations' };
+  return { code: state, page: 'alerts' };
+}
+
 @Injectable()
 export class BriefsService {
   private readonly logger = new Logger(BriefsService.name);
@@ -166,13 +189,13 @@ export class BriefsService {
   }
 
   /** The "Add to Slack" link. Slack sends the person back to {@link finishSlackInstall}. */
-  async createSlackLink(user: DashboardUser, projectId?: string, timezone?: unknown) {
+  async createSlackLink(user: DashboardUser, projectId?: string, timezone?: unknown, returnTo?: unknown) {
     if (!this.slack.isConfigured) {
       throw new ServiceUnavailableException('Slack is not set up on this TraceIQ server.');
     }
     const project = await this.projects.requireWritableProject(user, projectId);
     const { code, expiresAt } = await this.storeLinkCode(user.id, project.id, 'slack', timezone);
-    return { url: this.slack.authorizeUrl(code), expiresAt };
+    return { url: this.slack.authorizeUrl(slackState(code, returnTo)), expiresAt };
   }
 
   /**
@@ -181,11 +204,12 @@ export class BriefsService {
    * made for a signed-in user with write access and can be used once.
    */
   async finishSlackInstall(params: { code?: string; state?: string; error?: string }): Promise<string> {
-    const back = (result: string) => `${dashboardUrl()}/dashboard/alerts?tab=brief&slack=${result}`;
+    const { code: linkCode, page } = readSlackState(params.state);
+    const back = (result: string) => `${dashboardUrl()}${SLACK_RETURN_PAGES[page]}slack=${result}`;
     if (params.error) return back('cancelled');
-    if (!params.code || !params.state) return back('error');
+    if (!params.code || !linkCode) return back('error');
 
-    const redeemed = await this.redeemStoredCode(params.state, 'slack');
+    const redeemed = await this.redeemStoredCode(linkCode, 'slack');
     if (!redeemed) return back('expired');
 
     const exchanged = await this.slack.exchangeCode(params.code);

@@ -120,10 +120,12 @@ describe('GitHub settings card', () => {
     expect(card).toContain("{busy === 'unlink' ? 'Unlinking…' : 'Unlink'}");
   });
 
-  it('is on the integrations page next to Linear', () => {
+  it('is on the integrations page next to Linear, inside the card grid', () => {
     const page = read('app/dashboard/settings/integrations/page.tsx');
-    expect(page).toContain('<GitHubIntegrationCard');
-    expect(page).toContain('<LinearIntegrationCard');
+    const grid = read('app/dashboard/settings/integrations/IntegrationsGrid.tsx');
+    expect(page).toContain('<IntegrationsGrid');
+    expect(grid).toContain('<GitHubIntegrationCard');
+    expect(grid).toContain('<LinearIntegrationCard');
   });
 });
 

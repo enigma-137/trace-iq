@@ -215,6 +215,32 @@ describe('BriefsService with Slack', () => {
     expect(telegram.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('returns to the Integrations page when Add to Slack was started there', async () => {
+    const { db, service: s } = service(() => unused);
+    const link = await s.createSlackLink(user as never, 'proj_1', 'Africa/Lagos', 'integrations');
+    const state = new URL(link.url).searchParams.get('state') as string;
+    expect(state).toMatch(/\.integrations$/);
+    // Only the code is stored; the page name is not part of the hash.
+    const stored = db.queryCalls(/INSERT INTO brief_link_codes/)[0].values[0];
+    const other = await s.createSlackLink(user as never, 'proj_1', 'Africa/Lagos', 'somewhere-else');
+    expect(new URL(other.url).searchParams.get('state')).not.toContain('.');
+    expect(stored).toMatch(/^[0-9a-f]{64}$/);
+
+    slack.exchangeCode.mockResolvedValue({ install });
+    const back = service((text) => {
+      if (/DELETE FROM brief_link_codes/.test(text)) return futureCode();
+      if (/INSERT INTO brief_channels/.test(text)) return { rows: [slackChannel], rowCount: 1 };
+      if (/SELECT webhook_url/.test(text)) return { rows: [{ webhookUrl: install.webhookUrl }], rowCount: 1 };
+      return project(text) ?? unused;
+    });
+    expect(await back.service.finishSlackInstall({ code: 'c', state: 'abc.integrations' })).toMatch(
+      /\/dashboard\/settings\/integrations\?slack=connected$/
+    );
+    expect(await back.service.finishSlackInstall({ error: 'access_denied', state: 'abc.integrations' })).toMatch(
+      /\/dashboard\/settings\/integrations\?slack=cancelled$/
+    );
+  });
+
   it('sends the person back with a reason when the link expired, was cancelled, or Slack refuses', async () => {
     const expired = service(() => unused);
     expect(await expired.service.finishSlackInstall({ code: 'c', state: 'old' })).toMatch(/slack=expired$/);
