@@ -22,7 +22,7 @@ const MESSAGE_SQL = `COALESCE(NULLIF(e.properties->>'message', ''), '(no message
  * Issue id: the fingerprint stamped at ingest, or, for events stored before
  * fingerprinting existed, a hash of type + message (how they were grouped then).
  */
-const ISSUE_ID_SQL = `COALESCE(NULLIF(e.properties->>'$fingerprint', ''), md5(${TYPE_SQL} || E'\n' || ${MESSAGE_SQL}))`;
+export const ISSUE_ID_SQL = `COALESCE(NULLIF(e.properties->>'$fingerprint', ''), md5(${TYPE_SQL} || E'\n' || ${MESSAGE_SQL}))`;
 /**
  * The release an event came from: `context.release` (the SDKs' `release`
  * option), `properties.release` (set by hand), else the mobile app version.
@@ -67,7 +67,13 @@ export type ErrorSample = {
   symbolicated?: SymbolicatedStack | null;
 };
 
-type IssueStateRow = { status: StoredIssueStatus; assignee_user_id: string | null; resolved_at: string | null };
+type IssueStateRow = {
+  status: StoredIssueStatus;
+  assignee_user_id: string | null;
+  resolved_at: string | null;
+  /** 'linear' when a Linear webhook last changed the status. */
+  status_source?: string | null;
+};
 
 export interface UpdateIssueRequest {
   projectId?: string;
@@ -229,6 +235,17 @@ export class ErrorsService {
     params: { id?: string; type?: string; message?: string; days?: string; projectId?: string }
   ) {
     const project = await this.projects.requireActiveProject(user, params.projectId);
+    return this.issueDetail(project, params);
+  }
+
+  /**
+   * {@link getIssue} for a project the caller has already resolved. Used by system
+   * work (e.g. Linear auto-create) that has no dashboard user.
+   */
+  async issueDetail<P extends { id: string }>(
+    project: P,
+    params: { id?: string; type?: string; message?: string; days?: string }
+  ) {
     const days = this.clampDays(params.days);
     const id = typeof params.id === 'string' && params.id.trim() ? params.id.trim() : null;
 
@@ -259,6 +276,7 @@ export class ErrorsService {
     const latest = identity.rows[0];
     const issueId = id ?? latest?.id ?? null;
     const state = issueId ? await this.readState(project.id, issueId) : null;
+    const linearIssue = issueId ? await this.readLinearIssue(project.id, issueId) : null;
 
     const totals = await this.database.query<{
       occurrences: number;
@@ -349,7 +367,9 @@ export class ErrorsService {
         status: this.effectiveStatus(state, totals.rows[0]?.lastSeen ?? null),
         assigneeUserId: state?.assignee_user_id ?? null,
         resolvedAt: state?.resolved_at ?? null,
-        regressedInRelease
+        statusSource: state?.status_source ?? null,
+        regressedInRelease,
+        linearIssue
       },
       days,
       totals: totals.rows[0] ?? { occurrences: 0, sessions: 0, users: 0, firstSeen: '', lastSeen: '', firstRelease: null, lastRelease: null },
@@ -400,6 +420,8 @@ export class ErrorsService {
           assignee_user_id = EXCLUDED.assignee_user_id,
           resolved_at = EXCLUDED.resolved_at,
           updated_by_user_id = EXCLUDED.updated_by_user_id,
+          -- A person changed it, so it is no longer "synced from Linear".
+          status_source = CASE WHEN EXCLUDED.status IS DISTINCT FROM error_issues.status THEN NULL ELSE error_issues.status_source END,
           updated_at = now()
         RETURNING status, assignee_user_id, resolved_at
       `,
@@ -419,10 +441,26 @@ export class ErrorsService {
 
   private async readState(projectId: string, issueId: string): Promise<IssueStateRow | null> {
     const result = await this.database.query<IssueStateRow>(
-      `SELECT status, assignee_user_id, resolved_at FROM error_issues WHERE project_id = $1 AND fingerprint = $2`,
+      `SELECT status, assignee_user_id, resolved_at, status_source FROM error_issues WHERE project_id = $1 AND fingerprint = $2`,
       [projectId, issueId]
     );
     return result.rows[0] ?? null;
+  }
+
+  /** The Linear issue created for this error issue, if any. */
+  private async readLinearIssue(projectId: string, issueId: string) {
+    try {
+      const result = await this.database.query<{ linearIssueId: string; identifier: string; url: string; createdAt: string }>(
+        `SELECT linear_issue_id AS "linearIssueId", identifier, url, created_at AS "createdAt"
+         FROM error_linear_issues WHERE project_id = $1 AND fingerprint = $2`,
+        [projectId, issueId]
+      );
+      return result.rows[0] ?? null;
+    } catch (error) {
+      // Before migration 0065 runs the table is missing; the issue page must still load.
+      if ((error as { code?: string })?.code === '42P01') return null;
+      throw error;
+    }
   }
 
   private effectiveStatus(state: IssueStateRow | null, lastSeen: string | null): IssueStatus {

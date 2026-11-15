@@ -29,19 +29,19 @@ function setupSteps(backend: RevenueBackend, endpoint: string): string {
    - Create one shared client, for example in a traceiq.py module (in Django, alongside settings or in a core app):
      import os
      from traceiq import Client
-     traceiq = Client(project_id=os.environ["TRACEIQ_PROJECT_ID"], write_key=os.environ["TRACEIQ_WRITE_KEY"], endpoint=os.environ.get("TRACEIQ_ENDPOINT", "${endpoint}"))
+     traceiq = Client(project_id=os.environ["TRACEIQ_PROJECT_ID"], write_key=os.environ["TRACEIQ_WRITE_KEY"], endpoint=os.environ.get("TRACEIQ_API_URL", "${endpoint}"))
    - Use this SDK. Don't write your own HTTP calls to TraceIQ.`;
     case 'php':
       return `   - Install the TraceIQ PHP SDK: composer require traceiq/traceiq-php (PHP 8.1+, no dependencies).
    - Create one shared client (in Laravel, bind it as a singleton in a service provider):
      use TraceIQ\\Client;
-     $traceiq = new Client(projectId: getenv('TRACEIQ_PROJECT_ID'), writeKey: getenv('TRACEIQ_WRITE_KEY'), endpoint: getenv('TRACEIQ_ENDPOINT') ?: '${endpoint}');
+     $traceiq = new Client(projectId: getenv('TRACEIQ_PROJECT_ID'), writeKey: getenv('TRACEIQ_WRITE_KEY'), endpoint: getenv('TRACEIQ_API_URL') ?: '${endpoint}');
    - PHP has no background thread: events flush at the batch size and on request shutdown. In queue workers and CLI scripts, call $traceiq->shutdown() when the job ends.`;
     case 'rust':
       return `   - Add the TraceIQ crate: cargo add traceiq serde_json. It flushes on a background thread.
    - Create one shared client (for example in your app state):
      let traceiq = traceiq::Client::builder(&std::env::var("TRACEIQ_PROJECT_ID")?, &std::env::var("TRACEIQ_WRITE_KEY")?)
-         .endpoint(&std::env::var("TRACEIQ_ENDPOINT").unwrap_or_else(|_| "${endpoint}".into()))
+         .endpoint(&std::env::var("TRACEIQ_API_URL").unwrap_or_else(|_| "${endpoint}".into()))
          .build();
    - Call traceiq.shutdown() on graceful shutdown so queued events are sent.`;
     case 'http':
@@ -55,7 +55,7 @@ function setupSteps(backend: RevenueBackend, endpoint: string): string {
       return `   - Install the TraceIQ Node SDK: npm install traceiq-node.
    - Create one shared client:
      import { TraceIQ } from 'traceiq-node';
-     export const traceiq = new TraceIQ({ projectId: process.env.TRACEIQ_PROJECT_ID!, writeKey: process.env.TRACEIQ_WRITE_KEY!, endpoint: process.env.TRACEIQ_ENDPOINT ?? '${endpoint}' });
+     export const traceiq = new TraceIQ({ projectId: process.env.TRACEIQ_PROJECT_ID!, writeKey: process.env.TRACEIQ_WRITE_KEY!, endpoint: process.env.TRACEIQ_API_URL ?? '${endpoint}' });
    - In serverless functions, await traceiq.flush() before returning.`;
   }
 }
@@ -208,7 +208,7 @@ export function buildRevenueSetupPrompt({
 
 2. Set up TraceIQ for ${language}
 ${setupSteps(backend, endpoint)}
-   - Add TRACEIQ_PROJECT_ID${projectId ? ` (${projectId})` : ''}, TRACEIQ_WRITE_KEY and TRACEIQ_ENDPOINT (${endpoint}) to the env example file. Never hard-code the write key. Without TRACEIQ_ENDPOINT the SDKs send to localhost.
+   - Add TRACEIQ_PROJECT_ID${projectId ? ` (${projectId})` : ''}, TRACEIQ_WRITE_KEY and TRACEIQ_API_URL (${endpoint}) to the env example file. Never hard-code the write key. Without TRACEIQ_API_URL the SDKs send to localhost.
 
 3. Use the same user id as the frontend
    - Payment events must use the exact id the frontend passes to traceiq.identify(), or they won't join the user's journey.

@@ -25,3 +25,12 @@ export function GitLabIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Linear's mark, drawn in currentColor so it follows the text color in light and dark. */
+export function LinearIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" fill="currentColor" aria-hidden>
+      <path d="M1.22 61.52c-.22-.95.91-1.55 1.6-.86l36.52 36.52c.69.69.09 1.82-.86 1.6A50.07 50.07 0 0 1 1.22 61.52ZM0 46.89a1 1 0 0 0 .29.77l52.05 52.05c.2.2.48.31.77.29a49.94 49.94 0 0 0 6.95-.93c.77-.16 1.04-1.1.48-1.66L2.82 39.69c-.56-.56-1.5-.29-1.66.48a49.94 49.94 0 0 0-.93 6.95ZM4.21 29.7c-.17.38-.08.82.21 1.11l64.77 64.77c.29.29.73.38 1.11.21a50.3 50.3 0 0 0 5.24-2.79c.56-.34.64-1.11.18-1.57L8.57 24.28c-.46-.46-1.23-.38-1.57.18a50.3 50.3 0 0 0-2.79 5.24ZM12.66 18.07c-.38-.38-.4-.98-.04-1.38A49.86 49.86 0 0 1 50.02 0C77.62 0 100 22.38 100 50c0 14.76-6.4 28.03-16.57 37.18-.4.36-1 .34-1.38-.04L12.66 18.07Z" />
+    </svg>
+  );
+}

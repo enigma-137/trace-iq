@@ -5,12 +5,13 @@ import { AchievementsModule } from '../achievements/achievements.module';
 import { SetupVerificationsModule } from '../setup-verifications/setup-verifications.module';
 import { RequestsModule } from '../requests/requests.module';
 import { ObservabilityModule } from '../observability/observability.module';
+import { LinearModule } from '../integrations/linear/linear.module';
 import { DashboardEventsController } from './dashboard-events.controller';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 
 @Module({
-  imports: [AuthModule, WebhooksModule, AchievementsModule, SetupVerificationsModule, RequestsModule, ObservabilityModule],
+  imports: [AuthModule, WebhooksModule, AchievementsModule, SetupVerificationsModule, RequestsModule, ObservabilityModule, LinearModule],
   controllers: [EventsController, DashboardEventsController],
   providers: [EventsService],
   exports: [EventsService]

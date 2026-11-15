@@ -13,6 +13,7 @@ import {
   isPackageResolvable,
   resolveTargetEnvFile
 } from './detector.js';
+import { SDK_PACKAGES, relativeImport } from './sdk-packages.js';
 
 export class NextJsAdapter implements FrameworkAdapter {
   readonly name = 'Next.js';
@@ -311,7 +312,8 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
 
         // Add import if not already present
         if (!updatedLayout.includes('TraceIQProvider')) {
-          const importStatement = `import { TraceIQProvider } from '@/components/traceiq-provider';\n`;
+          // Relative, so it works without an `@/` path alias.
+          const importStatement = `import { TraceIQProvider } from '${relativeImport(appLayoutPath, providerFilePath)}';\n`;
           updatedLayout = importStatement + updatedLayout;
         }
 
@@ -361,7 +363,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
       const pkg = JSON.parse(pkgContent);
       pkg.dependencies = pkg.dependencies ?? {};
       if (!pkg.dependencies['traceiq-sdk-js']) {
-        pkg.dependencies['traceiq-sdk-js'] = '^0.1.7';
+        pkg.dependencies['traceiq-sdk-js'] = SDK_PACKAGES.browser.range;
         changes.installedPackages.push('traceiq-sdk-js');
         if (!options.dryRun) {
           await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');

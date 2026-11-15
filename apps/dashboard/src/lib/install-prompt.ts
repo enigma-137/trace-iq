@@ -56,7 +56,7 @@ function credentialsGuidance(id: AiLanguageId, apiUrl: string): string[] {
   }
   if (SERVER_STACKS.includes(id)) {
     return [
-      `Read them from environment variables: TRACEIQ_PROJECT_ID, TRACEIQ_WRITE_KEY and TRACEIQ_ENDPOINT (${apiUrl}). Without TRACEIQ_ENDPOINT most SDKs send to localhost, so set it everywhere.`,
+      `Read them from environment variables: TRACEIQ_PROJECT_ID, TRACEIQ_WRITE_KEY and TRACEIQ_API_URL (${apiUrl}). Without TRACEIQ_API_URL most SDKs send to localhost, so set it everywhere.`,
       'Write the real values to the local env file, add the names (without values) to the env example file, and make sure the real file is git-ignored.'
     ];
   }

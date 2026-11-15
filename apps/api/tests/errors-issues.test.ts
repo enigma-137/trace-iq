@@ -70,7 +70,9 @@ describe('ErrorsService.getIssue', () => {
       status: 'regressed',
       assigneeUserId: 'user_2',
       resolvedAt: '2026-10-10T00:00:00Z',
-      regressedInRelease: '2.1.0'
+      statusSource: null,
+      regressedInRelease: '2.1.0',
+      linearIssue: null
     });
     const [regressed] = db.queryCalls(/occurred_at > \$5::timestamptz/);
     expect(regressed.values).toEqual(['proj_1', '$exception', 'fp_1', 14, '2026-10-10T00:00:00Z']);
@@ -96,7 +98,7 @@ describe('ErrorsService.updateIssue', () => {
     return makeService((text, values) => {
       if (/SELECT 1 FROM events/.test(text)) return rows(exists ? [{ '?column?': 1 }] : []);
       if (/FROM organization_members/.test(text)) return rows(member ? [{ '?column?': 1 }] : []);
-      if (/SELECT status, assignee_user_id, resolved_at FROM error_issues/.test(text)) return rows(state ? [state] : []);
+      if (/SELECT status, assignee_user_id, resolved_at, status_source FROM error_issues/.test(text)) return rows(state ? [state] : []);
       if (/INSERT INTO error_issues/.test(text)) {
         return rows([{ status: values[2], assignee_user_id: values[3], resolved_at: values[4] }]);
       }

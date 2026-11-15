@@ -5,10 +5,10 @@
  * source of truth for publishing; this file keeps user-facing copy in sync.
  */
 export const SDK_VERSIONS = {
-  javascript: "0.3.0",
-  node: "0.2.0",
+  javascript: "0.4.0",
+  node: "0.3.0",
   reactNative: "0.3.0",
   flutter: "0.1.0",
-  python: "0.2.0",
+  python: "0.3.0",
   rust: "0.2.0",
 } as const;

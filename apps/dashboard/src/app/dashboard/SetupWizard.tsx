@@ -9,6 +9,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { retryAfterStepUp } from '@/lib/step-up';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { InstallWithAiCard } from './InstallWithAiCard';
+import { GitHubSetupPanel } from './GitHubSetupPanel';
+import { GitHubQuickSetup } from './GitHubQuickSetup';
 
 export interface SetupWizardProps {
   projectId: string;
@@ -145,6 +147,10 @@ function SetupWizardContent({
   const [isGeneratingKey, setIsGeneratingKey] = useState<boolean>(false);
 
   const [currentStep, setCurrentStep] = useState<number>(1);
+  // Back from installing the GitHub App: open the install step, where the GitHub panel finishes it.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('github')) setCurrentStep(2);
+  }, []);
   const [selectedProducts, setSelectedProducts] = useState<string[]>(
     PRODUCTS.filter((p) => p.defaultSelected).map((p) => p.id)
   );
@@ -406,6 +412,9 @@ function SetupWizardContent({
         </div>
       </div>
 
+      {/* Shortcut: paste a repository URL → setup PR, then straight to verification */}
+      {currentStep < 4 ? <GitHubQuickSetup projectId={projectId} onWaitForEvent={() => setCurrentStep(4)} /> : null}
+
       {/* STEP 1: PRODUCT SELECTION */}
       {currentStep === 1 ? (
         <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -475,6 +484,9 @@ function SetupWizardContent({
               Let your coding assistant do it, run our CLI, or install manually. Pick whichever you like; they all end at the same check.
             </p>
           </div>
+
+          {/* Connect GitHub: TraceIQ opens a setup pull request */}
+          <GitHubSetupPanel projectId={projectId} onWaitForEvent={() => setCurrentStep(4)} />
 
           {/* Option A: Install with AI */}
           <InstallWithAiCard

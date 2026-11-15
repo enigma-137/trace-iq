@@ -12,7 +12,8 @@ import { getPreferredProjectId } from '../../common/active-project';
 import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
 import { RequestsService } from '../requests/requests.service';
 import { EventLogInput, ObservabilityService } from '../observability/observability.service';
-import { withExceptionFingerprint } from '../errors/fingerprint';
+import { EXCEPTION_EVENT, FINGERPRINT_PROPERTY, withExceptionFingerprint } from '../errors/fingerprint';
+import { LinearAutoCreateService } from '../integrations/linear/linear-auto-create.service';
 import {
   API_REQUEST_EVENT,
   ApiRequestRecord,
@@ -120,7 +121,8 @@ export class EventsService {
     private readonly usage: UsageService = new UsageService(new EntitlementService(database)),
     @Optional() private readonly setupVerifications?: SetupVerificationsService,
     @Optional() private readonly requests?: RequestsService,
-    @Optional() private readonly observability?: ObservabilityService
+    @Optional() private readonly observability?: ObservabilityService,
+    @Optional() private readonly linearAutoCreate?: LinearAutoCreateService
   ) {}
 
   async ingest(input: IngestEventRequest, meta: IngestMeta = {}): Promise<IngestEventResponse> {
@@ -275,6 +277,12 @@ export class EventsService {
         );
       }
     });
+
+    // Opt-in Linear auto-create: returns at once and never fails the ingest.
+    this.linearAutoCreate?.onExceptionsIngested(
+      auth.project_id,
+      prepared.filter((p) => p.eventName === EXCEPTION_EVENT).map((p) => exceptionFingerprint(p.properties))
+    );
 
     // Re-evaluate workspace achievements without blocking the ingest response.
     void this.achievements.afterProjectIngest(auth.project_id);
@@ -603,6 +611,11 @@ export class EventsService {
         meta,
         eventId
       );
+    }
+
+    // Opt-in Linear auto-create: returns at once and never fails the ingest.
+    if (eventName === EXCEPTION_EVENT) {
+      this.linearAutoCreate?.onExceptionsIngested(auth.project_id, [exceptionFingerprint(input.properties)]);
     }
 
     // Re-evaluate workspace achievements without blocking the ingest response.
@@ -977,4 +990,10 @@ export class EventsService {
   private sha256(value: string): string {
     return createHash('sha256').update(value).digest('hex');
   }
+}
+
+/** The fingerprint stamped on an `$exception` event at ingest. */
+function exceptionFingerprint(properties: JsonObject | undefined): string | undefined {
+  const value = properties?.[FINGERPRINT_PROPERTY];
+  return typeof value === 'string' && value ? value : undefined;
 }
