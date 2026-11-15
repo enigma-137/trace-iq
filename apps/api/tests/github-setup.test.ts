@@ -242,6 +242,40 @@ describe('setup generator', () => {
     expect(validateGeneratedFiles(plan.files)).toEqual([]);
   });
 
+  it('reports the deployed commit as the release in every template, and the PR body says how', async () => {
+    const plans = await Promise.all(
+      [nextApp, viteApp, expressApp].map(async (files) => {
+        const detection = await detectStack(repo(files));
+        if (detection.kind !== 'app') throw new Error('expected app');
+        return generateSetup(detection.app, repo(files), context);
+      })
+    );
+    const [next, vite, express] = plans;
+
+    const provider = next.files.find((file) => file.path.endsWith('traceiq-provider.tsx'))!.content;
+    expect(provider).toContain('process.env.NEXT_PUBLIC_TRACEIQ_RELEASE || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || undefined');
+    expect(provider).toMatch(/endpoint,\n\s+release,\n/);
+    expect(next.body).toContain('### Exact source links (recommended)');
+    expect(next.body).toContain('`NEXT_PUBLIC_TRACEIQ_RELEASE=$GITHUB_SHA`');
+    expect(next.body).toContain('`NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA`');
+
+    expect(vite.files.find((file) => file.path === 'src/traceiq.ts')!.content).toContain(
+      'import.meta.env.VITE_TRACEIQ_RELEASE || import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA'
+    );
+    expect(vite.body).toContain('`VITE_TRACEIQ_RELEASE');
+
+    const nodeModule = express.files.find((file) => file.path === 'traceiq.js')!.content;
+    expect(nodeModule).toContain('process.env.TRACEIQ_RELEASE ||');
+    expect(nodeModule).toContain('process.env.VERCEL_GIT_COMMIT_SHA ||');
+    expect(express.body).toContain('`TRACEIQ_RELEASE=$GITHUB_SHA`');
+
+    // Optional, so it is explained in the body, not added to the required variables.
+    for (const plan of plans) {
+      expect(plan.envVars.some((item) => item.name.endsWith('TRACEIQ_RELEASE'))).toBe(false);
+      expect(validateGeneratedFiles(plan.files)).toEqual([]);
+    }
+  });
+
   it('NestJS (TypeScript) and ESM imports', async () => {
     const files = {
       'package.json': pkg({ dependencies: { '@nestjs/core': '10' } }),

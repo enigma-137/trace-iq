@@ -195,6 +195,7 @@ describe('GitHubService', () => {
   let roles: Record<string, string>;
   let installation: Record<string, unknown> | null;
   let installationOwner: string | null;
+  let projectLinked: boolean;
   let service: GitHubService;
   let client: GitHubAppClient;
   const projects = { requireActiveProject: vi.fn(), requireWritableProject: vi.fn(), resolveActiveProject: vi.fn() };
@@ -230,7 +231,9 @@ describe('GitHubService', () => {
     roles = { usr_owner: 'owner', usr_member: 'member' };
     installation = null;
     installationOwner = null;
+    projectLinked = false;
     db = mockDatabase((text, values) => {
+      if (text.includes('DELETE FROM github_project_repos WHERE project_id = $1')) return rows([{ unlinked: projectLinked }]);
       if (text.includes('FROM organization_members om') && text.includes('om.organization_id = $1 AND om.user_id = $2')) {
         const role = roles[values[1] as string];
         return role ? rows([{ role }]) : empty();
@@ -404,6 +407,28 @@ describe('GitHubService', () => {
       expect(status).toMatchObject({ configured: true, connected: true, canManage: false, project: { id: 'proj_1' }, installation: { accountLogin: 'acme' } });
     });
 
+    it('unlinks one project from its repository and its setup PR record, leaving the installation', async () => {
+      const unlinkSql = 'DELETE FROM github_project_repos WHERE project_id = $1';
+      projectLinked = true;
+      await expect(service.unlinkProjectRepo(owner, 'proj_1')).resolves.toEqual({ unlinked: true });
+      const [call] = db.queryCalls(unlinkSql);
+      expect(call.text).toContain('DELETE FROM github_setup_pull_requests WHERE project_id = $1');
+      expect(call.values).toEqual(['proj_1']);
+      expect(db.queryCalls('DELETE FROM github_installations')).toHaveLength(0);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('unlink reports false when nothing was linked, works while suspended, and needs a manager on a session', async () => {
+      installation = { ...installation, status: 'suspended' };
+      await expect(service.unlinkProjectRepo(owner, 'proj_1')).resolves.toEqual({ unlinked: false });
+      projects.requireWritableProject.mockResolvedValue({ id: 'proj_1', organizationId: 'org_1', role: 'member' });
+      await expect(service.unlinkProjectRepo(member, 'proj_1')).rejects.toBeInstanceOf(ForbiddenException);
+      projects.requireWritableProject.mockResolvedValue({ id: 'proj_1', organizationId: 'org_1', role: 'owner' });
+      await expect(service.unlinkProjectRepo({ id: 'usr_owner', authMethod: 'pat', scopes: ['projects:write'] } as never, 'proj_1')).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+    });
+
     it('disconnect uninstalls the app on GitHub and removes the installation', async () => {
       github();
       await expect(service.disconnect(owner, {})).resolves.toEqual({ disconnected: true, uninstalled: true });
@@ -492,11 +517,20 @@ describe('GitHubController authorization', () => {
         throw new ForbiddenException('Personal access token requires "projects:read" scope.');
       })
     };
-    const githubService = { createInstallUrl: vi.fn(), completeInstall: vi.fn(), getStatus: vi.fn(), listRepos: vi.fn(), linkProjectRepo: vi.fn(), disconnect: vi.fn() };
+    const githubService = {
+      createInstallUrl: vi.fn(),
+      completeInstall: vi.fn(),
+      getStatus: vi.fn(),
+      listRepos: vi.fn(),
+      linkProjectRepo: vi.fn(),
+      unlinkProjectRepo: vi.fn(),
+      disconnect: vi.fn()
+    };
     const controller = new GitHubController(authService as never, githubService as never, {} as never, {} as never, {} as never);
     await expect(controller.install(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.complete({}, undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.linkProject('proj_1', {}, undefined)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(controller.unlinkProject('proj_1', undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.disconnect(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.status('Bearer tiq_pat_x')).rejects.toBeInstanceOf(ForbiddenException);
     await expect(controller.repos('Bearer tiq_pat_x')).rejects.toBeInstanceOf(ForbiddenException);

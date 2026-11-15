@@ -114,6 +114,12 @@ describe('GitHub settings card', () => {
     expect(card).toContain('never pushes to your default branch');
   });
 
+  it('unlinks only this project, and only when a repository is linked', () => {
+    expect(card).toContain('`${GITHUB_API}/projects/${encodeURIComponent(project.id)}`, { method: \'DELETE\', headers }');
+    expect(card).toContain('{status.projectRepo ? (');
+    expect(card).toContain("{busy === 'unlink' ? 'Unlinking…' : 'Unlink'}");
+  });
+
   it('is on the integrations page next to Linear', () => {
     const page = read('app/dashboard/settings/integrations/page.tsx');
     expect(page).toContain('<GitHubIntegrationCard');

@@ -341,6 +341,28 @@ export class GitHubService {
     return { projectRepo: saved.rows[0] };
   }
 
+  /**
+   * Unlinks a project from its repository, leaving the installation and other projects
+   * alone. The project's setup pull request record goes too (the PR itself stays on
+   * GitHub), so the wizard stops offering it. Works while the installation is suspended.
+   */
+  async unlinkProjectRepo(user: DashboardUser, projectId: string) {
+    this.requireInteractive(user);
+    const project = await this.projects.requireWritableProject(user, projectId);
+    this.requireManager(project.role);
+    // One statement, so the link and the setup PR record go together.
+    const result = await this.database.query<{ unlinked: boolean }>(
+      `WITH link AS (
+         DELETE FROM github_project_repos WHERE project_id = $1 RETURNING project_id
+       ), setup AS (
+         DELETE FROM github_setup_pull_requests WHERE project_id = $1 RETURNING project_id
+       )
+       SELECT EXISTS (SELECT 1 FROM link) AS unlinked`,
+      [project.id]
+    );
+    return { unlinked: result.rows[0]?.unlinked === true };
+  }
+
   /** Uninstalls the app from GitHub (best effort) and forgets the installation and repo links. */
   async disconnect(user: DashboardUser, scope: OrganizationScope) {
     this.requireInteractive(user);
