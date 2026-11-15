@@ -14,7 +14,8 @@ export function SignedInToast() {
     document.cookie = `${SIGNED_IN_COOKIE}=; path=/; max-age=0; samesite=lax`;
     const name = PROVIDER_NAMES[decodeURIComponent(match[1])];
     if (name) {
-      toast.success(`You're signed in with ${name}.`, { title: 'Signed in' });
+      // Part of signing in, so it keeps the auth pages' light look even though it shows on the dashboard.
+      toast.success(`You're signed in with ${name}.`, { title: 'Signed in', light: true });
     }
   }, []);
 

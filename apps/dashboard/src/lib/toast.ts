@@ -5,12 +5,21 @@ export interface TraceIQToast {
   tone: ToastTone;
   title?: string;
   message: string;
+  /** Drawn in light colours whatever the saved theme (toasts raised on the always-light sign-in pages). */
+  light?: boolean;
 }
 
 export interface ToastOptions {
   title?: string;
   /** Use null to keep the toast visible until it is dismissed. */
   durationMs?: number | null;
+  /** Force the light look. Defaults to on when raised on a sign-in page, which is always light. */
+  light?: boolean;
+}
+
+/** The sign-in and sign-up pages are always light, whatever the saved theme. */
+export function isAlwaysLightPath(pathname: string | null | undefined): boolean {
+  return pathname === '/auth' || Boolean(pathname?.startsWith('/auth/'));
 }
 
 type ToastListener = () => void;
@@ -54,7 +63,9 @@ function showToast(tone: ToastTone, message: string, options: ToastOptions = {})
   if (!normalizedMessage) return '';
 
   const id = `traceiq-toast-${Date.now()}-${nextId++}`;
-  const next = [...snapshot, { id, tone, title: options.title, message: normalizedMessage }];
+  // Decided once, so a toast raised on the sign-in page stays light after it sends the person on to the dashboard.
+  const light = options.light ?? isAlwaysLightPath(window.location?.pathname);
+  const next = [...snapshot, { id, tone, title: options.title, message: normalizedMessage, ...(light ? { light } : {}) }];
 
   while (next.length > MAX_VISIBLE_TOASTS) {
     const removed = next.shift();
