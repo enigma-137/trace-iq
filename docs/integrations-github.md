@@ -1,0 +1,103 @@
+# GitHub App integration
+
+The **TraceIQ GitHub App** is separate from "Sign in with GitHub". Sign-in only
+identifies a person; the App is installed on a GitHub account or organization, on the
+repositories the user picks, so TraceIQ can open setup pull requests later (phase 5).
+
+Rules the code enforces:
+
+- One installation per TraceIQ organization, and an installation belongs to one
+  organization.
+- TraceIQ **never writes to the default branch**. The client refuses it. Changes go on
+  a branch such as `traceiq/setup` and a pull request the user reviews and merges.
+- Permissions are minimal, and only on the repositories the user selects.
+
+## 1. Create the GitHub App
+
+GitHub → **Settings → Developer settings → GitHub Apps → New GitHub App** (under your
+organization, if TraceIQ Cloud or a company runs it):
+
+| Field | Value |
+| --- | --- |
+| GitHub App name | `TraceIQ` (its slug becomes `GITHUB_APP_SLUG`) |
+| Homepage URL | Your TraceIQ dashboard URL |
+| Callback URL | `https://<your-api>/v1/integrations/github/callback` |
+| Request user authorization (OAuth) during installation | **On** (required, see below) |
+| Expire user authorization tokens | On |
+| Setup URL | Leave empty (the callback URL is used when the option above is on) |
+| Redirect on update | On |
+| Webhook | Active, URL `https://<your-api>/v1/integrations/github/webhook`, with a random secret |
+| Where can this app be installed | Any account (or only this account for a private install) |
+
+**Repository permissions:** Contents **Read and write**, Pull requests **Read and write**,
+Metadata **Read-only** (mandatory). Nothing else, no organization or account permissions.
+
+**Subscribe to events:** none are required. `installation` and
+`installation_repositories` are always delivered to GitHub Apps. TraceIQ uses them to
+handle uninstall, suspend and repository access changes.
+
+Then **Generate a private key** (a `.pem` file) and **Generate a new client secret**.
+
+## 2. Configure the API
+
+```bash
+GITHUB_APP_ID=123456                 # "App ID" on the app page
+GITHUB_APP_SLUG=traceiq              # from the app's public URL github.com/apps/<slug>
+GITHUB_APP_CLIENT_ID=Iv23li...       # "Client ID"
+GITHUB_APP_CLIENT_SECRET=...         # a client secret; also signs the install state
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+GITHUB_APP_WEBHOOK_SECRET=...        # the webhook secret you chose
+```
+
+`GITHUB_APP_PRIVATE_KEY` can be the PEM with `\n` escapes, or the whole `.pem` base64-encoded.
+Never commit it.
+
+Run the migration `0067_github_app.sql` with `npm run migrate -w @traceiq/api`. Owners
+and admins then install the app from **Settings → Integrations** and pick each project's
+repository (and app folder, for monorepos).
+
+## Why "Request user authorization during installation" is required
+
+After installing, GitHub redirects the browser with `installation_id`, and anyone can
+edit that number. If TraceIQ trusted it, a person could attach another company's
+installation (and its repositories) to their own TraceIQ organization. With the option
+on, GitHub also sends a one-time `code`. TraceIQ trades it for a short-lived user token,
+checks that this GitHub user can access the installation (`GET /user/installations`),
+then revokes the token. The token is never stored.
+
+As with Linear, the callback does not store anything. It forwards to the dashboard,
+which finishes with the signed-in session, and the server requires that the person
+finishing is the person who started (from the signed `state`). The dashboard also keeps
+a copy of the state in `sessionStorage`, in case GitHub does not hand it back.
+
+## API
+
+All routes are under `/v1/integrations/github`. The organization is picked with
+`?organizationId=` or `?projectId=`.
+
+| Route | Who | What |
+| --- | --- | --- |
+| `GET /install` | owner/admin | `{ url, state, expiresAt }`: the app's installation URL with a signed state that lasts 10 minutes |
+| `GET /callback` | GitHub redirect | Forwards `installation_id`, `code`, `state` to `/dashboard/settings/integrations?github=complete…` or `?github=error&reason=…` |
+| `POST /complete` | the person who started | `{ installationId, code, state }`. Runs the checks above and stores the installation |
+| `GET /status` | any member (`projects:read`) | Installation (account, all/selected repos, active/suspended) and this project's repository |
+| `GET /repos` | any member (`projects:read`) | Repositories the installation can see |
+| `PUT /projects/:projectId` | owner/admin | `{ repoFullName, subdirectory? }`. The repo must be visible to the installation; the folder must exist on the default branch |
+| `DELETE /` | owner/admin | Uninstalls the app on GitHub (best effort) and removes the installation and repository links |
+| `POST /webhook` | GitHub | Verifies `X-Hub-Signature-256`, then handles `installation` (deleted, suspend, unsuspend) and `installation_repositories` (removed repos unlink their projects) |
+
+Error codes include `GITHUB_STATE_INVALID`, `GITHUB_STATE_EXPIRED`,
+`GITHUB_STATE_USER_MISMATCH`, `GITHUB_CODE_INVALID`, `GITHUB_INSTALLATION_NOT_YOURS`,
+`GITHUB_INSTALLATION_IN_USE`, `GITHUB_NOT_CONNECTED`, `GITHUB_SUSPENDED`, `GITHUB_NOT_FOUND`,
+`GITHUB_ERROR`. Callback reasons: `pending_approval` (an org owner must approve the app),
+`missing_installation`, `missing_code`, `not_configured`.
+
+## Tokens
+
+- The App authenticates with an RS256 JWT (`iss` = App ID, valid for 9 minutes,
+  backdated 60 seconds for clock drift).
+- Repository calls use installation tokens. They last an hour, are cached in memory and
+  are re-minted five minutes before they expire. Nothing is stored in the database.
+- `GitHubAppClient` can list repositories, read files and trees, create a branch, commit
+  files (one fast-forward commit, never forced) and open a pull request against the
+  default branch. Phase 5 builds the setup PR on these.

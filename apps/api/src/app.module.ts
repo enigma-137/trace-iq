@@ -40,6 +40,7 @@ import { SetupVerificationsModule } from './modules/setup-verifications/setup-ve
 import { StatusModule } from './modules/status/status.module';
 import { AccountLifecycleModule } from './modules/account-lifecycle/account-lifecycle.module';
 import { LinearModule } from './modules/integrations/linear/linear.module';
+import { GitHubModule } from './modules/integrations/github/github.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { ObservabilityInterceptor } from './common/interceptors/observability.interceptor';
@@ -92,7 +93,8 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     FeedbackModule,
     StatusModule,
     AccountLifecycleModule,
-    LinearModule
+    LinearModule,
+    GitHubModule
   ],
   controllers: [AppController],
   providers: [
