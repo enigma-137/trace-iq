@@ -24,7 +24,7 @@ import {
 
 const GITHUB_API = GITHUB_INTEGRATION_API;
 
-type Busy = 'install' | 'complete' | 'disconnect' | 'save' | null;
+type Busy = 'install' | 'complete' | 'disconnect' | 'save' | 'unlink' | null;
 
 /** The TraceIQ GitHub App: install it, then pick the repository (and folder) for this project. */
 export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?: string }) {
@@ -133,6 +133,26 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
     }
   }
 
+  /** Unlinks this project only; the app stays installed for the organization's other projects. */
+  async function unlinkRepo() {
+    const project = status?.project;
+    const linked = status?.projectRepo?.repoFullName;
+    if (!project || !linked) return;
+    setBusy('unlink');
+    try {
+      const headers = await authHeaders();
+      if (!headers) return toast.error('Your dashboard session expired. Sign in again.');
+      const response = await fetch(`${GITHUB_API}/projects/${encodeURIComponent(project.id)}`, { method: 'DELETE', headers });
+      if (!response.ok) return toast.error(await readApiError(response, 'Could not unlink the repository.'));
+      toast.success(`${project.name} no longer uses ${linked}. Its open pull requests on GitHub are not changed.`, { title: 'Repository unlinked' });
+      await load();
+    } catch (error) {
+      toast.error(await readApiError(error, 'Could not unlink the repository.'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function disconnect() {
     setBusy('disconnect');
     try {
@@ -233,9 +253,16 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                 hint="Used to open setup pull requests and link errors to code."
                 actions={
                   canManage ? (
-                    <button type="button" className={secondaryButton} disabled={busy !== null || !repoFullName || !dirty} onClick={() => void saveRepo()}>
-                      {busy === 'save' ? 'Saving…' : 'Save'}
-                    </button>
+                    <span className="inline-flex flex-wrap gap-2">
+                      {status.projectRepo ? (
+                        <button type="button" className={secondaryButton} disabled={busy !== null} onClick={() => void unlinkRepo()}>
+                          {busy === 'unlink' ? 'Unlinking…' : 'Unlink'}
+                        </button>
+                      ) : null}
+                      <button type="button" className={secondaryButton} disabled={busy !== null || !repoFullName || !dirty} onClick={() => void saveRepo()}>
+                        {busy === 'save' ? 'Saving…' : 'Save'}
+                      </button>
+                    </span>
                   ) : null
                 }
               >

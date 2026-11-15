@@ -54,7 +54,7 @@ await traceiq.shutdown();
 | Option | Default | Notes |
 | --- | --- | --- |
 | `endpoint` | `http://localhost:4000` | TraceIQ API base URL. |
-| `release` | `TRACEIQ_RELEASE` env | Your deploy's version or git SHA, sent with every event so Error tracking can show the release each error was seen in. |
+| `release` | `TRACEIQ_RELEASE` env | Your deploy's version or git SHA, sent with every event so Error tracking can show the release each error was seen in. Prefer the deployed commit SHA (`VERCEL_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `$GITHUB_SHA` from CI): with a GitHub-linked project, error pages then link stack frames to the exact lines. |
 | `flushAt` | `20` | Flush once this many events are queued. |
 | `flushIntervalMs` | `10000` | Timer flush; `0` disables it. |
 | `maxRetries` | `3` | Network retries per batch (exponential backoff + jitter). |

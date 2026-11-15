@@ -29,6 +29,11 @@ organization, if TraceIQ Cloud or a company runs it):
 | Webhook | Active, URL `https://<your-api>/v1/integrations/github/webhook`, with a random secret |
 | Where can this app be installed | Any account (or only this account for a private install) |
 
+After creating the app, check its public page (`https://github.com/apps/<slug>`). If it says
+"is a private GitHub App", only the owner account can install it: open the app's settings,
+**Advanced → Make public**. Public means anyone can install it on their own account; each
+installer still chooses which repositories (private ones included) it can see.
+
 **Repository permissions:** Contents **Read and write**, Pull requests **Read and write**,
 Metadata **Read-only** (mandatory). Nothing else, no organization or account permissions.
 
@@ -83,6 +88,7 @@ All routes are under `/v1/integrations/github`. The organization is picked with
 | `GET /status` | any member (`projects:read`) | Installation (account, all/selected repos, active/suspended) and this project's repository |
 | `GET /repos` | any member (`projects:read`) | Repositories the installation can see |
 | `PUT /projects/:projectId` | owner/admin | `{ repoFullName, subdirectory? }`. The repo must be visible to the installation; the folder must exist on the default branch |
+| `DELETE /projects/:projectId` | owner/admin | Unlinks this project's repository and forgets its setup PR record. The installation, other projects and the PR on GitHub are unchanged. `{ unlinked }` is false when nothing was linked |
 | `DELETE /` | owner/admin | Uninstalls the app on GitHub (best effort) and removes the installation and repository links |
 | `POST /webhook` | GitHub | Verifies `X-Hub-Signature-256`, then handles `installation` (deleted, suspend, unsuspend) and `installation_repositories` (removed repos unlink their projects) |
 
@@ -181,8 +187,11 @@ resolves the error's release:
 3. Otherwise links point at the default branch and say that lines may have moved.
 
 Results are cached for ten minutes per project and release. Setting the SDK's `release`
-to the deployed commit SHA (for example `VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA`) gives exact
-links.
+to the deployed commit SHA gives exact links. Setup PRs wire this in: the generated code
+reads `<PREFIX>TRACEIQ_RELEASE` (`NEXT_PUBLIC_`, `VITE_`, `REACT_APP_`, or none for Node),
+falling back to Vercel's commit SHA (and Render's and Railway's for Node). Elsewhere, set it
+at build or deploy time, for example `NEXT_PUBLIC_TRACEIQ_RELEASE=$GITHUB_SHA` in GitHub
+Actions. The setup PR body explains this too.
 
 Frames are mapped in the dashboard (`apps/dashboard/src/lib/source-links.ts`).
 Source-mapped paths (`src/App.tsx`, `webpack://…/./src/App.tsx`) are placed under the app

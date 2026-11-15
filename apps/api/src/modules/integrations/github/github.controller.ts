@@ -133,6 +133,12 @@ export class GitHubController {
     return this.github.linkProjectRepo(user, projectId, body ?? {});
   }
 
+  @Delete('projects/:projectId')
+  async unlinkProject(@Param('projectId') projectId: string, @Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.github.unlinkProjectRepo(user, projectId);
+  }
+
   @Delete()
   async disconnect(
     @Headers('authorization') authorization?: string,
