@@ -35,7 +35,11 @@ Rotating `LINEAR_CLIENT_SECRET` invalidates connect links that are still in flig
 but not existing connections. Rotating `TRACEIQ_SECRET_ENCRYPTION_KEY` makes stored
 tokens unreadable, so every organization would have to reconnect.
 
-Run the migration (`0064_linear_integration.sql`) with `npm run migrate -w @traceiq/api`.
+Run the migrations (`0064_linear_integration.sql`, `0065_error_linear_issues.sql`) with
+`npm run migrate -w @traceiq/api`.
+
+Once configured, owners and admins connect from **Settings → Integrations** in the dashboard
+and pick a default team (and optional label) for each project.
 
 ## API
 
@@ -46,14 +50,42 @@ neither is given, the person's first organization is used.
 | Route | Who | What |
 | --- | --- | --- |
 | `GET /connect` | owner/admin | Returns `{ url, expiresAt }`: the Linear authorize URL with a signed state that lasts 10 minutes |
-| `GET /callback` | Linear redirect | Checks the state, exchanges the code, stores the encrypted token, and redirects to `/dashboard/settings/integrations?linear=connected` or `?linear=error&reason=…` |
+| `GET /callback` | Linear redirect | Checks the state's signature and forwards the browser to `/dashboard/settings/integrations?linear=complete&linear_code=…&linear_state=…` (or `?linear=error&reason=…`). It does **not** exchange the code |
+| `POST /complete` | the person who started | `{ code, state }` from the forward. Requires the signed-in user to be the user in the state, re-checks owner/admin, exchanges the code and stores the encrypted token |
 | `GET /status` | any member (`projects:read` for PATs) | `not_connected`, `active` or `needs_reconnect`, plus the workspace, teams and per-project defaults |
 | `GET /teams/:teamId/labels` | any member | Labels for that team, plus workspace-wide labels |
 | `DELETE /` | owner/admin | Revokes the token with Linear (best effort) and removes the connection and project defaults |
 | `PUT /projects/:projectId` | owner/admin | `{ teamId, labelId? }`, checked against the connected workspace |
 
 Values for the `reason` on a callback error: `cancelled`, `expired`, `invalid_state`,
-`forbidden`, `invalid_code`, `missing_code`, `linear_error`, `not_configured`.
+`missing_code`, `linear_error`, `not_configured`. `POST /complete` fails with these codes:
+`LINEAR_STATE_INVALID`, `LINEAR_STATE_EXPIRED`, `LINEAR_STATE_USER_MISMATCH`, `LINEAR_CODE_INVALID`.
+
+### Why the callback does not finish the connection
+
+The callback is a browser redirect from Linear with no TraceIQ session, so it cannot tell
+who is in the browser. If it finished the connection itself, an attacker could start a
+connection for their own organization and send the Linear link to a victim; if the victim
+approved, the victim's Linear workspace would be connected to the attacker's organization.
+Finishing in the dashboard with the signed-in session, and requiring that it is the same
+person who started, closes that hole. The dashboard removes the code from the address bar
+before posting it.
+
+### Creating issues from errors
+
+`POST /v1/dashboard/errors/issues/:id/linear-issue` with `{ projectId }` (`:id` is the error
+issue's fingerprint; PATs need `errors:write`). It creates an issue in the project's default
+team with the configured label. The title is the error type and message. The description
+holds the stack trace (source-mapped when available, cut to 30 lines), occurrences and
+affected users over the last 90 days, first and last seen, environment and release when
+known, and a link back to TraceIQ. Error text is kept inside code fences, because it comes
+from end users' devices.
+
+The link is stored in `error_linear_issues`. Calling again returns the stored link
+(`created: false`) instead of a second issue; a per-error lock covers double clicks.
+Errors: `LINEAR_NOT_CONNECTED` (404), `LINEAR_NEEDS_RECONNECT` (409), `LINEAR_TEAM_NOT_SET`
+(409), `LINEAR_ERROR` (502). The dashboard sends the first three to Settings → Integrations.
+`GET /v1/dashboard/errors/issue` includes `issue.linearIssue` once one exists.
 
 Personal access tokens cannot connect, disconnect or change Linear settings.
 

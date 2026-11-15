@@ -26,6 +26,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readApiError } from '@/lib/api-error';
 import { buildErrorFixPrompt } from '@/lib/error-fix-prompt';
 import { toast } from '@/lib/toast';
+import { integrationsSettingsHref, needsLinearSettings, readApiErrorCode, type ErrorLinearIssue } from '@/lib/linear';
+import { LinearIcon } from '@/components/ProviderIcons';
 import { BrandIcon } from '@/components/icons/BrandIcon';
 import { EmptyState } from '@/components/EmptyState';
 
@@ -81,7 +83,10 @@ export interface IssueDetailData {
     resolvedAt: string | null;
     /** Release of the first occurrence after the issue was resolved, when it regressed. */
     regressedInRelease?: string | null;
+    /** The Linear issue created for this error issue, if any. */
+    linearIssue?: ErrorLinearIssue | null;
   };
+  project?: { id: string; name: string } | null;
   totals: {
     occurrences: number;
     sessions: number;
@@ -214,6 +219,9 @@ export function ErrorTrackingClientView({
   const [showMinifiedStack, setShowMinifiedStack] = useState(false);
   // Workflow state returned by the last PATCH, so the buttons update without waiting on router.refresh().
   const [savedState, setSavedState] = useState<Record<string, { status: IssueStatus; assigneeUserId: string | null }>>({});
+  // Linear issues created from this page, by error issue id.
+  const [createdLinearIssues, setCreatedLinearIssues] = useState<Record<string, ErrorLinearIssue>>({});
+  const [creatingLinearIssue, setCreatingLinearIssue] = useState(false);
 
   // Derive top KPIs
   const totalIssuesCount = counts.all || initialIssues.length;
@@ -267,6 +275,52 @@ export function ErrorTrackingClientView({
   const saved = activeIssue ? savedState[activeIssue.id] : undefined;
   const activeStatus: IssueStatus = saved?.status ?? (detailMatches ? activeDetail?.issue.status : activeIssue?.status) ?? 'open';
   const activeAssignee = (saved ? saved.assigneeUserId : detailMatches ? activeDetail?.issue.assigneeUserId : activeIssue?.assigneeUserId) ?? null;
+
+  const linearIssue = activeIssue
+    ? createdLinearIssues[activeIssue.id] ?? (detailMatches ? activeDetail?.issue.linearIssue ?? null : null)
+    : null;
+  const detailProjectId = activeDetail?.project?.id ?? null;
+
+  async function createLinearIssue(id: string) {
+    setCreatingLinearIssue(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error('Your session expired. Sign in again.');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/v1/dashboard/errors/issues/${encodeURIComponent(id)}/linear-issue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(detailProjectId ? { projectId: detailProjectId } : {})
+      });
+      if (!response.ok) {
+        const code = await readApiErrorCode(response);
+        const message = await readApiError(response, 'Could not create the Linear issue.');
+        if (needsLinearSettings(code)) {
+          // Not connected, needs reconnecting, or no default team: fix it in Settings.
+          toast.warning(message, { title: 'Finish setting up Linear' });
+          router.push(integrationsSettingsHref(detailProjectId));
+          return;
+        }
+        toast.error(message, { title: 'Linear issue not created' });
+        return;
+      }
+      const result = (await response.json()) as { linearIssue: ErrorLinearIssue; created: boolean };
+      setCreatedLinearIssues((previous) => ({ ...previous, [id]: result.linearIssue }));
+      toast.success(
+        result.created ? `Created ${result.linearIssue.identifier} in Linear.` : `This error is already tracked in ${result.linearIssue.identifier}.`,
+        { title: result.created ? 'Linear issue created' : 'Already in Linear' }
+      );
+    } catch (error) {
+      toast.error(await readApiError(error, 'Could not create the Linear issue.'));
+    } finally {
+      setCreatingLinearIssue(false);
+    }
+  }
 
   const navigate = (changes: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
@@ -774,6 +828,30 @@ export function ErrorTrackingClientView({
                         {copiedPrompt ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Wand className="h-3.5 w-3.5" />}
                         {copiedPrompt ? 'Copied' : 'Copy fix prompt'}
                       </button>
+                      {linearIssue ? (
+                        <a
+                          href={linearIssue.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open the Linear issue for this error"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          <LinearIcon className="h-3.5 w-3.5" />
+                          {linearIssue.identifier}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={creatingLinearIssue || !detailMatches}
+                          aria-busy={creatingLinearIssue}
+                          onClick={() => void createLinearIssue(activeIssue.id)}
+                          title="Creates an issue in this project’s default Linear team, with the stack trace and a link back here"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          <LinearIcon className="h-3.5 w-3.5" />
+                          {creatingLinearIssue ? 'Creating…' : 'Create Linear issue'}
+                        </button>
+                      )}
                     </div>
                   </div>
 

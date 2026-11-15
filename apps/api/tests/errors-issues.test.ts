@@ -70,7 +70,8 @@ describe('ErrorsService.getIssue', () => {
       status: 'regressed',
       assigneeUserId: 'user_2',
       resolvedAt: '2026-10-10T00:00:00Z',
-      regressedInRelease: '2.1.0'
+      regressedInRelease: '2.1.0',
+      linearIssue: null
     });
     const [regressed] = db.queryCalls(/occurred_at > \$5::timestamptz/);
     expect(regressed.values).toEqual(['proj_1', '$exception', 'fp_1', 14, '2026-10-10T00:00:00Z']);

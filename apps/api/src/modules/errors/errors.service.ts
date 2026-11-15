@@ -22,7 +22,7 @@ const MESSAGE_SQL = `COALESCE(NULLIF(e.properties->>'message', ''), '(no message
  * Issue id: the fingerprint stamped at ingest, or, for events stored before
  * fingerprinting existed, a hash of type + message (how they were grouped then).
  */
-const ISSUE_ID_SQL = `COALESCE(NULLIF(e.properties->>'$fingerprint', ''), md5(${TYPE_SQL} || E'\n' || ${MESSAGE_SQL}))`;
+export const ISSUE_ID_SQL = `COALESCE(NULLIF(e.properties->>'$fingerprint', ''), md5(${TYPE_SQL} || E'\n' || ${MESSAGE_SQL}))`;
 /**
  * The release an event came from: `context.release` (the SDKs' `release`
  * option), `properties.release` (set by hand), else the mobile app version.
@@ -259,6 +259,7 @@ export class ErrorsService {
     const latest = identity.rows[0];
     const issueId = id ?? latest?.id ?? null;
     const state = issueId ? await this.readState(project.id, issueId) : null;
+    const linearIssue = issueId ? await this.readLinearIssue(project.id, issueId) : null;
 
     const totals = await this.database.query<{
       occurrences: number;
@@ -349,7 +350,8 @@ export class ErrorsService {
         status: this.effectiveStatus(state, totals.rows[0]?.lastSeen ?? null),
         assigneeUserId: state?.assignee_user_id ?? null,
         resolvedAt: state?.resolved_at ?? null,
-        regressedInRelease
+        regressedInRelease,
+        linearIssue
       },
       days,
       totals: totals.rows[0] ?? { occurrences: 0, sessions: 0, users: 0, firstSeen: '', lastSeen: '', firstRelease: null, lastRelease: null },
@@ -423,6 +425,22 @@ export class ErrorsService {
       [projectId, issueId]
     );
     return result.rows[0] ?? null;
+  }
+
+  /** The Linear issue created for this error issue, if any. */
+  private async readLinearIssue(projectId: string, issueId: string) {
+    try {
+      const result = await this.database.query<{ linearIssueId: string; identifier: string; url: string; createdAt: string }>(
+        `SELECT linear_issue_id AS "linearIssueId", identifier, url, created_at AS "createdAt"
+         FROM error_linear_issues WHERE project_id = $1 AND fingerprint = $2`,
+        [projectId, issueId]
+      );
+      return result.rows[0] ?? null;
+    } catch (error) {
+      // Before migration 0065 runs the table is missing; the issue page must still load.
+      if ((error as { code?: string })?.code === '42P01') return null;
+      throw error;
+    }
   }
 
   private effectiveStatus(state: IssueStateRow | null, lastSeen: string | null): IssueStatus {

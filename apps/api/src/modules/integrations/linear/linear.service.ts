@@ -93,12 +93,12 @@ const SETTINGS_COLUMNS = `
 
 export const dashboardUrl = () => (process.env.DASHBOARD_URL ?? 'https://traceiq.run').replace(/\/+$/, '');
 
-/** Where the browser lands after the Linear consent screen. */
-export function settingsReturnUrl(result: 'connected' | 'error', reason?: string, projectId?: string): string {
-  const url = new URL(`${dashboardUrl()}/dashboard/settings/integrations`);
-  url.searchParams.set('linear', result);
-  if (reason) url.searchParams.set('reason', reason);
-  if (projectId) url.searchParams.set('projectId', projectId);
+export const SETTINGS_PATH = '/dashboard/settings/integrations';
+
+/** A URL on the dashboard's integrations settings page with the given query. */
+export function settingsReturnUrl(params: Record<string, string | undefined>): string {
+  const url = new URL(`${dashboardUrl()}${SETTINGS_PATH}`);
+  for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
   return url.toString();
 }
 
@@ -134,89 +134,140 @@ export class LinearService {
   }
 
   /**
-   * Step 2: Linear sends the browser back here. Identity comes from the signed state,
-   * re-checked against current membership. Returns the dashboard URL to redirect to.
-   * Never throws: every failure becomes `?linear=error&reason=...`.
+   * Step 2: Linear sends the browser back to the API. Nothing is exchanged here: the
+   * callback has no session, so it cannot know who is in the browser. It checks the
+   * state's signature and forwards the code to the dashboard, which finishes with the
+   * signed-in session ({@link completeConnect}). Never throws.
    */
-  async finishConnect(params: { code?: string; state?: string; error?: string }): Promise<string> {
-    if (!this.linear.isConfigured) return settingsReturnUrl('error', 'not_configured');
-    if (!params.state) return settingsReturnUrl('error', 'invalid_state');
+  forwardCallback(params: { code?: string; state?: string; error?: string }): string {
+    const fail = (reason: string, projectId?: string) => settingsReturnUrl({ linear: 'error', reason, projectId });
+    if (!this.linear.isConfigured) return fail('not_configured');
+    if (!params.state) return fail('invalid_state');
 
     let claims;
     try {
       claims = verifyIntegrationState(this.stateKey(), params.state, STATE_PURPOSE);
     } catch (error) {
-      return settingsReturnUrl('error', error instanceof InvalidStateError && error.reason === 'expired' ? 'expired' : 'invalid_state');
+      return fail(error instanceof InvalidStateError && error.reason === 'expired' ? 'expired' : 'invalid_state');
     }
-    const back = (result: 'connected' | 'error', reason?: string) => settingsReturnUrl(result, reason, claims.projectId);
+    if (params.error) return fail(params.error === 'access_denied' ? 'cancelled' : 'linear_error', claims.projectId);
+    if (!params.code) return fail('missing_code', claims.projectId);
+    return settingsReturnUrl({ linear: 'complete', linear_code: params.code, linear_state: params.state, projectId: claims.projectId });
+  }
 
-    if (params.error) return back('error', params.error === 'access_denied' ? 'cancelled' : 'linear_error');
-    if (!params.code) return back('error', 'missing_code');
+  /**
+   * Step 3: the dashboard posts the forwarded code with the signed-in session. The
+   * person finishing must be the person who started (the user in the signed state),
+   * so a connect link sent to someone else cannot attach their Linear workspace to
+   * the sender's organization. Membership and role are checked again here.
+   */
+  async completeConnect(user: DashboardUser, body: { code?: unknown; state?: unknown }) {
+    this.requireInteractive(user);
+    this.requireConfigured();
+    this.cipher.assertConfigured();
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    const state = typeof body?.state === 'string' ? body.state.trim() : '';
+    if (!code || !state) throw new BadRequestException('code and state are required.');
 
+    let claims;
     try {
-      // The person may have lost access between starting and finishing.
-      const role = await this.memberRole(claims.organizationId, claims.userId);
-      if (!role || !MANAGE_ROLES.includes(role)) return back('error', 'forbidden');
-
-      const tokens = await this.linear.exchangeCode(params.code);
-      const workspace = await this.linear.fetchWorkspace(tokens.accessToken);
-
-      await this.database.transaction(async (client) => {
-        const previous = await client.query<{ workspaceId: string }>(
-          `SELECT workspace_id AS "workspaceId" FROM linear_connections WHERE organization_id = $1 FOR UPDATE`,
-          [claims.organizationId]
-        );
-        await client.query(
-          `INSERT INTO linear_connections
-             (id, organization_id, access_token_encrypted, refresh_token_encrypted, token_expires_at, scopes,
-              workspace_id, workspace_name, workspace_url_key, status, connected_by_user_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10)
-           ON CONFLICT (organization_id) DO UPDATE SET
-             access_token_encrypted = EXCLUDED.access_token_encrypted,
-             refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
-             token_expires_at = EXCLUDED.token_expires_at,
-             scopes = EXCLUDED.scopes,
-             workspace_id = EXCLUDED.workspace_id,
-             workspace_name = EXCLUDED.workspace_name,
-             workspace_url_key = EXCLUDED.workspace_url_key,
-             status = 'active',
-             connected_by_user_id = EXCLUDED.connected_by_user_id,
-             updated_at = now()`,
-          [
-            `lin_${randomUUID().replace(/-/g, '')}`,
-            claims.organizationId,
-            this.cipher.encrypt(tokens.accessToken),
-            tokens.refreshToken ? this.cipher.encrypt(tokens.refreshToken) : null,
-            tokens.expiresAt,
-            tokens.scopes,
-            workspace.id,
-            workspace.name,
-            workspace.urlKey,
-            claims.userId
-          ]
-        );
-        // Team and label ids belong to a workspace; drop ones from a different workspace.
-        const previousWorkspace = previous.rows[0]?.workspaceId;
-        if (previousWorkspace && previousWorkspace !== workspace.id) {
-          await client.query(
-            `DELETE FROM linear_project_settings
-             WHERE project_id IN (SELECT id FROM projects WHERE organization_id = $1)`,
-            [claims.organizationId]
-          );
-        }
+      claims = verifyIntegrationState(this.stateKey(), state, STATE_PURPOSE);
+    } catch (error) {
+      const expired = error instanceof InvalidStateError && error.reason === 'expired';
+      throw new BadRequestException({
+        code: expired ? 'LINEAR_STATE_EXPIRED' : 'LINEAR_STATE_INVALID',
+        message: expired ? 'The Linear connection took too long. Start it again.' : 'This Linear connection link is not valid. Start it again.'
       });
-      return back('connected');
+    }
+    if (claims.userId !== user.id) {
+      throw new ForbiddenException({
+        code: 'LINEAR_STATE_USER_MISMATCH',
+        message: 'This Linear connection was started by a different TraceIQ user. Start it again from Settings.'
+      });
+    }
+    // The person may have lost access between starting and finishing.
+    const role = await this.memberRole(claims.organizationId, user.id);
+    if (!role) throw new NotFoundException('Organization not found or not accessible.');
+    this.requireManager(role);
+
+    let tokens;
+    let workspace;
+    try {
+      tokens = await this.linear.exchangeCode(code);
+      workspace = await this.linear.fetchWorkspace(tokens.accessToken);
     } catch (error) {
       // Log the failure class only; never the code, state or any token.
       this.logger.warn(`Linear connect failed for organization ${claims.organizationId}: ${describeError(error)}`);
-      return back('error', error instanceof LinearAuthError ? 'invalid_code' : 'linear_error');
+      if (error instanceof LinearAuthError) {
+        throw new BadRequestException({ code: 'LINEAR_CODE_INVALID', message: 'Linear did not accept the sign-in. Try connecting again.' });
+      }
+      throw toHttpError(error);
     }
+
+    await this.database.transaction(async (client) => {
+      const previous = await client.query<{ workspaceId: string }>(
+        `SELECT workspace_id AS "workspaceId" FROM linear_connections WHERE organization_id = $1 FOR UPDATE`,
+        [claims.organizationId]
+      );
+      await client.query(
+        `INSERT INTO linear_connections
+           (id, organization_id, access_token_encrypted, refresh_token_encrypted, token_expires_at, scopes,
+            workspace_id, workspace_name, workspace_url_key, status, connected_by_user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10)
+         ON CONFLICT (organization_id) DO UPDATE SET
+           access_token_encrypted = EXCLUDED.access_token_encrypted,
+           refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
+           token_expires_at = EXCLUDED.token_expires_at,
+           scopes = EXCLUDED.scopes,
+           workspace_id = EXCLUDED.workspace_id,
+           workspace_name = EXCLUDED.workspace_name,
+           workspace_url_key = EXCLUDED.workspace_url_key,
+           status = 'active',
+           connected_by_user_id = EXCLUDED.connected_by_user_id,
+           updated_at = now()`,
+        [
+          `lin_${randomUUID().replace(/-/g, '')}`,
+          claims.organizationId,
+          this.cipher.encrypt(tokens.accessToken),
+          tokens.refreshToken ? this.cipher.encrypt(tokens.refreshToken) : null,
+          tokens.expiresAt,
+          tokens.scopes,
+          workspace.id,
+          workspace.name,
+          workspace.urlKey,
+          user.id
+        ]
+      );
+      // Team and label ids belong to a workspace; drop ones from a different workspace.
+      const previousWorkspace = previous.rows[0]?.workspaceId;
+      if (previousWorkspace && previousWorkspace !== workspace.id) {
+        await client.query(
+          `DELETE FROM linear_project_settings
+           WHERE project_id IN (SELECT id FROM projects WHERE organization_id = $1)`,
+          [claims.organizationId]
+        );
+      }
+    });
+
+    return {
+      connected: true,
+      organizationId: claims.organizationId,
+      projectId: claims.projectId ?? null,
+      workspace: { id: workspace.id, name: workspace.name, urlKey: workspace.urlKey }
+    };
   }
 
   /** Connection status for the organization, plus its teams when the connection works. */
   async getStatus(user: DashboardUser, scope: OrganizationScope) {
     const org = await this.resolveOrganization(user, scope);
-    const base = { configured: this.linear.isConfigured, organizationId: org.organizationId, canManage: MANAGE_ROLES.includes(org.role) };
+    // The project whose defaults the settings card edits: the requested one, else the active one.
+    const project = await this.projects.resolveActiveProject(user, org.projectId, org.organizationId);
+    const base = {
+      configured: this.linear.isConfigured,
+      organizationId: org.organizationId,
+      canManage: MANAGE_ROLES.includes(org.role),
+      project: project ? { id: project.id, name: project.name } : null
+    };
     const connection = await this.findConnection(org.organizationId);
     if (!connection) return { ...base, connected: false as const, status: 'not_connected' as const };
 
@@ -356,11 +407,7 @@ export class LinearService {
     try {
       return await request();
     } catch (error) {
-      if (error instanceof LinearAuthError) {
-        throw new ConflictException({ code: 'LINEAR_NEEDS_RECONNECT', message: 'Linear needs to be reconnected in Settings.' });
-      }
-      if (error instanceof LinearApiError) throw new BadGatewayException({ code: 'LINEAR_ERROR', message: error.message });
-      throw error;
+      throw toHttpError(error);
     }
   }
 
@@ -423,7 +470,19 @@ export class LinearService {
   }
 }
 
-function describeError(error: unknown): string {
+/**
+ * Linear failures as HTTP errors with codes the dashboard acts on:
+ * LINEAR_NEEDS_RECONNECT (409) and LINEAR_ERROR (502). Anything else passes through.
+ */
+export function toHttpError(error: unknown): unknown {
+  if (error instanceof LinearAuthError) {
+    return new ConflictException({ code: 'LINEAR_NEEDS_RECONNECT', message: 'Linear needs to be reconnected in Settings.' });
+  }
+  if (error instanceof LinearApiError) return new BadGatewayException({ code: 'LINEAR_ERROR', message: error.message });
+  return error;
+}
+
+export function describeError(error: unknown): string {
   if (error instanceof LinearApiError) return `${error.name}${error.status ? ` (${error.status})` : ''}`;
   if (error instanceof Error) return error.name;
   return 'unknown error';

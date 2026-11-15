@@ -112,7 +112,8 @@ describe('Linear integration', () => {
   let service: LinearService;
   const projects = {
     requireActiveProject: vi.fn(),
-    requireWritableProject: vi.fn()
+    requireWritableProject: vi.fn(),
+    resolveActiveProject: vi.fn()
   };
 
   function makeConnection(overrides: Partial<LinearConnectionRecord> = {}) {
@@ -160,6 +161,7 @@ describe('Linear integration', () => {
     });
     projects.requireActiveProject.mockReset();
     projects.requireWritableProject.mockReset();
+    projects.resolveActiveProject.mockReset().mockResolvedValue({ id: 'proj_1', name: 'Web', organizationId: 'org_1', role: 'owner' });
     client = new LinearClient(db as never, cipher);
     service = new LinearService(db as never, projects as never, client, cipher);
   });
@@ -202,6 +204,32 @@ describe('Linear integration', () => {
   });
 
   describe('callback', () => {
+    it('only forwards the code to dashboard settings; it never exchanges or stores it', () => {
+      const state = stateFor('usr_owner', 'org_1', 'proj_1');
+      const url = new URL(service.forwardCallback({ code: 'code-1', state }));
+      expect(url.origin + url.pathname).toBe('https://app.test/dashboard/settings/integrations');
+      expect(url.searchParams.get('linear')).toBe('complete');
+      expect(url.searchParams.get('linear_code')).toBe('code-1');
+      expect(url.searchParams.get('linear_state')).toBe(state);
+      expect(url.searchParams.get('projectId')).toBe('proj_1');
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(db.query).not.toHaveBeenCalled();
+    });
+
+    it('turns forged, expired, missing states and cancellations into error flags', () => {
+      const forged = signIntegrationState('wrong-key', { purpose: 'linear-connect', organizationId: 'org_1', userId: 'usr_owner' });
+      expect(returned(service.forwardCallback({ code: 'c', state: forged }))).toMatchObject({ linear: 'error', reason: 'invalid_state' });
+      const expired = signIntegrationState(STATE_KEY, { purpose: 'linear-connect', organizationId: 'org_1', userId: 'usr_owner' }, 600, Date.now() - 700_000);
+      expect(returned(service.forwardCallback({ code: 'c', state: expired }))).toMatchObject({ linear: 'error', reason: 'expired' });
+      expect(returned(service.forwardCallback({ code: 'c' }))).toMatchObject({ linear: 'error', reason: 'invalid_state' });
+      expect(returned(service.forwardCallback({ error: 'access_denied', state: stateFor('usr_owner') }))).toMatchObject({ linear: 'error', reason: 'cancelled' });
+      expect(returned(service.forwardCallback({ state: stateFor('usr_owner') }))).toMatchObject({ linear: 'error', reason: 'missing_code' });
+      delete process.env.LINEAR_CLIENT_SECRET;
+      expect(returned(service.forwardCallback({ code: 'c', state: 'x.y' }))).toMatchObject({ linear: 'error', reason: 'not_configured' });
+    });
+  });
+
+  describe('complete', () => {
     function linearAccepts() {
       fetchMock.mockImplementation(async (url: string) => {
         if (url === 'https://api.linear.app/oauth/token') {
@@ -212,10 +240,10 @@ describe('Linear integration', () => {
       });
     }
 
-    it('exchanges the code and stores only encrypted tokens', async () => {
+    it('exchanges the code for the signed-in starter and stores only encrypted tokens', async () => {
       linearAccepts();
-      const url = await service.finishConnect({ code: 'code-1', state: stateFor('usr_owner', 'org_1', 'proj_1') });
-      expect(returned(url)).toEqual({ path: '/dashboard/settings/integrations', linear: 'connected', reason: null, projectId: 'proj_1' });
+      const result = await service.completeConnect(owner, { code: 'code-1', state: stateFor('usr_owner', 'org_1', 'proj_1') });
+      expect(result).toEqual({ connected: true, organizationId: 'org_1', projectId: 'proj_1', workspace: { id: 'ws_1', name: 'Acme', urlKey: 'acme' } });
 
       const tokenCall = fetchMock.mock.calls.find(([u]) => u === 'https://api.linear.app/oauth/token')!;
       const form = new URLSearchParams(tokenCall[1].body as URLSearchParams);
@@ -234,47 +262,56 @@ describe('Linear integration', () => {
       expect(insert.values[9]).toBe('usr_owner');
     });
 
+    it('refuses a connect link finished by a different person (login CSRF)', async () => {
+      linearAccepts();
+      roles.usr_attacker = 'owner';
+      // The attacker starts a connection for their own org and sends the link to a victim.
+      const attackerState = stateFor('usr_attacker', 'org_attacker');
+      await expect(service.completeConnect(member, { code: 'victim-code', state: attackerState })).rejects.toMatchObject({
+        response: { code: 'LINEAR_STATE_USER_MISMATCH' }
+      });
+      await expect(service.completeConnect(owner, { code: 'victim-code', state: attackerState })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(db.queryCalls('INSERT INTO linear_connections')).toHaveLength(0);
+    });
+
     it('clears project defaults when a different workspace is connected', async () => {
       linearAccepts();
-      db.query.mockImplementationOnce(async () => rows([{ role: 'owner' }]));
       const original = db.query.getMockImplementation()!;
       db.query.mockImplementation(async (text: string, values: unknown[]) => {
         if (text.includes('FOR UPDATE')) return rows([{ workspaceId: 'ws_old' }]);
         return original(text, values);
       });
-      await service.finishConnect({ code: 'code-1', state: stateFor('usr_owner') });
+      await service.completeConnect(owner, { code: 'code-1', state: stateFor('usr_owner') });
       expect(db.query.mock.calls.some(([text]) => String(text).includes('DELETE FROM linear_project_settings'))).toBe(true);
     });
 
-    it('rejects a forged, expired or missing state without calling Linear', async () => {
+    it('rejects forged, expired or missing states without calling Linear', async () => {
       const forged = signIntegrationState('wrong-key', { purpose: 'linear-connect', organizationId: 'org_1', userId: 'usr_owner' });
-      expect(returned(await service.finishConnect({ code: 'c', state: forged }))).toMatchObject({ linear: 'error', reason: 'invalid_state' });
+      await expect(service.completeConnect(owner, { code: 'c', state: forged })).rejects.toMatchObject({ response: { code: 'LINEAR_STATE_INVALID' } });
       const expired = signIntegrationState(STATE_KEY, { purpose: 'linear-connect', organizationId: 'org_1', userId: 'usr_owner' }, 600, Date.now() - 700_000);
-      expect(returned(await service.finishConnect({ code: 'c', state: expired }))).toMatchObject({ linear: 'error', reason: 'expired' });
-      expect(returned(await service.finishConnect({ code: 'c' }))).toMatchObject({ linear: 'error', reason: 'invalid_state' });
+      await expect(service.completeConnect(owner, { code: 'c', state: expired })).rejects.toMatchObject({ response: { code: 'LINEAR_STATE_EXPIRED' } });
+      await expect(service.completeConnect(owner, { code: 'c' })).rejects.toThrow(/code and state are required/);
+      await expect(service.completeConnect(pat, { code: 'c', state: stateFor('usr_owner') })).rejects.toBeInstanceOf(ForbiddenException);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(db.queryCalls('INSERT INTO linear_connections')).toHaveLength(0);
-    });
-
-    it('handles the person cancelling on Linear', async () => {
-      const url = await service.finishConnect({ error: 'access_denied', state: stateFor('usr_owner') });
-      expect(returned(url)).toMatchObject({ linear: 'error', reason: 'cancelled' });
-      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('refuses when the person is no longer an owner or admin', async () => {
       linearAccepts();
       roles.usr_owner = 'member';
-      const url = await service.finishConnect({ code: 'c', state: stateFor('usr_owner') });
-      expect(returned(url)).toMatchObject({ linear: 'error', reason: 'forbidden' });
+      await expect(service.completeConnect(owner, { code: 'c', state: stateFor('usr_owner') })).rejects.toBeInstanceOf(ForbiddenException);
+      delete roles.usr_owner;
+      await expect(service.completeConnect(owner, { code: 'c', state: stateFor('usr_owner') })).rejects.toBeInstanceOf(NotFoundException);
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('reports a failed code exchange without storing anything or logging secrets', async () => {
       const warn = vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation(() => undefined);
       fetchMock.mockResolvedValue(json({ error: 'invalid_grant' }, 400));
-      const url = await service.finishConnect({ code: 'secret-code', state: stateFor('usr_owner') });
-      expect(returned(url)).toMatchObject({ linear: 'error', reason: 'invalid_code' });
+      await expect(service.completeConnect(owner, { code: 'secret-code', state: stateFor('usr_owner') })).rejects.toMatchObject({
+        response: { code: 'LINEAR_CODE_INVALID' }
+      });
       expect(db.queryCalls('INSERT INTO linear_connections')).toHaveLength(0);
       expect(warn.mock.calls.flat().join(' ')).not.toContain('secret-code');
     });
@@ -282,7 +319,10 @@ describe('Linear integration', () => {
 
   describe('status', () => {
     it('reports not connected', async () => {
-      await expect(service.getStatus(member, {})).resolves.toMatchObject({ connected: false, status: 'not_connected', configured: true, canManage: false });
+      await expect(service.getStatus(member, {})).resolves.toMatchObject({
+        connected: false, status: 'not_connected', configured: true, canManage: false, project: { id: 'proj_1', name: 'Web' }
+      });
+      expect(projects.resolveActiveProject).toHaveBeenCalledWith(member, undefined, 'org_1');
     });
 
     it('lists teams and project defaults for a working connection', async () => {
@@ -428,10 +468,11 @@ describe('LinearController authorization', () => {
         throw new ForbiddenException('Personal access token requires "projects:read" scope.');
       })
     };
-    const linear = { getStatus: vi.fn(), listLabels: vi.fn(), createConnectUrl: vi.fn(), disconnect: vi.fn(), saveProjectSettings: vi.fn() };
+    const linear = { getStatus: vi.fn(), listLabels: vi.fn(), createConnectUrl: vi.fn(), disconnect: vi.fn(), saveProjectSettings: vi.fn(), completeConnect: vi.fn() };
     const controller = new LinearController(authService as never, linear as never);
 
     await expect(controller.connect(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(controller.complete({ code: 'c', state: 's' }, undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.disconnect(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.saveProject('proj_1', { teamId: 't' }, undefined)).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(controller.status('Bearer tiq_pat_x')).rejects.toBeInstanceOf(ForbiddenException);
@@ -439,5 +480,6 @@ describe('LinearController authorization', () => {
     expect(authService.requireScope).toHaveBeenCalledWith(expect.anything(), 'projects:read');
     expect(linear.getStatus).not.toHaveBeenCalled();
     expect(linear.createConnectUrl).not.toHaveBeenCalled();
+    expect(linear.completeConnect).not.toHaveBeenCalled();
   });
 });

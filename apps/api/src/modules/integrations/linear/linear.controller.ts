@@ -1,11 +1,11 @@
-import { Body, Controller, Delete, Get, Headers, Param, Put, Query, Redirect } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Query, Redirect } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '../../auth/auth.service';
 import { LinearService } from './linear.service';
 
 /**
  * Linear integration. Every route except the OAuth callback needs a dashboard
- * session; the callback is trusted through its signed `state` instead.
+ * session. The callback stores nothing: it forwards the code to the dashboard.
  * Organization is chosen by `organizationId` or `projectId` (first org otherwise).
  */
 @Controller('v1/integrations/linear')
@@ -26,12 +26,24 @@ export class LinearController {
     return this.linear.createConnectUrl(user, { organizationId, projectId });
   }
 
-  /** Linear redirects the browser here after consent; we send it on to dashboard settings. */
+  /**
+   * Linear redirects the browser here after consent. The code is only forwarded to
+   * dashboard settings, which finishes the connection with the signed-in session.
+   */
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('callback')
   @Redirect()
-  async callback(@Query('code') code?: string, @Query('state') state?: string, @Query('error') error?: string) {
-    return { url: await this.linear.finishConnect({ code, state, error }), statusCode: 302 };
+  callback(@Query('code') code?: string, @Query('state') state?: string, @Query('error') error?: string) {
+    return { url: this.linear.forwardCallback({ code, state, error }), statusCode: 302 };
+  }
+
+  /** The dashboard posts the forwarded code here; only the person who started may finish. */
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('complete')
+  @HttpCode(200)
+  async complete(@Body() body: { code?: unknown; state?: unknown }, @Headers('authorization') authorization?: string) {
+    const user = await this.authService.getDashboardUser(authorization);
+    return this.linear.completeConnect(user, body ?? {});
   }
 
   @Get('status')
