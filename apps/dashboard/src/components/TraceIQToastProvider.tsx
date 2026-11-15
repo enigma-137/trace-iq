@@ -21,6 +21,14 @@ const TONE_STYLES: Record<ToastTone, { icon: IconSvgElement; iconClass: string; 
   error: { icon: CancelCircleIcon, iconClass: 'text-red-600 dark:text-red-400', title: 'Something went wrong' }
 };
 
+/** Drops the `dark:` variants from a class list. */
+export function lightOnly(classes: string): string {
+  return classes
+    .split(/\s+/)
+    .filter((name) => name && !name.startsWith('dark:'))
+    .join(' ');
+}
+
 export function TraceIQToastProvider({ children }: { children: ReactNode }) {
   const toasts = useSyncExternalStore(subscribeToToasts, getToastSnapshot, getServerToastSnapshot);
 
@@ -42,22 +50,24 @@ export function TraceIQToastProvider({ children }: { children: ReactNode }) {
 
 function ToastItem({ toastItem }: { toastItem: TraceIQToast }) {
   const style = TONE_STYLES[toastItem.tone];
+  // Sign-in and sign-up toasts match the always-light auth pages.
+  const cx = (classes: string) => (toastItem.light ? lightOnly(classes) : classes);
 
   return (
     <article
-      className="traceiq-toast pointer-events-auto flex w-full items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4 text-neutral-950 shadow-xl shadow-neutral-950/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:shadow-black/40"
+      className={cx("traceiq-toast pointer-events-auto flex w-full items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4 text-neutral-950 shadow-xl shadow-neutral-950/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:shadow-black/40")}
       role={toastItem.tone === 'error' ? 'alert' : 'status'}
       aria-live={toastItem.tone === 'error' ? 'assertive' : 'polite'}
       aria-atomic="true"
     >
-      <HugeiconsIcon icon={style.icon} size={20} className={`mt-0.5 shrink-0 ${style.iconClass}`} aria-hidden="true" />
+      <HugeiconsIcon icon={style.icon} size={20} className={cx(`mt-0.5 shrink-0 ${style.iconClass}`)} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{toastItem.title ?? style.title}</p>
-        <p className="mt-1 break-words text-sm leading-5 text-neutral-600 dark:text-slate-300">{toastItem.message}</p>
+        <p className={cx("mt-1 break-words text-sm leading-5 text-neutral-600 dark:text-slate-300")}>{toastItem.message}</p>
       </div>
       <button
         type="button"
-        className="-mr-1 -mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 focus:outline-none focus:ring-2 focus:ring-neutral-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+        className={cx("-mr-1 -mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 focus:outline-none focus:ring-2 focus:ring-neutral-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white")}
         aria-label="Dismiss notification"
         onClick={() => toast.dismiss(toastItem.id)}
       >
