@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireAdminAccess } from '@/lib/admin';
+import { GROWTH_RANGES, requireAdminAccess } from '@/lib/admin';
 import { StatTile } from '@/components/charts/StatTile';
 import { BarChart } from '@/components/charts/BarChart';
 import { DonutChart } from '@/components/charts/DonutChart';
@@ -7,6 +7,8 @@ import { RankedList } from '@/components/charts/RankedList';
 import { AdminActivityFeed } from './AdminActivityFeed';
 import { AdminActivationSection } from './AdminActivation';
 import { AdminNotificationBell } from './AdminNotificationBell';
+import { AdminGrowthSection } from './AdminGrowth';
+import { SkipSiteStats } from './SkipSiteStats';
 
 export const metadata = { title: 'Admin · TraceIQ' };
 
@@ -17,8 +19,10 @@ const LOG_KIND_LABELS: Record<string, string> = {
   audit: 'Audit'
 };
 
-export default async function AdminPage() {
-  const access = await requireAdminAccess('/admin');
+export default async function AdminPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+  const requested = Number(Array.isArray(searchParams.growth) ? searchParams.growth[0] : searchParams.growth);
+  const growthDays = GROWTH_RANGES.find((days) => days === requested) ?? 30;
+  const access = await requireAdminAccess(growthDays === 30 ? '/admin' : `/admin?growth=${growthDays}`, growthDays);
 
   if (!access.isAdmin) {
     return <AccessDenied />;
@@ -76,6 +80,9 @@ export default async function AdminPage() {
           <StatTile label="Events (24h)" value={overview.events24h} hint={`${overview.eventsTotal.toLocaleString()} all time`} tone="green" />
           <StatTile label="Tracked users" value={overview.trackedUsers} hint={`${totalMembers} workspace members`} tone="blue" />
         </section>
+
+        <SkipSiteStats />
+        {access.growth ? <AdminGrowthSection growth={access.growth} /> : null}
 
         {access.activation ? <AdminActivationSection activation={access.activation} /> : null}
 

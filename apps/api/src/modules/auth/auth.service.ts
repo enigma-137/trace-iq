@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
+import { decodeSignInClaims, UserActivityRecorder } from './user-activity.recorder';
 
 export interface AmrEntry {
   method: string;
@@ -45,13 +46,29 @@ const MFA_METHODS = ['totp', 'webauthn', 'phone', 'sms'];
 const SUPABASE_USER_CACHE_TTL_MS = 30_000;
 const SUPABASE_USER_CACHE_MAX_ENTRIES = 5_000;
 
+/** A Supabase Auth account as the Admin API lists it, trimmed to what growth stats need. */
+export interface SupabaseAccount {
+  id: string;
+  email: string | null;
+  createdAt: string;
+  lastSignInAt: string | null;
+  provider: string | null;
+  confirmed: boolean;
+}
+
+const SUPABASE_ACCOUNTS_PAGE_SIZE = 1000;
+const SUPABASE_ACCOUNTS_MAX_PAGES = 50;
+
 @Injectable()
 export class AuthService {
   private localWorkspaceReady?: Promise<void>;
   private readonly supabaseUserCache = new Map<string, { user: SupabaseUserResponse; expiresAt: number }>();
   private readonly supabaseUserInFlight = new Map<string, Promise<SupabaseUserResponse>>();
+  private readonly activity: UserActivityRecorder;
 
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService) {
+    this.activity = new UserActivityRecorder(database);
+  }
 
   /**
    * Pass `fresh: true` where the response shows the account's live MFA factors,
@@ -77,6 +94,7 @@ export class AuthService {
     if (token.startsWith('tiq_pat_')) {
       const user = await this.validatePersonalAccessToken(token);
       if (!options.allowPendingDeletion) await this.assertAccountNotPendingDeletion(user.id);
+      this.activity.record(user, null);
       return user;
     }
 
@@ -94,7 +112,60 @@ export class AuthService {
       factors: user.factors
     };
     if (!options.allowPendingDeletion) await this.assertAccountNotPendingDeletion(dashboardUser.id);
+    this.activity.record(dashboardUser, decodeSignInClaims(token));
     return dashboardUser;
+  }
+
+  /**
+   * Every Supabase Auth account, for the admin growth numbers (sign-ups). Uses the
+   * service-role key; returns null when it isn't configured or in local auth mode.
+   */
+  async listSupabaseAccounts(): Promise<SupabaseAccount[] | null> {
+    if (this.isLocalAuthMode()) return null;
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return null;
+
+    const accounts: SupabaseAccount[] = [];
+    for (let page = 1; page <= SUPABASE_ACCOUNTS_MAX_PAGES; page += 1) {
+      const response = await fetch(
+        `${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=${SUPABASE_ACCOUNTS_PAGE_SIZE}`,
+        { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } }
+      );
+      if (!response.ok) {
+        throw new ServiceUnavailableException(`Supabase could not list accounts (HTTP ${response.status}).`);
+      }
+      const data = (await response.json()) as {
+        users?: Array<{
+          id?: string;
+          email?: string | null;
+          created_at?: string;
+          last_sign_in_at?: string | null;
+          email_confirmed_at?: string | null;
+          confirmed_at?: string | null;
+          app_metadata?: { provider?: string };
+        }>;
+      };
+      const users = data.users ?? [];
+      for (const user of users) {
+        if (!user.id || !user.created_at) continue;
+        accounts.push({
+          id: user.id,
+          email: user.email ?? null,
+          createdAt: user.created_at,
+          lastSignInAt: user.last_sign_in_at ?? null,
+          provider: user.app_metadata?.provider ?? null,
+          confirmed: Boolean(user.email_confirmed_at ?? user.confirmed_at)
+        });
+      }
+      if (users.length < SUPABASE_ACCOUNTS_PAGE_SIZE) break;
+    }
+    return accounts;
+  }
+
+  /** Stops recording activity for a deleted account from in-memory state. */
+  forgetUserActivity(userId: string): void {
+    this.activity.forget(userId);
   }
 
   async deleteSupabaseUser(userId: string): Promise<void> {

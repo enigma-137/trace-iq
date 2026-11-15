@@ -8,6 +8,7 @@ import { OAuthModule } from './modules/oauth/oauth.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { GrowthModule } from './modules/growth/growth.module';
 import { EventsModule } from './modules/events/events.module';
 import { FunnelsModule } from './modules/funnels/funnels.module';
 import { CohortsModule } from './modules/cohorts/cohorts.module';
@@ -91,6 +92,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     BillingModule,
     AdminModule,
     FeedbackModule,
+    GrowthModule,
     StatusModule,
     AccountLifecycleModule,
     LinearModule,
