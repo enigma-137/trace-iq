@@ -11,6 +11,9 @@ import {
   isPackageResolvable,
   resolveTargetEnvFile
 } from './detector.js';
+import { SDK_PACKAGES } from './sdk-packages.js';
+
+const NODE_SDK = SDK_PACKAGES.node.name;
 
 export class NodeAdapter implements FrameworkAdapter {
   readonly name = 'Node.js';
@@ -30,15 +33,18 @@ export class NodeAdapter implements FrameworkAdapter {
     const pm = await detectPackageManager(cwd);
     const envCreds = await detectExistingEnvCredentials(cwd);
 
-    const isResolvable = await isPackageResolvable(cwd, 'traceiq-sdk-js');
-    const inPkgJson = Boolean(meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']);
+    // Node apps use the server SDK, not the browser one.
+    const isResolvable = await isPackageResolvable(cwd, NODE_SDK);
+    const inPkgJson = Boolean(meta.dependencies[NODE_SDK] || meta.devDependencies[NODE_SDK]);
     const sdkDetected = isResolvable;
-    const sdkVersion = inPkgJson ? (meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']) : undefined;
+    const sdkVersion = inPkgJson ? (meta.dependencies[NODE_SDK] || meta.devDependencies[NODE_SDK]) : undefined;
 
     const hasClient =
       (await this.fileExists(path.join(cwd, 'traceiq.ts'))) ||
       (await this.fileExists(path.join(cwd, 'src', 'traceiq.ts'))) ||
-      (await this.fileExists(path.join(cwd, 'traceiq.js')));
+      (await this.fileExists(path.join(cwd, 'traceiq.js'))) ||
+      (await this.fileExists(path.join(cwd, 'traceiq.mjs')));
+    const browserSdkOnServer = Boolean(meta.dependencies['traceiq-sdk-js'] || meta.devDependencies['traceiq-sdk-js']);
 
     const issues: string[] = [];
     if (!sdkDetected) {
@@ -49,6 +55,10 @@ export class NodeAdapter implements FrameworkAdapter {
       }
     }
     if (!hasClient) issues.push('TraceIQ initialization module is not configured.');
+    const recommendations: string[] = [];
+    if (browserSdkOnServer && !inPkgJson) {
+      recommendations.push(`This Node app depends on the browser SDK (traceiq-sdk-js). Use ${NODE_SDK} on the server.`);
+    }
     if (!envCreds.projectId || !envCreds.writeKey) issues.push('TraceIQ environment variables are missing.');
 
     return {
@@ -66,7 +76,7 @@ export class NodeAdapter implements FrameworkAdapter {
       featureFlagsConfigured: false,
       envFiles: envCreds.foundInFile ? [envCreds.foundInFile] : [],
       issues,
-      recommendations: []
+      recommendations
     };
   }
 
@@ -79,46 +89,25 @@ export class NodeAdapter implements FrameworkAdapter {
       diffs: []
     };
 
-    // Ensure package is installed using package manager and verified resolvable
-    const wasInstalled = await ensurePackageInstalled(options.cwd, 'traceiq-sdk-js', options.packageManager, options.dryRun);
+    // Ensure the server SDK is installed with the project's package manager and resolvable.
+    const wasInstalled = await ensurePackageInstalled(options.cwd, NODE_SDK, options.packageManager, options.dryRun);
     if (wasInstalled) {
-      changes.installedPackages.push('traceiq-sdk-js');
+      changes.installedPackages.push(NODE_SDK);
     }
 
     const isTypeScript = await this.fileExists(path.join(options.cwd, 'tsconfig.json'));
+    const meta = await this.readPackageJson(options.cwd);
+    const esm = meta?.type === 'module';
+    // TypeScript compiles imports either way; plain JS must match the package's module type.
     const ext = isTypeScript ? 'ts' : 'js';
-    const filePath = path.join(options.cwd, `traceiq.${ext}`);
-
-    const initCode = `import { traceiq } from 'traceiq-sdk-js';
-
-const projectId = process.env.TRACEIQ_PROJECT_ID;
-const writeKey = process.env.TRACEIQ_WRITE_KEY;
-const endpoint = process.env.TRACEIQ_API_URL || 'https://api.traceiq.run';
-
-if (!projectId || !writeKey) {
-  if (process.env.NODE_ENV === 'development') {
-    console.warn(
-      '[TraceIQ] Initialization skipped: missing project ID or write key.\\n' +
-      'Restart the application after changing environment variables.'
-    );
-  }
-} else {
-  traceiq.initialize({
-    projectId,
-    writeKey,
-    endpoint,
-    autoCaptureExceptions: true
-  });
-}
-
-export { traceiq };
-`;
+    const fileName = `traceiq.${ext}`;
+    const filePath = path.join(options.cwd, fileName);
 
     if (!(await this.fileExists(filePath))) {
       if (!options.dryRun) {
-        await fs.writeFile(filePath, initCode, 'utf8');
+        await fs.writeFile(filePath, nodeClientModule(isTypeScript || esm), 'utf8');
       }
-      changes.createdFiles.push(`traceiq.${ext}`);
+      changes.createdFiles.push(fileName);
     }
 
     // Update environment file
@@ -142,9 +131,9 @@ export { traceiq };
     try {
       const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
       pkg.dependencies = pkg.dependencies ?? {};
-      if (!pkg.dependencies['traceiq-sdk-js']) {
-        pkg.dependencies['traceiq-sdk-js'] = '^0.1.7';
-        changes.installedPackages.push('traceiq-sdk-js');
+      if (!pkg.dependencies[NODE_SDK]) {
+        pkg.dependencies[NODE_SDK] = SDK_PACKAGES.node.range;
+        if (!changes.installedPackages.includes(NODE_SDK)) changes.installedPackages.push(NODE_SDK);
         if (!options.dryRun) {
           await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
         }
@@ -160,8 +149,17 @@ export { traceiq };
   getVerificationInstructions(): string[] {
     return [
       '1. Start your Node.js application (e.g. node index.js / npm start).',
-      '2. Trigger your application entry to initialize TraceIQ and emit the verification event.'
+      '2. Import `traceiq` from ./traceiq where your server is created and add `if (traceiq) app.use(traceiq.middleware());`, or send an event with `traceiq?.capture({ event: \'app_started\' })`.',
+      '3. Trigger a request so the verification event is sent. Call `await traceiq?.shutdown()` before short-lived scripts exit.'
     ];
+  }
+
+  private async readPackageJson(cwd: string): Promise<{ type?: string } | null> {
+    try {
+      return JSON.parse(await fs.readFile(path.join(cwd, 'package.json'), 'utf8')) as { type?: string };
+    } catch {
+      return null;
+    }
   }
 
   private async fileExists(filePath: string): Promise<boolean> {
@@ -172,4 +170,28 @@ export { traceiq };
       return false;
     }
   }
+}
+
+/**
+ * One shared client for the process, or null when the env vars are missing: the
+ * TraceIQ constructor throws without a write key, and analytics must never stop the app.
+ * The Node SDK has no default endpoint beyond localhost, so it is always passed.
+ */
+export function nodeClientModule(esm: boolean): string {
+  const body = `const projectId = process.env.TRACEIQ_PROJECT_ID;
+const writeKey = process.env.TRACEIQ_WRITE_KEY;
+const endpoint = process.env.TRACEIQ_API_URL || process.env.TRACEIQ_ENDPOINT || 'https://api.traceiq.run';
+
+${esm ? 'export ' : ''}const traceiq = projectId && writeKey ? new TraceIQ({ projectId, writeKey, endpoint }) : null;
+
+if (!traceiq && process.env.NODE_ENV === 'development') {
+  console.warn(
+    '[TraceIQ] Not started: missing TRACEIQ_PROJECT_ID or TRACEIQ_WRITE_KEY.\\n' +
+    'Restart the application after changing environment variables.'
+  );
+}
+`;
+  return esm
+    ? `import { TraceIQ } from '${NODE_SDK}';\n\n${body}`
+    : `const { TraceIQ } = require('${NODE_SDK}');\n\n${body}\nmodule.exports = { traceiq };\n`;
 }

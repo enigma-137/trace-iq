@@ -11,6 +11,7 @@ import {
   isPackageResolvable,
   resolveTargetEnvFile
 } from './detector.js';
+import { SDK_PACKAGES } from './sdk-packages.js';
 
 export class ViteReactAdapter implements FrameworkAdapter {
   readonly name = 'React (Vite)';
@@ -182,7 +183,7 @@ export { traceiq };
       const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
       pkg.dependencies = pkg.dependencies ?? {};
       if (!pkg.dependencies['traceiq-sdk-js']) {
-        pkg.dependencies['traceiq-sdk-js'] = '^0.1.7';
+        pkg.dependencies['traceiq-sdk-js'] = SDK_PACKAGES.browser.range;
         changes.installedPackages.push('traceiq-sdk-js');
         if (!options.dryRun) {
           await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');

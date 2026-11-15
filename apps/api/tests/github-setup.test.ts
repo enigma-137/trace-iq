@@ -237,7 +237,8 @@ describe('setup generator', () => {
     expect(server).toContain("const { traceiq } = require('./traceiq');");
     expect(server).toContain('const app = express();\nif (traceiq) app.use(traceiq.middleware());');
     expect(JSON.parse(plan.files.find((file) => file.path === 'package.json')!.content).dependencies['traceiq-node']).toBe('^0.3.0');
-    expect(plan.envVars.map((item) => item.name)).toEqual(['TRACEIQ_PROJECT_ID', 'TRACEIQ_WRITE_KEY', 'TRACEIQ_ENDPOINT']);
+    expect(plan.envVars.map((item) => item.name)).toEqual(['TRACEIQ_PROJECT_ID', 'TRACEIQ_WRITE_KEY', 'TRACEIQ_API_URL']);
+    expect(module).toContain('process.env.TRACEIQ_API_URL || process.env.TRACEIQ_ENDPOINT');
     expect(validateGeneratedFiles(plan.files)).toEqual([]);
   });
 

@@ -117,7 +117,7 @@ export async function generateSetup(app: DetectedApp, snapshot: RepoSnapshot, co
       update(entry, addImport(entryText, `import '${relativeImport(entry, initPath)}';`));
     }
   } else {
-    envVars = envFor('TRACEIQ', 'ENDPOINT', context, true);
+    envVars = envFor('TRACEIQ', 'API_URL', context, true);
     const entry = app.details.entry;
     const inSrc = entry ? entry.slice(app.folder ? app.folder.length + 1 : 0).startsWith('src/') : false;
     const esm = app.details.moduleType === 'esm';
@@ -171,7 +171,7 @@ export async function generateSetup(app: DetectedApp, snapshot: RepoSnapshot, co
 
 // ------------------------------------------------------------------ templates
 
-function envFor(prefix: string, urlName: 'API_URL' | 'ENDPOINT', context: SetupContext, server: boolean): EnvVar[] {
+function envFor(prefix: string, urlName: 'API_URL', context: SetupContext, server: boolean): EnvVar[] {
   return [
     { name: `${prefix}_PROJECT_ID`, exampleValue: context.projectId, secret: false, description: 'Your TraceIQ project id (not secret).' },
     {
@@ -302,7 +302,8 @@ ${typescript || esm ? 'export ' : ''}const traceiq = projectId && writeKey
   ? new TraceIQ({
       projectId,
       writeKey,
-      endpoint: process.env.TRACEIQ_ENDPOINT || 'https://api.traceiq.run'
+      // TRACEIQ_API_URL is the name the CLI and docs use; TRACEIQ_ENDPOINT is still accepted.
+      endpoint: process.env.TRACEIQ_API_URL || process.env.TRACEIQ_ENDPOINT || 'https://api.traceiq.run'
     })
   : null;
 
