@@ -30,9 +30,32 @@ import { comparisonRanges, type MetricComparison } from '@/components/charts/Com
 import { percentChange } from '@/components/dashboard/DashCard';
 import { CountryFlag } from '@/components/icons/CountryFlag';
 import { useDemo, useDemoCompany } from './DemoContext';
+import { OverviewWorkspace, type OverviewWidget } from '../dashboard/overview/OverviewWorkspace';
 
 const cardClass =
   'relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-slate-800/90 dark:bg-slate-900/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-5';
+/** The demo's own saved layout, kept apart from a real Overview's. */
+const DEMO_LAYOUT_KEY = 'traceiq-demo-overview-layout-v1';
+
+/** What a first visit shows; P95 latency, browsers and operating systems wait in "Add card". */
+const DEMO_DEFAULT_WIDGETS = [
+  'kpi-pageviews',
+  'kpi-visitors',
+  'kpi-sessions',
+  'kpi-bounce',
+  'trends',
+  'now',
+  'top-events',
+  'sources',
+  'pages',
+  'ai-referrals',
+  'latency',
+  'status',
+  'locations',
+  'devices',
+  'requests'
+];
+
 const cardTitleClass = 'text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400';
 
 export function DemoOverview() {
@@ -67,65 +90,109 @@ export function DemoOverview() {
   const percent = (value: number) => `${value}%`;
   const ms = (value: number) => `${value.toLocaleString()} ms`;
 
-  return (
-    <div className="mx-auto w-full max-w-[1360px] space-y-5 sm:space-y-6">
-      <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <OverviewMetricCard
-          icon={<HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.8} />}
-          title="Pageviews"
-          value={compactNumber(overview.totals.pageviews)}
-          {...deltaProps(percentChange(overview.totals.pageviews, previous.pageviews))}
-          deltaSubtext={`vs previous ${info.long}`}
-          color="blue"
-          sparklineData={pageviews}
-          comparison={compare(overview.totals.pageviews, previous.pageviews, compactNumber)}
-        />
-        <OverviewMetricCard
-          icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}
-          title="Visitors"
-          value={compactNumber(overview.totals.visitors)}
-          {...deltaProps(percentChange(overview.totals.visitors, previous.visitors))}
-          color="purple"
-          sparklineData={visitors}
-          comparison={compare(overview.totals.visitors, previous.visitors, compactNumber)}
-        />
-        <OverviewMetricCard
-          icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
-          title="Sessions"
-          value={compactNumber(overview.totals.sessions)}
-          {...deltaProps(percentChange(overview.totals.sessions, previous.sessions))}
-          deltaSubtext={`avg ${seconds(overview.avgSessionSec)}`}
-          color="cyan"
-          sparklineData={sessions}
-          comparison={compare(overview.totals.sessions, previous.sessions, compactNumber)}
-          comparisonAlign="right"
-        />
-        <OverviewMetricCard
-          icon={<HugeiconsIcon icon={Cursor01Icon} size={16} strokeWidth={1.8} />}
-          title="Bounce rate"
-          value={`${overview.bounceRate}%`}
-          // A rising bounce rate is the bad direction.
-          {...deltaProps(percentChange(overview.bounceRate, previous.bounceRate), true)}
-          color="rose"
-          sparklineData={overview.bounceSeries}
-          comparison={compare(overview.bounceRate, previous.bounceRate, percent, true)}
-          comparisonAlign="right"
-        />
-        <OverviewMetricCard
-          icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
-          title="P95 latency"
-          value={`${overview.p95.toLocaleString()} ms`}
-          delta={`Median ${overview.p50} ms`}
-          deltaTone="neutral"
-          deltaSubtext={`${overview.errorRate}% failed`}
-          color="emerald"
-          sparklineData={overview.latencySeries.map((p) => p.p90)}
-          comparison={compare(overview.p95, previous.p95, ms, true)}
-          comparisonAlign="right"
-        />
-      </section>
+  const metric = (id: string, title: string, description: string, node: ReactNode): OverviewWidget => ({
+    id,
+    title,
+    description,
+    category: 'Metrics',
+    node,
+    defaultSize: 'sm',
+    sizes: ['sm', 'md']
+  });
 
-      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.65fr_1fr]">
+  const card = (title: string, subtitle: string, body: ReactNode) => (
+    <div className={cardClass}>
+      <p className="text-sm font-semibold text-neutral-900 dark:text-white">{title}</p>
+      <p className="text-xs text-neutral-500 dark:text-slate-400">{subtitle}</p>
+      {body}
+    </div>
+  );
+
+  const widgets: OverviewWidget[] = [
+    metric(
+      'kpi-pageviews',
+      'Pageviews',
+      'Every page load in the range, against the range before.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.8} />}
+        title="Pageviews"
+        value={compactNumber(overview.totals.pageviews)}
+        {...deltaProps(percentChange(overview.totals.pageviews, previous.pageviews))}
+        deltaSubtext={`vs previous ${info.long}`}
+        color="blue"
+        sparklineData={pageviews}
+        comparison={compare(overview.totals.pageviews, previous.pageviews, compactNumber)}
+      />
+    ),
+    metric(
+      'kpi-visitors',
+      'Visitors',
+      'Unique people who visited.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={UserMultiple02Icon} size={16} strokeWidth={1.8} />}
+        title="Visitors"
+        value={compactNumber(overview.totals.visitors)}
+        {...deltaProps(percentChange(overview.totals.visitors, previous.visitors))}
+        color="purple"
+        sparklineData={visitors}
+        comparison={compare(overview.totals.visitors, previous.visitors, compactNumber)}
+      />
+    ),
+    metric(
+      'kpi-sessions',
+      'Sessions',
+      'Visits, with the average session length.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Activity01Icon} size={16} strokeWidth={1.8} />}
+        title="Sessions"
+        value={compactNumber(overview.totals.sessions)}
+        {...deltaProps(percentChange(overview.totals.sessions, previous.sessions))}
+        deltaSubtext={`avg ${seconds(overview.avgSessionSec)}`}
+        color="cyan"
+        sparklineData={sessions}
+        comparison={compare(overview.totals.sessions, previous.sessions, compactNumber)}
+        comparisonAlign="right"
+      />
+    ),
+    metric(
+      'kpi-bounce',
+      'Bounce rate',
+      'Share of visits that left after one page.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Cursor01Icon} size={16} strokeWidth={1.8} />}
+        title="Bounce rate"
+        value={`${overview.bounceRate}%`}
+        // A rising bounce rate is the bad direction.
+        {...deltaProps(percentChange(overview.bounceRate, previous.bounceRate), true)}
+        color="rose"
+        sparklineData={overview.bounceSeries}
+        comparison={compare(overview.bounceRate, previous.bounceRate, percent, true)}
+        comparisonAlign="right"
+      />
+    ),
+    metric(
+      'kpi-latency',
+      'P95 latency',
+      'API response time, with the median and failure rate.',
+      <OverviewMetricCard
+        icon={<HugeiconsIcon icon={Clock03Icon} size={16} strokeWidth={1.8} />}
+        title="P95 latency"
+        value={`${overview.p95.toLocaleString()} ms`}
+        delta={`Median ${overview.p50} ms`}
+        deltaTone="neutral"
+        deltaSubtext={`${overview.errorRate}% failed`}
+        color="emerald"
+        sparklineData={overview.latencySeries.map((p) => p.p90)}
+        comparison={compare(overview.p95, previous.p95, ms, true)}
+        comparisonAlign="right"
+      />
+    ),
+    {
+      id: 'trends',
+      title: 'Traffic, API calls and errors',
+      description: 'One chart with a tab for each, over the range.',
+      category: 'Observability',
+      node: (
         <OverviewTabbedChart
           data={overview.series.map((p) => ({
             bucket: label(p.bucket),
@@ -137,24 +204,25 @@ export function DemoOverview() {
           }))}
           windowLabel={info.hourly ? '24-hour' : `${info.buckets}-day`}
         />
-        <LiveNowPanel overview={overview} seed={company.name} />
-      </section>
-
-      <AiReferrals overview={overview} />
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TrafficSources overview={overview} />
-        <TopPages overview={overview} />
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <LatencyTimelineCard
-          data={overview.latencySeries.map((p) => ({ ...p, bucket: label(p.bucket) }))}
-          currentP50={overview.p50}
-          currentP90={overview.p90}
-          currentP99={overview.p99}
-        />
-        <RequestStatusCard breakdown={overview.statusBreakdown} totalRequests={overview.totals.apiCalls} windowLabel={range} />
+      ),
+      defaultSize: 'lg',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'now',
+      title: 'Right now',
+      description: 'Visitors online and a live event feed.',
+      category: 'Activity',
+      node: <LiveNowPanel overview={overview} seed={company.name} />,
+      defaultSize: 'md',
+      sizes: ['sm', 'md', 'lg']
+    },
+    {
+      id: 'top-events',
+      title: 'Top events',
+      description: 'The events sent most often.',
+      category: 'Activity',
+      node: (
         <div className={cardClass}>
           <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-slate-800/70">
             <p className={cardTitleClass}>Top events</p>
@@ -164,24 +232,91 @@ export function DemoOverview() {
             <TopEventsList events={overview.topEvents} windowLabel={info.long} />
           </div>
         </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className={cardClass}>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Visitor locations</p>
-          <p className="text-xs text-neutral-500 dark:text-slate-400">Geographic distribution</p>
-          <BarRanking
-            items={overview.countries.map((country) => ({
-              label: country.name,
-              value: country.visitors,
-              icon: <CountryFlag country={country.code} />
-            }))}
-            total={overview.totals.visitors}
-          />
-        </div>
-        <div className={cardClass}>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Devices</p>
-          <p className="text-xs text-neutral-500 dark:text-slate-400">Device breakdown</p>
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'sources',
+      title: 'Traffic sources',
+      description: 'Sources, referrers and UTM campaigns.',
+      category: 'Audience',
+      node: <TrafficSources overview={overview} />,
+      defaultSize: 'md',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'pages',
+      title: 'Pages',
+      description: 'Top pages by traffic or time on page.',
+      category: 'Audience',
+      node: <TopPages overview={overview} />,
+      defaultSize: 'md',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'ai-referrals',
+      title: 'AI referrals',
+      description: 'Visits from ChatGPT, Perplexity and Claude answers.',
+      category: 'Audience',
+      node: <AiReferrals overview={overview} />,
+      defaultSize: 'lg',
+      sizes: ['md', 'lg']
+    },
+    {
+      id: 'latency',
+      title: 'Latency',
+      description: 'P50, P90 and P99 response times over the range.',
+      category: 'Observability',
+      node: (
+        <LatencyTimelineCard
+          data={overview.latencySeries.map((p) => ({ ...p, bucket: label(p.bucket) }))}
+          currentP50={overview.p50}
+          currentP90={overview.p90}
+          currentP99={overview.p99}
+        />
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md', 'lg']
+    },
+    {
+      id: 'status',
+      title: 'Request status',
+      description: 'API responses by status class.',
+      category: 'Observability',
+      node: <RequestStatusCard breakdown={overview.statusBreakdown} totalRequests={overview.totals.apiCalls} windowLabel={range} />,
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'locations',
+      title: 'Visitor locations',
+      description: 'Visitors by country.',
+      category: 'Audience',
+      node: card(
+        'Visitor locations',
+        'Geographic distribution',
+        <BarRanking
+          items={overview.countries.map((country) => ({
+            label: country.name,
+            value: country.visitors,
+            icon: <CountryFlag country={country.code} />
+          }))}
+          total={overview.totals.visitors}
+        />
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md', 'lg']
+    },
+    {
+      id: 'devices',
+      title: 'Devices',
+      description: 'Desktop, mobile and tablet visitors.',
+      category: 'Audience',
+      node: card(
+        'Devices',
+        'Device breakdown',
+        <>
           <div className="mt-3">
             <DonutChart
               items={overview.devices.map((row) => ({ label: row.label, value: row.visitors, icon: <BrandIcon label={row.label} size={14} /> }))}
@@ -190,46 +325,84 @@ export function DemoOverview() {
             />
           </div>
           <BreakdownTable rows={overview.devices} heading="Device type" />
-        </div>
-      </section>
+        </>
+      ),
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'browsers',
+      title: 'Browsers',
+      description: 'Visitors by browser.',
+      category: 'Audience',
+      node: card('Browsers', 'Browser breakdown', <BreakdownTable rows={overview.browsers} heading="Browser" />),
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'os',
+      title: 'Operating systems',
+      description: 'Visitors by operating system.',
+      category: 'Audience',
+      node: card('Operating systems', 'OS breakdown', <BreakdownTable rows={overview.operatingSystems} heading="Operating system" />),
+      defaultSize: 'md',
+      sizes: ['sm', 'md']
+    },
+    {
+      id: 'requests',
+      title: 'Latest API requests',
+      description: 'The newest requests, linked to the explorer.',
+      category: 'Observability',
+      node: (
+        <section className={cardClass}>
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-slate-800/70">
+            <p className={cardTitleClass}>Latest API requests</p>
+            <Link href="/demo/requests" className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+              Open requests explorer →
+            </Link>
+          </div>
+          <ul className="divide-y divide-neutral-100 dark:divide-slate-800/70">
+            {recent.map((request) => (
+              <li key={request.id}>
+                <Link
+                  href={`/demo/requests?request=${encodeURIComponent(request.id)}`}
+                  className="flex items-center gap-3 py-2.5 text-xs hover:bg-neutral-50 dark:hover:bg-slate-900/60"
+                >
+                  <MethodBadge method={request.method} />
+                  <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-neutral-900 dark:text-slate-100">{request.route}</span>
+                  <span className="hidden text-neutral-500 dark:text-slate-400 sm:inline">{request.service ?? 'browser'}</span>
+                  <StatusBadge status={request.statusCode} />
+                  <span className="w-16 text-right font-mono tabular-nums text-neutral-700 dark:text-slate-300">{formatDuration(request.durationMs)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ),
+      defaultSize: 'lg',
+      sizes: ['md', 'lg']
+    }
+  ];
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className={cardClass}>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Browsers</p>
-          <p className="text-xs text-neutral-500 dark:text-slate-400">Browser breakdown</p>
-          <BreakdownTable rows={overview.browsers} heading="Browser" />
-        </div>
-        <div className={cardClass}>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-white">Operating systems</p>
-          <p className="text-xs text-neutral-500 dark:text-slate-400">OS breakdown</p>
-          <BreakdownTable rows={overview.operatingSystems} heading="Operating system" />
-        </div>
-      </section>
-
-      <section className={cardClass}>
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-slate-800/70">
-          <p className={cardTitleClass}>Latest API requests</p>
-          <Link href="/demo/requests" className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
-            Open requests explorer →
-          </Link>
-        </div>
-        <ul className="divide-y divide-neutral-100 dark:divide-slate-800/70">
-          {recent.map((request) => (
-            <li key={request.id}>
-              <Link
-                href={`/demo/requests?request=${encodeURIComponent(request.id)}`}
-                className="flex items-center gap-3 py-2.5 text-xs hover:bg-neutral-50 dark:hover:bg-slate-900/60"
-              >
-                <MethodBadge method={request.method} />
-                <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-neutral-900 dark:text-slate-100">{request.route}</span>
-                <span className="hidden text-neutral-500 dark:text-slate-400 sm:inline">{request.service ?? 'browser'}</span>
-                <StatusBadge status={request.statusCode} />
-                <span className="w-16 text-right font-mono tabular-nums text-neutral-700 dark:text-slate-300">{formatDuration(request.durationMs)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+  return (
+    <div className="mx-auto w-full max-w-[1360px]">
+      <OverviewWorkspace
+        widgets={widgets}
+        defaultVisible={DEMO_DEFAULT_WIDGETS}
+        days={info.hourly ? 1 : info.buckets}
+        windowLabel={info.long}
+        cardClass={cardClass}
+        storageKey={DEMO_LAYOUT_KEY}
+        allowCustomCards={false}
+        menuFooter={
+          <p className="text-center text-[11px] text-neutral-500 dark:text-slate-400">
+            Build cards from your own events.{' '}
+            <a href="/auth/login?mode=signup" className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+              Start free →
+            </a>
+          </p>
+        }
+      />
     </div>
   );
 }

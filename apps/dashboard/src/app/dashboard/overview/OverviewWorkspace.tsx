@@ -43,9 +43,9 @@ const SPAN: Record<WidgetSize, string> = {
 const SIZE_LABEL: Record<WidgetSize, string> = { sm: 'S', md: 'M', lg: 'L' };
 const SIZE_NAME: Record<WidgetSize, string> = { sm: 'Small', md: 'Medium', lg: 'Full width' };
 
-function readLayout(): Layout | null {
+function readLayout(key: string): Layout | null {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<Layout> | null;
+    const parsed = JSON.parse(localStorage.getItem(key) ?? 'null') as Partial<Layout> | null;
     if (!parsed || !Array.isArray(parsed.visible)) return null;
     return { visible: parsed.visible.filter((id) => typeof id === 'string'), sizes: parsed.sizes ?? {} };
   } catch {
@@ -53,10 +53,10 @@ function readLayout(): Layout | null {
   }
 }
 
-function writeLayout(layout: Layout | null): void {
+function writeLayout(key: string, layout: Layout | null): void {
   try {
-    if (layout) localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
-    else localStorage.removeItem(STORAGE_KEY);
+    if (layout) localStorage.setItem(key, JSON.stringify(layout));
+    else localStorage.removeItem(key);
   } catch {
     // Storage blocked: the layout still applies until the page reloads.
   }
@@ -69,7 +69,11 @@ export function OverviewWorkspace({
   projectId,
   days,
   windowLabel,
-  cardClass
+  cardClass,
+  storageKey = STORAGE_KEY,
+  allowCustomCards = true,
+  heading = 'Analytics',
+  menuFooter
 }: {
   widgets: OverviewWidget[];
   defaultVisible: string[];
@@ -80,6 +84,13 @@ export function OverviewWorkspace({
   days: number;
   windowLabel: string;
   cardClass: string;
+  /** Where this workspace's layout is saved, so the demo never touches a real Overview's layout. */
+  storageKey?: string;
+  /** Custom cards query a real project; the demo has none, so it turns them off. */
+  allowCustomCards?: boolean;
+  heading?: string;
+  /** Shown at the bottom of the "Add card" list, e.g. the demo's sign-up prompt. */
+  menuFooter?: ReactNode;
 }) {
   // Cards people built themselves live in this browser, next to the layout.
   const [customCards, setCustomCards] = useState<CustomCard[]>([]);
@@ -112,21 +123,21 @@ export function OverviewWorkspace({
   const [dragging, setDragging] = useState<string | null>(null);
 
   useEffect(() => {
-    const custom = readCustomCards();
+    const custom = allowCustomCards ? readCustomCards() : [];
     setCustomCards(custom);
     const known = new Set([...builtIn.map((widget) => widget.id), ...custom.map((card) => `${CUSTOM_PREFIX}${card.id}`)]);
-    const saved = readLayout();
+    const saved = readLayout(storageKey);
     if (saved) setLayout({ visible: saved.visible.filter((id) => known.has(id)), sizes: saved.sizes });
     setReady(true);
-  }, [builtIn]);
+  }, [builtIn, allowCustomCards, storageKey]);
 
   const update = useCallback((next: (current: Layout) => Layout) => {
     setLayout((current) => {
       const value = next(current);
-      writeLayout(value);
+      writeLayout(storageKey, value);
       return value;
     });
-  }, []);
+  }, [storageKey]);
 
   const sizeOf = (widget: OverviewWidget): WidgetSize => {
     const saved = layout.sizes[widget.id];
@@ -158,7 +169,7 @@ export function OverviewWorkspace({
       return { ...current, visible: next };
     });
   const reset = () => {
-    writeLayout(null);
+    writeLayout(storageKey, null);
     setLayout(fallback);
   };
   const createCustom = (card: Omit<CustomCard, 'id'>) => {
@@ -182,7 +193,7 @@ export function OverviewWorkspace({
     <section aria-labelledby="overview-analytics" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="overview-analytics" className="text-[15px] font-semibold text-neutral-900 dark:text-white">
-          Analytics
+          {heading}
         </h2>
         <div className="flex flex-wrap items-center gap-2">
           {toolbar}
@@ -194,6 +205,8 @@ export function OverviewWorkspace({
               <AddCardMenu
                 hidden={hidden}
                 projectId={projectId}
+                allowCustomCards={allowCustomCards}
+                footer={menuFooter}
                 onAdd={(id) => {
                   add(id);
                 }}
@@ -398,6 +411,8 @@ function IconButton({ label, onClick, active, children }: { label: string; onCli
 function AddCardMenu({
   hidden,
   projectId,
+  allowCustomCards,
+  footer,
   onAdd,
   onCreate,
   onDelete,
@@ -406,6 +421,8 @@ function AddCardMenu({
 }: {
   hidden: OverviewWidget[];
   projectId?: string | null;
+  allowCustomCards: boolean;
+  footer?: ReactNode;
   onAdd: (id: string) => void;
   onCreate: (card: Omit<CustomCard, 'id'>) => void;
   onDelete: (id: string) => void;
@@ -498,21 +515,24 @@ function AddCardMenu({
               ))
             )}
           </div>
-          <div className="space-y-2 border-t border-neutral-100 px-3 py-2.5 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setView('build')}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-300 py-1.5 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              <span aria-hidden>+</span> Build your own card
-            </button>
-            <p className="text-center text-[11px] text-neutral-500 dark:text-slate-400">
-              Need something else?{' '}
-              <button type="button" onClick={() => setView('request')} className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
-                Request a card
+          {footer ? <div className="border-t border-neutral-100 px-3 py-2.5 dark:border-slate-800">{footer}</div> : null}
+          {allowCustomCards ? (
+            <div className="space-y-2 border-t border-neutral-100 px-3 py-2.5 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setView('build')}
+                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-300 py-1.5 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <span aria-hidden>+</span> Build your own card
               </button>
-            </p>
-          </div>
+              <p className="text-center text-[11px] text-neutral-500 dark:text-slate-400">
+                Need something else?{' '}
+                <button type="button" onClick={() => setView('request')} className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                  Request a card
+                </button>
+              </p>
+            </div>
+          ) : null}
           <div className="border-t border-neutral-100 px-3 py-2 dark:border-slate-800">
             <button type="button" onClick={onReset} className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white">
               Reset to default layout
