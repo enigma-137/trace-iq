@@ -286,7 +286,8 @@ export function ErrorTrackingClientView({
   const sampleRelease = latestSample?.release ?? '';
 
   // Linked GitHub repository + the release's commit, loaded when the stack tab opens.
-  const [sourceContext, setSourceContext] = useState<{ key: string; value: SourceContext } | null>(null);
+  // value null: the lookup failed, so we don't know whether GitHub is linked.
+  const [sourceContext, setSourceContext] = useState<{ key: string; value: SourceContext | null } | null>(null);
   const sourceKey = detailProjectId ? `${detailProjectId}:${sampleRelease}` : null;
   useEffect(() => {
     if (activeTab !== 'stack' || !sourceKey || !detailProjectId || sourceContext?.key === sourceKey) return;
@@ -302,10 +303,10 @@ export function ErrorTrackingClientView({
           headers: { Authorization: `Bearer ${session.access_token}` }
         });
         // No links is fine: GitHub may not be connected, or the API may be older.
-        const value = response.ok ? ((await response.json()) as SourceContext) : ({ linked: false } as SourceContext);
+        const value = response.ok ? ((await response.json()) as SourceContext) : null;
         if (!cancelled) setSourceContext({ key: sourceKey, value });
       } catch {
-        if (!cancelled) setSourceContext({ key: sourceKey, value: { linked: false } });
+        if (!cancelled) setSourceContext({ key: sourceKey, value: null });
       }
     })();
     return () => {
@@ -1135,6 +1136,17 @@ export function ErrorTrackingClientView({
                                 </p>
                               )}
                             </div>
+                          ) : activeSource && detailProjectId ? (
+                            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-md border border-dashed border-neutral-300 px-3 py-2.5 text-xs text-neutral-600 dark:border-slate-700 dark:text-slate-400">
+                              <GitHubIcon className="h-3.5 w-3.5 shrink-0" />
+                              Link a GitHub repository to open each frame at its line in your code, with the release&apos;s commit and pull request.
+                              <Link
+                                href={`/dashboard/settings/integrations?projectId=${encodeURIComponent(detailProjectId)}`}
+                                className="font-semibold text-blue-700 hover:underline dark:text-blue-400"
+                              >
+                                Connect GitHub →
+                              </Link>
+                            </p>
                           ) : null}
                         </div>
                       ) : (

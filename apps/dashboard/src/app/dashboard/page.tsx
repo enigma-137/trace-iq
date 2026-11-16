@@ -28,6 +28,7 @@ import { TopEventsList } from '@/components/charts/TopEventsList';
 import { OverviewHero, type OverviewSignal } from './overview/OverviewHero';
 import { OverviewWorkspace, type OverviewWidget } from './overview/OverviewWorkspace';
 import { HealthBanner } from './HealthBanner';
+import { GitHubAnnouncement } from './GitHubAnnouncement';
 import { NowActivityPanel } from './NowActivityPanel';
 import { RecentLogsPanel } from './RecentLogsPanel';
 import { alpha2ToName } from '@/lib/country-codes';
@@ -754,6 +755,8 @@ export default async function DashboardPage({
         ) : null}
 
         {overview?.project ? <HealthBanner projectId={canonicalProjectId} /> : null}
+
+        {overview?.project ? <GitHubAnnouncement projectId={canonicalProjectId} /> : null}
 
         {hasNoProject ? (
           <PageBanner
