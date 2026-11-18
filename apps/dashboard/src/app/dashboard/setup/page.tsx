@@ -57,7 +57,7 @@ export default async function SetupPage({
           <div className="mx-auto max-w-xl py-8">
             <div className="rounded-2xl border border-neutral-200/90 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
               <EmptyState
-                illustrationSrc="/dashboards/connect-app.png"
+                illustrationSrc="/dashboards/connect-app.webp"
                 illustrationAlt="Connect your application"
                 title="Step 1: create your project"
                 description="A project holds your app's events and gives you the write key the SDK sends them with. Create one, then come back here to install the SDK and check that your first event arrives."

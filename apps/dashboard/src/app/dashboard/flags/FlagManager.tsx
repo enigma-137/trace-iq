@@ -264,7 +264,7 @@ export function FlagManager({
         badge="Progressive Delivery"
         title="Safe Rollouts & Feature Releases"
         description="Ship code behind targeted feature flags, rollout gradually by percentage or user segment, and observe real-time error and conversion telemetry."
-        illustrationSrc="/dashboards/banner-feature-release.png"
+        illustrationSrc="/dashboards/banner-feature-release.webp"
         illustrationAlt="Feature Release Banner Artwork"
         primaryAction={{
           label: 'Create flag',
@@ -347,7 +347,7 @@ export function FlagManager({
       {filteredFlags.length === 0 ? (
         <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
           <EmptyState
-            illustrationSrc="/dashboards/banner-feature-release.png"
+            illustrationSrc="/dashboards/banner-feature-release.webp"
             illustrationAlt="No feature flags"
             title={
               searchQuery || statusFilter !== 'all' || selectedEnv !== 'all'

@@ -34,7 +34,7 @@ export function EventsTable({
     return (
       <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <EmptyState
-          illustrationSrc="/dashboards/no-events.png"
+          illustrationSrc="/dashboards/no-events.webp"
           illustrationAlt="No incoming events"
           title="Waiting for incoming telemetry events"
           description="Dashboards, funnels, and insights require active event data. Install the TraceIQ SDK and trigger your first tracking call to stream events in real time."

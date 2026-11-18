@@ -828,7 +828,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
                   <div className="relative shrink-0 flex items-center justify-center">
                     <div className="pointer-events-none absolute -inset-2 rounded-full bg-emerald-500/10 opacity-70 blur-xl" />
                     <Image
-                      src="/dashboards/setup-success.png"
+                      src="/dashboards/setup-success.webp"
                       alt="Setup Success Celebration"
                       width={160}
                       height={160}
