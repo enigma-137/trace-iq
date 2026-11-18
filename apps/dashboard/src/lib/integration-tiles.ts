@@ -20,6 +20,9 @@ export function returningIntegration(params: URLSearchParams): IntegrationKey | 
   if (params.has('github')) return 'github';
   if (params.has('linear')) return 'linear';
   if (params.has('slack')) return 'slack';
+  // Plain links that open a card, e.g. "install the GitHub App first" from the Setup Wizard.
+  const open = params.get('open');
+  if (open === 'github' || open === 'linear' || open === 'slack' || open === 'telegram') return open;
   return null;
 }
 

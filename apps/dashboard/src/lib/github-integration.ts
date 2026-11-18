@@ -183,3 +183,38 @@ export function resolveRepoInput(input: string, options: { repos?: GitHubRepoOpt
 export function setupWizardHref(projectId: string): string {
   return `/dashboard/setup?projectId=${encodeURIComponent(projectId)}&step=install`;
 }
+
+/** The API lists at most this many repositories; past it, a missing repo may just be unlisted. */
+export const REPO_LIST_CAP = 1000;
+
+/** Whether the app can see a repository, from the loaded list. `unknown` when the list can't tell. */
+export function repoVisibility(fullName: string | null, repos: GitHubRepoOption[] | null): 'visible' | 'not_visible' | 'unknown' {
+  if (!fullName || !repos || repos.length >= REPO_LIST_CAP) return 'unknown';
+  return repos.some((repo) => repo.fullName.toLowerCase() === fullName.toLowerCase()) ? 'visible' : 'not_visible';
+}
+
+/** One sentence on which repositories the app can see, so "selected repositories" makes sense. */
+export function visibleReposSummary(repos: GitHubRepoOption[], selection: 'all' | 'selected', accountLogin: string): string {
+  if (!repos.length) return 'TraceIQ can’t see any of your repositories yet. Choose the ones it may use on GitHub.';
+  const noun = repos.length === 1 ? 'repository' : 'repositories';
+  const names = repos.slice(0, 3).map((repo) => repo.fullName.split('/')[1]);
+  const more = repos.length > 3 ? ` and ${repos.length - 3} more` : '';
+  return selection === 'all'
+    ? `TraceIQ can see all ${repos.length} ${noun} on ${accountLogin}.`
+    : `TraceIQ can see the ${repos.length} ${noun} you picked on GitHub: ${names.join(', ')}${more}.`;
+}
+
+/** Settings → Integrations with a card already open. */
+export function integrationsHref(projectId?: string | null, open: 'github' | 'linear' = 'github'): string {
+  const query = new URLSearchParams({ open });
+  if (projectId) query.set('projectId', projectId);
+  return `/dashboard/settings/integrations?${query.toString()}`;
+}
+
+/** Why the Setup Wizard's paste-a-URL shortcut can't be used yet, or null when it can. */
+export function quickSetupBlocker(status: GitHubStatusResponse): 'not_installed' | 'suspended' | 'not_allowed' | null {
+  if (!status.installation) return 'not_installed';
+  if (status.installation.status !== 'active') return 'suspended';
+  if (!status.canManage) return 'not_allowed';
+  return null;
+}

@@ -7,6 +7,7 @@ import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import {
   normalizeSubdirectoryInput,
+  repoVisibility,
   resolveRepoInput,
   setupStage,
   type GitHubRepoOption,
@@ -17,6 +18,7 @@ import {
 import { GitHubIcon } from '@/components/ProviderIcons';
 import { GITHUB_INTEGRATION_API, completeGitHubReturn, startGitHubInstall } from './settings/integrations/github-install';
 import { RepoNameInput } from './settings/integrations/RepoNameInput';
+import { RepoAccessHint } from './settings/integrations/RepoAccessHint';
 
 type StatusWithPr = GitHubStatusResponse & { setupPullRequest?: SetupPullRequestInfo | null };
 
@@ -207,18 +209,28 @@ export function GitHubSetupPanel({ projectId, onWaitForEvent }: { projectId: str
                 App folder <span className="font-normal text-neutral-400">(monorepos, optional)</span>
                 <input className={input} placeholder="apps/web" value={folder} disabled={busy !== null} onChange={(event) => setFolder(event.target.value)} />
               </label>
-              <button type="button" className={buttonPrimary} disabled={busy !== null || !repoFullName.trim()} onClick={() => void linkRepo()}>
+              <button
+                type="button"
+                className={buttonPrimary}
+                disabled={
+                  busy !== null ||
+                  !repoFullName.trim() ||
+                  repoVisibility(resolveRepoInput(repoFullName, { repos, accountLogin: installation?.accountLogin }), repos) === 'not_visible'
+                }
+                onClick={() => void linkRepo()}
+              >
                 {busy === 'link' ? 'Saving…' : 'Use this repository'}
               </button>
-              {repos?.length === 0 ? (
-                <p className="text-xs text-neutral-500 sm:col-span-3">
-                  The app cannot see any repositories yet.{' '}
-                  {installation ? (
-                    <a className="underline" href={installation.manageUrl} target="_blank" rel="noopener noreferrer">
-                      Add one on GitHub
-                    </a>
-                  ) : null}
-                </p>
+              {installation ? (
+                <div className="sm:col-span-3">
+                  <RepoAccessHint
+                    installation={installation}
+                    repos={repos}
+                    reposError={null}
+                    resolved={resolveRepoInput(repoFullName, { repos, accountLogin: installation.accountLogin })}
+                    onRecheck={() => void load()}
+                  />
+                </div>
               ) : null}
             </div>
           ) : stage === 'pull_request' && pullRequest ? (

@@ -6,7 +6,8 @@ import { readActiveProjectIdFromDocument } from '@/lib/active-project';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import Link from 'next/link';
-import { normalizeSubdirectoryInput, resolveRepoInput, setupWizardHref, type GitHubRepoOption, type GitHubStatusResponse } from '@/lib/github-integration';
+import { normalizeSubdirectoryInput, repoVisibility, resolveRepoInput, setupWizardHref, type GitHubRepoOption, type GitHubStatusResponse } from '@/lib/github-integration';
+import { RepoAccessHint } from './RepoAccessHint';
 import { RepoNameInput } from './RepoNameInput';
 import { GITHUB_INTEGRATION_API, completeGitHubReturn, startGitHubInstall } from './github-install';
 import { GitHubIcon } from '@/components/ProviderIcons';
@@ -82,6 +83,7 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
 
   // Repositories the installation can see, once connected.
   const installationStatus = status?.installation?.status;
+  const [reposVersion, setReposVersion] = useState(0);
   useEffect(() => {
     setRepos(null);
     setReposError(null);
@@ -103,7 +105,7 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
     return () => {
       cancelled = true;
     };
-  }, [installationStatus, authHeaders, query]);
+  }, [installationStatus, authHeaders, query, reposVersion]);
 
   async function install() {
     setBusy('install');
@@ -182,7 +184,9 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
 
   const installation = status?.installation ?? null;
   const canManage = status?.canManage ?? false;
-  const resolvedInput = resolveRepoInput(repoFullName, { repos, accountLogin: installation?.accountLogin }) ?? repoFullName.trim();
+  const resolvedRepo = resolveRepoInput(repoFullName, { repos, accountLogin: installation?.accountLogin });
+  const resolvedInput = resolvedRepo ?? repoFullName.trim();
+  const notVisible = repoVisibility(resolvedRepo, repos) === 'not_visible';
   const dirty =
     resolvedInput !== (status?.projectRepo?.repoFullName ?? '') ||
     (normalizeSubdirectoryInput(subdirectory) ?? subdirectory) !== (status?.projectRepo?.appSubdirectory ?? '');
@@ -231,7 +235,9 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                   : 'Ask an owner or admin to install the GitHub App.'
                 : installation.status === 'suspended'
                   ? 'The app is suspended on GitHub. Unsuspend it there to continue.'
-                  : undefined
+                  : status.projectRepo
+                    ? undefined
+                    : 'Installed. Next, choose this project’s repository below.'
             }
           >
             <span className="inline-flex flex-wrap items-center gap-2">
@@ -264,7 +270,7 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                           {busy === 'unlink' ? 'Unlinking…' : 'Unlink'}
                         </button>
                       ) : null}
-                      <button type="button" className={secondaryButton} disabled={busy !== null || !repoFullName.trim() || !dirty} onClick={() => void saveRepo()}>
+                      <button type="button" className={secondaryButton} disabled={busy !== null || !repoFullName.trim() || !dirty || notVisible} onClick={() => void saveRepo()}>
                         {busy === 'save' ? 'Saving…' : 'Save'}
                       </button>
                     </span>
@@ -294,11 +300,14 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                     />
                   </label>
                 </div>
-                {reposError ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{reposError}</p> : null}
-                {repos?.length === 0 ? (
-                  <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
-                    The app cannot see any repositories yet. Add some under “manage on GitHub”.
-                  </p>
+                {installation ? (
+                  <RepoAccessHint
+                    installation={installation}
+                    repos={repos}
+                    reposError={reposError}
+                    resolved={resolvedRepo}
+                    onRecheck={() => setReposVersion((version) => version + 1)}
+                  />
                 ) : null}
               </SettingsRow>
             ) : (
