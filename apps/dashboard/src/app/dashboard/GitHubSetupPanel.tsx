@@ -7,6 +7,7 @@ import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
 import {
   normalizeSubdirectoryInput,
+  resolveRepoInput,
   setupStage,
   type GitHubRepoOption,
   type GitHubStatusResponse,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/github-integration';
 import { GitHubIcon } from '@/components/ProviderIcons';
 import { GITHUB_INTEGRATION_API, completeGitHubReturn, startGitHubInstall } from './settings/integrations/github-install';
+import { RepoNameInput } from './settings/integrations/RepoNameInput';
 
 type StatusWithPr = GitHubStatusResponse & { setupPullRequest?: SetupPullRequestInfo | null };
 
@@ -110,6 +112,8 @@ export function GitHubSetupPanel({ projectId, onWaitForEvent }: { projectId: str
   }
 
   async function linkRepo(nextFolder = folder) {
+    const resolved = resolveRepoInput(repoFullName, { repos, accountLogin: status?.installation?.accountLogin });
+    if (!resolved) return toast.error('Enter the repository as owner/name, its name, or its GitHub URL.');
     const subdirectory = normalizeSubdirectoryInput(nextFolder);
     if (subdirectory === null) return toast.error('The app folder must be a folder inside the repository, like apps/web.');
     setBusy('link');
@@ -119,9 +123,10 @@ export function GitHubSetupPanel({ projectId, onWaitForEvent }: { projectId: str
       const response = await fetch(`${GITHUB_INTEGRATION_API}/projects/${encodeURIComponent(projectId)}`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoFullName, subdirectory })
+        body: JSON.stringify({ repoFullName: resolved, subdirectory })
       });
       if (!response.ok) return toast.error(await readApiError(response, 'Could not use that repository.'));
+      setRepoFullName(resolved);
       setFolder(subdirectory);
       setEditingRepo(false);
       await load();
@@ -194,22 +199,15 @@ export function GitHubSetupPanel({ projectId, onWaitForEvent }: { projectId: str
             </p>
           ) : stage === 'pick_repo' ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-              <label className="grid gap-1.5 text-sm font-medium text-neutral-700 dark:text-slate-300">
+              <label className="grid gap-1.5 text-sm font-medium text-neutral-700 dark:text-slate-300" htmlFor="github-repo-wizard">
                 Repository
-                <select className={input} value={repoFullName} disabled={busy !== null || repos === null} onChange={(event) => setRepoFullName(event.target.value)}>
-                  <option value="">{repos === null ? 'Loading repositories…' : 'Choose a repository…'}</option>
-                  {(repos ?? []).map((repo) => (
-                    <option key={repo.id} value={repo.fullName}>
-                      {repo.fullName}
-                    </option>
-                  ))}
-                </select>
+                <RepoNameInput id="github-repo-wizard" className={input} value={repoFullName} repos={repos} disabled={busy !== null} onChange={setRepoFullName} />
               </label>
               <label className="grid gap-1.5 text-sm font-medium text-neutral-700 dark:text-slate-300">
                 App folder <span className="font-normal text-neutral-400">(monorepos, optional)</span>
                 <input className={input} placeholder="apps/web" value={folder} disabled={busy !== null} onChange={(event) => setFolder(event.target.value)} />
               </label>
-              <button type="button" className={buttonPrimary} disabled={busy !== null || !repoFullName} onClick={() => void linkRepo()}>
+              <button type="button" className={buttonPrimary} disabled={busy !== null || !repoFullName.trim()} onClick={() => void linkRepo()}>
                 {busy === 'link' ? 'Saving…' : 'Use this repository'}
               </button>
               {repos?.length === 0 ? (

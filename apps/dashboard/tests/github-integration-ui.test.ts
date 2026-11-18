@@ -108,7 +108,7 @@ describe('GitHub settings card', () => {
   });
 
   it('links a repository and folder, and confirms before uninstalling', () => {
-    expect(card).toContain('JSON.stringify({ repoFullName, subdirectory: folder })');
+    expect(card).toContain('JSON.stringify({ repoFullName: resolved, subdirectory: folder })');
     expect(card).toContain('Disconnect GitHub?');
     expect(card).toContain("method: 'DELETE'");
     expect(card).toContain('never pushes to your default branch');
@@ -149,7 +149,7 @@ describe('Setup Wizard GitHub path', () => {
   it('installs with a return to the wizard and finishes there', () => {
     expect(panel).toContain("startGitHubInstall(authHeaders, { projectId, returnTo: 'setup' })");
     expect(panel).toContain('await completeGitHubReturn(authHeaders)');
-    expect(wizard).toContain("if (new URLSearchParams(window.location.search).has('github')) setCurrentStep(2);");
+    expect(wizard).toContain("if (params.has('github') || params.get('step') === 'install') setCurrentStep(2);");
   });
 
   it('previews, opens the PR, then hands over to the first-event verification', () => {
