@@ -1,7 +1,7 @@
 "use client";
 
 import styles from "./landing-ai-demos.module.css";
-import { useScriptedPlayback } from "./useScriptedPlayback";
+import { useFollowScroll, useScriptedPlayback } from "./useScriptedPlayback";
 
 type Session = {
   prompt: string;
@@ -71,6 +71,7 @@ export function LandingMcpDemo() {
   const callsShown = Math.min(playback.beat, session.calls.length);
   const replied = playback.beat > session.calls.length;
   const working = !playback.typing && !replied;
+  const scrollRef = useFollowScroll<HTMLDivElement>(playback.index, playback.beat, playback.prompt);
 
   return (
     <div className={styles.terminal} ref={playback.ref}>
@@ -85,42 +86,44 @@ export function LandingMcpDemo() {
       </div>
 
       <div className={styles.terminalBody}>
-        <div className={styles.terminalHeader}>
-          <ClaudeCodeLogo />
-          <div>
-            <strong>Claude Code</strong>
-            <span>MCP · traceiq connected</span>
-            <span>~/shop-app</span>
+        <div className={styles.terminalScroll} ref={scrollRef}>
+          <div className={styles.terminalHeader}>
+            <ClaudeCodeLogo />
+            <div>
+              <strong>Claude Code</strong>
+              <span>MCP · traceiq connected</span>
+              <span>~/shop-app</span>
+            </div>
           </div>
+
+          <div className={styles.terminalPrompt}>
+            <span aria-hidden="true">&gt;</span>
+            <p>
+              {playback.prompt}
+              {playback.typing && <span className={styles.termCaret} aria-hidden="true" />}
+            </p>
+          </div>
+
+          <ul className={styles.calls}>
+            {session.calls.slice(0, callsShown).map((call, index) => {
+              const done = playback.beat > index + 1;
+              return (
+                <li key={call.tool} className={styles.reveal}>
+                  <div>
+                    <span className={done ? styles.callDone : styles.callRunning} aria-hidden="true">
+                      ●
+                    </span>
+                    <strong>traceiq - {call.tool}</strong> <span className={styles.callMcp}>(MCP)</span>
+                    <span className={styles.callArgs}>({call.args})</span>
+                  </div>
+                  {done && <p className={styles.callResult}>⎿ {call.result}</p>}
+                </li>
+              );
+            })}
+          </ul>
+
+          {replied && <p className={`${styles.reply} ${styles.reveal}`}>● {session.reply}</p>}
         </div>
-
-        <div className={styles.terminalPrompt}>
-          <span aria-hidden="true">&gt;</span>
-          <p>
-            {playback.prompt}
-            {playback.typing && <span className={styles.termCaret} aria-hidden="true" />}
-          </p>
-        </div>
-
-        <ul className={styles.calls}>
-          {session.calls.slice(0, callsShown).map((call, index) => {
-            const done = playback.beat > index + 1;
-            return (
-              <li key={call.tool} className={styles.reveal}>
-                <div>
-                  <span className={done ? styles.callDone : styles.callRunning} aria-hidden="true">
-                    ●
-                  </span>
-                  <strong>traceiq - {call.tool}</strong> <span className={styles.callMcp}>(MCP)</span>
-                  <span className={styles.callArgs}>({call.args})</span>
-                </div>
-                {done && <p className={styles.callResult}>⎿ {call.result}</p>}
-              </li>
-            );
-          })}
-        </ul>
-
-        {replied && <p className={`${styles.reply} ${styles.reveal}`}>● {session.reply}</p>}
 
         <div className={styles.terminalStatus}>
           {working ? (

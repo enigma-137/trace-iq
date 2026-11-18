@@ -85,6 +85,10 @@
 
 /* ---------- Shared motion ---------- */
 @media (prefers-reduced-motion: no-preference) {
+  .askScroll,
+  .terminalScroll {
+    scroll-behavior: smooth;
+  }
   .reveal {
     animation: reveal 320ms ease-out both;
   }
@@ -174,6 +178,15 @@
 .askBody {
   padding: 22px 22px 24px;
   min-height: 520px;
+}
+/* Fixed height: the answer scrolls inside the card instead of growing the page. */
+.askScroll {
+  height: 520px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 .askWho {
   display: inline-flex;
@@ -403,9 +416,18 @@
 }
 .terminalBody {
   padding: 18px 20px 14px;
-  min-height: 470px;
+  /* Fixed height: the transcript scrolls above the pinned input line. */
+  height: 470px;
   display: flex;
   flex-direction: column;
+}
+.terminalScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--term-line) transparent;
 }
 .terminalHeader {
   display: flex;
@@ -722,6 +744,10 @@
     padding: 16px 14px 18px;
     min-height: 600px;
   }
+  .askScroll {
+    height: 560px;
+    min-height: 0;
+  }
   .askDemo,
   .terminal {
     box-shadow: 6px 6px 0 var(--sky);
@@ -751,7 +777,7 @@
   }
   .terminalBody {
     padding: 14px 12px 12px;
-    min-height: 560px;
+    height: 520px;
   }
   .highlights > div {
     border-right: 0;

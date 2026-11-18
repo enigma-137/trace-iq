@@ -1,0 +1,548 @@
+/* Integrations band on the landing page. Colours come from the .site tokens in landing-light.module.css.
+   Every scene shows its finished state by default; the loops only run while the section is on
+   screen (data-playing) and the visitor has not asked for reduced motion. */
+
+.section {
+  --loop: 7s;
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 40px;
+}
+.head > :first-child > p {
+  max-width: 520px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px 18px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 6px 6px 0 var(--sky);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+.card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 var(--sky);
+}
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logoTile {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.logoTile > svg {
+  display: block;
+}
+.githubMark {
+  width: 30px;
+  height: 30px;
+  color: #101715;
+}
+.linearMark {
+  width: 28px;
+  height: 28px;
+  color: #5e6ad2;
+}
+.connected {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 10px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--green);
+}
+.connected i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.card h3 {
+  margin-top: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.card > p {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  min-height: 3em;
+}
+
+/* ---------- Scenes ---------- */
+.scene {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  height: 138px;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.scene code {
+  font: 500 11px/1.4 var(--mono);
+}
+
+/* GitHub: an error gains a source link, then a setup pull request. */
+.ghError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ghError code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ghDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--orange);
+}
+.ghSource {
+  padding-left: 16px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ghSource code {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ghPr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ghPrIcon {
+  color: #1a7f37;
+  font-weight: 700;
+}
+.ghPr em {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: #1f883d;
+  color: #fff;
+  font: 600 10px/1.5 var(--mono);
+  font-style: normal;
+}
+
+/* Linear: an issue walks Todo → In Progress → Done, and syncs back. */
+.lnIssue {
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.lnId {
+  font: 500 10px/1.5 var(--mono);
+  color: var(--muted);
+}
+.lnIssue p {
+  margin-top: 2px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lnStatus {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  height: 18px;
+  overflow: hidden;
+  font: 500 11px/18px var(--mono);
+}
+.lnRing {
+  flex: none;
+  margin-top: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #5e6ad2;
+  background: #5e6ad2;
+}
+.lnLabels {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(-36px);
+}
+.lnLabels span {
+  height: 18px;
+}
+.lnSync {
+  display: flex;
+  gap: 6px;
+  color: var(--green);
+  font: 500 11px/1.4 var(--mono);
+}
+
+/* Slack: typing, then the daily brief posts. */
+.chatHead {
+  font-weight: 700;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.slTyping {
+  display: none;
+  gap: 4px;
+  padding: 6px 0;
+}
+.slTyping i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.slMessage strong {
+  font-weight: 700;
+}
+.slApp {
+  margin-left: 6px;
+  padding: 0 4px;
+  background: #e8e8e8;
+  color: #616061;
+  font: 600 9px/1.5 var(--mono);
+}
+.slMessage p {
+  margin-top: 2px;
+}
+
+/* Telegram: a question goes out, the bot answers, a paper plane flies past. */
+.tgBubble {
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 12px;
+}
+.tgOut {
+  justify-self: end;
+  background: #e1f5fe;
+  border-bottom-right-radius: 3px;
+}
+.tgIn {
+  justify-self: start;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 3px;
+}
+.tgPlane {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  opacity: 0;
+}
+.tgPlane svg {
+  display: block;
+}
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .section[data-playing="true"] .step1,
+  .section[data-playing="true"] .step2,
+  .section[data-playing="true"] .slMessage,
+  .section[data-playing="true"] .slTyping,
+  .section[data-playing="true"] .lnLabels,
+  .section[data-playing="true"] .lnRing,
+  .section[data-playing="true"] .tgPlane,
+  .section[data-playing="true"] .logoTile > svg {
+    animation-duration: var(--loop);
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-out;
+    animation-fill-mode: both;
+  }
+
+  /* Shared reveal timing for each scene's beats. */
+  .section[data-playing="true"] .step1 {
+    animation-name: step1;
+  }
+  .section[data-playing="true"] .step2 {
+    animation-name: step2;
+  }
+
+  /* GitHub: the mark waves, like a nod. */
+  .section[data-playing="true"] .github .logoTile > svg {
+    animation-name: ghNod;
+    transform-origin: 50% 80%;
+  }
+
+  /* Linear: the mark sweeps round once per loop. */
+  .section[data-playing="true"] .linear .logoTile > svg {
+    animation-name: lnSweep;
+    animation-timing-function: cubic-bezier(0.6, 0, 0.2, 1);
+  }
+  .section[data-playing="true"] .lnLabels {
+    animation-name: lnLabels;
+    animation-timing-function: linear;
+  }
+  .section[data-playing="true"] .lnRing {
+    animation-name: lnRing;
+    animation-timing-function: linear;
+  }
+
+  /* Slack: the pinwheel turns a quarter, twice. */
+  .section[data-playing="true"] .slack .logoTile > svg {
+    animation-name: slTurn;
+    animation-timing-function: cubic-bezier(0.5, 0, 0.2, 1.3);
+  }
+  .section[data-playing="true"] .slTyping {
+    display: flex;
+    animation-name: slTyping;
+  }
+  .section[data-playing="true"] .slTyping i {
+    animation: dot 900ms ease-in-out infinite;
+  }
+  .section[data-playing="true"] .slTyping i:nth-child(2) {
+    animation-delay: 150ms;
+  }
+  .section[data-playing="true"] .slTyping i:nth-child(3) {
+    animation-delay: 300ms;
+  }
+  .section[data-playing="true"] .slMessage {
+    animation-name: slMessage;
+  }
+
+  /* Telegram: the plane takes off and comes back. */
+  .section[data-playing="true"] .telegram .logoTile > svg {
+    animation-name: tgHop;
+    animation-timing-function: ease-in-out;
+  }
+  .section[data-playing="true"] .tgPlane {
+    animation-name: tgFly;
+    animation-timing-function: ease-in;
+  }
+}
+
+@keyframes step1 {
+  0%,
+  18% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  26%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes step2 {
+  0%,
+  42% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  50%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ghNod {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  66% {
+    transform: rotate(-12deg);
+  }
+  72% {
+    transform: rotate(10deg);
+  }
+  78% {
+    transform: rotate(-6deg);
+  }
+  84% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes lnSweep {
+  0%,
+  10% {
+    transform: rotate(0);
+  }
+  30%,
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lnLabels {
+  0%,
+  14% {
+    transform: translateY(0);
+  }
+  18%,
+  32% {
+    transform: translateY(-18px);
+  }
+  36%,
+  100% {
+    transform: translateY(-36px);
+  }
+}
+@keyframes lnRing {
+  0%,
+  14% {
+    border-color: #b7bcc6;
+    background: transparent;
+  }
+  18%,
+  32% {
+    border-color: #f2c94c;
+    background: linear-gradient(90deg, #f2c94c 50%, transparent 50%);
+  }
+  36%,
+  100% {
+    border-color: #5e6ad2;
+    background: #5e6ad2;
+  }
+}
+
+@keyframes slTurn {
+  0%,
+  20% {
+    transform: rotate(0);
+  }
+  28%,
+  60% {
+    transform: rotate(90deg);
+  }
+  68%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+@keyframes slTyping {
+  0%,
+  20% {
+    opacity: 1;
+    height: auto;
+  }
+  21%,
+  100% {
+    opacity: 0;
+    height: 0;
+    padding: 0;
+  }
+}
+@keyframes slMessage {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  28%,
+  92% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes dot {
+  50% {
+    transform: translateY(-3px);
+    opacity: 0.4;
+  }
+}
+
+@keyframes tgHop {
+  0%,
+  8%,
+  100% {
+    transform: none;
+  }
+  16% {
+    transform: translate(4px, -5px) rotate(-10deg) scale(1.06);
+  }
+  26% {
+    transform: none;
+  }
+}
+/* Flies from the bottom-left corner up past the outgoing message. */
+@keyframes tgFly {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0);
+  }
+  10% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 1;
+    transform: translate(160px, -60px) rotate(-12deg) scale(1.1);
+  }
+  28%,
+  100% {
+    opacity: 0;
+    transform: translate(240px, -110px) rotate(-20deg) scale(0.8);
+  }
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .card > p {
+    min-height: 0;
+  }
+}

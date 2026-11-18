@@ -3,6 +3,7 @@
 import { LandingAiSection } from "@/components/landing/LandingAiSection";
 import { LandingAlertsSection } from "@/components/landing/LandingAlertsSection";
 import { LandingHero } from "@/components/landing/LandingHero";
+import { LandingIntegrations } from "@/components/landing/LandingIntegrations";
 import { LandingProductOverview } from "@/components/landing/LandingProductOverview";
 import { LandingSignalPath } from "@/components/landing/LandingSignalPath";
 import { LandingSiteChrome } from "@/components/landing/LandingSiteChrome";
@@ -31,6 +32,7 @@ export default function Page() {
       <LandingSignalPath />
       <LandingAlertsSection />
       <LandingAiSection />
+      <LandingIntegrations />
       <section
         className={`${styles.frame} ${styles.setup}`}
         aria-label="Get started with TraceIQ"
