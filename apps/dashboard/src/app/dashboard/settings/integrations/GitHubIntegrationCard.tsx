@@ -5,7 +5,9 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { readActiveProjectIdFromDocument } from '@/lib/active-project';
 import { readApiError } from '@/lib/api-error';
 import { toast } from '@/lib/toast';
-import { normalizeSubdirectoryInput, type GitHubRepoOption, type GitHubStatusResponse } from '@/lib/github-integration';
+import Link from 'next/link';
+import { normalizeSubdirectoryInput, resolveRepoInput, setupWizardHref, type GitHubRepoOption, type GitHubStatusResponse } from '@/lib/github-integration';
+import { RepoNameInput } from './RepoNameInput';
 import { GITHUB_INTEGRATION_API, completeGitHubReturn, startGitHubInstall } from './github-install';
 import { GitHubIcon } from '@/components/ProviderIcons';
 import { Skeleton } from '@/components/Skeleton';
@@ -111,7 +113,9 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
   }
 
   async function saveRepo() {
-    if (!status?.project || !repoFullName) return;
+    if (!status?.project || !repoFullName.trim()) return;
+    const resolved = resolveRepoInput(repoFullName, { repos, accountLogin: status.installation?.accountLogin });
+    if (!resolved) return toast.error('Enter the repository as owner/name, its name, or its GitHub URL.');
     const folder = normalizeSubdirectoryInput(subdirectory);
     if (folder === null) return toast.error('The app folder must be a folder inside the repository, like apps/web.');
     setBusy('save');
@@ -121,10 +125,10 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
       const response = await fetch(`${GITHUB_API}/projects/${encodeURIComponent(status.project.id)}`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoFullName, subdirectory: folder })
+        body: JSON.stringify({ repoFullName: resolved, subdirectory: folder })
       });
       if (!response.ok) return toast.error(await readApiError(response, 'Could not link the repository.'));
-      toast.success(`${status.project.name} now uses ${repoFullName}${folder ? ` (${folder})` : ''}.`, { title: 'Repository linked' });
+      toast.success(`${resolved}${folder ? ` (${folder})` : ''} is linked to ${status.project.name}. Next: get a setup pull request.`, { title: 'Repository linked' });
       await load();
     } catch (error) {
       toast.error(await readApiError(error, 'Could not link the repository.'));
@@ -178,8 +182,9 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
 
   const installation = status?.installation ?? null;
   const canManage = status?.canManage ?? false;
+  const resolvedInput = resolveRepoInput(repoFullName, { repos, accountLogin: installation?.accountLogin }) ?? repoFullName.trim();
   const dirty =
-    repoFullName !== (status?.projectRepo?.repoFullName ?? '') ||
+    resolvedInput !== (status?.projectRepo?.repoFullName ?? '') ||
     (normalizeSubdirectoryInput(subdirectory) ?? subdirectory) !== (status?.projectRepo?.appSubdirectory ?? '');
 
   const headerActions = !status || !status.configured || !canManage ? null : installation ? (
@@ -259,7 +264,7 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                           {busy === 'unlink' ? 'Unlinking…' : 'Unlink'}
                         </button>
                       ) : null}
-                      <button type="button" className={secondaryButton} disabled={busy !== null || !repoFullName || !dirty} onClick={() => void saveRepo()}>
+                      <button type="button" className={secondaryButton} disabled={busy !== null || !repoFullName.trim() || !dirty} onClick={() => void saveRepo()}>
                         {busy === 'save' ? 'Saving…' : 'Save'}
                       </button>
                     </span>
@@ -267,22 +272,16 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                 }
               >
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className={fieldLabelClass}>
+                  <label className={fieldLabelClass} htmlFor="github-repo-settings">
                     Repository
-                    <select
+                    <RepoNameInput
+                      id="github-repo-settings"
                       className={inputClass}
                       value={repoFullName}
-                      disabled={!canManage || busy !== null || repos === null}
-                      onChange={(event) => setRepoFullName(event.target.value)}
-                    >
-                      <option value="">{repos === null && !reposError ? 'Loading repositories…' : 'Choose a repository…'}</option>
-                      {(repos ?? []).map((repo) => (
-                        <option key={repo.id} value={repo.fullName}>
-                          {repo.fullName}
-                          {repo.private ? ' (private)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      repos={repos}
+                      disabled={!canManage || busy !== null}
+                      onChange={setRepoFullName}
+                    />
                   </label>
                   <label className={fieldLabelClass}>
                     App folder <span className="font-normal text-neutral-400">(monorepos)</span>
@@ -307,6 +306,36 @@ export function GitHubIntegrationCard({ projectId: projectIdProp }: { projectId?
                 <span className="text-neutral-500 dark:text-slate-400">Create a project to link its repository.</span>
               </SettingsRow>
             )
+          ) : null}
+
+          {installation?.status === 'active' && status.project && status.projectRepo ? (
+            <SettingsRow
+              label="Next step"
+              hint={`No new project needed: ${status.projectRepo.repoFullName} is linked to ${status.project.name}, so its events and errors arrive there.`}
+              actions={
+                status.setupPullRequest ? (
+                  <a className={secondaryButton} href={status.setupPullRequest.url} target="_blank" rel="noopener noreferrer">
+                    Open PR #{status.setupPullRequest.number}
+                  </a>
+                ) : (
+                  <Link className={primaryButton} href={setupWizardHref(status.project.id)}>
+                    Get a setup PR
+                  </Link>
+                )
+              }
+            >
+              {status.setupPullRequest ? (
+                <span>
+                  The setup pull request is open. Merge it, add the environment variables it lists, and{' '}
+                  <Link className="underline underline-offset-2" href={setupWizardHref(status.project.id)}>
+                    watch for the first event
+                  </Link>{' '}
+                  in the Setup Wizard.
+                </span>
+              ) : (
+                <span>TraceIQ reads the repository, detects your stack, and opens a pull request that installs the SDK. You review and merge it.</span>
+              )}
+            </SettingsRow>
           ) : null}
         </>
       )}

@@ -35,6 +35,8 @@ export interface GitHubStatusResponse {
   connected: boolean;
   installation: GitHubInstallationInfo | null;
   projectRepo: GitHubProjectRepo | null;
+  /** The setup pull request opened for this project, if any. */
+  setupPullRequest?: { number: number; url: string } | null;
 }
 
 export const GITHUB_RETURN_PARAMS = ['github', 'reason', 'github_installation_id', 'github_code', 'github_state'] as const;
@@ -144,4 +146,40 @@ export function setupStage(input: {
   if (input.suspended) return 'suspended';
   if (!input.repoLinked) return 'pick_repo';
   return input.pullRequest ? 'pull_request' : 'preview';
+}
+
+const REPO_FULL_NAME = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
+
+/**
+ * Turns what someone typed into `owner/name`: `owner/name`, a GitHub URL (https, ssh or a
+ * folder link), or just `name`. A bare name matches a repository the app can see, else it
+ * is taken to be on the account the app is installed on. Null when it can't be one.
+ * The server still checks the app can see the repository.
+ */
+export function resolveRepoInput(input: string, options: { repos?: GitHubRepoOption[] | null; accountLogin?: string | null } = {}): string | null {
+  let value = input.trim().replace(/\.git$/, '').replace(/\/+$/, '');
+  if (!value) return null;
+  const ssh = /^(?:ssh:\/\/)?git@github\.com[:/]([^/\s]+\/[^/\s]+)$/i.exec(value);
+  if (ssh) value = ssh[1].replace(/\.git$/, '');
+  else if (/^(https?:\/\/)?(www\.)?github\.com\//i.test(value)) {
+    const path = value.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '').split(/[?#]/)[0];
+    const [owner, name] = path.split('/');
+    if (!owner || !name) return null;
+    value = `${owner}/${name.replace(/\.git$/, '')}`;
+  }
+  if (!value.includes('/')) {
+    const matches = (options.repos ?? []).filter((repo) => repo.fullName.split('/')[1].toLowerCase() === value.toLowerCase());
+    if (matches.length === 1) return matches[0].fullName;
+    if (!options.accountLogin) return null;
+    value = `${options.accountLogin}/${value}`;
+  }
+  // Use the listed spelling when the case differs.
+  const listed = (options.repos ?? []).find((repo) => repo.fullName.toLowerCase() === value.toLowerCase());
+  if (listed) return listed.fullName;
+  return REPO_FULL_NAME.test(value) && !/\/\.\.?$/.test(value) ? value : null;
+}
+
+/** The Setup Wizard, opened on its install step for a project. */
+export function setupWizardHref(projectId: string): string {
+  return `/dashboard/setup?projectId=${encodeURIComponent(projectId)}&step=install`;
 }

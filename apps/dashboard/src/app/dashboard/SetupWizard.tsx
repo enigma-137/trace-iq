@@ -149,7 +149,9 @@ function SetupWizardContent({
   const [currentStep, setCurrentStep] = useState<number>(1);
   // Back from installing the GitHub App: open the install step, where the GitHub panel finishes it.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('github')) setCurrentStep(2);
+    const params = new URLSearchParams(window.location.search);
+    // `step=install` comes from links such as "Get a setup PR" in Settings → Integrations.
+    if (params.has('github') || params.get('step') === 'install') setCurrentStep(2);
   }, []);
   const [selectedProducts, setSelectedProducts] = useState<string[]>(
     PRODUCTS.filter((p) => p.defaultSelected).map((p) => p.id)
