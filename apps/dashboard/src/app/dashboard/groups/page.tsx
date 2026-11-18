@@ -79,7 +79,7 @@ export default async function GroupsPage({
       {data?.project && groups.length === 0 ? (
         <section className="rounded-md border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
           <EmptyState
-            illustrationSrc="/dashboards/connect-app.png"
+            illustrationSrc="/dashboards/connect-app.webp"
             illustrationAlt="No groups yet"
             title={search ? 'No groups match your search' : 'No groups yet'}
             description={

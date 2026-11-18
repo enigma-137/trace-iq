@@ -45,7 +45,7 @@ export const metadata: Metadata = {
       {
         url: '/og.png',
         width: 1200,
-        height: 630,
+        height: 675,
         alt: 'TraceIQ — Data that drives real growth'
       }
     ]

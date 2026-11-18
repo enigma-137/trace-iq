@@ -617,7 +617,7 @@ export function ErrorTrackingClientView({
       {counts.all === 0 && initialIssues.length === 0 ? (
         <div className="rounded-lg border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           <EmptyState
-            illustrationSrc="/dashboards/no-errors.png"
+            illustrationSrc="/dashboards/no-errors.webp"
             illustrationAlt="No errors found"
             title="All systems healthy — zero exceptions recorded"
             description="TraceIQ hasn't detected any unhandled exceptions or error events in the selected time window. Your application is running smoothly."

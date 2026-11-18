@@ -82,7 +82,7 @@ export default async function DashboardEventsPage() {
       {!project && !error ? (
         <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
           <EmptyState
-            illustrationSrc="/dashboards/connect-app.png"
+            illustrationSrc="/dashboards/connect-app.webp"
             illustrationAlt="No project connected"
             title="No project selected"
             description="Create your first tracking project or select an existing project from your workspace to start capturing live events."

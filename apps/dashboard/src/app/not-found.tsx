@@ -18,7 +18,7 @@ export default function NotFound() {
       }}
     >
       <Image
-        src="/brand/notfound.png"
+        src="/brand/notfound.webp"
         alt="Robot holding disconnected cables"
         width={320}
         height={320}

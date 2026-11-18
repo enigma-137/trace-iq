@@ -764,7 +764,7 @@ export default async function DashboardPage({
             badge="Get started"
             title="Create your first project"
             description="You don't have a project yet. The setup wizard creates one, gives you the write key for the SDK, and checks that your first event arrives. This overview fills in as soon as it does."
-            illustrationSrc="/dashboards/banner-connect-project.png"
+            illustrationSrc="/dashboards/banner-connect-project.webp"
             illustrationAlt="Connect Project Artwork"
             primaryAction={{
               label: 'Open setup wizard →',

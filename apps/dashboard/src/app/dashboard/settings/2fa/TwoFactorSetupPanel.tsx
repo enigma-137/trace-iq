@@ -269,7 +269,7 @@ function EnabledState({
             </div>
           </div>
 
-          <HeroIllustration src="/brand/enabled.png" alt="Illustration of a robot mascot with a shield, representing a protected account" />
+          <HeroIllustration src="/brand/enabled.webp" alt="Illustration of a robot mascot with a shield, representing a protected account" />
         </div>
       </div>
 
@@ -480,7 +480,7 @@ function SetupFlow({
             </ul>
           </div>
 
-          <HeroIllustration src="/brand/disabled.png" alt="Illustration of a worried robot mascot, representing an unprotected account" />
+          <HeroIllustration src="/brand/disabled.webp" alt="Illustration of a worried robot mascot, representing an unprotected account" />
         </div>
       </div>
     );
