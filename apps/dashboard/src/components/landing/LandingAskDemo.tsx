@@ -5,7 +5,7 @@ import ArrowRight01Icon from "@hugeicons/core-free-icons/ArrowRight01Icon";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import Tick02Icon from "@hugeicons/core-free-icons/Tick02Icon";
 import styles from "./landing-ai-demos.module.css";
-import { useScriptedPlayback } from "./useScriptedPlayback";
+import { useFollowScroll, useScriptedPlayback } from "./useScriptedPlayback";
 
 type Claim = { kind: "Observed" | "Correlated" | "Hypothesis"; text: string };
 
@@ -75,6 +75,7 @@ export function LandingAskDemo() {
   const toolsShown = Math.min(playback.beat, conversation.tools.length);
   const chartShown = playback.beat > conversation.tools.length;
   const claimsShown = Math.max(0, playback.beat - conversation.tools.length - 1);
+  const bodyRef = useFollowScroll<HTMLDivElement>(playback.index, playback.beat);
 
   return (
     <div className={styles.askDemo} ref={playback.ref}>
@@ -93,7 +94,7 @@ export function LandingAskDemo() {
         <span className={styles.sampleTag}>Sample data</span>
       </div>
 
-      <div className={styles.askBody} aria-live="off">
+      <div className={`${styles.askBody} ${styles.askScroll}`} ref={bodyRef} aria-live="off">
         <div className={styles.askQuestion}>
           <span className={styles.askWho}>You</span>
           <p>

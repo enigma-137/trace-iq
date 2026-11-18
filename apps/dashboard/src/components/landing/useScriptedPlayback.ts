@@ -82,3 +82,18 @@ export function useScriptedPlayback(scripts: PlaybackScript[]) {
     beat,
   };
 }
+
+/**
+ * Keeps a fixed-height scroll box pinned to its newest content, like a chat window,
+ * so a growing transcript scrolls inside the box instead of pushing the page down.
+ * Scrolls only the box itself, never the page.
+ */
+export function useFollowScroll<T extends HTMLElement>(...deps: unknown[]) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (node) node.scrollTop = node.scrollHeight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return ref;
+}
