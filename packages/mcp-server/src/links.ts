@@ -44,6 +44,8 @@ const LINKS: Record<string, LinkBuilder> = {
   summarize_funnel_dropoff: detail('/dashboard/funnels', 'funnelId'),
   explain_conversion_drop: detail('/dashboard/funnels', 'funnelId'),
   find_users_who_failed_checkout: detail('/dashboard/funnels', 'funnelId'),
+  create_funnel: (_args, result) => (resultId(result) ? `/dashboard/funnels/${enc(resultId(result)!)}` : '/dashboard/funnels'),
+  update_funnel: detail('/dashboard/funnels', 'funnelId'),
   list_error_issues: section('/dashboard/errors'),
   get_error_issue: (args) =>
     str(args.type) && str(args.message) ? `/dashboard/errors?type=${enc(str(args.type)!)}&message=${enc(str(args.message)!)}` : '/dashboard/errors',
@@ -53,6 +55,8 @@ const LINKS: Record<string, LinkBuilder> = {
   get_user_timeline: detail('/dashboard/users', 'userId'),
   list_feature_flags: section('/dashboard/flags'),
   toggle_feature_flag: detail('/dashboard/flags', 'flagId'),
+  create_feature_flag: (_args, result) => (resultId(result) ? `/dashboard/flags/${enc(resultId(result)!)}` : '/dashboard/flags'),
+  update_feature_flag: detail('/dashboard/flags', 'flagId'),
   list_alerts: section('/dashboard/alerts'),
   create_alert: section('/dashboard/alerts'),
   set_alert_enabled: section('/dashboard/alerts'),

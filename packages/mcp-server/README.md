@@ -173,6 +173,9 @@ Read-only tokens cannot perform mutations.
 - `get_funnel_results`
 - `get_funnel_step_users`
 - `summarize_funnel_dropoff`
+- `create_funnel`: 2 to 12 steps, each an event name or `{ eventName, label }`
+- `update_funnel`: rename, replace steps, or both; anything left out is kept
+- `delete_funnel`
 
 ---
 
@@ -206,6 +209,8 @@ Read-only tokens cannot perform mutations.
 ## Feature Flags
 
 - `list_feature_flags`
+- `create_feature_flag`: key, rollout percentage, environment and targeting; starts off unless `enabled` is true
+- `update_feature_flag`: change rollout, targeting, on/off, name or description
 - `toggle_feature_flag`
 
 ---

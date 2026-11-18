@@ -94,6 +94,8 @@ The server currently exposes these tools:
 
 - `list_projects`
 - `list_feature_flags`
+- `create_feature_flag`
+- `update_feature_flag`
 - `toggle_feature_flag`
 
 ## Development
