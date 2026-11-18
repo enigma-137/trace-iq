@@ -33,7 +33,7 @@ export function RepoNameInput({
         list={listId}
         autoComplete="off"
         spellCheck={false}
-        placeholder="owner/repo, a name, or a GitHub URL"
+        placeholder="owner/repo or URL"
         onChange={(event) => onChange(event.target.value)}
       />
       <datalist id={listId}>

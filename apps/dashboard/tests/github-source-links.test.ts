@@ -95,7 +95,7 @@ describe('error page and wizard', () => {
     const wizard = read('app/dashboard/SetupWizard.tsx');
     expect(quick).toContain('/setup-pr-from-url`');
     expect(quick).toContain("body?.code === 'SETUP_PICK_FOLDER'");
-    expect(quick).toContain("status.canManage && status.installation?.status === 'active'");
+    expect(quick).toContain('quickSetupBlocker(status)');
     expect(wizard).toContain('{currentStep < 4 ? <GitHubQuickSetup projectId={projectId} onWaitForEvent={() => setCurrentStep(4)} /> : null}');
     expect(wizard.indexOf('<GitHubQuickSetup')).toBeLessThan(wizard.indexOf('STEP 1: PRODUCT SELECTION'));
   });
