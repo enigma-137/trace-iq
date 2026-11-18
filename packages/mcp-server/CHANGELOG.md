@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0
+
+- `create_feature_flag`: create a flag with a key, name, description, rollout percentage, environment
+  and targeting groups. It starts off unless `enabled` is true; turning it on at creation asks the
+  user to confirm.
+- `update_feature_flag`: change a flag's rollout, targeting, on/off state, name or description.
+  Fields left out are kept. Changes to who gets the flag ask the user to confirm; renames do not.
+- `create_funnel` and `update_funnel` accept steps with a readable label: `{ eventName, label }`.
+- Fixed: `update_funnel` failed when given only a new name or only new steps, because the API
+  replaces the whole funnel. It now fills in the missing part from the saved funnel.
+
 ## 0.7.0
 
 - Inline charts with MCP Apps: `get_project_health`, `get_trends`, `get_funnel_results` and
