@@ -71,7 +71,8 @@ export const navItems: NavItem[] = [
 
 export const bottomNavItems: NavItem[] = [
   { label: 'Settings', href: '/dashboard/settings', key: 'settings' },
-  { label: 'Docs', href: '/docs', key: 'docs' }
+  { label: 'Docs', href: '/docs', key: 'docs' },
+  { label: "What's new", href: '/changelog', key: 'whats-new' }
 ];
 
 export const allNavItems: NavItem[] = [...navItems, ...bottomNavItems];

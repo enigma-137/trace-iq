@@ -21,6 +21,7 @@ import {
   withProjectId
 } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
+import { useChangelogUnseen } from '@/lib/changelog-seen';
 import { DashboardPlanBadge } from './DashboardPlan';
 
 export function MobileNav({
@@ -38,6 +39,7 @@ export function MobileNav({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { enrolled } = useMfaStatus();
   const showMfaWarning = enrolled === false;
+  const changelogUnseen = useChangelogUnseen();
 
   const activeGroup = findGroupForActiveItem(active);
 
@@ -209,6 +211,9 @@ export function MobileNav({
                     >
                       <NavIcon name={item.key} />
                       {item.label}
+                      {item.key === 'whats-new' && changelogUnseen ? (
+                        <span className="ml-auto size-2 rounded-full bg-blue-600 dark:bg-blue-400" role="status" aria-label="New changelog entries" />
+                      ) : null}
                       {item.key === 'settings' && showMfaWarning ? (
                         <span className="ml-auto inline-flex text-amber-500" title="Two-factor authentication is not enabled yet">
                           <HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.9} aria-hidden="true" />

@@ -1,0 +1,54 @@
+/* Rendered inside landing-light.module.css's .site, so its tokens apply. Its
+   `.site p { margin: 0 }` reset outranks single-class rules, hence `.card .text`. */
+.wrap {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: 64px 24px;
+}
+.card {
+  width: 100%;
+  max-width: 520px;
+}
+.card .kicker {
+  font: 600 11px/1.4 var(--mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.card h1 {
+  margin: 14px 0 0;
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+.card .text {
+  margin-top: 14px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.card .text strong {
+  color: var(--ink);
+  word-break: break-all;
+}
+.card .text a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.card button {
+  margin-top: 24px;
+  border: 0;
+  cursor: pointer;
+}
+.card button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.card .error {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--orange-ink);
+}

@@ -25,6 +25,7 @@ import {
   withProjectId
 } from './nav';
 import { useMfaStatus } from '@/lib/mfa';
+import { useChangelogUnseen } from '@/lib/changelog-seen';
 import { DashboardPlanBadge } from './DashboardPlan';
 import { useAskTraceIQ } from '@/components/ai/AskTraceIQContext';
 
@@ -49,6 +50,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
   const [customizing, setCustomizing] = useState<{ groupKey: string; top: number; left: number } | null>(null);
   const { enrolled } = useMfaStatus();
   const showMfaWarning = mounted && enrolled === false;
+  const changelogUnseen = useChangelogUnseen();
 
   const activeGroup = findGroupForActiveItem(active);
 
@@ -353,6 +355,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
         {bottomNavItems.map((item) => {
           const isActive = item.key === active;
           const showWarning = item.key === 'settings' && showMfaWarning;
+          const showNewDot = item.key === 'whats-new' && changelogUnseen;
           return (
             <Link
               key={item.key}
@@ -362,6 +365,7 @@ export function Sidebar({ active, userEmail, projectId, organizationId }: Sideba
             >
               <NavIcon name={item.key} />
               {expanded && <span className="truncate">{item.label}</span>}
+              {showNewDot && <NewDot collapsed={!expanded} />}
               {showWarning && (
                 <WarningIcon
                   collapsed={!expanded}
@@ -524,6 +528,18 @@ function CustomizePanel({
       </div>
     </div>,
     document.body
+  );
+}
+
+/** Marks "What's new" until the newest changelog entry has been opened. */
+function NewDot({ collapsed }: { collapsed: boolean }) {
+  return (
+    <span
+      className={`${collapsed ? 'absolute right-2 top-1.5' : 'ml-auto'} size-2 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400`}
+      role="status"
+      aria-label="New changelog entries"
+      title="New changelog entries"
+    />
   );
 }
 

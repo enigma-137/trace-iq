@@ -27,11 +27,16 @@
   line-height: 1.55;
   color: var(--muted);
 }
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+  margin-top: 22px;
+}
 .cta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 22px;
   font: 500 12px/1.5 var(--mono);
   color: var(--blue);
 }

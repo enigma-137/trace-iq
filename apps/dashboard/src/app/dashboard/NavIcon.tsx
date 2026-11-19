@@ -3,6 +3,7 @@ import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import AnalyticsUpIcon from '@hugeicons/core-free-icons/AnalyticsUpIcon';
 import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
+import Megaphone01Icon from '@hugeicons/core-free-icons/Megaphone01Icon';
 import ChampionIcon from '@hugeicons/core-free-icons/ChampionIcon';
 import Clock03Icon from '@hugeicons/core-free-icons/Clock03Icon';
 import DashboardBrowsingIcon from '@hugeicons/core-free-icons/DashboardBrowsingIcon';
@@ -50,7 +51,8 @@ const ICONS: Record<string, IconSvgElement> = {
   achievements: ChampionIcon,
   export: Download04Icon,
   settings: Settings02Icon,
-  docs: BookOpen02Icon
+  docs: BookOpen02Icon,
+  'whats-new': Megaphone01Icon
 };
 
 export function NavIcon({ name }: { name: string }) {
