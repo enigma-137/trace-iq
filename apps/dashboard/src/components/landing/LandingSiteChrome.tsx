@@ -190,6 +190,7 @@ export function LandingSiteChrome({
                 <a href="/docs">Docs</a>
                 <a href="/docs?page=quickstart">SDK setup</a>
                 <a href="/blog">Blog</a>
+                <a href="/changelog">Changelog</a>
                 <a href="https://github.com/enigma-137/trace-iq">GitHub</a>
               </div>
               <div>
