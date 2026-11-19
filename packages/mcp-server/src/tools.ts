@@ -5,6 +5,65 @@ import { incidentTools } from './incident-tools.js';
 import { productTools } from './product-tools.js';
 import { accountTools } from './account-tools.js';
 
+const FLAG_OPERATORS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'not_contains', 'exists', 'not_exists', 'in'];
+
+/** Funnel steps as the API takes them: event names, or { eventName, label } for a readable step name. */
+function funnelSteps(value: JsonValue | undefined): JsonValue[] {
+  if (!Array.isArray(value)) throw new Error('"steps" must be an array.');
+  return value.map((step, index) => {
+    if (typeof step === 'string' && step.trim()) return step.trim();
+    if (step && typeof step === 'object' && !Array.isArray(step) && typeof step.eventName === 'string' && step.eventName.trim()) {
+      const label = typeof step.label === 'string' && step.label.trim() ? step.label.trim() : undefined;
+      return label ? { eventName: step.eventName.trim(), label } : step.eventName.trim();
+    }
+    throw new Error(`Step ${index + 1} must be an event name or { "eventName": "...", "label": "..." }.`);
+  });
+}
+
+/** Checks targeting groups up front so the assistant gets a precise error instead of a generic 400. */
+function targetingGroups(value: JsonValue | undefined): JsonValue[] {
+  if (!Array.isArray(value)) throw new Error('"targetingGroups" must be an array of rule groups.');
+  value.forEach((group, groupIndex) => {
+    const where = `targetingGroups[${groupIndex}]`;
+    if (!group || typeof group !== 'object' || Array.isArray(group)) throw new Error(`${where} must be an object with "rules".`);
+    if (!Array.isArray(group.rules)) throw new Error(`${where}.rules must be an array.`);
+    if (group.rolloutPercentage !== undefined && (typeof group.rolloutPercentage !== 'number' || group.rolloutPercentage < 0 || group.rolloutPercentage > 100)) {
+      throw new Error(`${where}.rolloutPercentage must be a number from 0 to 100.`);
+    }
+    group.rules.forEach((rule, ruleIndex) => {
+      const at = `${where}.rules[${ruleIndex}]`;
+      if (!rule || typeof rule !== 'object' || Array.isArray(rule)) throw new Error(`${at} must be { property, operator, value }.`);
+      if (typeof rule.property !== 'string' || !rule.property.trim()) throw new Error(`${at}.property is required.`);
+      if (typeof rule.operator !== 'string' || !FLAG_OPERATORS.includes(rule.operator)) {
+        throw new Error(`${at}.operator must be one of: ${FLAG_OPERATORS.join(', ')}.`);
+      }
+    });
+  });
+  return value;
+}
+
+function percent(key: string, value: JsonValue | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || value < 0 || value > 100) throw new Error(`"${key}" must be a number from 0 to 100.`);
+  return Math.round(value);
+}
+
+const STEPS_SCHEMA = {
+  type: 'array' as const,
+  description:
+    'Ordered steps, 2 to 12. Each is an event name ("signup_started") or { "eventName": "signup_started", "label": "Started signup" }.',
+  items: {}
+};
+
+const TARGETING_SCHEMA = {
+  type: 'array' as const,
+  description:
+    'Who the flag targets. A user matches when every rule in any one group passes. Each group: ' +
+    '{ "name"?: string, "rolloutPercentage"?: 0-100, "rules": [{ "property": "plan", "operator": "eq", "value": "pro" }] }. ' +
+    `Operators: ${FLAG_OPERATORS.join(', ')}. "in" takes an array value; "exists"/"not_exists" ignore value.`,
+  items: {}
+};
+
 function withProject(projectId?: string): Record<string, JsonValue> {
   return projectId ? { projectId } : {};
 }
@@ -654,16 +713,97 @@ export const tools: Tool[] = [
   },
 
   {
+    name: 'create_feature_flag',
+    title: 'Create feature flag',
+    description:
+      'Create a feature flag. It starts off unless enabled is true; turning it on at creation asks the user to confirm. ' +
+      'Set rolloutPercentage for a gradual rollout and targetingGroups to aim it at some users.',
+    requiredScopes: ['flags:write'],
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    schema: {
+      type: 'object',
+      properties: {
+        key: {
+          type: 'string',
+          description: 'The key your code checks, e.g. "new-checkout". Lowercase letters, numbers, dashes and underscores.'
+        },
+        name: { type: 'string', description: 'Readable name. Defaults to the key.' },
+        description: { type: 'string', description: 'What the flag controls.' },
+        enabled: { type: 'boolean', description: 'Turn it on straight away. Default false.', default: false },
+        rolloutPercentage: {
+          type: 'number',
+          description: 'Share of matching users who get the flag when it is on, 0 to 100. Default 100.',
+          default: 100
+        },
+        environment: {
+          type: 'string',
+          enum: ['production', 'staging', 'development'],
+          description: 'Environment. Default production.'
+        },
+        targetingGroups: TARGETING_SCHEMA,
+        projectId: { type: 'string', description: 'Optional project id.' }
+      },
+      required: ['key'],
+      additionalProperties: false
+    },
+    handler: async (args) => {
+      const body: JsonObject = {
+        key: args.key,
+        enabled: args.enabled ?? false,
+        rolloutPercentage: percent('rolloutPercentage', args.rolloutPercentage) ?? 100
+      };
+      for (const key of ['name', 'description', 'environment', 'projectId']) if (args[key] !== undefined) body[key] = args[key];
+      if (args.targetingGroups !== undefined) body.targetingGroups = targetingGroups(args.targetingGroups);
+      return request('POST', '/v1/dashboard/flags', { body });
+    }
+  },
+
+  {
+    name: 'update_feature_flag',
+    title: 'Update feature flag',
+    description:
+      'Change a feature flag: rollout percentage, targeting, on/off, name or description. Anything left out is kept. ' +
+      'Changes that affect who gets the flag ask the user to confirm.',
+    requiredScopes: ['flags:write'],
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: {
+      type: 'object',
+      properties: {
+        flagId: { type: 'string', description: 'TraceIQ feature flag id (from list_feature_flags).' },
+        name: { type: 'string', description: 'New readable name.' },
+        description: { type: 'string', description: 'New description.' },
+        enabled: { type: 'boolean', description: 'Turn the flag on or off.' },
+        rolloutPercentage: { type: 'number', description: 'New rollout, 0 to 100.' },
+        targetingGroups: { ...TARGETING_SCHEMA, description: `Replaces the current targeting; [] removes it. ${TARGETING_SCHEMA.description}` },
+        projectId: { type: 'string', description: 'Optional project id.' }
+      },
+      required: ['flagId'],
+      additionalProperties: false
+    },
+    handler: async (args) => {
+      const body: JsonObject = {};
+      for (const key of ['name', 'description', 'enabled', 'projectId']) if (args[key] !== undefined) body[key] = args[key];
+      const rollout = percent('rolloutPercentage', args.rolloutPercentage);
+      if (rollout !== undefined) body.rolloutPercentage = rollout;
+      if (args.targetingGroups !== undefined) body.targetingGroups = targetingGroups(args.targetingGroups);
+      if (Object.keys(body).every((key) => key === 'projectId')) throw new Error('Pass at least one field to change.');
+      return request('PUT', `/v1/dashboard/flags/${encodeURIComponent(args.flagId as string)}`, { body });
+    }
+  },
+
+  {
     name: 'create_funnel',
     title: 'Create funnel',
-    description: 'Create a funnel from an ordered list of event names. Non-destructive.',
+    description:
+      'Create a funnel from 2 to 12 ordered steps. Each step is an event name, optionally with a readable label. ' +
+      'Use list_event_names first to pick real events. Non-destructive.',
     requiredScopes: ['funnels:write'],
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     schema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Funnel name.' },
-        steps: { type: 'array', items: { type: 'string' }, description: 'Ordered event names that define the funnel.' },
+        steps: STEPS_SCHEMA,
         projectId: { type: 'string', description: 'Optional project id.' }
       },
       required: ['name', 'steps'],
@@ -673,7 +813,7 @@ export const tools: Tool[] = [
       return request('POST', '/v1/dashboard/funnels', {
         body: {
           name: args.name,
-          steps: args.steps,
+          steps: funnelSteps(args.steps),
           ...(args.projectId !== undefined ? { projectId: args.projectId } : {})
         }
       });
@@ -683,26 +823,39 @@ export const tools: Tool[] = [
   {
     name: 'update_funnel',
     title: 'Update funnel',
-    description: 'Rename a funnel or replace its steps. Non-destructive.',
+    description: 'Rename a funnel, replace its steps, or both. Anything left out is kept. Non-destructive.',
     requiredScopes: ['funnels:write'],
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: {
       type: 'object',
       properties: {
         funnelId: { type: 'string', description: 'The funnel id.' },
         name: { type: 'string', description: 'New funnel name.' },
-        steps: { type: 'array', items: { type: 'string' }, description: 'New ordered event names.' },
+        steps: { ...STEPS_SCHEMA, description: `New steps, replacing the old ones. ${STEPS_SCHEMA.description}` },
         projectId: { type: 'string', description: 'Optional project id.' }
       },
       required: ['funnelId'],
       additionalProperties: false
     },
     handler: async (args) => {
-      const body: JsonObject = {};
-      if (args.name !== undefined) body.name = args.name;
-      if (args.steps !== undefined) body.steps = args.steps;
-      if (args.projectId !== undefined) body.projectId = args.projectId;
-      return request('PUT', `/v1/dashboard/funnels/${encodeURIComponent(args.funnelId as string)}`, { body });
+      if (args.name === undefined && args.steps === undefined) throw new Error('Pass "name", "steps" or both.');
+      const path = `/v1/dashboard/funnels/${encodeURIComponent(args.funnelId as string)}`;
+      const project = args.projectId !== undefined ? { projectId: args.projectId } : {};
+
+      // The API replaces the whole funnel, so fill in whatever was left out from the saved one.
+      let name = args.name;
+      let steps = args.steps !== undefined ? funnelSteps(args.steps) : undefined;
+      if (name === undefined || steps === undefined) {
+        const current = (await request('GET', path, { query: withProject(args.projectId as string) })) as JsonObject;
+        name ??= current.name;
+        steps ??= Array.isArray(current.steps)
+          ? (current.steps as JsonObject[])
+              .slice()
+              .sort((a, b) => Number(a.order) - Number(b.order))
+              .map((step) => (typeof step.label === 'string' && step.label ? { eventName: step.eventName, label: step.label } : step.eventName))
+          : undefined;
+      }
+      return request('PUT', path, { body: { name: name as JsonValue, steps: steps as JsonValue, ...project } });
     }
   },
 

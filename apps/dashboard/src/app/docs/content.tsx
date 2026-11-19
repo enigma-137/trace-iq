@@ -1951,7 +1951,7 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
 
         <h3 className={h3}>What the assistant can do</h3>
         <P>
-          The server has 66 tools. Each one needs the matching scope (for example <Mono>funnels:read</Mono> or{' '}
+          The server has 68 tools. Each one needs the matching scope (for example <Mono>funnels:read</Mono> or{' '}
           <Mono>flags:write</Mono>); ask the assistant to run <Mono>whoami</Mono> to see which tools your connection can
           use.
         </P>
@@ -1963,7 +1963,7 @@ traceiq open logs --print  # print the URL instead of opening a browser`}</Code>
             ['Users and errors', 'list_users, get_user, get_user_timeline, list_error_issues, get_error_issue'],
             ['Experiments and surveys', 'list_experiments, get_experiment_results, create_experiment, set_experiment_status, list_surveys, get_survey_results, set_survey_status'],
             ['Dashboards and cohorts', 'list_dashboards, get_dashboard, create_dashboard, add_dashboard_widget, list_cohorts, create_cohort, delete_cohort'],
-            ['Flags, alerts and links', 'list_feature_flags, toggle_feature_flag, list_alerts, create_alert, set_alert_enabled, delete_alert, list_links, get_link_stats, create_link'],
+            ['Flags, alerts and links', 'list_feature_flags, create_feature_flag, update_feature_flag, toggle_feature_flag, list_alerts, create_alert, set_alert_enabled, delete_alert, list_links, get_link_stats, create_link'],
             ['Monitors and webhooks', 'list_synthetic_monitors, get_synthetic_monitor_runs, run_synthetic_monitor, set_synthetic_monitor_paused, list_webhooks, list_webhook_deliveries, retry_webhook_delivery, test_webhook'],
             ['Account', 'list_projects, whoami']
           ]}
