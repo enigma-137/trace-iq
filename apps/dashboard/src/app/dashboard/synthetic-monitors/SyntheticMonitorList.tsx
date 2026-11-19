@@ -108,7 +108,7 @@ export function SyntheticMonitorList({
     <div className="space-y-4">
       {/* Error Banner */}
       {(initialError || actionError) && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+        <div className="rounded-lg border border-rose-200 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
           {actionError || initialError}
         </div>
       )}
@@ -153,7 +153,7 @@ export function SyntheticMonitorList({
       {/* Monitors List / Cards */}
       {filteredMonitors.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-950">
-          {/* <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+          {/* <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
@@ -206,7 +206,7 @@ export function SyntheticMonitorList({
 
                     {/* Status Badge */}
                     {isRunning ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                         Running
                       </span>
@@ -215,12 +215,12 @@ export function SyntheticMonitorList({
                         Paused
                       </span>
                     ) : isPassing ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         Passing
                       </span>
                     ) : isFailing ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                         <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                         Failing
                       </span>

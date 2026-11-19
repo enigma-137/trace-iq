@@ -131,13 +131,13 @@ export default async function ApiPerformancePage({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          <div className="rounded-lg border border-red-200 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
             {error}
           </div>
         ) : null}
 
         {hasData && source !== 'server' && sourceCounts.client > 0 ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="rounded-lg border border-amber-200 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
             {source === 'client' ? 'These are' : 'This view includes'} browser timings: the full round trip from the
             visitor&apos;s device (DNS, TLS, network distance to your host, queueing), so they run far higher than the
             handler time your host reports.{' '}

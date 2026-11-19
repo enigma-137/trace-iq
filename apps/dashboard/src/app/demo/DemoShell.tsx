@@ -125,7 +125,7 @@ function DemoFrame({ children }: { children: ReactNode }) {
               </div>
 
               <div className="ml-auto flex items-center gap-2">
-                <span className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-300 sm:inline-flex">
+                <span className="hidden items-center gap-1.5 rounded-full border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-300 sm:inline-flex">
                   <span className="relative flex size-1.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
                     <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />

@@ -1087,7 +1087,7 @@ export function DashboardsApp({
                       setCreateBreakdown(tmpl.definition.breakdown ?? '');
                     }}
                     className={`flex flex-col items-start rounded-lg border p-2.5 text-left transition ${isSelected
-                      ? 'border-blue-500 bg-blue-50/50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/30 dark:text-blue-100'
+                      ? 'border-blue-500 text-blue-900 dark:border-blue-500 dark:bg-blue-950/30 dark:text-blue-100'
                       : 'border-neutral-200 bg-white hover:bg-neutral-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800'
                       }`}
                   >
@@ -1261,7 +1261,7 @@ export function DashboardsApp({
             </select>
           </label>
           {createdShareUrl ? (
-            <div className="rounded border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <div className="rounded border border-emerald-300 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
               <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                 Copy this link now—the secret is shown only once.
               </p>
@@ -1332,7 +1332,7 @@ export function DashboardsApp({
         }
       >
         {shareRevokeError ? (
-          <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+          <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
             {shareRevokeError}
           </p>
         ) : null}
@@ -1394,7 +1394,7 @@ export function DashboardsApp({
             <span className="font-semibold text-neutral-900 dark:text-white">{deleting?.name}</span> will be removed.
           </p>
           {deleteError ? (
-            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+            <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
               {deleteError}
             </p>
           ) : null}

@@ -266,7 +266,7 @@ export function FunnelsClientView({ funnels, resultsMap, eventNames }: FunnelsCl
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-400 dark:text-slate-500">
                 Top Performing Flow
               </span>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                 Leader
               </span>
             </div>

@@ -253,7 +253,7 @@ export function UserPickerModal({
                   onClick={() => toggleUser(user)}
                   className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 transition ${
                     isSelected
-                      ? 'bg-blue-50/70 text-blue-950 dark:bg-blue-950/40 dark:text-blue-200'
+                      ? ' text-blue-950 dark:bg-blue-950/40 dark:text-blue-200'
                       : isFocused
                         ? 'bg-neutral-100 dark:bg-slate-900'
                         : 'hover:bg-neutral-50 dark:hover:bg-slate-900/60'

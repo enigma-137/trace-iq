@@ -180,7 +180,7 @@ function Notice({ children }: { children: ReactNode }) {
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="flex items-center justify-between rounded border border-red-200 bg-red-50 px-3 py-2 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+    <div className="flex items-center justify-between rounded border border-red-200 px-3 py-2 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
       <span>{message}</span>
       <button type="button" onClick={onRetry} className="font-semibold underline-offset-2 hover:underline">
         Retry

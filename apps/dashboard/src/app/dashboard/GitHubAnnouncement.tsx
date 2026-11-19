@@ -72,7 +72,7 @@ export function GitHubAnnouncement({ projectId }: { projectId?: string | null })
         </span>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-            <span className="mr-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+            <span className="mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
               New
             </span>
             Connect GitHub

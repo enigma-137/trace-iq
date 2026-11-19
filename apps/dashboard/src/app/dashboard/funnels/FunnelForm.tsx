@@ -350,7 +350,7 @@ export function FunnelForm({ eventNames, funnel, initialTemplate, onSuccess, onC
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-lg border border-red-200 p-3.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
           {error}
         </div>
       )}
@@ -452,7 +452,7 @@ export function FunnelForm({ eventNames, funnel, initialTemplate, onSuccess, onC
               The funnel <span className="font-semibold text-neutral-900 dark:text-white">{funnel?.name}</span> will be permanently removed.
             </p>
             {deleteError && (
-              <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300" role="alert">
+              <p className="rounded-lg border border-red-200 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300" role="alert">
                 {deleteError}
               </p>
             )}

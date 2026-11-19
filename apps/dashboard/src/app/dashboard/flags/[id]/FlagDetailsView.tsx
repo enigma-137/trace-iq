@@ -654,7 +654,7 @@ export function FlagDetailsView({
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
                 flag.enabled
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  ? ' text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                   : 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400'
               }`}
             >
@@ -892,7 +892,7 @@ export function FlagDetailsView({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Specific Users (Always Included)</h3>
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                       {includedUsersList.length}
                     </span>
                   </div>
@@ -967,7 +967,7 @@ export function FlagDetailsView({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Excluded Users (Always Blocked)</h3>
-                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/40 dark:text-red-300">
                       {excludedUsersList.length}
                     </span>
                   </div>
@@ -1354,7 +1354,7 @@ export function FlagDetailsView({
                       {isEditingSimulationProps ? (
                         <div className="space-y-1.5 pt-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                               Simulation Only
                             </span>
                             <span className="text-[10px] text-neutral-400 dark:text-slate-500">
@@ -1378,7 +1378,7 @@ export function FlagDetailsView({
                   ) : null}
 
                   {testError ? (
-                    <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+                    <p className="rounded-md border border-red-200 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
                       {testError}
                     </p>
                   ) : null}
@@ -1395,7 +1395,7 @@ export function FlagDetailsView({
               ) : (
                 /* Mode 2: Manual Simulation Form */
                 <form onSubmit={handleRunTestEvaluation} className="space-y-4">
-                  <div className="flex items-center gap-1.5 rounded bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                  <div className="flex items-center gap-1.5 rounded p-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                     <span>💡 <strong>Manual mode:</strong> Test hypothetical users that do not exist yet.</span>
                   </div>
 
@@ -1436,7 +1436,7 @@ export function FlagDetailsView({
                   </div>
 
                   {testError ? (
-                    <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+                    <p className="rounded-md border border-red-200 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
                       {testError}
                     </p>
                   ) : null}
@@ -1462,8 +1462,8 @@ export function FlagDetailsView({
                   <div
                     className={`flex items-center justify-between rounded-lg p-4 border ${
                       testResult.enabled
-                        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
-                        : 'border-red-200 bg-red-50/70 text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300'
+                        ? 'border-emerald-200 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
+                        : 'border-red-200 text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300'
                     }`}
                   >
                     <div className="space-y-0.5">
@@ -1614,7 +1614,7 @@ export function FlagDetailsView({
           </div>
 
           {payloadError ? (
-            <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+            <p className="rounded-md border border-red-200 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
               {payloadError}
             </p>
           ) : null}
@@ -1791,7 +1791,7 @@ export function FlagDetailsView({
           </form>
 
           {/* Danger Zone */}
-          <div className="rounded-lg border border-red-200 bg-red-50/40 p-5 dark:border-red-900/40 dark:bg-red-950/20 space-y-4">
+          <div className="rounded-lg border border-red-200 p-5 dark:border-red-900/40 dark:bg-red-950/20 space-y-4">
             <h3 className="text-sm font-bold text-red-900 dark:text-red-300">Danger Zone</h3>
 
             <div className="flex items-center justify-between">

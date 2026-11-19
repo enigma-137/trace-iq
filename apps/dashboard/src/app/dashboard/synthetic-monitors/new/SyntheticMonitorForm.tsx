@@ -265,17 +265,17 @@ export function SyntheticMonitorForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+        <div className="rounded-lg border border-rose-200 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </div>
       )}
 
       {/* Session Replay Extraction Provenance Banner */}
       {initialReplayDraft && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-5 dark:border-indigo-900/50 dark:bg-indigo-950/30 space-y-4">
+        <div className="rounded-xl border border-indigo-200 p-5 dark:border-indigo-900/50 dark:bg-indigo-950/30 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+              <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
                 Session Replay Extraction
               </span>
               <span className="text-sm font-semibold text-neutral-900 dark:text-white">
@@ -320,7 +320,7 @@ export function SyntheticMonitorForm({
           </div>
 
           {initialReplayDraft.warnings && initialReplayDraft.warnings.length > 0 && (
-            <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+            <div className="space-y-1.5 rounded-lg border border-amber-200 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
               <div className="font-semibold flex items-center gap-1.5">
                 <span>⚠️ Journey Extraction Warnings:</span>
               </div>
@@ -332,7 +332,7 @@ export function SyntheticMonitorForm({
             </div>
           )}
 
-          <div className="rounded-md bg-indigo-100/60 p-2.5 text-[11px] text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200">
+          <div className="rounded-md p-2.5 text-[11px] text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200">
             🔒 <strong>Deterministic Privacy:</strong> Passwords, payment cards, and sensitive keystrokes were automatically replaced with secure placeholders (e.g. <code>&#123;&#123;TEST_PASSWORD&#125;&#125;</code>, <code>&#123;&#123;TEST_EMAIL&#125;&#125;</code>).
           </div>
         </div>
@@ -340,10 +340,10 @@ export function SyntheticMonitorForm({
 
       {/* Funnel Conversion Provenance Banner */}
       {initialDraft && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-5 dark:border-blue-900/50 dark:bg-blue-950/30 space-y-4">
+        <div className="rounded-xl border border-blue-200 p-5 dark:border-blue-900/50 dark:bg-blue-950/30 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+              <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
                 Funnel Conversion
               </span>
               <span className="text-sm font-semibold text-neutral-900 dark:text-white">
@@ -375,11 +375,11 @@ export function SyntheticMonitorForm({
                     {idx + 1}. {ms.label || ms.eventName}
                   </span>
                   {ms.needsConfiguration ? (
-                    <span className="shrink-0 rounded-xs bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                    <span className="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
                       Needs Action
                     </span>
                   ) : (
-                    <span className="shrink-0 rounded-xs bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    <span className="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
                       Pre-filled
                     </span>
                   )}
@@ -396,7 +396,7 @@ export function SyntheticMonitorForm({
             ))}
           </div>
 
-          <div className="rounded-md bg-blue-100/60 p-2.5 text-[11px] text-blue-900 dark:bg-blue-900/30 dark:text-blue-200">
+          <div className="rounded-md p-2.5 text-[11px] text-blue-900 dark:bg-blue-900/30 dark:text-blue-200">
             💡 <strong>Security Tip:</strong> Use secure variables like <code>&#123;&#123;SYNTHETIC_EMAIL&#125;&#125;</code> and <code>&#123;&#123;SYNTHETIC_PASSWORD&#125;&#125;</code> for authentication credentials to keep them encrypted at rest and redacted from logs.
           </div>
         </div>
@@ -582,22 +582,22 @@ export function SyntheticMonitorForm({
 
                   {/* Selector confidence badges */}
                   {(step as any).confidence === 'high' && (
-                    <span className="inline-flex items-center rounded-xs bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    <span className="inline-flex items-center rounded-xs px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
                       High confidence
                     </span>
                   )}
                   {(step as any).confidence === 'medium' && (
-                    <span className="inline-flex items-center rounded-xs bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-900/50 dark:text-sky-300">
+                    <span className="inline-flex items-center rounded-xs px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-900/50 dark:text-sky-300">
                       Medium
                     </span>
                   )}
                   {((step as any).confidence === 'low' || (step as any).needsReview) && (
-                    <span className="inline-flex items-center rounded-xs bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                    <span className="inline-flex items-center rounded-xs px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
                       Needs selector review
                     </span>
                   )}
                   {(step as any).isMasked && (
-                    <span className="inline-flex items-center rounded-xs bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+                    <span className="inline-flex items-center rounded-xs px-1.5 py-0.5 text-[10px] font-semibold text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
                       🔒 Masked
                     </span>
                   )}

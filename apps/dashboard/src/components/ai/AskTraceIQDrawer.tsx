@@ -287,7 +287,7 @@ export function AskTraceIQDrawer() {
 
           {/* Investigation Progress Indicator */}
           {isInvestigating ? (
-            <div className="space-y-2 rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <div className="space-y-2 rounded-xl border border-blue-200 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
               <div className="flex items-center gap-2.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
                 <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-500 animate-ping" />
                 <span>Investigating…</span>
@@ -298,7 +298,7 @@ export function AskTraceIQDrawer() {
 
           {/* Error Banner */}
           {error ? (
-            <div className="space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+            <div className="space-y-2 rounded-xl border border-rose-200 p-4 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
               <p className="font-semibold text-rose-900 dark:text-rose-200">Investigation Note:</p>
               <p>{error}</p>
             </div>
@@ -306,7 +306,7 @@ export function AskTraceIQDrawer() {
 
           {/* Quota Exhaustion Upgrade Banner */}
           {quota && quota.isExhausted ? (
-            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+            <div className="space-y-2 rounded-xl border border-amber-200 p-4 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
               <p className="font-semibold text-amber-950 dark:text-amber-100">
                 You’ve used your {quota.limit} Ask TraceIQ investigations this month.
               </p>

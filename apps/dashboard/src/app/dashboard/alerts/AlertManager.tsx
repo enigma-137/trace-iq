@@ -442,7 +442,7 @@ export function AlertManager({
 
       {/* Plan Entitlement Warning */}
       {!alertsAvailable ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-300 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
           <p>
             <strong className="font-semibold">Alerts need the Pro plan.</strong> Your rules stay saved, but they are not
             checked and no notifications go out.
@@ -475,7 +475,7 @@ export function AlertManager({
 
       {/* Firing banner */}
       {firingAlerts.length > 0 ? (
-        <div className="flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+        <div className="flex items-start gap-3 rounded-xl border border-red-300 p-4 text-sm text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
           <HugeiconsIcon icon={Alert02Icon} size={18} strokeWidth={2} className="mt-0.5 shrink-0" />
           <p>
             <strong className="font-semibold">
@@ -540,7 +540,7 @@ export function AlertManager({
 
           {alerts.length === 0 ? (
             <div className="px-6 py-10 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                 <HugeiconsIcon icon={Notification02Icon} size={22} strokeWidth={1.8} />
               </div>
               <h3 className="text-base font-semibold text-neutral-900 dark:text-white">No alerts yet</h3>

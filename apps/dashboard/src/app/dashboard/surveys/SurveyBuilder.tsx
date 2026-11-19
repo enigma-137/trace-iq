@@ -359,7 +359,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-lg border border-red-200 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
           {error}
         </div>
       )}
@@ -630,7 +630,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                     onClick={() => setTargetingType(t.id as any)}
                     className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                       targetingType === t.id
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-300 font-semibold'
+                        ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-300 font-semibold'
                         : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -750,7 +750,7 @@ export function SurveyBuilder({ initialSurvey, projectId, token: initialToken }:
                   </div>
 
                   {previewError && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300">
+                    <div className="rounded-lg border border-red-200 p-2.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300">
                       {previewError}
                     </div>
                   )}

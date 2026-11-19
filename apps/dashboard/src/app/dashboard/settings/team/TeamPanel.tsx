@@ -278,7 +278,7 @@ export function TeamPanel() {
         <p
           className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
             ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-            : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+            : 'border-red-300 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
             }`}
         >
           {status.message}
@@ -286,7 +286,7 @@ export function TeamPanel() {
       ) : null}
 
       {pendingForMe.length > 0 ? (
-        <section className="rounded-md border border-blue-200 bg-blue-50/40 dark:border-blue-900 dark:bg-blue-950/20" aria-label="Invitations for you">
+        <section className="rounded-md border border-blue-200 dark:border-blue-900 dark:bg-blue-950/20" aria-label="Invitations for you">
           <div className="border-b border-blue-200 px-5 py-3 dark:border-blue-900">
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-blue-600 dark:text-blue-300">
               Invites awaiting your acceptance ({pendingForMe.length})
@@ -563,7 +563,7 @@ function selectableRoleOptions(
 function RoleBadge({ role }: { role: Role }) {
   const className =
     role === 'owner'
-      ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900'
+      ? 'text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900'
       : role === 'admin'
         ? 'text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900'
         : 'bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-800';
@@ -575,11 +575,11 @@ function InviteStatusBadge({ status }: { status: InviteRecord['status'] }) {
   const map: Record<InviteRecord['status'], { label: string; className: string }> = {
     pending: {
       label: 'Pending',
-      className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900'
+      className: 'text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900'
     },
     accepted: {
       label: 'Accepted',
-      className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900'
+      className: 'text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900'
     },
     revoked: {
       label: 'Revoked',
@@ -606,4 +606,4 @@ const secondaryButtonClass =
   'inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
 
 const dangerButtonClass =
-  'inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-red-300 bg-red-50 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50';
+  'inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-red-300 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50';

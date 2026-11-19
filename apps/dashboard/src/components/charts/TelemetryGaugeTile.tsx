@@ -17,19 +17,19 @@ const toneStyles = {
     dot: 'bg-emerald-500',
     ping: 'bg-emerald-400',
     bar: 'bg-gradient-to-r from-emerald-500 to-teal-400',
-    badge: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    badge: 'border-emerald-500/20 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
   },
   blue: {
     dot: 'bg-blue-500',
     ping: 'bg-blue-400',
     bar: 'bg-gradient-to-r from-blue-600 to-cyan-400',
-    badge: 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+    badge: 'border-blue-500/20 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
   },
   amber: {
     dot: 'bg-amber-500',
     ping: 'bg-amber-400',
     bar: 'bg-gradient-to-r from-amber-500 to-orange-400',
-    badge: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    badge: 'border-amber-500/20 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
   }
 };
 

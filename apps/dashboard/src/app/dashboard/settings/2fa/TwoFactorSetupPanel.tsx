@@ -29,7 +29,7 @@ export function TwoFactorSetupPanel({ userEmail }: { userEmail?: string | null }
           role="status"
           className={`rounded-md border px-3 py-2 text-sm ${status.tone === 'success'
             ? 'border-neutral-300 bg-neutral-100 text-neutral-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
-            : 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+            : 'border-red-300 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
             }`}
         >
           {status.message}
@@ -282,7 +282,7 @@ function EnabledState({
             Removing two-factor authentication will reduce the security of your account.
           </p>
           <button
-            className="h-10 shrink-0 rounded-md border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
+            className="h-10 shrink-0 rounded-md border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
             type="button"
             disabled={isRemoving}
             onClick={() => setIsConfirmOpen(true)}

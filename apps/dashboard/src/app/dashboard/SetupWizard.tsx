@@ -122,7 +122,7 @@ export function SetupWizard(props: SetupWizardProps) {
   // its own component so SetupWizardContent always calls the same hooks.
   if (!props.projectId) {
     return (
-      <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-6 text-center text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+      <div className="rounded-xl border border-amber-300 p-6 text-center text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
         <h3 className="text-base font-semibold">Project context required</h3>
         <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
           The Setup Wizard must be scoped to an existing TraceIQ project. Please select or create a project first.
@@ -391,7 +391,7 @@ function SetupWizardContent({
                 type="button"
                 onClick={() => setCurrentStep(step.num)}
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition ${isCurrent
-                    ? 'border-blue-600 bg-blue-50/50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/20 dark:text-blue-200'
+                    ? 'border-blue-600 text-blue-900 dark:border-blue-500 dark:bg-blue-950/20 dark:text-blue-200'
                     : isDone
                       ? 'border-neutral-200 bg-white text-neutral-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100'
                       : 'border-transparent text-neutral-400 dark:text-slate-600'
@@ -598,7 +598,7 @@ function SetupWizardContent({
 
           {/* Missing Write Key Prompt */}
           {!writeKey ? (
-            <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <div className="rounded-xl border border-amber-300 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200">
@@ -903,7 +903,7 @@ export function TraceIQProvider({ children }: { children: React.ReactNode }) {
               </div>
 
               {verificationError ? (
-                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                <div className="rounded-lg border border-red-300 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
                   {verificationError}
                 </div>
               ) : null}

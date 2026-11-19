@@ -57,7 +57,7 @@ export default async function UsersPage({
   return (
     <DashboardShell active="users" title="Users" userEmail={user.email ?? undefined} projectId={projectId}>
       {error ? (
-        <section className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-400">
+        <section className="mb-4 rounded-md border border-rose-200 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-400">
           {error}
         </section>
       ) : null}

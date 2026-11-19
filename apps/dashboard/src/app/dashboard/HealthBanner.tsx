@@ -48,8 +48,8 @@ export function HealthBanner({ projectId }: { projectId?: string | null }) {
   if (when) details.push(when);
 
   const tone = outage
-    ? 'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-100'
-    : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100';
+    ? 'border-rose-200 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-100'
+    : 'border-amber-200 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100';
   const link = outage
     ? 'text-rose-700 hover:text-rose-900 dark:text-rose-300 dark:hover:text-rose-100'
     : 'text-amber-800 hover:text-amber-950 dark:text-amber-300 dark:hover:text-amber-100';

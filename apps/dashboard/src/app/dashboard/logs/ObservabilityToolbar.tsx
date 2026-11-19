@@ -186,7 +186,7 @@ export function ObservabilityToolbar({
           onClick={onToggleLive}
           aria-pressed={isLive}
           className={`${control} inline-flex items-center gap-1.5 px-3 font-medium ${
-            isLive ? 'border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : ''
+            isLive ? 'border-emerald-500/60 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : ''
           }`}
           title={isLive ? 'Live updates on (every 3s)' : 'Turn on live updates'}
         >

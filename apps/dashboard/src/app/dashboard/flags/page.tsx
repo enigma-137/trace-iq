@@ -23,7 +23,7 @@ export default async function FlagsPage({
   return (
     <DashboardShell active="flags" title="Feature flags" userEmail={user.email} projectId={projectId}>
       {error ? (
-        <section className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+        <section className="mb-4 rounded-md border border-red-200 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
           {error}
         </section>
       ) : null}

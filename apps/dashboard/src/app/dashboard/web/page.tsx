@@ -179,7 +179,7 @@ export default async function WebAnalyticsPage({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{error}</div>
+          <div className="rounded-lg border border-red-200 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{error}</div>
         ) : null}
 
         <WebFilterBar token={token ?? ''} projectId={canonicalProjectId} days={days} initialFilters={data?.filters ?? []} />

@@ -657,9 +657,9 @@ function BarRanking({ items, total }: { items: Array<{ label: string; value: num
 function SharePill({ share }: { share: number }) {
   const tone =
     share >= 30
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+      ? 'text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
       : share >= 10
-        ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
+        ? 'text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
         : 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300';
   return <span className={`inline-flex min-w-[46px] justify-center rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums ${tone}`}>{share.toFixed(1)}%</span>;
 }

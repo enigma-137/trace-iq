@@ -101,7 +101,7 @@ export function ForgotPasswordForm() {
 
           {isSent ? (
             <div className="mt-7 grid gap-4">
-              <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+              <div className="rounded-lg border border-emerald-300 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -166,8 +166,8 @@ export function ForgotPasswordForm() {
                 <p
                   className={`mt-5 rounded-lg border px-3 py-2.5 text-sm ${
                     status.tone === 'error'
-                      ? 'border-red-300 bg-red-50 text-red-700'
-                      : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                      ? 'border-red-300 text-red-700'
+                      : 'border-emerald-300 text-emerald-800'
                   }`}
                 >
                   {status.message}

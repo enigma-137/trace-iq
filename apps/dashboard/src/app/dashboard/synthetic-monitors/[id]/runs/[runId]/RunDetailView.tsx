@@ -48,17 +48,17 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               {isPassed ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   PASSED
                 </span>
               ) : isFailed ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                   <span className="h-2 w-2 rounded-full bg-rose-500" />
                   {run.status === 'timed_out' ? 'TIMED OUT' : 'FAILED'}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
+                <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
                   <span className="h-2 w-2 rounded-full bg-amber-500" />
                   RUNNING
                 </span>
@@ -94,14 +94,14 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
 
         {/* CI Provenance Card */}
         {run.trigger === 'ci' && (
-          <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/50 dark:bg-purple-950/20 text-xs">
+          <div className="rounded-lg border border-purple-200 p-4 dark:border-purple-900/50 dark:bg-purple-950/20 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="font-semibold text-purple-900 dark:text-purple-200">
                   CI Preview Run
                 </span>
                 {run.pullRequestNumber && (
-                  <span className="rounded bg-purple-100 px-2 py-0.5 font-mono font-medium text-purple-800 dark:bg-purple-900/80 dark:text-purple-200">
+                  <span className="rounded px-2 py-0.5 font-mono font-medium text-purple-800 dark:bg-purple-900/80 dark:text-purple-200">
                     PR #{run.pullRequestNumber}
                   </span>
                 )}
@@ -130,7 +130,7 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
 
         {/* Failure Box */}
         {isFailed && run.failureReason && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-4 dark:border-rose-900/60 dark:bg-rose-950/40">
+          <div className="rounded-lg border border-rose-200 p-4 dark:border-rose-900/60 dark:bg-rose-950/40">
             <div className="flex items-start gap-2">
               <span className="text-rose-600 dark:text-rose-400 font-bold text-sm">✕</span>
               <div className="space-y-1 flex-1">
@@ -236,9 +236,9 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                     st.status === 'passed'
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                      ? ' text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
                       : st.status === 'failed'
-                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200'
+                      ? ' text-rose-800 dark:bg-rose-900 dark:text-rose-200'
                       : 'bg-neutral-200 text-neutral-600 dark:bg-slate-800 dark:text-slate-400'
                   }`}
                 >
@@ -370,7 +370,7 @@ export function RunDetailView({ run, monitor, projectId }: RunDetailViewProps) {
 
       {/* Tab Content 5: HTTP Errors */}
       {activeTab === 'errors' && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-6 dark:border-rose-950 dark:bg-rose-950/30 space-y-3 shadow-xs">
+        <div className="rounded-xl border border-rose-200 p-6 dark:border-rose-950 dark:bg-rose-950/30 space-y-3 shadow-xs">
           <h3 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
             HTTP 4xx / 5xx Network Failures Encountered
           </h3>

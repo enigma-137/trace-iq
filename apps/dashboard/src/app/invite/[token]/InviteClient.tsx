@@ -131,7 +131,7 @@ export function InviteClient({ token }: { token: string }) {
             </div>
           ) : accepted ? (
             <div className="grid gap-4 text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full text-emerald-600">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M20 6 9 17l-5-5" />
                 </svg>

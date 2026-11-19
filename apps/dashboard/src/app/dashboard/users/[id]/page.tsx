@@ -118,7 +118,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
                   {isFlagExposure ? (
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                        <span className="rounded px-2 py-0.5 text-xs font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
                           🚩 Feature Flag Exposure
                         </span>
                         {flagId ? (
@@ -134,7 +134,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
                         <span
                           className={`rounded px-1.5 py-0.2 text-[10px] font-bold ${
                             flagEnabled
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                              ? ' text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
                               : 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400'
                           }`}
                         >

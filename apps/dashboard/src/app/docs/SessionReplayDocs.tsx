@@ -1128,7 +1128,7 @@ function Callout({
 }) {
   const styles =
     tone === "warning"
-      ? "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/20 dark:text-amber-100"
+      ? "border-amber-300 text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/20 dark:text-amber-100"
       : "border-blue-300 text-blue-950 dark:border-cyan-500/40 dark:bg-cyan-950/20 dark:text-cyan-100";
   return (
     <div className={`rounded-lg border p-4 ${styles}`}>

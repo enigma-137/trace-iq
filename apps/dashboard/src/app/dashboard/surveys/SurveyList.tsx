@@ -101,14 +101,14 @@ export function SurveyList({ initialSurveys, projectId, token: initialToken }: S
     switch (status) {
       case 'published':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Published
           </span>
         );
       case 'paused':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             Paused
           </span>

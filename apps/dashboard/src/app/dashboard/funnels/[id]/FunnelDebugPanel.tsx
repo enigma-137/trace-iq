@@ -34,15 +34,15 @@ type Tone = 'ok' | 'warn' | 'miss';
 
 const TONE_STYLES: Record<Tone, { badge: string; bar: string }> = {
   ok: {
-    badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30',
+    badge: 'text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30',
     bar: 'bg-emerald-500 dark:bg-emerald-400'
   },
   warn: {
-    badge: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30',
+    badge: 'text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30',
     bar: 'bg-amber-400 dark:bg-amber-400'
   },
   miss: {
-    badge: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30',
+    badge: 'text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30',
     bar: 'bg-red-500 dark:bg-red-400'
   }
 };
@@ -101,11 +101,11 @@ export function FunnelDebugPanel({ data }: { data: FunnelDebugData }) {
           </p>
         </div>
         {hasIssue ? (
-          <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">
+          <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">
             Needs attention
           </span>
         ) : (
-          <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">
+          <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">
             All steps matching
           </span>
         )}
@@ -136,7 +136,7 @@ export function FunnelDebugPanel({ data }: { data: FunnelDebugData }) {
               <p className="mt-2 max-w-3xl text-sm text-neutral-600 dark:text-slate-300">{stepHint(step, tone, data.days)}</p>
 
               {identitySplit(step, data.steps[step.index - 1]) ? (
-                <p className="mt-2 flex max-w-3xl items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                <p className="mt-2 flex max-w-3xl items-center gap-1.5 rounded-md border border-amber-300 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
                   Identity split suspected: the previous step's events are all anonymous (keyed by
                   <code className="font-mono">anonymous_id</code>), while this step's events are all identified (keyed by{' '}
                   <code className="font-mono">user_id</code>). Unless the app sends a linking
@@ -220,7 +220,7 @@ export function FunnelDebugPanel({ data }: { data: FunnelDebugData }) {
           <p className="mt-2 text-sm text-neutral-600 dark:text-slate-300">
             Not observed at all:
             {absent.map((step) => (
-              <code key={step.index} className="ml-2 rounded bg-red-50 px-1.5 py-0.5 font-mono text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              <code key={step.index} className="ml-2 rounded px-1.5 py-0.5 font-mono text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
                 {step.eventName}
               </code>
             ))}
@@ -237,7 +237,7 @@ export function FunnelDebugPanel({ data }: { data: FunnelDebugData }) {
                   key={entry.eventName}
                   className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-xs ring-1 ${
                     inFunnel
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30'
+                      ? ' text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30'
                       : 'bg-neutral-50 text-neutral-600 ring-neutral-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700'
                   }`}
                   title={inFunnel ? 'Used by this funnel' : 'Not used by this funnel'}

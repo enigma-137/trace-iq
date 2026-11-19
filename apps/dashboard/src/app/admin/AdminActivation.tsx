@@ -118,7 +118,7 @@ export function AdminActivationSection({ activation }: { activation: AdminActiva
                     className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                       item.stage === 'no_project'
                         ? 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                        : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'
+                        : 'border-amber-200 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'
                     }`}
                   >
                     {item.stage === 'no_project' ? 'No project' : 'Project, no events'}

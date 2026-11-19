@@ -489,7 +489,7 @@ export function FlagManager({
           </div>
 
           {createError ? (
-            <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+            <p className="rounded-md border border-red-200 p-2.5 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
               {createError}
             </p>
           ) : null}
@@ -588,7 +588,7 @@ function FlagListRow({
             {flag.environment}
           </span>
           {flag.flagType === 'remote_config' ? (
-            <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
               Remote config
             </span>
           ) : null}
@@ -657,22 +657,22 @@ function getStatusBadge(flag: FlagItem): { label: string; className: string } {
     return { label: 'Disabled', className: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-400' };
   }
   if (flag.totalExposures === 0 && flag.rolloutPercentage === 0) {
-    return { label: 'Draft / Never evaluated', className: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
+    return { label: 'Draft / Never evaluated', className: 'text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
   }
   if (flag.rolloutPercentage === 0) {
-    return { label: 'Enabled · 0% rollout', className: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
+    return { label: 'Enabled · 0% rollout', className: 'text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
   }
 
   const hasTargeting = (flag.targetingGroups && flag.targetingGroups.length > 0) || (flag.targeting && flag.targeting.length > 0);
   if (flag.rolloutPercentage === 100) {
     return hasTargeting
-      ? { label: 'Enabled · Targeted only', className: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300' }
-      : { label: 'Enabled · All users', className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' };
+      ? { label: 'Enabled · Targeted only', className: 'text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300' }
+      : { label: 'Enabled · All users', className: 'text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' };
   }
 
   return hasTargeting
-    ? { label: `Enabled · Targeted · ${flag.rolloutPercentage}%`, className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' }
-    : { label: `Enabled · ${flag.rolloutPercentage}% rollout`, className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' };
+    ? { label: `Enabled · Targeted · ${flag.rolloutPercentage}%`, className: 'text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' }
+    : { label: `Enabled · ${flag.rolloutPercentage}% rollout`, className: 'text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' };
 }
 
 function formatTargetingSummary(flag: FlagItem): string {

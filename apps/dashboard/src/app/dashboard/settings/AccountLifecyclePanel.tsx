@@ -343,7 +343,7 @@ export function AccountLifecyclePanel({ exportHref }: { exportHref: string }) {
         {dialog ? (
           <div className="space-y-4 text-sm">
             {notice?.tone === 'error' ? <Notice tone="error">{notice.message}</Notice> : null}
-            <div className="rounded-lg border border-red-200 bg-red-50/80 p-3.5 text-red-900 dark:border-red-950/80 dark:bg-red-950/30 dark:text-red-200">
+            <div className="rounded-lg border border-red-200 p-3.5 text-red-900 dark:border-red-950/80 dark:bg-red-950/30 dark:text-red-200">
               {dialog.kind === 'delete-organization' ? (
                 <p>
                   Organization data remains available during the 30-day cancellation period. If this organization has an active subscription or checkout, resolve it in{' '}

@@ -334,7 +334,7 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
                       {cohort.filters.map((f, idx) => (
                         <span key={idx} className="inline-flex items-center gap-1.5">
                           {idx > 0 ? (
-                            <span className="rounded bg-blue-100/70 px-1 py-0.2 text-[9px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                            <span className="rounded px-1 py-0.2 text-[9px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                               AND
                             </span>
                           ) : null}
@@ -390,7 +390,7 @@ export function CohortManager({ cohorts }: { cohorts: Cohort[] }) {
                     </button>
 
                     {confirmDeleteId === cohort.id ? (
-                      <div className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 p-1 dark:border-red-900/60 dark:bg-red-950/50">
+                      <div className="inline-flex items-center gap-1 rounded-lg border border-red-300 p-1 dark:border-red-900/60 dark:bg-red-950/50">
                         <span className="px-1 text-[11px] font-semibold text-red-800 dark:text-red-200">Delete?</span>
                         <button
                           type="button"

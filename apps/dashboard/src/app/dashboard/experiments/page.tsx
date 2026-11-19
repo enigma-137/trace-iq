@@ -39,7 +39,7 @@ export default async function ExperimentsPage({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
                 A/B & Multivariate Testing
               </span>
@@ -58,11 +58,11 @@ export default async function ExperimentsPage({
               <div className="text-lg font-bold text-neutral-900 dark:text-white">{metrics.total}</div>
               <div className="text-[11px] font-medium text-neutral-500 dark:text-slate-400">Total</div>
             </div>
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-center dark:border-emerald-950/40 dark:bg-emerald-950/20">
+            <div className="rounded-lg border border-emerald-100 p-3 text-center dark:border-emerald-950/40 dark:bg-emerald-950/20">
               <div className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{metrics.running}</div>
               <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-500">Running</div>
             </div>
-            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-center dark:border-blue-950/40 dark:bg-blue-950/20">
+            <div className="rounded-lg border border-blue-100 p-3 text-center dark:border-blue-950/40 dark:bg-blue-950/20">
               <div className="text-lg font-bold text-blue-700 dark:text-blue-400">{metrics.completed}</div>
               <div className="text-[11px] font-medium text-blue-600 dark:text-blue-500">Completed</div>
             </div>
@@ -75,7 +75,7 @@ export default async function ExperimentsPage({
       </section>
 
       {error ? (
-        <section className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+        <section className="mb-6 rounded-lg border border-red-200 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </section>
       ) : null}

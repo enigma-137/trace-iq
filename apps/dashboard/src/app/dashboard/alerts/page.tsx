@@ -72,7 +72,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: { tab
     <DashboardShell active="alerts" title="Alerts" userEmail={user.email}>
       <AlertsTabs active="alerts" />
       {error ? (
-        <section className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+        <section className="mb-6 rounded-lg border border-red-200 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </section>
       ) : null}

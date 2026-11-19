@@ -749,7 +749,7 @@ export default async function DashboardPage({
     >
       <div className="mx-auto w-full max-w-[1280px] space-y-8 sm:space-y-10">
         {error ? (
-          <section className="rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+          <section className="rounded-lg border border-red-200 px-4 py-3 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             {error}
           </section>
         ) : null}

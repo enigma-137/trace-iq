@@ -182,7 +182,7 @@ function StepList({ result }: { result: DemoFunnelResult }) {
               <span
                 className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
                   isLast
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    ? 'border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                     : 'border-neutral-200 text-neutral-600 dark:border-slate-700 dark:text-slate-300'
                 }`}
               >
