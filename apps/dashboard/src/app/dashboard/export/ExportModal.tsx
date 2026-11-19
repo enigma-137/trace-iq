@@ -405,7 +405,7 @@ export function ExportModal({
           {/* Email Recipient or Pro Upsell */}
           {deliveryMethod === 'email' ? (
             isProOrSelfHosted ? (
-              <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-3.5 dark:border-blue-900/40 dark:bg-blue-950/20">
+              <div className="rounded-lg border border-blue-100 p-3.5 dark:border-blue-900/40 dark:bg-blue-950/20">
                 <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-900 dark:text-blue-300">
                   Recipient email address
                 </label>
@@ -458,7 +458,7 @@ export function ExportModal({
 
         {/* Feedback Alerts */}
         {error ? (
-          <div className="mt-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-red-200 p-3 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
             <svg className="h-4 w-4 shrink-0 text-red-500 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
@@ -469,7 +469,7 @@ export function ExportModal({
         ) : null}
 
         {successMessage ? (
-          <div className="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 p-3 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200">
             <svg className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />

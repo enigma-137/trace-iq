@@ -192,8 +192,8 @@ export function AlertDetailsModal({
             <div
               className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
                 testResult.triggered
-                  ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
-                  : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+                  ? 'border-amber-300 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
+                  : 'border-emerald-300 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
               }`}
             >
               <HugeiconsIcon icon={testResult.triggered ? Alert02Icon : CheckmarkCircle02Icon} size={14} strokeWidth={2} className="mt-0.5 shrink-0" />

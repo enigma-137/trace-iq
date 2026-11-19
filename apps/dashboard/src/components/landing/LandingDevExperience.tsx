@@ -112,7 +112,7 @@ export function LandingDevExperience() {
 
               <div className="flex min-w-0 flex-1 items-center gap-2">
 
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 whitespace-nowrap sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/20 dark:bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 whitespace-nowrap sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
 
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
 
@@ -310,7 +310,7 @@ export function LandingDevExperience() {
 
                   <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
 
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-emerald-500/20 dark:bg-emerald-500/10 text-emerald-400">
 
                       <HugeiconsIcon icon={Tick02Icon} size={11} />
 
@@ -358,7 +358,7 @@ export function LandingDevExperience() {
 
                   <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
 
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-blue-500/20 bg-blue-500/10 text-blue-400">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-blue-500/20 dark:bg-blue-500/10 text-blue-400">
 
                       <HugeiconsIcon icon={Notification02Icon} size={11} />
 
@@ -406,7 +406,7 @@ export function LandingDevExperience() {
 
                   <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
 
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-purple-500/20 bg-purple-500/10 text-purple-400">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-purple-500/20 dark:bg-purple-500/10 text-purple-400">
 
                       <HugeiconsIcon icon={WebhookIcon} size={11} />
 

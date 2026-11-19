@@ -175,7 +175,7 @@ export function GitHubSetupPanel({ projectId, onWaitForEvent }: { projectId: str
       <div className="flex items-start gap-3">
         <GitHubIcon className="mt-0.5 size-5 shrink-0 text-neutral-900 dark:text-white" />
         <div className="min-w-0 flex-1">
-          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
             Connect GitHub · we set it up
           </span>
           <h4 id="github-setup-title" className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">

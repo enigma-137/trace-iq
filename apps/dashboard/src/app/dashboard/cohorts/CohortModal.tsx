@@ -264,7 +264,7 @@ export function CohortModal({
 
         {/* Live Readable Preview */}
         {readableSummary ? (
-          <div className="rounded-lg border border-blue-200/60 bg-blue-50/50 p-3 text-xs dark:border-blue-900/40 dark:bg-blue-950/20">
+          <div className="rounded-lg border border-blue-200/60 p-3 text-xs dark:border-blue-900/40 dark:bg-blue-950/20">
             <span className="font-semibold text-blue-900 dark:text-blue-200">Segment definition: </span>
             <span className="text-blue-800 dark:text-blue-300">
               Users where {readableSummary}
@@ -274,7 +274,7 @@ export function CohortModal({
 
         {/* Error Banners */}
         {validationError || error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+          <div className="rounded-lg border border-red-200 p-3 text-xs font-medium text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             {validationError || error}
           </div>
         ) : null}

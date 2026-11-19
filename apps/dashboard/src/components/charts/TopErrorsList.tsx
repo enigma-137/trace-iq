@@ -58,7 +58,7 @@ export function TopErrorsList({
               <div key={idx} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex rounded border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                    <span className="inline-flex rounded border border-rose-500/20 dark:bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
                       {err.type}
                     </span>
                     <span className="truncate text-xs font-medium text-neutral-900 dark:text-slate-200" title={err.message}>

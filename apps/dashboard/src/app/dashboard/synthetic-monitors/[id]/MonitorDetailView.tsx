@@ -100,7 +100,7 @@ export function MonitorDetailView({
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+        <div className="rounded-lg border border-rose-200 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </div>
       )}
@@ -131,12 +131,12 @@ export function MonitorDetailView({
                 Paused
               </span>
             ) : isPassing ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Passing
               </span>
             ) : isFailing ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                 Failing
               </span>
@@ -166,7 +166,7 @@ export function MonitorDetailView({
           </div>
 
           {monitor.sourceType === 'funnel' && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-md border border-purple-200/80 bg-purple-50/70 px-3 py-1.5 text-xs text-purple-900 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-300">
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-md border border-purple-200/80 px-3 py-1.5 text-xs text-purple-900 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-300">
               <span className="font-semibold flex items-center gap-1">
                 <span>🔄</span> Converted from Funnel:
               </span>
@@ -269,7 +269,7 @@ export function MonitorDetailView({
                   key={idx}
                   className="flex items-start gap-3.5 rounded-lg border border-neutral-100 bg-neutral-50/60 p-3.5 dark:border-slate-800/80 dark:bg-slate-900/40"
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                     {idx + 1}
                   </span>
 
@@ -323,15 +323,15 @@ export function MonitorDetailView({
                     <tr key={run.id} className="hover:bg-neutral-50/50 dark:hover:bg-slate-900/30 transition">
                       <td className="px-4 py-3">
                         {run.status === 'passed' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                             Passed
                           </span>
                         ) : run.status === 'running' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
                             Running
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                             {run.status === 'timed_out' ? 'Timed Out' : 'Failed'}
                           </span>
                         )}
@@ -339,7 +339,7 @@ export function MonitorDetailView({
                       <td className="px-4 py-3 text-xs">
                         {run.trigger === 'ci' ? (
                           <div className="flex flex-col gap-0.5">
-                            <span className="inline-flex items-center gap-1 rounded-sm bg-purple-50 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
+                            <span className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-medium text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
                               <span className="font-mono">PR #{run.pullRequestNumber || run.branch || 'CI'}</span>
                             </span>
                             {run.branch && (

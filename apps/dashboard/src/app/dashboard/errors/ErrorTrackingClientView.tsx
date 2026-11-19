@@ -134,8 +134,8 @@ const STATUS_TABS: Array<{ value: IssueStatusFilter; label: string }> = [
 function StatusBadge({ status }: { status: IssueStatus }) {
   if (status === 'open') return null;
   const styles: Record<Exclude<IssueStatus, 'open'>, string> = {
-    regressed: 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
-    resolved: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
+    regressed: 'border-rose-300 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
+    resolved: 'border-emerald-300 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
     ignored: 'border-neutral-300 bg-neutral-100 text-neutral-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
   };
   const labels = { regressed: 'Regressed', resolved: 'Resolved', ignored: 'Ignored' };
@@ -569,7 +569,7 @@ export function ErrorTrackingClientView({
         <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Affected Users</span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-600 dark:border-violet-900/60 dark:bg-violet-950/50 dark:text-violet-400">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-violet-200 text-violet-600 dark:border-violet-900/60 dark:bg-violet-950/50 dark:text-violet-400">
               <Users className="h-4 w-4" />
             </div>
           </div>
@@ -597,7 +597,7 @@ export function ErrorTrackingClientView({
         <div className="rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 dark:border-slate-800 dark:bg-slate-900/80">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Regressed</span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900/60 dark:text-amber-400">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 text-amber-600 dark:border-amber-900/60 dark:text-amber-400">
               <AlertCircle className="h-4 w-4" />
             </div>
           </div>
@@ -739,12 +739,12 @@ export function ErrorTrackingClientView({
                           </span>
                         )}
                         {sev === 'Medium' && (
-                          <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400">
+                          <span className="inline-flex items-center rounded border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400">
                             Medium
                           </span>
                         )}
                         {sev === 'Low' && (
-                          <span className="inline-flex items-center rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/50 dark:text-sky-400">
+                          <span className="inline-flex items-center rounded border border-sky-200 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/50 dark:text-sky-400">
                             Low
                           </span>
                         )}
@@ -834,7 +834,7 @@ export function ErrorTrackingClientView({
                           disabled={pendingAction !== null}
                           onClick={() => void updateIssue(activeIssue.id, { assigneeUserId: null }, 'Unassigned.')}
                           title="Assigned to you. Click to unassign."
-                          className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
                         >
                           <Users className="h-3.5 w-3.5" />
                           Assigned to you
@@ -862,7 +862,7 @@ export function ErrorTrackingClientView({
                         type="button"
                         onClick={() => void copyFixPrompt()}
                         title="Copies the error, stack and source with instructions, to paste into Claude Code, Cursor or Codex"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
                       >
                         {copiedPrompt ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Wand className="h-3.5 w-3.5" />}
                         {copiedPrompt ? 'Copied' : 'Copy fix prompt'}
@@ -1025,7 +1025,7 @@ export function ErrorTrackingClientView({
                           <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                           <h4 className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Diagnosis & Description</h4>
                         </div>
-                        <p className="mt-1.5 rounded-md border border-blue-100 bg-blue-50/50 p-3.5 text-xs leading-relaxed text-neutral-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-slate-300">
+                        <p className="mt-1.5 rounded-md border border-blue-100 p-3.5 text-xs leading-relaxed text-neutral-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-slate-300">
                           {getErrorExplanation(activeIssue.type, activeIssue.message)}
                         </p>
                       </div>
@@ -1070,7 +1070,7 @@ export function ErrorTrackingClientView({
                                 {latestSymbolicated.context.lines.map((row) => (
                                   <div
                                     key={row.line}
-                                    className={`flex px-3 ${row.line === latestSymbolicated.context?.line ? 'bg-rose-50 text-rose-900 dark:bg-rose-950/40 dark:text-rose-200' : 'text-neutral-700 dark:text-slate-300'}`}
+                                    className={`flex px-3 ${row.line === latestSymbolicated.context?.line ? ' text-rose-900 dark:bg-rose-950/40 dark:text-rose-200' : 'text-neutral-700 dark:text-slate-300'}`}
                                   >
                                     <span className="mr-4 w-8 shrink-0 select-none text-right text-neutral-400 dark:text-slate-600">{row.line}</span>
                                     <code className="whitespace-pre">{row.code}</code>
@@ -1371,9 +1371,9 @@ export function ErrorTrackingClientView({
               </div>
 
               {/* Callout Card: Watch the full session replay */}
-              <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
+              <div className="mt-5 rounded-lg border border-blue-200 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-100 text-blue-600 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-400">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-blue-200 text-blue-600 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-400">
                     <Film className="h-4 w-4" />
                   </div>
                   <div>

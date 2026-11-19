@@ -88,9 +88,9 @@ export function LogDetailDrawer({
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span
             className={`rounded px-2 py-0.5 font-mono text-xs font-bold ${log.level === 'error' || log.level === 'fatal'
-              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+              ? ' text-rose-800 dark:bg-rose-950 dark:text-rose-300'
               : log.level === 'warn'
-                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                ? ' text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                 : 'text-blue-800 dark:bg-blue-950 dark:text-blue-300'
               }`}
           >
@@ -211,7 +211,7 @@ export function LogDetailDrawer({
 
             {/* AI Execution Details (if applicable) */}
             {(log.provider || log.model || log.inputTokens || log.outputTokens || log.costUsd) && (
-              <div className="rounded-lg border border-purple-200 bg-purple-50/40 p-4 dark:border-purple-900/50 dark:bg-purple-950/20">
+              <div className="rounded-lg border border-purple-200 p-4 dark:border-purple-900/50 dark:bg-purple-950/20">
                 <h3 className="text-xs font-semibold text-purple-900 dark:text-purple-300">AI Execution Telemetry</h3>
                 <div className="mt-2.5 grid grid-cols-2 gap-3">
                   <div>
@@ -441,13 +441,13 @@ export function LogDetailDrawer({
                     'errorJson'
                   )
                 }
-                className="rounded border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-300"
+                className="rounded border border-rose-300 px-2.5 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-300"
               >
                 {copiedKey === 'errorJson' ? 'Copied Error!' : 'Copy Error Stack'}
               </button>
             </div>
 
-            <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-3 text-xs dark:border-rose-900/60 dark:bg-rose-950/20">
+            <div className="rounded-lg border border-rose-200 p-3 text-xs dark:border-rose-900/60 dark:bg-rose-950/20">
               <div className="font-semibold text-rose-900 dark:text-rose-300">
                 {(log.errorDetails.name as string) || 'Error'}: {(log.errorDetails.message as string) || log.message}
               </div>

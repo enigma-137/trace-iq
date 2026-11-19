@@ -277,8 +277,8 @@ export function InsightChartRenderer({
             <span
               className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
                 delta >= 0
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                  ? 'dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
               }`}
             >
               {deltaFormatted}

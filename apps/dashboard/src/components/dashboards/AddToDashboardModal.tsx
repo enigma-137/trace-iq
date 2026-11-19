@@ -175,7 +175,7 @@ export function AddToDashboardModal({
     >
       <div className="space-y-4 pt-2">
         {error && (
-          <div className="rounded-md border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-400">
+          <div className="rounded-md border border-rose-500/20 dark:bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-400">
             {error}
           </div>
         )}

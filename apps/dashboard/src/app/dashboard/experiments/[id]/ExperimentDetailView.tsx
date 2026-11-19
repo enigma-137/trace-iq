@@ -100,21 +100,21 @@ export function ExperimentDetailView({
     switch (status) {
       case 'running':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Running
           </span>
         );
       case 'paused':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             Paused
           </span>
         );
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
             Completed
           </span>
@@ -325,7 +325,7 @@ export function ExperimentDetailView({
           <div className="text-xs font-medium text-neutral-500 dark:text-slate-400">Statistical Significance</div>
           <div className="mt-2">
             {bestVariant?.isSignificant ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {bestVariant.confidence}% Confidence (p &lt; 0.05)
               </span>
@@ -335,7 +335,7 @@ export function ExperimentDetailView({
                 Collecting Data (Need &ge; 30/var)
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
                 <span className="h-2 w-2 rounded-full bg-amber-500" />
                 No Significant Difference Yet
               </span>
@@ -455,7 +455,7 @@ export function ExperimentDetailView({
 
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       {v.isSignificant ? (
-                        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                           Significant
                         </span>
                       ) : v.sampleStatus === 'insufficient_data' ? (
@@ -540,7 +540,7 @@ export function ExperimentDetailView({
                     )}
                   </div>
                   {results.recommendedWinner === v.key && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                       Top Performer
                     </span>
                   )}

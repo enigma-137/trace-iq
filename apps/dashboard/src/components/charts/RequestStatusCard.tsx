@@ -65,7 +65,7 @@ export function RequestStatusCard({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="inline-flex items-center rounded-full border border-emerald-500/20 dark:bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                 200
               </span>
               <span className="font-medium text-neutral-800 dark:text-slate-200">Success OK</span>
@@ -89,7 +89,7 @@ export function RequestStatusCard({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+              <span className="inline-flex items-center rounded-full border border-amber-500/20 dark:bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-600 dark:text-amber-400">
                 429
               </span>
               <span className="font-medium text-neutral-800 dark:text-slate-200">Rate Limited</span>
@@ -113,7 +113,7 @@ export function RequestStatusCard({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+              <span className="inline-flex items-center rounded-full border border-rose-500/20 dark:bg-rose-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-600 dark:text-rose-400">
                 500
               </span>
               <span className="font-medium text-neutral-800 dark:text-slate-200">Server Errors</span>

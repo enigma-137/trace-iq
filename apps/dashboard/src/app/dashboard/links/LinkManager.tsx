@@ -495,8 +495,8 @@ function LinkBadges({ link }: { link: ShortLink }) {
         <span
           className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
             expired
-              ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+              ? ' text-red-700 dark:bg-red-950/40 dark:text-red-300'
+              : ' text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
           }`}
         >
           {expired ? 'Expired' : `Expires ${new Date(link.expiresAt).toLocaleDateString()}`}

@@ -24,11 +24,11 @@ export function MethodBadge({ method }: { method: string }) {
 }
 
 const statusClasses = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
+  success: 'border-emerald-200 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
   redirect: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
-  client: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  server: 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300',
-  network: 'border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300',
+  client: 'border-amber-200 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  server: 'border-red-200 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300',
+  network: 'border-red-300 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300',
   none: 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
 };
 
@@ -67,11 +67,11 @@ export function CaptureBadge({ state }: { state: CaptureState }) {
 }
 
 const pillClasses = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-300',
+  success: 'border-emerald-200 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-300',
   redirect: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
-  client: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/60 dark:text-amber-300',
-  server: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300',
-  network: 'border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-950/70 dark:text-red-300',
+  client: 'border-amber-200 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/60 dark:text-amber-300',
+  server: 'border-red-200 text-red-700 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300',
+  network: 'border-red-300 text-red-800 dark:border-red-800 dark:bg-red-950/70 dark:text-red-300',
   none: 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
 };
 

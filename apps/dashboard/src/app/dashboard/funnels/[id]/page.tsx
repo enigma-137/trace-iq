@@ -133,7 +133,7 @@ export default async function FunnelResultsPage({
               href={`/dashboard/funnels/${params.id}?days=${days}&debug=${debugEnabled ? '' : '1'}`}
               className={`inline-flex h-9 items-center rounded-md border px-3 text-sm font-semibold transition ${
                 debugEnabled
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300'
+                  ? 'border-emerald-300 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300'
                   : 'border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
               }`}
             >
@@ -212,12 +212,12 @@ export default async function FunnelResultsPage({
                             {m.name}
                           </Link>
                           {m.lastRunStatus === 'passed' ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               Passing
                             </span>
                           ) : m.lastRunStatus === 'failed' || m.lastRunStatus === 'timed_out' ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                               Failing
                             </span>

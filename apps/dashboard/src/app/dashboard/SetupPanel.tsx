@@ -835,7 +835,7 @@ export function SetupPanel({
         }
       >
         <div className="space-y-3 text-sm text-neutral-600 dark:text-slate-300">
-          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+          <div className="rounded-lg border border-amber-200 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
             <p className="font-semibold text-amber-900 dark:text-amber-200">The current key stops working immediately</p>
             <p className="mt-1 leading-6 text-amber-800 dark:text-amber-300">
               Any website, backend service, or SDK client still sending events with the previous key will be rejected with 401 Unauthorized until updated.
@@ -870,7 +870,7 @@ export function SetupPanel({
         }
       >
         <div className="space-y-4 text-sm">
-          <div className="rounded-lg border border-red-200 bg-red-50/80 p-3.5 text-red-900 dark:border-red-950/80 dark:bg-red-950/30 dark:text-red-200">
+          <div className="rounded-lg border border-red-200 p-3.5 text-red-900 dark:border-red-950/80 dark:bg-red-950/30 dark:text-red-200">
             <p className="font-semibold">
               You are about to delete {setup?.project?.name} ({setup?.project?.id}).
             </p>

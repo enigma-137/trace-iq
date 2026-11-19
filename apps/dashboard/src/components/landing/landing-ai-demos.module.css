@@ -327,22 +327,19 @@
 .claimObserved,
 .claimCorrelated,
 .claimHypothesis {
-  padding: 3px 6px;
-  font: 500 9px/1.5 var(--mono);
+  padding: 3px 0;
+  font: 600 9px/1.5 var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  text-align: center;
+  text-align: left;
 }
 .claimObserved {
-  background: var(--green-paper);
-  color: var(--ink);
+  color: var(--green);
 }
 .claimCorrelated {
-  background: var(--sky);
-  color: var(--blue-hover);
+  color: var(--blue);
 }
 .claimHypothesis {
-  background: var(--orange-paper);
   color: var(--orange-ink);
 }
 .askLinks {
@@ -576,8 +573,6 @@
 .soon {
   display: inline-block;
   margin-left: 10px;
-  padding: 2px 7px;
-  background: var(--orange-paper);
   color: var(--orange-ink);
   vertical-align: middle;
 }
@@ -696,8 +691,6 @@
   font: 500 9px/1.5 var(--mono);
   font-style: normal;
   text-transform: uppercase;
-  padding: 1px 5px;
-  background: var(--orange-paper);
   color: var(--orange-ink);
 }
 .groupLabel {
@@ -810,8 +803,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 3px 8px;
-  font: 500 10px/1.5 var(--mono);
+  padding: 3px 0;
+  font: 600 10px/1.5 var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -825,16 +818,13 @@
   background: currentColor;
 }
 .statusWatching {
-  background: var(--sky);
-  color: var(--blue-hover);
+  color: var(--blue);
 }
 .statusFiring {
-  background: var(--orange-paper);
   color: var(--orange-ink);
 }
 .statusReady {
-  background: var(--green-paper);
-  color: var(--ink);
+  color: var(--green);
 }
 .alertValue {
   font: 600 22px/1 var(--mono);

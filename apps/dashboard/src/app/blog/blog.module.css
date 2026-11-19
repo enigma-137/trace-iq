@@ -49,10 +49,8 @@
   color: var(--muted);
 }
 .tag {
-  padding: 3px 8px;
-  background: var(--orange-paper);
   color: var(--orange-ink);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* Index: the newest post as a feature, the rest as ruled rows. */

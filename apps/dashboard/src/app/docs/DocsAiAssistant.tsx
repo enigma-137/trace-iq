@@ -270,7 +270,7 @@ export function DocsAiAssistant({ apiBaseUrl }: { apiBaseUrl: string }) {
                       {selectedFeatures.map((feat) => (
                         <span
                           key={feat.id}
-                          className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50/80 px-2 py-0.5 text-xs font-medium text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
+                          className="inline-flex items-center gap-1 rounded-full border border-blue-200 px-2 py-0.5 text-xs font-medium text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
                         >
                           {feat.label}
                         </span>

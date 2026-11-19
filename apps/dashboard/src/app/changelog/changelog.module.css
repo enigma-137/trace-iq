@@ -77,19 +77,16 @@
 .areas {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 6px 14px;
 }
 .area,
 .areaFix {
-  padding: 3px 8px;
-  font: 500 10px/1.6 var(--mono);
+  font: 600 10px/1.6 var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.7px;
-  background: var(--sky);
   color: var(--blue);
 }
 .areaFix {
-  background: var(--orange-paper);
   color: var(--orange-ink);
 }
 .content h3 {

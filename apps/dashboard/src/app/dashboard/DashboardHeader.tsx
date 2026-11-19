@@ -226,8 +226,8 @@ export function DashboardHeader({
 type PillTone = 'outage' | 'degraded' | 'ok' | 'neutral';
 
 const PILL_TONE: Record<PillTone, string> = {
-  outage: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
-  degraded: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+  outage: 'border-rose-200 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
+  degraded: 'border-amber-200 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
   ok: 'border-neutral-200 bg-neutral-50/70 text-neutral-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300',
   neutral: 'border-neutral-200 bg-neutral-50/70 text-neutral-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400'
 };

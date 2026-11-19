@@ -143,7 +143,7 @@ export function PageBanner({
         {/* Content Column */}
         <div className="flex-1 space-y-2 text-left">
           {badge && (
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/80 bg-blue-50/80 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-900/80 dark:bg-blue-950/60 dark:text-blue-300">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/80 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-900/80 dark:bg-blue-950/60 dark:text-blue-300">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
               {badge}
             </div>

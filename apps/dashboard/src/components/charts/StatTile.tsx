@@ -10,8 +10,8 @@ interface StatTileProps {
 }
 
 const toneClasses = {
-  blue: 'border-blue-500/10 bg-blue-500/5 text-blue-700 dark:text-blue-300',
-  green: 'border-emerald-400/15 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300',
+  blue: 'border-blue-500/10 dark:bg-blue-500/5 text-blue-700 dark:text-blue-300',
+  green: 'border-emerald-400/15 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-300',
   red: 'border-red-400/15 bg-red-400/10 text-red-300'
 };
 

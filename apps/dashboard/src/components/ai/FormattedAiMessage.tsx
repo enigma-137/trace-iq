@@ -282,7 +282,7 @@ function renderInline(text: string): React.ReactNode[] {
         parts.push(
           <span
             key={match.index}
-            className="inline-flex items-center rounded border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:border-purple-800/60 dark:bg-purple-950/60 dark:text-purple-300"
+            className="inline-flex items-center rounded border border-purple-200 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:border-purple-800/60 dark:bg-purple-950/60 dark:text-purple-300"
           >
             {boldText}
           </span>
@@ -291,7 +291,7 @@ function renderInline(text: string): React.ReactNode[] {
         parts.push(
           <span
             key={match.index}
-            className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/60 dark:text-amber-300"
+            className="inline-flex items-center rounded border border-amber-200 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/60 dark:text-amber-300"
           >
             {boldText}
           </span>

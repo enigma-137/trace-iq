@@ -131,7 +131,7 @@ export function RetentionFilterModal({
           {activeFilters.map((f, idx) => (
             <div
               key={idx}
-              className="group inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50/70 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200"
+              className="group inline-flex items-center gap-1.5 rounded-full border border-blue-200 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200"
             >
               <button
                 type="button"

@@ -176,13 +176,13 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
         </div>
 
         {/* Callout Box */}
-        <div className="rounded-xl border-l-4 border-cyan-500 bg-cyan-500/10 p-5 dark:border-cyan-400 dark:bg-cyan-950/30">
+        <div className="rounded-xl border-l-4 border-cyan-500 p-5 dark:border-cyan-400 dark:bg-cyan-950/30">
           <div className="flex items-center gap-2 text-sm font-bold text-cyan-700 dark:text-cyan-300">
 
             <span>Start with a clean setup</span>
           </div>
           <p className="mt-2 text-xs leading-5 text-neutral-700 dark:text-slate-300">
-            TraceIQ is built for developer efficiency. Have your <code className="rounded border border-cyan-500/20 bg-cyan-500/10 px-1 py-0.5 font-mono text-[11px] text-cyan-800 dark:text-cyan-200">Write Key</code> ready from Settings to begin capturing events, user identity timelines, and retention cohorts right away.
+            TraceIQ is built for developer efficiency. Have your <code className="rounded border border-cyan-500/20 dark:bg-cyan-500/10 px-1 py-0.5 font-mono text-[11px] text-cyan-800 dark:text-cyan-200">Write Key</code> ready from Settings to begin capturing events, user identity timelines, and retention cohorts right away.
           </p>
         </div>
 
@@ -234,7 +234,7 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
           ]} />
           <Code lang="bash">{`docker compose -f compose.local.yml ps
 curl http://localhost:4000/health`}</Code>
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <div className="rounded-lg border border-amber-300 p-4 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             Local mode is designed for one operator on their own machine. Both HTTP services bind to loopback, and PostgreSQL and Redis are not published. Do not expose this configuration through a public reverse proxy.
           </div>
           <P>Stop the containers without deleting PostgreSQL data:</P>
@@ -244,7 +244,7 @@ curl http://localhost:4000/health`}</Code>
         <Section id="auth-modes" title="Choose an authentication mode">
           <P>Supabase is not required. Choose the path that matches who can reach the dashboard:</P>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border-2 border-blue-500 bg-blue-50/50 p-5 dark:border-cyan-500 dark:bg-cyan-500/10">
+            <div className="rounded-xl border-2 border-blue-500 p-5 dark:border-cyan-500 dark:bg-cyan-500/10">
               <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-cyan-300">No hosted auth</span>
               <h3 className="mt-2 text-base font-bold text-neutral-900 dark:text-white">Private local mode</h3>
               <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-slate-300">No login, Supabase project, or external identity service. Intended for one operator on localhost, a private machine, or a trusted private network.</p>
@@ -336,7 +336,7 @@ docker compose run --rm api npm run migrate --workspace=@traceiq/api
 docker compose up -d api
 docker compose ps
 curl http://127.0.0.1:4000/health`}</Code>
-          <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm leading-6 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+          <div className="rounded-lg border border-red-300 p-4 text-sm leading-6 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
             Never use <Mono>docker compose down -v</Mono> during an upgrade. The <Mono>-v</Mono> flag removes the PostgreSQL volume and can permanently delete analytics data.
           </div>
         </Section>

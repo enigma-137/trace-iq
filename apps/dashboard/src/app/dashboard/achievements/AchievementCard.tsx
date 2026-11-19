@@ -44,7 +44,7 @@ export function AchievementCard({ achievement, onSelect }: AchievementCardProps)
               {achievement.category}
             </span>
             {unlocked ? (
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+              <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
                 Earned
               </span>
             ) : (

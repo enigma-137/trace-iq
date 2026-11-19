@@ -610,19 +610,16 @@
 }
 .status {
   display: inline-block;
-  background: var(--sky);
-  color: var(--blue-hover);
-  padding: 5px 7px;
+  color: var(--blue);
+  padding: 5px 0;
   font: 9px/1.5 var(--mono);
   text-transform: uppercase;
 }
 .status.error {
-  background: var(--orange-paper);
   color: var(--orange-ink);
 }
 .status.success {
-  background: var(--green-paper);
-  color: var(--ink);
+  color: var(--green);
 }
 .properties {
   margin: 18px 0;
@@ -1352,8 +1349,6 @@
   color: var(--muted);
 }
 .soonBadge {
-  padding: 1px 5px;
-  background: var(--orange-paper);
   color: var(--orange-ink);
   font: 500 9px/1.5 var(--mono);
   font-style: normal;

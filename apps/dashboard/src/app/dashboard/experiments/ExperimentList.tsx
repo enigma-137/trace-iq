@@ -102,21 +102,21 @@ export function ExperimentList({ initialExperiments, projectId, token: initialTo
     switch (status) {
       case 'running':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Running
           </span>
         );
       case 'paused':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             Paused
           </span>
         );
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
             Completed
           </span>
@@ -284,7 +284,7 @@ export function ExperimentList({ initialExperiments, projectId, token: initialTo
                             className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
                               v.isControl
                                 ? 'border border-neutral-200 bg-white text-neutral-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                : 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                                : ' text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
                             }`}
                           >
                             <span>{v.name}</span>

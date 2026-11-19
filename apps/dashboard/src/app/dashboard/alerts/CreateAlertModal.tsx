@@ -458,14 +458,14 @@ export function CreateAlertModal({
         </div>
 
         {/* Real-time Rule Preview */}
-        <div className="rounded-xl border border-blue-200/70 bg-blue-50/60 p-3.5 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+        <div className="rounded-xl border border-blue-200/70 p-3.5 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
           <span className="font-bold">Rule Summary: </span>
           <span>{ruleSummaryText}</span>
         </div>
 
         {/* Error Output */}
         {validationError || error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+          <div className="rounded-lg border border-red-200 p-3 text-xs font-medium text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             {validationError || error}
           </div>
         ) : null}

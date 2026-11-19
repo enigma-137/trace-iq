@@ -337,7 +337,7 @@ export function OrganizationSwitcher({ collapsed = false, projectId, organizatio
                       />
                     </label>
                     {error ? (
-                      <p className="rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                      <p className="rounded-md border border-red-300 px-2 py-1.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
                         {error}
                       </p>
                     ) : null}

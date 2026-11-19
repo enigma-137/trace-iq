@@ -133,15 +133,15 @@ export function ruleSummary(alert: AlertRecord): string {
 
 export function alertStatus(alert: AlertRecord, alertsAvailable: boolean) {
   if (!alertsAvailable) {
-    return { key: 'locked', label: 'Pro required', badge: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300', dot: 'bg-amber-500' };
+    return { key: 'locked', label: 'Pro required', badge: 'text-amber-800 dark:bg-amber-500/10 dark:text-amber-300', dot: 'bg-amber-500' };
   }
   if (!alert.enabled) {
     return { key: 'paused', label: 'Paused', badge: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300', dot: 'bg-neutral-400' };
   }
   if (alert.lastStatus === 'triggered') {
-    return { key: 'firing', label: 'Firing', badge: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300', dot: 'bg-red-500 animate-pulse' };
+    return { key: 'firing', label: 'Firing', badge: 'text-red-700 dark:bg-red-500/15 dark:text-red-300', dot: 'bg-red-500 animate-pulse' };
   }
-  return { key: 'active', label: 'Active', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', dot: 'bg-emerald-500' };
+  return { key: 'active', label: 'Active', badge: 'text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', dot: 'bg-emerald-500' };
 }
 
 /** The deliveries from the most recent firing (they share a send time within a minute). */

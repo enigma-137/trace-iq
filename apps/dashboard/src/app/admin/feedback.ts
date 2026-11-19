@@ -33,9 +33,9 @@ export const KIND_LABEL: Record<FeedbackKind, string> = {
 };
 
 export const KIND_TONE: Record<FeedbackKind, string> = {
-  card_request: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
-  idea: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
-  problem: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
+  card_request: 'text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
+  idea: 'text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+  problem: 'text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
   other: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300'
 };
 
