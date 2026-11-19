@@ -8,6 +8,7 @@ import { AdminActivityFeed } from './AdminActivityFeed';
 import { AdminActivationSection } from './AdminActivation';
 import { AdminNotificationBell } from './AdminNotificationBell';
 import { AdminGrowthSection } from './AdminGrowth';
+import { AdminChangelogEmailSection } from './AdminChangelogEmail';
 import { SkipSiteStats } from './SkipSiteStats';
 
 export const metadata = { title: 'Admin · TraceIQ' };
@@ -85,6 +86,8 @@ export default async function AdminPage({ searchParams }: { searchParams: { [key
         {access.growth ? <AdminGrowthSection growth={access.growth} /> : null}
 
         {access.activation ? <AdminActivationSection activation={access.activation} /> : null}
+
+        <AdminChangelogEmailSection />
 
         {/* Charts row */}
         <section className="mb-5 grid gap-3 lg:grid-cols-[1.6fr_1fr]">

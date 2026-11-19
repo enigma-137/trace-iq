@@ -7,6 +7,7 @@ import { SettingsSection } from './SettingsUI';
 import { SettingsTabs } from './SettingsTabs';
 import { TwoFactorPanel } from './TwoFactorPanel';
 import { AccountLifecyclePanel } from './AccountLifecyclePanel';
+import { EmailPreferencesPanel } from './EmailPreferencesPanel';
 import { requireDashboardSession } from '@/lib/dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,9 @@ export default async function SettingsPage({
           <TwoFactorPanel />
           <PasswordSettingsPanel userEmail={user.email} />
           <ConnectedAccountsPanel />
+        </SettingsSection>
+        <SettingsSection id="email" title="Email" description="Choose what TraceIQ emails you about.">
+          <EmailPreferencesPanel />
         </SettingsSection>
         <PersonalAccessTokensPanel />
       </SetupPanel>

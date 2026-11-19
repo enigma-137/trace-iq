@@ -104,16 +104,17 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
     expect(keys).toEqual(['webhooks', 'export']);
   });
 
-  it('preserves all bottom navigation items for Settings and Docs', () => {
+  it("preserves all bottom navigation items for Settings, Docs and What's new", () => {
     expect(bottomNavItems).toEqual([
       { label: 'Settings', href: '/dashboard/settings', key: 'settings' },
-      { label: 'Docs', href: '/docs', key: 'docs' }
+      { label: 'Docs', href: '/docs', key: 'docs' },
+      { label: "What's new", href: '/changelog', key: 'whats-new' }
     ]);
   });
 
   it('navItems and allNavItems contain all grouped and standalone items without omissions', () => {
     expect(navItems).toHaveLength(24);
-    expect(allNavItems).toHaveLength(26);
+    expect(allNavItems).toHaveLength(27);
   });
 
   it('findGroupForActiveItem maps active child keys to their parent group', () => {

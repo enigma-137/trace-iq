@@ -1,15 +1,17 @@
 import type { Metadata } from 'next';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Rss } from 'lucide-react';
 import { LandingSiteChrome } from '@/components/landing/LandingSiteChrome';
 import { formatEntryDate, formatMonth } from '@/lib/changelog';
 import landing from '../landing-light.module.css';
 import blog from '../blog/blog.module.css';
 import styles from './changelog.module.css';
 import { entries, type LoadedEntry } from './entries';
+import { MarkSeen } from './MarkSeen';
 
 export const metadata: Metadata = {
   title: 'Changelog',
-  description: 'New features, improvements and fixes in TraceIQ, newest first.'
+  description: 'New features, improvements and fixes in TraceIQ, newest first.',
+  alternates: { types: { 'application/rss+xml': [{ url: '/changelog/rss.xml', title: 'TraceIQ Changelog' }] } }
 };
 
 /** Entries grouped by month, keeping the newest-first order. */
@@ -32,9 +34,15 @@ export default function ChangelogPage() {
           What&rsquo;s new in <span>TraceIQ.</span>
         </h1>
         <p className={styles.lede}>New features, improvements and fixes, newest first.</p>
-        <a className={styles.cta} href="/auth/login?mode=signup">
-          Try the latest <ArrowRight size={14} aria-hidden="true" />
-        </a>
+        <div className={styles.links}>
+          <a className={styles.cta} href="/auth/login?mode=signup">
+            Try the latest <ArrowRight size={14} aria-hidden="true" />
+          </a>
+          <a className={styles.cta} href="/changelog/rss.xml">
+            <Rss size={13} aria-hidden="true" /> RSS feed
+          </a>
+        </div>
+        <MarkSeen slug={entries[0]?.slug} />
       </section>
 
       <div className={`${landing.frame} ${styles.timeline}`}>

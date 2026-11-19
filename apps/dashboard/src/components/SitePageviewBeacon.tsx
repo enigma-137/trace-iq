@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 /** The public site; product routes (dashboard, admin, auth...) are never counted. */
-const PUBLIC_PREFIXES = ['/pricing', '/blog', '/docs', '/features', '/waitlist', '/privacy', '/terms', '/status', '/demo', '/sdk-demo'];
+const PUBLIC_PREFIXES = ['/pricing', '/blog', '/changelog', '/docs', '/features', '/waitlist', '/privacy', '/terms', '/status', '/demo', '/sdk-demo'];
 
 /** Set on this browser when a platform admin opens /admin, so the team's own visits don't count. */
 export const SKIP_SITE_STATS_KEY = 'traceiq-skip-site-stats';
