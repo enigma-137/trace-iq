@@ -212,14 +212,12 @@ export function LandingSiteChrome({
               products.
             </p>
           </div>
-          <a
-            className={styles.footerWordmark}
-            href="#top"
-            aria-label="TraceIQ, back to top"
-          >
+          {/* Decorative: at this size the letters overhang their box, so as a link it
+              swallowed clicks meant for the footer links above. "Back to top" is below. */}
+          <div className={styles.footerWordmark} aria-hidden="true">
             TraceIQ
-            <span aria-hidden="true" />
-          </a>
+            <span />
+          </div>
           <div className={styles.footerBottom}>
             <span>&copy; {new Date().getFullYear()} TraceIQ</span>
             <span>Product analytics and observability, connected.</span>
