@@ -184,6 +184,8 @@
   letter-spacing: -0.06em;
 }
 .heroCopy h1 span {
+  /* The highlighted phrase wraps as one piece instead of splitting across lines. */
+  white-space: nowrap;
   color: var(--paper);
   background: var(--blue);
   padding: 0 12px 2px;

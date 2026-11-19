@@ -15,11 +15,11 @@ export function LandingHero() {
           Open-source product analytics &amp; monitoring
         </p>
         <h1 id="hero-heading">
-          Know why users <span>drop off.</span>
+          Your product, <span>fully traced.</span>
         </h1>
         <p className={styles.heroLead}>
-          TraceIQ puts what users do and what breaks for them on one timeline,
-          so you can trace any drop to the exact click and error behind it.
+          TraceIQ puts your analytics, session replays, errors and APIs on one
+          timeline, so you always know what happened and why.
         </p>
         <div className={styles.heroActions}>
           <a className={styles.button} href="/auth/login?mode=signup">
