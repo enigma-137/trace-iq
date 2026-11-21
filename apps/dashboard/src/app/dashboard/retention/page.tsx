@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 interface RetentionResponse {
   project: { id: string } | null;
   weeks: number;
+  people?: 'identified' | 'all';
   cohorts: Array<{ cohort: string; size: number; periods: Array<number | null> }>;
   averages: number[];
   summary: { week1: number; week4: number };
@@ -36,6 +37,18 @@ const RANGES = [
   { value: '26', label: '26 weeks' }
 ];
 
+const PEOPLE = [
+  { value: 'identified', label: 'Identified users', hint: 'Signed-in users only. Matches the Users page.' },
+  { value: 'all', label: 'Everyone', hint: 'Also counts anonymous visitors, one per browser or device that never signed in.' }
+] as const;
+
+function retentionHref(weeks: string, people: string, filtersParam?: string): string {
+  const params = new URLSearchParams({ weeks });
+  if (people === 'all') params.set('people', 'all');
+  if (filtersParam) params.set('filters', filtersParam);
+  return `/dashboard/retention?${params.toString()}`;
+}
+
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -55,8 +68,9 @@ export default async function RetentionPage({
   const weeks = firstParam(searchParams.weeks) ?? '8';
   const filtersParam = firstParam(searchParams.filters);
   const filters = parseFiltersParam(filtersParam);
+  const people = firstParam(searchParams.people) === 'all' ? 'all' : 'identified';
 
-  const retentionQuery = new URLSearchParams({ weeks });
+  const retentionQuery = new URLSearchParams({ weeks, people });
   if (filtersParam) {
     retentionQuery.set('filters', filtersParam);
   }
@@ -124,9 +138,7 @@ export default async function RetentionPage({
               <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-50/80 p-1 dark:border-slate-800 dark:bg-slate-900/60">
                 {RANGES.map((range) => {
                   const isSelected = weeks === range.value;
-                  const targetUrl = filtersParam
-                    ? `/dashboard/retention?weeks=${range.value}&filters=${encodeURIComponent(filtersParam)}`
-                    : `/dashboard/retention?weeks=${range.value}`;
+                  const targetUrl = retentionHref(range.value, people, filtersParam);
                   return (
                     <Link
                       key={range.value}
@@ -142,11 +154,27 @@ export default async function RetentionPage({
                 })}
               </div>
 
+              <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-50/80 p-1 dark:border-slate-800 dark:bg-slate-900/60">
+                {PEOPLE.map((option) => (
+                  <Link
+                    key={option.value}
+                    href={retentionHref(weeks, option.value, filtersParam)}
+                    title={option.hint}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${people === option.value
+                        ? 'bg-white text-neutral-900 shadow-xs dark:bg-slate-800 dark:text-white'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
+                      }`}
+                  >
+                    {option.label}
+                  </Link>
+                ))}
+              </div>
+
               <AddCurrentViewToDashboardButton
                 title="Weekly User Retention"
                 type="retention"
                 chartType="retention"
-                query={{ weeks, filters }}
+                query={{ weeks, filters, people }}
                 dateConfig={{ days: String(Number(weeks) * 7) }}
               />
             </div>
@@ -199,7 +227,7 @@ export default async function RetentionPage({
               {totalW1Returners.toLocaleString()}
             </span>
             <span className="text-xs text-blue-100 font-medium">
-              of {totalUsers.toLocaleString()} users
+              of {totalUsers.toLocaleString()} {people === 'all' ? 'people' : 'identified users'}
             </span>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-blue-50/90">

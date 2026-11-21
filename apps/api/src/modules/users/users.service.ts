@@ -14,6 +14,8 @@ export type PersonSummary = {
   traits: Record<string, unknown>;
   traitsPreview: Record<string, string | number | boolean>;
   eventCount: number;
+  /** Real number of sessions (list endpoint only). */
+  sessionCount?: number;
   firstSeenAt: string;
   lastSeenAt: string;
   lastOs?: string | null;
@@ -341,6 +343,7 @@ export class UsersService {
       firstSeenAt: string;
       lastSeenAt: string;
       eventCount: number;
+      sessionCount: number;
       lastOs: string | null;
       lastDeviceType: string | null;
       lastBrowser: string | null;
@@ -356,6 +359,7 @@ export class UsersService {
           u.first_seen_at AS "firstSeenAt",
           u.last_seen_at AS "lastSeenAt",
           (SELECT count(*) FROM events e WHERE e.user_id = u.id)::int AS "eventCount",
+          (SELECT count(*) FROM sessions s WHERE s.project_id = u.project_id AND s.user_id = u.id)::int AS "sessionCount",
           (SELECT e.device_info->>'os' FROM events e WHERE e.user_id = u.id AND NULLIF(e.device_info->>'os','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastOs",
           (SELECT e.device_info->>'deviceType' FROM events e WHERE e.user_id = u.id AND NULLIF(e.device_info->>'deviceType','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastDeviceType",
           (SELECT e.device_info->>'browser' FROM events e WHERE e.user_id = u.id AND NULLIF(e.device_info->>'browser','') IS NOT NULL ORDER BY e.occurred_at DESC LIMIT 1) AS "lastBrowser",
@@ -392,6 +396,7 @@ export class UsersService {
         traits: row.traits ?? {},
         traitsPreview,
         eventCount: row.eventCount ?? 0,
+        sessionCount: row.sessionCount ?? 0,
         firstSeenAt: row.firstSeenAt,
         lastSeenAt: row.lastSeenAt,
         lastOs: row.lastOs ?? null,

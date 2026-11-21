@@ -6,6 +6,7 @@ import { RequestSource, clientRequestSql, parseRequestSource } from '../requests
 import { DIMENSION_SOURCES, FilterCondition, buildFilterClause, parseFiltersParam } from '../../common/filters';
 import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
 import { failedStatusSql } from '../../common/failures';
+import { PASSIVE_EVENTS_SQL } from '../../common/passive-events';
 import { RevenueTotals, loadRevenueSettings, queryRevenueTotals, revenueActive } from '../revenue/revenue.util';
 
 type TrendInterval = 'hour' | 'day' | 'week';
@@ -218,9 +219,12 @@ export interface RetentionCohort {
   periods: Array<number | null>; // returning-actor count per week offset; null = week not elapsed yet
 }
 
+export type RetentionPeople = 'identified' | 'all';
+
 export interface RetentionResponse {
   project: ResolvedProject | null;
   weeks: number;
+  people: RetentionPeople;
   cohorts: RetentionCohort[];
   averages: number[]; // size-weighted retention % per period (period 0 = 100)
   summary: { week1: number; week4: number };
@@ -1166,12 +1170,15 @@ export class AnalyticsService {
   // many returned in each later week. Actor = COALESCE(user_id, anonymous_id).
   async getRetention(
     user: DashboardUser,
-    params: { weeks?: string; filters?: string; projectId?: string }
+    params: { weeks?: string; filters?: string; projectId?: string; people?: string }
   ): Promise<RetentionResponse> {
     const weeks = this.clampWeeks(params.weeks);
+    // Identified users by default, so the cohort total lines up with the Users page.
+    // "all" also counts anonymous visitors (one per browser/device that never signed in).
+    const people: RetentionPeople = params.people === 'all' ? 'all' : 'identified';
     const project = await this.projects.resolveActiveProject(user, params.projectId);
     if (!project) {
-      return { project: null, weeks, cohorts: [], averages: [], summary: { week1: 0, week4: 0 } };
+      return { project: null, weeks, people, cohorts: [], averages: [], summary: { week1: 0, week4: 0 } };
     }
 
     const now = new Date();
@@ -1186,9 +1193,11 @@ export class AnalyticsService {
     const rows = await this.database.query<{ cohort: string; period: number; actors: number }>(
       `
         WITH base AS (
-          SELECT COALESCE(user_id::text, anonymous_id) AS actor, occurred_at
+          SELECT ${people === 'all' ? 'COALESCE(user_id::text, anonymous_id)' : 'user_id::text'} AS actor, occurred_at
           FROM events
-          WHERE project_id = $1 AND COALESCE(user_id::text, anonymous_id) IS NOT NULL${filterClause}
+          WHERE project_id = $1
+            AND ${people === 'all' ? 'COALESCE(user_id::text, anonymous_id)' : 'user_id'} IS NOT NULL
+            AND event_name NOT IN (${PASSIVE_EVENTS_SQL})${filterClause}
         ),
         first_seen AS (
           SELECT actor, MIN(occurred_at) AS first_at FROM base GROUP BY actor
@@ -1256,6 +1265,7 @@ export class AnalyticsService {
     return {
       project,
       weeks,
+      people,
       cohorts,
       averages,
       summary: { week1: averages[1] ?? 0, week4: averages[4] ?? 0 }
