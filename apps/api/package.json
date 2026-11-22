@@ -16,6 +16,7 @@
     "migrate:status": "node scripts/migrate.js status",
     "digest": "node dist/digest.cli.js",
     "seed": "node scripts/seed.js",
+    "users:recompute-last-seen": "node scripts/recompute-last-seen.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
