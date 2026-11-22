@@ -2094,9 +2094,9 @@ app.add_middleware(ASGIMiddleware, client=traceiq)`}</Code>
           <strong>What browser capture can&apos;t see.</strong> Only calls made through <Mono>window.fetch</Mono> or{' '}
           <Mono>XMLHttpRequest</Mono> after <Mono>initialize()</Mono> runs are recorded. WebSockets (including Supabase
           Realtime), <Mono>navigator.sendBeacon</Mono>, server actions and server-side fetches never show up. Some
-          clients keep their own copy of <Mono>fetch</Mono> from when they were created; <Mono>supabase-js</Mono> does,
-          so if your Supabase client is created before TraceIQ initializes, none of its calls are captured. Either
-          initialize TraceIQ first, or hand the client a wrapper that looks up <Mono>fetch</Mono> on every call:
+          clients keep their own copy of <Mono>fetch</Mono> from when they were created (older <Mono>supabase-js</Mono>{' '}
+          releases did), so if such a client is created before TraceIQ initializes, none of its calls are captured.
+          Either initialize TraceIQ first, or hand the client a wrapper that looks up <Mono>fetch</Mono> on every call:
         </P>
         <Code lang="ts">{`export const supabase = createClient(url, anonKey, {
   global: { fetch: (...args) => fetch(...args) }
