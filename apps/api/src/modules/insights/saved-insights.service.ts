@@ -432,7 +432,8 @@ export class SavedInsightsService {
         const retentionData = await this.analytics.getRetention(user, {
           weeks,
           filters: mergedFiltersStr,
-          projectId: project.id
+          projectId: project.id,
+          people: typeof query.people === 'string' ? query.people : undefined
         });
         return { type: 'retention', data: retentionData };
       }

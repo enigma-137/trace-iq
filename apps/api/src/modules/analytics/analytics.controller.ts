@@ -79,11 +79,12 @@ export class AnalyticsController {
     @Headers('authorization') authorization?: string,
     @Query('weeks') weeks?: string,
     @Query('filters') filters?: string,
-    @Query('projectId') projectId?: string
+    @Query('projectId') projectId?: string,
+    @Query('people') people?: string
   ) {
     const user = await this.authService.getDashboardUser(authorization);
     this.authService.requireScope(user, 'insights:read');
-    return this.analyticsService.getRetention(user, { weeks, filters, projectId });
+    return this.analyticsService.getRetention(user, { weeks, filters, projectId, people });
   }
 
   @Get('insights/trends')

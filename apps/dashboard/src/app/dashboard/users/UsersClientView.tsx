@@ -31,6 +31,7 @@ export interface PersonItem {
   traits: Record<string, unknown>;
   traitsPreview?: Record<string, string | number | boolean>;
   eventCount: number;
+  sessionCount?: number;
   firstSeenAt: string;
   lastSeenAt: string;
   lastOs?: string | null;
@@ -87,11 +88,25 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[index];
 }
 
-function getUserStatus(lastSeenAt: string): 'Active' | 'Idle' | 'Inactive' {
+// "Last seen" only moves on events the person triggered (not background requests,
+// web vitals or errors), so these reflect real use. "Active" is a 7-day window,
+// not "online": only someone seen in the last 5 minutes shows as Online.
+type UserStatus = 'Online' | 'Active' | 'Idle' | 'Inactive';
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+const STATUS_HINT: Record<UserStatus, string> = {
+  Online: 'Did something in the app in the last 5 minutes',
+  Active: 'Did something in the app in the last 7 days',
+  Idle: 'Last did something 8 to 30 days ago',
+  Inactive: 'Nothing in the last 30 days'
+};
+
+function getUserStatus(lastSeenAt: string): UserStatus {
   if (!lastSeenAt) return 'Inactive';
   const last = new Date(lastSeenAt).getTime();
   if (Number.isNaN(last)) return 'Inactive';
   const now = Date.now();
+  if (now - last <= ONLINE_WINDOW_MS) return 'Online';
   const diffDays = (now - last) / (1000 * 60 * 60 * 24);
 
   if (diffDays <= 7) return 'Active';
@@ -495,10 +510,16 @@ export function UsersClientView({
                       </span>
 
                       {/* Status Badge (Solid Colors) */}
-                      <div>
+                      <div title={STATUS_HINT[status]}>
+                        {status === 'Online' && (
+                          <span className="inline-flex items-center gap-1 rounded border border-emerald-500 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-600 dark:text-emerald-300">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Online
+                          </span>
+                        )}
                         {status === 'Active' && (
                           <span className="inline-flex items-center rounded border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-800 dark:text-emerald-400">
-                            Active
+                            Active (7d)
                           </span>
                         )}
                         {status === 'Idle' && (
@@ -671,7 +692,7 @@ export function UsersClientView({
                         <span className="text-[10px] font-bold uppercase tracking-wider">Sessions</span>
                       </div>
                       <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white">
-                        {Math.max(1, Math.round(activePerson.eventCount / 5)).toLocaleString()}
+                        {typeof activePerson.sessionCount === 'number' ? activePerson.sessionCount.toLocaleString() : '—'}
                       </p>
                     </div>
 
@@ -696,7 +717,9 @@ export function UsersClientView({
                         <span className="h-2 w-2 rounded-full bg-emerald-600" />
                         <span className="text-[10px] font-bold uppercase tracking-wider">Status</span>
                       </div>
-                      <p className="mt-1 text-xs font-bold text-neutral-900 dark:text-white">{getUserStatus(activePerson.lastSeenAt)}</p>
+                      <p className="mt-1 text-xs font-bold text-neutral-900 dark:text-white" title={STATUS_HINT[getUserStatus(activePerson.lastSeenAt)]}>
+                        {getUserStatus(activePerson.lastSeenAt)}
+                      </p>
                     </div>
 
                     <div className="rounded-md border border-neutral-100 bg-neutral-50/60 p-3 dark:border-slate-800 dark:bg-slate-950">

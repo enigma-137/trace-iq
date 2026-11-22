@@ -1328,7 +1328,8 @@ payload = data.get("payloads", {}).get("nuwell-new-add-meal")`}</Code>
           items={[
             ['Rows', 'Each row is a weekly cohort: the people whose first event in your project happened that week (weeks start on Monday, UTC).'],
             ['W0', 'The week they arrived, always 100%.'],
-            ['W1, W2, …', 'The share of that cohort who sent any event again 1, 2, … weeks later.'],
+            ['W1, W2, …', 'The share of that cohort who did something again 1, 2, … weeks later. Events the SDK sends on its own ($api_request, $web_vital, $exception) don\'t count, so a tab left open in the background doesn\'t make anyone \u201ccome back\u201d.'],
+            ['People', 'Identified users (the default) counts only people your app passed to identify(), so the total lines up with the Users page. Everyone also counts anonymous visitors, one per browser or device that never signed in, so it is usually much larger.'],
             ['Average row', 'The average return rate for each week across all cohorts.'],
             ['Range', 'Show the last 8, 12 or 26 weeks of cohorts.']
           ]}
@@ -2088,6 +2089,17 @@ app.add_middleware(ASGIMiddleware, client=traceiq)`}</Code>
   autoCaptureRequests: true, // capture outgoing fetch() and XHR as $api_request
   // Or narrow it to your backend:
   // autoCaptureRequests: { include: ['https://api.example.com'], exclude: [/\\/health$/] },
+});`}</Code>
+        <P>
+          <strong>What browser capture can&apos;t see.</strong> Only calls made through <Mono>window.fetch</Mono> or{' '}
+          <Mono>XMLHttpRequest</Mono> after <Mono>initialize()</Mono> runs are recorded. WebSockets (including Supabase
+          Realtime), <Mono>navigator.sendBeacon</Mono>, server actions and server-side fetches never show up. Some
+          clients keep their own copy of <Mono>fetch</Mono> from when they were created (older <Mono>supabase-js</Mono>{' '}
+          releases did), so if such a client is created before TraceIQ initializes, none of its calls are captured.
+          Either initialize TraceIQ first, or hand the client a wrapper that looks up <Mono>fetch</Mono> on every call:
+        </P>
+        <Code lang="ts">{`export const supabase = createClient(url, anonKey, {
+  global: { fetch: (...args) => fetch(...args) }
 });`}</Code>
         <P>
           Only API calls are recorded. Page loads are skipped on both sides: Next.js navigations and prefetches (RSC

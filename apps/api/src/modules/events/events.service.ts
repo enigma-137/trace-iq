@@ -9,6 +9,7 @@ import { UsageService } from '../billing/usage.service';
 import { EntitlementService } from '../billing/entitlement.service';
 import { sanitizeIngestedTraits } from '../users/users.service';
 import { getPreferredProjectId } from '../../common/active-project';
+import { isPassiveEvent } from '../../common/passive-events';
 import { SetupVerificationsService } from '../setup-verifications/setup-verifications.service';
 import { RequestsService } from '../requests/requests.service';
 import { EventLogInput, ObservabilityService } from '../observability/observability.service';
@@ -70,6 +71,10 @@ export interface BatchIngestResponse {
 const MAX_BATCH_SIZE = 500;
 
 const SESSION_UPSERT_ATTEMPTS = 3;
+
+// Client clocks can run ahead. A timestamp further in the future than this is
+// treated as "now" so the event can't show up at a time nobody was online.
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
 // unique_violation on the sessions keys, or a deadlock: both clear on retry.
 // The page an event happened on (browser SDK context), for the log line's route.
@@ -184,7 +189,12 @@ export class EventsService {
     // 1) Upsert every distinct identified user once, then map each event to its user id.
     const userMap = await this.bulkEnsureUsers(
       auth.project_id,
-      prepared.filter((p) => p.externalId).map((p) => ({ externalId: p.externalId as string, anonymousId: p.anonymousId }))
+      prepared.filter((p) => p.externalId).map((p) => ({
+        externalId: p.externalId as string,
+        anonymousId: p.anonymousId,
+        occurredAt: p.occurredAt,
+        active: !isPassiveEvent(p.eventName)
+      }))
     );
     for (const p of prepared) {
       p.userId = p.externalId ? userMap.get(p.externalId) ?? null : null;
@@ -294,40 +304,79 @@ export class EventsService {
   // Uses ON CONFLICT to make it idempotent, returning a map of external_id -> user_id.
   private async bulkEnsureUsers(
     projectId: string,
-    users: Array<{ externalId: string; anonymousId?: string }>
+    users: Array<{ externalId: string; anonymousId?: string; occurredAt: Date; active: boolean }>
   ): Promise<Map<string, string>> {
     const map = new Map<string, string>();
     // Dedupe by external_id so one INSERT can't touch the same conflict row twice.
-    const distinct = new Map<string, string | undefined>();
+    // Per user: the earliest and latest event of any kind (used only when a new row
+    // is created) and the latest event the person triggered (the only thing that
+    // moves an existing user's last_seen_at).
+    const distinct = new Map<string, { anonymousId?: string; firstAt: Date; seenAt: Date; activeAt: Date | null }>();
     for (const u of users) {
-      if (!distinct.has(u.externalId)) distinct.set(u.externalId, u.anonymousId);
+      const existing = distinct.get(u.externalId);
+      const activeAt = u.active ? u.occurredAt : null;
+      if (!existing) {
+        distinct.set(u.externalId, { anonymousId: u.anonymousId, firstAt: u.occurredAt, seenAt: u.occurredAt, activeAt });
+        continue;
+      }
+      if (u.occurredAt < existing.firstAt) existing.firstAt = u.occurredAt;
+      if (u.occurredAt > existing.seenAt) existing.seenAt = u.occurredAt;
+      if (activeAt && (!existing.activeAt || activeAt > existing.activeAt)) existing.activeAt = activeAt;
     }
     if (distinct.size === 0) return map;
 
     const values: unknown[] = [];
     const groups: string[] = [];
     let idx = 0;
-    for (const [externalId, anon] of distinct) {
-      const base = idx * 4;
-      groups.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
-      values.push(`usr_${randomUUID()}`, projectId, externalId, anon ?? null);
+    for (const [externalId, u] of distinct) {
+      const base = idx * 6;
+      groups.push(
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::timestamptz, $${base + 6}::timestamptz)`
+      );
+      values.push(
+        `usr_${randomUUID()}`,
+        projectId,
+        externalId,
+        u.anonymousId ?? null,
+        u.firstAt.toISOString(),
+        (u.activeAt ?? u.seenAt).toISOString()
+      );
       idx += 1;
     }
 
+    // last_seen_at is left alone on conflict; the UPDATE below moves it, and only
+    // for users with an event they triggered themselves.
     const result = await this.database.query<{ external_id: string; id: string }>(
       `
-        INSERT INTO users (id, project_id, external_id, anonymous_id)
+        INSERT INTO users (id, project_id, external_id, anonymous_id, first_seen_at, last_seen_at)
         VALUES ${groups.join(', ')}
         ON CONFLICT (project_id, external_id)
         WHERE external_id IS NOT NULL
         DO UPDATE
         SET anonymous_id = COALESCE(users.anonymous_id, EXCLUDED.anonymous_id),
-            last_seen_at = now(),
             updated_at = now()
         RETURNING external_id, id
       `,
       values
     );
+
+    const active = [...distinct].filter(([, u]) => u.activeAt);
+    if (active.length > 0) {
+      const activeValues: unknown[] = [projectId];
+      const activeGroups = active.map(([externalId, u], i) => {
+        activeValues.push(externalId, (u.activeAt as Date).toISOString());
+        return `($${i * 2 + 2}, $${i * 2 + 3}::timestamptz)`;
+      });
+      await this.database.query(
+        `
+          UPDATE users u
+          SET last_seen_at = v.active_at
+          FROM (VALUES ${activeGroups.join(', ')}) AS v(external_id, active_at)
+          WHERE u.project_id = $1 AND u.external_id = v.external_id AND v.active_at > u.last_seen_at
+        `,
+        activeValues
+      );
+    }
     for (const row of result.rows) map.set(row.external_id, row.id);
     return map;
   }
@@ -492,7 +541,7 @@ export class EventsService {
     input = { ...input, properties: withExceptionFingerprint(eventName, stripApiRequestPayload(eventName, input.properties)) };
     const occurredAt = this.parseTimestamp(input.timestamp);
     const anonymousId = this.optionalString(input.anonymousId);
-    const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId);
+    const userId = await this.ensureUser(auth.project_id, input.userId, anonymousId, occurredAt, !isPassiveEvent(eventName));
     const sessionId = await this.ensureSession(auth.project_id, input.sessionId, userId, anonymousId, input.context);
 
     // Identity stitching: once a previously-anonymous visitor identifies, merge their
@@ -816,10 +865,14 @@ export class EventsService {
     return record;
   }
 
+  // `active` is false for events the SDK sends on its own (see PASSIVE_EVENTS): they
+  // create the user if needed but never move an existing user's last_seen_at.
   private async ensureUser(
     projectId: string,
-    externalId?: string,
-    anonymousId?: string
+    externalId: string | undefined,
+    anonymousId: string | undefined,
+    occurredAt: Date,
+    active: boolean
   ): Promise<string | null> {
     const safeExternalId = this.optionalString(externalId);
     if (!safeExternalId) {
@@ -829,17 +882,17 @@ export class EventsService {
     const userId = `usr_${randomUUID()}`;
     const result = await this.database.query<UserRecord>(
       `
-        INSERT INTO users (id, project_id, external_id, anonymous_id)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO users (id, project_id, external_id, anonymous_id, first_seen_at, last_seen_at)
+        VALUES ($1, $2, $3, $4, $5::timestamptz, $5::timestamptz)
         ON CONFLICT (project_id, external_id)
         WHERE external_id IS NOT NULL
         DO UPDATE
         SET anonymous_id = COALESCE(users.anonymous_id, EXCLUDED.anonymous_id),
-            last_seen_at = now(),
+            last_seen_at = CASE WHEN $6::boolean THEN GREATEST(users.last_seen_at, $5::timestamptz) ELSE users.last_seen_at END,
             updated_at = now()
         RETURNING id
       `,
-      [userId, projectId, safeExternalId, anonymousId ?? null]
+      [userId, projectId, safeExternalId, anonymousId ?? null, occurredAt.toISOString(), active]
     );
 
     return result.rows[0]?.id ?? userId;
@@ -965,6 +1018,11 @@ export class EventsService {
     const parsed = new Date(timestamp);
     if (Number.isNaN(parsed.getTime())) {
       throw new BadRequestException('timestamp must be a valid ISO date string.');
+    }
+
+    const now = Date.now();
+    if (parsed.getTime() > now + MAX_FUTURE_SKEW_MS) {
+      return new Date(now);
     }
 
     return parsed;
