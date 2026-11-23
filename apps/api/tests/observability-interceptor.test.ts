@@ -2,20 +2,40 @@ import { describe, expect, it, vi } from 'vitest';
 import { lastValueFrom, of, throwError } from 'rxjs';
 import { ObservabilityInterceptor, shouldRecordRequest } from '../src/common/interceptors/observability.interceptor';
 
-function run(path: string, outcome: { status: number; error?: { status: number; message: string } }) {
+type Outcome = { status: number; error?: { status: number; message: string } };
+
+// `validKeys` maps write key -> project it belongs to, mimicking project_write_keys.
+function run(
+  path: string,
+  outcome: Outcome,
+  opts: { headers?: Record<string, string>; body?: Record<string, unknown>; validKeys?: Record<string, string> } = {}
+) {
   const recordLog = vi.fn().mockResolvedValue({ ok: true });
-  const interceptor = new ObservabilityInterceptor({ recordLog } as never);
-  const req = { method: 'POST', path, headers: {}, query: {}, body: { projectId: 'proj_1' } };
+  const verifyWriteKeyProject = vi.fn(async (key: unknown, projectId?: unknown) => {
+    const owner = typeof key === 'string' ? opts.validKeys?.[key] : undefined;
+    if (!owner) return null;
+    return !projectId || projectId === owner ? owner : null;
+  });
+  const interceptor = new ObservabilityInterceptor({ recordLog, verifyWriteKeyProject } as never);
+  const req = {
+    method: 'POST',
+    path,
+    headers: opts.headers ?? { 'x-traceiq-write-key': 'wk_valid' },
+    query: {},
+    body: opts.body ?? { projectId: 'proj_1' }
+  };
   const res = { statusCode: outcome.status, setHeader: vi.fn() };
   const context = {
     getType: () => 'http',
     switchToHttp: () => ({ getRequest: () => req, getResponse: () => res })
   };
   const handler = { handle: () => (outcome.error ? throwError(() => outcome.error) : of({ ok: true })) };
-  return { recordLog, result: lastValueFrom(interceptor.intercept(context as never, handler as never)) };
+  return { recordLog, verifyWriteKeyProject, result: lastValueFrom(interceptor.intercept(context as never, handler as never)) };
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const rejected = { status: 401, message: 'Invalid write key.' };
+const validKeys = { wk_valid: 'proj_1' };
 
 describe('ObservabilityInterceptor', () => {
   it('only records failed SDK deliveries', () => {
@@ -41,10 +61,7 @@ describe('ObservabilityInterceptor', () => {
   });
 
   it('records a rejected SDK batch as an SDK delivery warning', async () => {
-    const { recordLog, result } = run('/v1/events/batch', {
-      status: 200,
-      error: { status: 401, message: 'Invalid write key.' }
-    });
+    const { recordLog, result } = run('/v1/events/batch', { status: 200, error: rejected }, { validKeys });
     await expect(result).rejects.toMatchObject({ status: 401 });
     await flush();
     expect(recordLog).toHaveBeenCalledTimes(1);
@@ -57,5 +74,42 @@ describe('ObservabilityInterceptor', () => {
       statusCode: 401,
       message: 'SDK delivery failed — POST /v1/events/batch -> 401: Invalid write key.'
     });
+  });
+
+  it('does not log a failed delivery that names a project without a valid write key', async () => {
+    for (const headers of [{}, { 'x-traceiq-write-key': 'wk_bogus' }]) {
+      const { recordLog, result } = run(
+        '/v1/events/batch',
+        { status: 200, error: rejected },
+        { headers, body: { projectId: 'victim_proj' }, validKeys }
+      );
+      await expect(result).rejects.toMatchObject({ status: 401 });
+      await flush();
+      expect(recordLog).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not let one project's write key log into another project", async () => {
+    const { recordLog, result } = run(
+      '/v1/events/batch',
+      { status: 200, error: rejected },
+      { body: { projectId: 'victim_proj' }, validKeys }
+    );
+    await expect(result).rejects.toMatchObject({ status: 401 });
+    await flush();
+    expect(recordLog).not.toHaveBeenCalled();
+  });
+
+  it('attributes the log to the project the write key verifies for, taking the key from the body too', async () => {
+    const { recordLog, verifyWriteKeyProject, result } = run(
+      '/v1/events/batch',
+      { status: 200, error: { status: 400, message: 'batch is required.' } },
+      { headers: {}, body: { projectId: 'proj_1', writeKey: 'wk_valid' }, validKeys }
+    );
+    await expect(result).rejects.toMatchObject({ status: 400 });
+    await flush();
+    expect(verifyWriteKeyProject).toHaveBeenCalledWith('wk_valid', 'proj_1');
+    expect(recordLog).toHaveBeenCalledTimes(1);
+    expect(recordLog.mock.calls[0][0]).toMatchObject({ projectId: 'proj_1', statusCode: 400 });
   });
 });
