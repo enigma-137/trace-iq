@@ -858,47 +858,54 @@ export class ObservabilityService {
     return { ok: true, accepted, rejected };
   }
 
+  /**
+   * Resolves the project a write key belongs to without throwing. Returns null when the
+   * key is missing, unknown, revoked, or not valid for `projectId`. Callers that must
+   * trust the project (e.g. before attributing a log row to it) should use this instead
+   * of reading a project ID straight off the request.
+   */
+  async verifyWriteKeyProject(key: unknown, projectId?: unknown): Promise<string | null> {
+    if (typeof key !== 'string' || !key) return null;
+    if (projectId !== undefined && projectId !== null && typeof projectId !== 'string') return null;
+
+    const keyHash = createHash('sha256').update(key).digest('hex');
+    const authRes = projectId
+      ? await this.database.query<{ project_id: string }>(
+          `
+            SELECT project_id
+            FROM project_write_keys
+            WHERE key_hash = $1
+              AND project_id = $2
+              AND revoked_at IS NULL
+            LIMIT 1
+          `,
+          [keyHash, projectId]
+        )
+      : await this.database.query<{ project_id: string }>(
+          `
+            SELECT project_id
+            FROM project_write_keys
+            WHERE key_hash = $1
+              AND revoked_at IS NULL
+            LIMIT 1
+          `,
+          [keyHash]
+        );
+
+    return authRes.rows[0]?.project_id ?? null;
+  }
+
   private async resolveWriteKeyProject(key: string | undefined, projectId: string | undefined): Promise<string> {
     if (!key) {
       throw new BadRequestException('Write key is required to ingest logs.');
     }
 
-    const keyHash = createHash('sha256').update(key).digest('hex');
-    let resolvedProjectId = projectId;
-
-    if (resolvedProjectId) {
-      const authRes = await this.database.query<{ project_id: string }>(
-        `
-          SELECT project_id
-          FROM project_write_keys
-          WHERE key_hash = $1
-            AND project_id = $2
-            AND revoked_at IS NULL
-          LIMIT 1
-        `,
-        [keyHash, resolvedProjectId]
-      );
-      if (!authRes.rows[0]) {
-        throw new BadRequestException('Invalid project ID or write key.');
-      }
-    } else {
-      const authRes = await this.database.query<{ project_id: string }>(
-        `
-          SELECT project_id
-          FROM project_write_keys
-          WHERE key_hash = $1
-            AND revoked_at IS NULL
-          LIMIT 1
-        `,
-        [keyHash]
-      );
-      if (!authRes.rows[0]) {
-        throw new BadRequestException('Invalid write key.');
-      }
-      resolvedProjectId = authRes.rows[0].project_id;
+    const resolvedProjectId = await this.verifyWriteKeyProject(key, projectId);
+    if (!resolvedProjectId) {
+      throw new BadRequestException(projectId ? 'Invalid project ID or write key.' : 'Invalid write key.');
     }
 
-    return resolvedProjectId as string;
+    return resolvedProjectId;
   }
 
   // `status` is a single value or a comma-separated list (e.g. "error,warning").

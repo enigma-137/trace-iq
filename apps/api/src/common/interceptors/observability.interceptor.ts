@@ -12,7 +12,9 @@ import { ObservabilityService } from '../../modules/observability/observability.
 // only TraceIQ-side requests worth surfacing there are SDK deliveries that failed
 // (rejected write key, rate limit, bad payload): the app's developers need to know
 // their data isn't arriving. Successful ingestion and all dashboard/setup/admin
-// traffic are never recorded.
+// traffic are never recorded. A failure is only attributed to a project when the
+// request's write key verifies for it, so deliveries rejected for a missing, invalid
+// or revoked key are not logged (there is no trustworthy project to attach them to).
 const SDK_PATH_PREFIXES = ['/v1/events', '/v1/flags', '/v1/experiments', '/v1/surveys', '/v1/replays'];
 
 export function shouldRecordRequest(path: string, statusCode: number): boolean {
@@ -127,14 +129,14 @@ export class ObservabilityInterceptor implements NestInterceptor {
     // Fire and forget, don't let log recording ever break request flow
     Promise.resolve().then(async () => {
       try {
-        const projectId =
-          params.req.query?.projectId ||
-          params.req.body?.projectId ||
-          params.req.headers?.['x-project-id'] ||
-          params.req.project?.id ||
-          params.req.user?.projectId;
-
-        // If no explicit project ID found on the request, we skip or use default if available
+        // The project named on the request is untrusted (project IDs are public, embedded
+        // in SDK snippets). Only attribute the log to it when the request also carries a
+        // write key that is valid for that project; otherwise anyone could plant log rows
+        // in someone else's project.
+        const claimedProjectId =
+          params.req.query?.projectId || params.req.body?.projectId || params.req.headers?.['x-project-id'];
+        const writeKey = params.req.headers?.['x-traceiq-write-key'] ?? params.req.body?.writeKey;
+        const projectId = await this.observabilityService.verifyWriteKeyProject(writeKey, claimedProjectId);
         if (!projectId) {
           return;
         }
