@@ -8,6 +8,8 @@ Use GitHub's private vulnerability reporting page:
 
 <https://github.com/enigma-137/trace-iq/security/advisories/new>
 
+If that page is unavailable, open a public issue titled "Request for private security contact" and leave out every detail of the vulnerability. A maintainer will reply with a private channel.
+
 Include the affected component and version or commit, reproduction steps, expected impact, and any suggested mitigation. Remove secrets, access tokens, personal data, and production event payloads from the report.
 
 We will acknowledge a complete report as soon as practical, investigate it, and coordinate remediation and disclosure with the reporter. Please allow maintainers a reasonable opportunity to address the issue before publishing details.
