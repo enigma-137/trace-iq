@@ -709,7 +709,14 @@ export class SyntheticMonitoringService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Authenticates caller for CI endpoints using PAT, Project Write Key, or active user session.
+   * Authenticates a CI caller with a personal access token (tiq_pat_...) from a member of
+   * the project's organization.
+   *
+   * Project write keys are deliberately not accepted. They are public (they ship in browser
+   * bundles), and a CI run executes the project's monitors against a caller-chosen baseUrl
+   * with the project's decrypted synthetic secrets, then returns the results. Accepting a
+   * public key here would let anyone who knows a monitor ID send those secrets to their own
+   * site.
    */
   async authenticateCiCaller(
     authHeader?: string,
@@ -727,14 +734,18 @@ export class SyntheticMonitoringService {
       (authHeader?.startsWith('Bearer ') ? authHeader.replace(/^Bearer\s+/i, '').trim() : authHeader?.trim());
 
     if (!rawKey) {
-      throw new UnauthorizedException('Authentication credentials (API key or Bearer token) required for CI runs.');
+      throw new UnauthorizedException('A personal access token (tiq_pat_...) is required for CI runs.');
+    }
+
+    if (!rawKey.startsWith('tiq_pat_')) {
+      throw new UnauthorizedException(
+        'CI runs require a personal access token (tiq_pat_...). Project write keys are public and are not accepted.'
+      );
     }
 
     const keyHash = createHash('sha256').update(rawKey).digest('hex');
-
-    // 1. Check Personal Access Token
-    if (rawKey.startsWith('tiq_pat_')) {
-      const patQuery = `
+    const patRes = await this.database.query(
+      `
         SELECT pat.user_id, p.id AS project_id
         FROM personal_access_tokens pat
         JOIN organization_members om ON om.user_id = pat.user_id
@@ -744,39 +755,14 @@ export class SyntheticMonitoringService {
           AND pat.revoked_at IS NULL
           AND (pat.expires_at IS NULL OR pat.expires_at > NOW())
         LIMIT 1
-      `;
-      const patRes = await this.database.query(patQuery, [keyHash, projectId]);
-      if (patRes.rows.length > 0) {
-        return { projectId };
-      }
-    }
-
-    // 2. Check Project Write Key
-    const writeKeyQuery = `
-      SELECT pwk.project_id
-      FROM project_write_keys pwk
-      WHERE pwk.key_hash = $1
-        AND pwk.project_id = $2
-        AND pwk.revoked_at IS NULL
-      LIMIT 1
-    `;
-    const writeKeyRes = await this.database.query(writeKeyQuery, [keyHash, projectId]);
-    if (writeKeyRes.rows.length > 0) {
+      `,
+      [keyHash, projectId]
+    );
+    if (patRes.rows.length > 0) {
       return { projectId };
     }
 
-    // 3. Fallback to Dashboard User session if valid
-    try {
-      const user = await this.projects['database'] ? await (this as any).authService?.getDashboardUser(authHeader) : null;
-      if (user) {
-        const project = await this.projects.requireWritableProject(user, projectId);
-        return { projectId: project.id };
-      }
-    } catch {
-      // Ignored, proceed to throw
-    }
-
-    throw new UnauthorizedException('Invalid API key or insufficient permissions for the specified project.');
+    throw new UnauthorizedException('Invalid personal access token, or its owner is not a member of this project.');
   }
 
   /**

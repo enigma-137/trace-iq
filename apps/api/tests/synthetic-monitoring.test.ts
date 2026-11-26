@@ -758,34 +758,47 @@ describe('SyntheticMonitoring - CI Run Groups & PR Preview Testing', () => {
     expect(result.runs[0].durationMs).toBe(1420);
   });
 
-  it('authenticates Personal Access Tokens and Project Write Keys', async () => {
+  it('authenticates CI runs with a personal access token', async () => {
     const { service } = makeService((sql) => {
       if (sql.includes('FROM personal_access_tokens pat')) {
         return rows([{ user_id: 'usr_pat_owner', project_id: PROJECT.id }]);
       }
-      if (sql.includes('FROM project_write_keys pwk')) {
-        return rows([{ project_id: PROJECT.id }]);
-      }
       return rows([]);
     });
 
-    // 1. PAT
-    const patAuth = await service.authenticateCiCaller(
-      'Bearer tiq_pat_valid_token_xyz',
-      undefined,
-      undefined,
-      PROJECT.id
-    );
-    expect(patAuth.projectId).toBe(PROJECT.id);
+    for (const [auth, apiKey] of [
+      ['Bearer tiq_pat_valid_token_xyz', undefined],
+      [undefined, 'tiq_pat_valid_token_xyz']
+    ] as const) {
+      const caller = await service.authenticateCiCaller(auth, apiKey, undefined, PROJECT.id);
+      expect(caller.projectId).toBe(PROJECT.id);
+    }
+  });
 
-    // 2. Project Write Key
-    const writeKeyAuth = await service.authenticateCiCaller(
-      undefined,
-      'tiq_write_key_sample_123',
-      undefined,
-      PROJECT.id
-    );
-    expect(writeKeyAuth.projectId).toBe(PROJECT.id);
+  it('refuses the public project write key for CI runs, without looking it up', async () => {
+    const { service, db } = makeService((sql) => {
+      // Even a valid, unrevoked write key must not work.
+      if (sql.includes('FROM project_write_keys')) return rows([{ project_id: PROJECT.id }]);
+      return rows([]);
+    });
+
+    for (const [auth, apiKey, writeKey] of [
+      [undefined, undefined, 'tiq_write_key_sample_123'],
+      [undefined, 'tiq_write_key_sample_123', undefined],
+      ['Bearer tiq_write_key_sample_123', undefined, undefined]
+    ] as const) {
+      await expect(service.authenticateCiCaller(auth, apiKey, writeKey, PROJECT.id)).rejects.toThrow(
+        /personal access token/
+      );
+    }
+    expect(db.queryCalls('FROM project_write_keys')).toHaveLength(0);
+  });
+
+  it('refuses a token whose owner is not a member of the project', async () => {
+    const { service } = makeService(() => rows([]));
+    await expect(
+      service.authenticateCiCaller('Bearer tiq_pat_other_org', undefined, undefined, PROJECT.id)
+    ).rejects.toThrow(/not a member of this project/);
   });
 
   describe('Session Replay → Synthetic Journey Extraction & Provenance', () => {
