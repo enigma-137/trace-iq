@@ -684,16 +684,6 @@ export class EventsService {
     void this.observability.recordEventLogs(projectId, events).catch(() => undefined);
   }
 
-  async listRecentEvents(projectId: string, limit = 25) {
-    const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? Math.trunc(limit) : 25, 1), 100);
-    const requiredProjectId = this.requiredString(projectId, 'projectId');
-    const events = await this.queryRecentEvents(requiredProjectId, safeLimit);
-
-    return {
-      events
-    };
-  }
-
   async listDashboardRecentEvents(user: DashboardUser, limit = 50) {
     const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? Math.trunc(limit) : 50, 1), 100);
     const result = await this.database.query(

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { resolveWriteKeyProject } from '../../common/write-key';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -954,16 +955,8 @@ export class SurveysService {
     return { success: true, responseId };
   }
 
-  private async resolveProjectIdByWriteKey(writeKey?: string, projectId?: string): Promise<string | null> {
-    if (projectId) return projectId;
-    if (!writeKey) return null;
-
-    const hash = createHash('sha256').update(writeKey).digest('hex');
-    const result = await this.database.query<{ project_id: string }>(
-      `SELECT project_id FROM project_write_keys WHERE key_hash = $1 AND revoked_at IS NULL LIMIT 1;`,
-      [hash]
-    );
-    return result.rows[0]?.project_id ?? null;
+  private resolveProjectIdByWriteKey(writeKey?: string, projectId?: string): Promise<string | null> {
+    return resolveWriteKeyProject(this.database, writeKey, projectId);
   }
 
   private normalizeQuestions(questions: any[]): SurveyQuestion[] {

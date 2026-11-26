@@ -7,7 +7,7 @@ import { FilterCondition, buildFilterClause, sanitizeFilters } from '../../commo
 import { ALLOWED_MEASURES, TrendMeasure, buildMeasureExpr } from '../../common/measures';
 import { EmailService, toUniqueEmails } from '../emails/email.service';
 import { NotificationGroupsService } from './notification-groups.service';
-import { assertSafeFetchUrl } from '../../common/url';
+import { assertSafeFetchUrl, fetchWithSafeRedirects } from '../../common/url';
 import { EntitlementService } from '../billing/entitlement.service';
 import { ChatNotifier } from '../briefs/chat-notifier';
 
@@ -517,7 +517,9 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     let status = 'sent';
     let error: string | null = null;
     try {
-      const res = await fetch(alert.webhook_url, {
+      // The URL was only checked as text when saved; resolve it now and check every
+      // redirect hop too, so a hostname that points at an internal address is refused.
+      const res = await fetchWithSafeRedirects(alert.webhook_url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -536,7 +538,7 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
           triggeredAt: new Date().toISOString()
         }),
         signal: controller.signal
-      });
+      }, { field: 'Webhook URL' });
       if (!res.ok) {
         status = 'failed';
         error = `HTTP ${res.status}`;

@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { SurveysService } from '../src/modules/surveys/surveys.service';
 import { mockDatabase, rows } from './helpers/mock-db';
@@ -18,8 +19,21 @@ const USER = {
   authMethod: 'supabase' as const
 };
 
+// The write key the public SDK routes authenticate with; valid for PROJECT only.
+const WRITE_KEY = 'mock_write_key';
+const WRITE_KEY_HASH = createHash('sha256').update(WRITE_KEY).digest('hex');
+const REVOKED_KEY = 'revoked_write_key';
+
+function writeKeyLookup(sql: string, params?: any[]) {
+  if (!sql.includes('FROM project_write_keys')) return undefined;
+  const [hash, projectId] = params ?? [];
+  // REVOKED_KEY exists but is filtered out by `revoked_at IS NULL`, like every unknown key.
+  const valid = hash === WRITE_KEY_HASH && (projectId === undefined || projectId === PROJECT.id);
+  return rows(valid ? [{ project_id: PROJECT.id }] : []);
+}
+
 function makeService(dbQueries?: (sql: string, params?: any[]) => any) {
-  const db = mockDatabase(dbQueries || (() => rows([])));
+  const db = mockDatabase((sql: string, params?: any[]) => writeKeyLookup(sql, params) ?? (dbQueries ? dbQueries(sql, params) : rows([])));
   const projects = {
     resolveActiveProject: vi.fn().mockImplementation(async (_u, projId) => {
       if (projId && projId !== PROJECT.id) return null;
@@ -407,5 +421,44 @@ describe('SurveysService - Unit & Integration Tests', () => {
 
     const textDist = results.questions.find((q) => q.questionId === 'q_text');
     expect(textDist?.recentTextAnswers?.length).toBe(2);
+  });
+
+  describe('public SDK routes authenticate the write key', () => {
+    const call = (service: SurveysService, key: string | undefined, projectId: string | undefined) =>
+      service.getEligibleSurveys(key, projectId, 'user_1', {}, undefined, 'production');
+
+    it('rejects a project ID sent without a write key', async () => {
+      const { service, db } = makeService();
+      await expect(call(service, undefined, PROJECT.id)).rejects.toBeInstanceOf(NotFoundException);
+      expect(db.queryCalls('FROM surveys')).toHaveLength(0);
+    });
+
+    it('rejects a revoked or unknown key even when the project ID is right', async () => {
+      const { service, db } = makeService();
+      await expect(call(service, REVOKED_KEY, PROJECT.id)).rejects.toBeInstanceOf(NotFoundException);
+      expect(db.queryCalls('FROM surveys')).toHaveLength(0);
+    });
+
+    it("rejects a valid key used with another project's ID", async () => {
+      const { service } = makeService();
+      await expect(call(service, WRITE_KEY, 'proj_other')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('checks the key against the named project and excludes revoked keys', async () => {
+      const { service, db } = makeService();
+      await call(service, WRITE_KEY, PROJECT.id);
+      const lookup = db.queryCalls('FROM project_write_keys')[0];
+      expect(lookup.values).toEqual([WRITE_KEY_HASH, PROJECT.id]);
+      expect(lookup.text).toMatch(/revoked_at IS NULL/);
+      expect(lookup.text).toMatch(/account_lifecycle_requests/);
+    });
+
+    it('applies the same check to submitted responses', async () => {
+      const { service, db } = makeService();
+      await expect(
+        service.submitResponse(REVOKED_KEY, PROJECT.id, { surveyId: 'srv_1', distinctId: 'u1', answers: [] } as never)
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(db.queryCalls('INSERT INTO survey_responses')).toHaveLength(0);
+    });
   });
 });

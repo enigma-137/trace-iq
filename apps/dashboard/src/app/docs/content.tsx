@@ -1633,8 +1633,8 @@ await traceiq.surveys.submitResponse(survey.id, [
         <P>
           Run chosen monitors against a pull request&apos;s preview deployment instead of their base URL, and fail the
           check if a journey breaks. Your production schedule is not affected. Add this step to a GitHub Actions job
-          that runs after your preview deploys, with a project write key or <Mono>tiq_pat_</Mono> token saved as the{' '}
-          <Mono>TRACEIQ_API_KEY</Mono> secret:
+          that runs after your preview deploys, with a personal access token (<Mono>tiq_pat_</Mono>) saved as the{' '}
+          <Mono>TRACEIQ_API_KEY</Mono> secret. Project write keys are public, so CI runs don&apos;t accept them:
         </P>
         <Code lang="yaml">{`- name: Run TraceIQ synthetic monitors
   env:

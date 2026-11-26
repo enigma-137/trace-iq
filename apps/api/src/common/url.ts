@@ -84,7 +84,8 @@ export function isBlockedHostname(host: string): boolean {
 
 export function isBlockedIpAddress(ip: string): boolean {
   const stripped = ip.replace(/^\[|\]$/g, '').toLowerCase();
-  if (stripped === '::1' || LINK_LOCAL_V6.test(stripped) || UNIQUE_LOCAL_V6.test(stripped)) {
+  // `::` is the unspecified address; like 0.0.0.0, connecting to it reaches the local host.
+  if (stripped === '::1' || stripped === '::' || LINK_LOCAL_V6.test(stripped) || UNIQUE_LOCAL_V6.test(stripped)) {
     return true;
   }
   if (stripped.includes(':')) {
@@ -161,4 +162,51 @@ export async function assertDnsSafeUrl(rawUrl: string, field = 'URL'): Promise<s
   }
 
   return validatedUrl;
+}
+
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+export const MAX_SAFE_REDIRECTS = 3;
+
+/**
+ * `fetch` for user-supplied URLs. Checking the URL once and then letting fetch follow
+ * redirects is not enough: the first host can answer with a redirect to a private
+ * address (cloud metadata, internal services) and fetch would go there unchecked. So
+ * redirects are followed by hand, and every hop is checked with assertDnsSafeUrl.
+ * Throws BadRequestException when a hop is unsafe or there are too many redirects.
+ */
+export async function fetchWithSafeRedirects(
+  url: string,
+  init: RequestInit = {},
+  options: { field?: string; maxRedirects?: number } = {}
+): Promise<Response> {
+  const field = options.field ?? 'URL';
+  const maxRedirects = options.maxRedirects ?? MAX_SAFE_REDIRECTS;
+  let current = url;
+  let request: RequestInit = { ...init, redirect: 'manual' };
+
+  for (let hop = 0; ; hop += 1) {
+    await assertDnsSafeUrl(current, field);
+    const response = await fetch(current, request);
+
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      return response;
+    }
+    const location = response.headers.get('location');
+    if (!location) {
+      return response;
+    }
+    await response.body?.cancel().catch(() => undefined);
+
+    if (hop >= maxRedirects) {
+      throw new BadRequestException(`${field} redirected more than ${maxRedirects} times.`);
+    }
+
+    current = new URL(location, current).toString();
+    // Same method rules as fetch's own redirect handling: 303, and 301/302 after a
+    // POST, continue as a body-less GET; 307 and 308 keep the method and body.
+    const method = (request.method ?? 'GET').toUpperCase();
+    if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === 'POST')) {
+      request = { ...request, method: method === 'HEAD' ? 'HEAD' : 'GET', body: undefined };
+    }
+  }
 }

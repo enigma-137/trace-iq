@@ -39,10 +39,9 @@ Use paths (for example `/signup`) in Navigate steps rather than full URLs, so th
 
 ## 2. Create a credential
 
-The CI endpoint accepts either:
+The CI endpoint accepts a **personal access token** (`tiq_pat_...`, Settings → Personal access tokens) from a member of the project's organization.
 
-- your project's **write key** (Settings), or
-- a **personal access token** (`tiq_pat_...`, Settings → Personal access tokens) from a member of the project's organization.
+Project write keys are not accepted. They are public (they ship in your site's JavaScript), and a CI run uses your project's synthetic secrets against the URL you pass, so it needs a private credential.
 
 Add it to your repository as a secret: GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**, named `TRACEIQ_API_KEY`. Add your project ID as a repository variable named `TRACEIQ_PROJECT_ID`.
 
@@ -115,7 +114,7 @@ jobs:
 
 ### `POST /v1/synthetic/ci-runs`
 
-Authenticate with `x-traceiq-api-key: <key>`, `x-traceiq-write-key: <key>` or `Authorization: Bearer <key>`.
+Authenticate with a personal access token, as `x-traceiq-api-key: <token>` or `Authorization: Bearer <token>`. Project write keys are rejected with `401`.
 
 | Field | Required | Description |
 |---|---|---|
