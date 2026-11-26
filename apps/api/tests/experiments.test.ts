@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { ExperimentsService } from '../src/modules/experiments/experiments.service';
 import { mockDatabase, rows } from './helpers/mock-db';
@@ -323,5 +324,49 @@ describe('ExperimentsService - Unit & Integration Tests', () => {
 
     await service.updateStatus(USER, 'exp_1', 'completed', 'variant_b', PROJECT.id);
     expect(updatedStatus).toBe('completed');
+  });
+
+  describe('public SDK routes authenticate the write key', () => {
+    const WRITE_KEY = 'mock_write_key';
+    const WRITE_KEY_HASH = createHash('sha256').update(WRITE_KEY).digest('hex');
+    const keyedService = () =>
+      makeService((sql, params) => {
+        if (sql.includes('FROM project_write_keys')) {
+          const [hash, projectId] = params ?? [];
+          const valid = hash === WRITE_KEY_HASH && (projectId === undefined || projectId === PROJECT.id);
+          return rows(valid ? [{ project_id: PROJECT.id }] : []);
+        }
+        return rows([]);
+      });
+
+    it('rejects evaluation with a project ID but no write key', async () => {
+      const { service, db } = keyedService();
+      await expect(service.evaluate(undefined, PROJECT.id, 'checkout', 'user_1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(db.queryCalls('FROM experiments')).toHaveLength(0);
+    });
+
+    it('rejects a revoked or unknown key even with the right project ID', async () => {
+      const { service, db } = keyedService();
+      await expect(service.evaluate('revoked_key', PROJECT.id, 'checkout', 'user_1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(db.queryCalls('FROM experiments')).toHaveLength(0);
+    });
+
+    it("rejects exposure tracking with another project's ID", async () => {
+      const { service, db } = keyedService();
+      await expect(
+        service.trackExposure(WRITE_KEY, 'proj_other', { experimentKey: 'checkout', distinctId: 'u1', variantKey: 'control' } as never)
+      ).rejects.toBeInstanceOf(NotFoundException);
+      // Refused at the key check, before the experiment is even looked up.
+      expect(db.queryCalls('FROM experiments')).toHaveLength(0);
+      expect(db.queryCalls(/INSERT INTO/)).toHaveLength(0);
+    });
+
+    it('accepts a valid key for the named project', async () => {
+      const { service, db } = keyedService();
+      // The experiment itself doesn't exist in this mock, so getting past auth means a later "not found".
+      await service.evaluate(WRITE_KEY, PROJECT.id, 'checkout', 'user_1').catch(() => undefined);
+      expect(db.queryCalls('FROM project_write_keys')[0].values).toEqual([WRITE_KEY_HASH, PROJECT.id]);
+      expect(db.queryCalls('FROM experiments').length).toBeGreaterThan(0);
+    });
   });
 });
