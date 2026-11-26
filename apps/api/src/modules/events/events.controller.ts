@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Ip, Post, Query } from '@nestjs/common';
+import { Body, Controller, Headers, Ip, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { EventsService, IngestEventRequest } from './events.service';
 
@@ -45,15 +45,7 @@ export class EventsController {
     });
   }
 
-  @Throttle({ default: { limit: 300, ttl: 60_000 } })
-  @Get('recent')
-  async listRecentEvents(
-    @Query('projectId') projectId: string,
-    @Headers() headers: Record<string, string | undefined>,
-    @Query('limit') limit?: string
-  ) {
-    const writeKey = headers['x-traceiq-write-key'] ?? headers.authorization?.replace(/^Bearer\s+/i, '');
-    await this.eventsService.authenticateWriteKey(writeKey ?? '', projectId);
-    return this.eventsService.listRecentEvents(projectId, limit ? Number(limit) : undefined);
-  }
+  // Reading events is deliberately not offered here. Write keys ship inside browser
+  // bundles, so anything they unlock is public; recent events are served only by the
+  // authenticated GET /v1/dashboard/events/recent.
 }
