@@ -229,6 +229,17 @@ docker compose ps
 curl http://127.0.0.1:4000/health
 ```
 
+### Automatic deploys
+
+`.github/workflows/deploy.yml` deploys `main` to the VPS after CI passes, and can also be run from the Actions tab. Over SSH it backs up PostgreSQL to `/opt/traceiq-backups` (keeping the 14 most recent), fast-forwards `/opt/traceiq` to the commit CI tested, and runs `docker compose up -d --build --remove-orphans`. The `migrate` service applies migrations before `api` starts, so a failed migration fails the job and leaves the previous API running. The job then waits for `/health`.
+
+Setup:
+
+1. On the VPS, create a deploy key for the user that owns `/opt/traceiq`: `ssh-keygen -t ed25519 -f traceiq-deploy -N ""`, then append `traceiq-deploy.pub` to that user's `~/.ssh/authorized_keys`.
+2. Run `ssh-keyscan -H <vps-host>` from a trusted machine.
+3. In GitHub, add the repository secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (the private key) and `VPS_KNOWN_HOSTS` (the ssh-keyscan output), plus `VPS_PORT` if SSH is not on port 22.
+4. Optionally add required reviewers to the `production` environment to approve each deploy.
+
 Do not run `docker compose down -v`; the `-v` flag removes the PostgreSQL volume. The historical `migrate-to-vps.sh` script is a one-time Neon migration utility and must not be part of an ordinary deployment.
 
 ## Local development
