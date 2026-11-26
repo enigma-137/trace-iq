@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AlertsService } from '../src/modules/alerts/alerts.service';
 import { affected, mockDatabase, rows, type MockDb } from './helpers/mock-db';
 
+// No real DNS in tests: webhook delivery resolves the host first (SSRF check), so
+// every hostname resolves to a public address here.
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(async () => [{ address: '93.184.216.34', family: 4 }])
+}));
+
 // Chat delivery is covered in alerts-chat.test.ts; these tests don't use it.
 const noChat = { listForProject: vi.fn(async () => []), idsInProject: vi.fn(async () => []), send: vi.fn(async () => []) };
 

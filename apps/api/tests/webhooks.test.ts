@@ -3,13 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebhooksService, type DeliverableEvent } from '../src/modules/webhooks/webhooks.service';
 import { affected, mockDatabase, rows, type MockDb } from './helpers/mock-db';
 
-vi.mock('../src/common/url', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/common/url')>();
-  return {
-    ...actual,
-    assertDnsSafeUrl: vi.fn().mockImplementation((url: string) => Promise.resolve(url))
-  };
-});
+// No real DNS in tests: every hostname resolves to a public address, so the real
+// SSRF checks in common/url still run on each delivery.
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(async () => [{ address: '93.184.216.34', family: 4 }])
+}));
 
 const baseEvent: DeliverableEvent = {
   id: 'evt_1',
@@ -181,6 +179,26 @@ describe('WebhooksService', () => {
       expect(result.statusCode).toBe(200);
       expect(result.response.body).toBe('{"status":"ok"}');
       expect(result.request.headers['x-traceiq-event']).toBe('$webhook_test');
+    });
+
+    it('does not follow a redirect to an internal address or return its response', async () => {
+      db = mockDatabase((text) => {
+        if (text.includes('SELECT * FROM webhooks')) return rows([makeHook()]);
+        return affected(1);
+      });
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      service = makeService(db);
+      const result = await service.test({ id: 'usr_1' } as never, 'whk_1');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][1].redirect).toBe('manual');
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/private or reserved/);
+      expect(result.response.body).toBeNull();
     });
   });
 

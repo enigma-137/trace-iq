@@ -3,7 +3,7 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService } from '../projects/projects.service';
-import { assertDnsSafeUrl, assertSafeFetchUrl } from '../../common/url';
+import { assertSafeFetchUrl, fetchWithSafeRedirects } from '../../common/url';
 
 export type WebhookStatus = 'active' | 'paused' | 'failing' | 'disabled';
 
@@ -737,20 +737,21 @@ export class WebhooksService implements OnModuleDestroy {
     }
 
     try {
-      // Verify DNS safety before fetch (SSRF & DNS rebinding protection)
-      await assertDnsSafeUrl(hook.url);
-
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
 
       try {
-        const response = await fetch(hook.url, {
-          method: 'POST',
-          headers: requestHeaders,
-          body: rawBody,
-          signal: controller.signal,
-          redirect: 'follow'
-        });
+        // Checks the URL and every redirect hop against private/reserved addresses (SSRF).
+        const response = await fetchWithSafeRedirects(
+          hook.url,
+          {
+            method: 'POST',
+            headers: requestHeaders,
+            body: rawBody,
+            signal: controller.signal
+          },
+          { field: 'Webhook URL' }
+        );
 
         statusCode = response.status;
         ok = response.ok;
