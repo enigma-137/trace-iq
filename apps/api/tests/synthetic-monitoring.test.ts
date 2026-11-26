@@ -775,6 +775,23 @@ describe('SyntheticMonitoring - CI Run Groups & PR Preview Testing', () => {
     }
   });
 
+  it('uses a valid PAT even when a leftover write-key header is also sent', async () => {
+    const { service } = makeService((sql) => {
+      if (sql.includes('FROM personal_access_tokens pat')) {
+        return rows([{ user_id: 'usr_pat_owner', project_id: PROJECT.id }]);
+      }
+      return rows([]);
+    });
+
+    for (const [auth, apiKey] of [
+      ['Bearer tiq_pat_valid_token_xyz', undefined],
+      [undefined, 'tiq_pat_valid_token_xyz']
+    ] as const) {
+      const caller = await service.authenticateCiCaller(auth, apiKey, 'tiq_write_key_sample_123', PROJECT.id);
+      expect(caller.projectId).toBe(PROJECT.id);
+    }
+  });
+
   it('refuses the public project write key for CI runs, without looking it up', async () => {
     const { service, db } = makeService((sql) => {
       // Even a valid, unrevoked write key must not work.

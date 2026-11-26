@@ -728,10 +728,13 @@ export class SyntheticMonitoringService {
       throw new BadRequestException('projectId is required.');
     }
 
+    // The PAT is read from x-traceiq-api-key or Authorization only. A leftover
+    // x-traceiq-write-key header must not shadow a valid PAT sent alongside it;
+    // it is only reported when it is the sole credential.
     const rawKey =
-      apiKeyHeader ||
-      writeKeyHeader ||
-      (authHeader?.startsWith('Bearer ') ? authHeader.replace(/^Bearer\s+/i, '').trim() : authHeader?.trim());
+      apiKeyHeader?.trim() ||
+      (authHeader?.startsWith('Bearer ') ? authHeader.replace(/^Bearer\s+/i, '').trim() : authHeader?.trim()) ||
+      writeKeyHeader?.trim();
 
     if (!rawKey) {
       throw new UnauthorizedException('A personal access token (tiq_pat_...) is required for CI runs.');
