@@ -16,6 +16,9 @@ import (
 const (
 	maxBatchSize     = 500
 	maxResponseBytes = 64 << 10
+	// A server can ask for an arbitrarily long delay. Cap it so the worker cannot
+	// be parked for hours and Shutdown cannot hang on a hostile Retry-After.
+	maxRetryAfter = 30 * time.Second
 )
 
 type batchRequest struct {
@@ -188,10 +191,17 @@ func parseRetryAfter(value string) time.Duration {
 		return 0
 	}
 	if seconds, err := strconv.Atoi(value); err == nil && seconds > 0 {
-		return time.Duration(seconds) * time.Second
+		wait := time.Duration(seconds) * time.Second
+		if wait > maxRetryAfter {
+			return maxRetryAfter
+		}
+		return wait
 	}
 	if when, err := http.ParseTime(value); err == nil {
 		if wait := time.Until(when); wait > 0 {
+			if wait > maxRetryAfter {
+				return maxRetryAfter
+			}
 			return wait
 		}
 	}

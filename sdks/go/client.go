@@ -85,8 +85,9 @@ func WithDebug(enabled bool) Option {
 }
 
 // WithOnError receives delivery failures: dropped batches, rejected events, and
-// a full queue. Delivery errors run on the worker goroutine; a full queue reports
-// on the goroutine calling Capture.
+// a full queue. Callbacks are serialized on their own goroutine, may run after
+// Capture returns, and are waited for by Shutdown. Do not call Shutdown from a
+// callback; Flush is safe. Concurrent and recursive reports may be coalesced.
 func WithOnError(fn func(error)) Option {
 	return func(c *config) { c.onError = fn }
 }
@@ -129,6 +130,14 @@ type Client struct {
 
 	mu     sync.RWMutex
 	closed bool
+
+	// Error callbacks run off the worker so a slow callback cannot stall delivery.
+	// errMu guards callback registration and Shutdown's wait; callbackMu serializes
+	// the callbacks themselves and makes recursive reports cheap to drop.
+	errMu      sync.Mutex
+	errClosed  bool
+	callbackMu sync.Mutex
+	errWG      sync.WaitGroup
 }
 
 // New creates a client and starts its background worker.
@@ -338,6 +347,25 @@ func (c *Client) Shutdown(ctx context.Context) error {
 
 	select {
 	case <-c.done:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	// Stop registering new callbacks only after the worker has reported everything
+	// it drained, so delivery failures during shutdown are not lost.
+	c.errMu.Lock()
+	c.errClosed = true
+	c.errMu.Unlock()
+
+	// Wait for callbacks that were already registered. Callbacks run on their own
+	// goroutine, so they can safely call Flush while this wait is in progress.
+	callbacksDone := make(chan struct{})
+	go func() {
+		c.errWG.Wait()
+		close(callbacksDone)
+	}()
+	select {
+	case <-callbacksDone:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -444,8 +472,21 @@ func (c *Client) reportError(err error) {
 	if c.config.onError == nil {
 		return
 	}
-	defer func() {
-		_ = recover()
+
+	c.errMu.Lock()
+	if c.errClosed || !c.callbackMu.TryLock() {
+		c.errMu.Unlock()
+		return // closed client, or a callback reporting from inside a callback
+	}
+	c.errWG.Add(1)
+	c.errMu.Unlock()
+
+	go func() {
+		defer c.errWG.Done()
+		defer c.callbackMu.Unlock()
+		defer func() {
+			_ = recover()
+		}()
+		c.config.onError(err)
 	}()
-	c.config.onError(err)
 }

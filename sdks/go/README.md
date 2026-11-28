@@ -183,7 +183,7 @@ server has stopped.
 | `WithTimeout` | `10s` | Per-request timeout. |
 | `WithQueueSize` | `10000` | Bounded in-memory queue. |
 | `WithRelease` | `TRACEIQ_RELEASE` | Stamped on every event as `context.release`. |
-| `WithOnError` | none | Receives delivery failures and a full queue. |
+| `WithOnError` | none | Receives delivery failures and a full queue. Serialized; may be coalesced. |
 | `WithDebug` | `false` | Log delivery warnings to the standard logger. |
 | `WithHTTPClient` | none | Use a custom `*http.Client`. |
 
@@ -209,6 +209,10 @@ server has stopped.
 - Keep the write key in an environment variable. It is never logged by the SDK.
 - `Capture` serializes the event immediately, so mutating a properties map after
   the call cannot race with delivery.
+- `OnError` callbacks run one at a time off the delivery worker, so a slow callback
+  cannot stall events. `Shutdown` waits for callbacks that were already reported.
+  A callback may call `Flush`, but must not call `Shutdown` (that would wait for
+  itself). Reports that arrive while a callback is running may be dropped.
 
 ## License
 

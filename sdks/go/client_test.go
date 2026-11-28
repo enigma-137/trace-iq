@@ -283,19 +283,24 @@ func TestBatchSplitsAt500(t *testing.T) {
 }
 
 func TestQueueFullReportsError(t *testing.T) {
-	var got error
+	reported := make(chan error, 1)
 	client := &Client{
 		queue: make(chan json.RawMessage, 1),
 		config: config{
-			onError: func(err error) { got = err },
+			onError: func(err error) { reported <- err },
 		},
 	}
 	client.queue <- json.RawMessage(`{"eventName":"first"}`)
 	if err := client.enqueue(json.RawMessage(`{"eventName":"second"}`)); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
-	if !errors.Is(got, ErrQueueFull) {
-		t.Errorf("error = %v, want ErrQueueFull", got)
+	select {
+	case got := <-reported:
+		if !errors.Is(got, ErrQueueFull) {
+			t.Errorf("error = %v, want ErrQueueFull", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("OnError was not called")
 	}
 }
 
@@ -595,7 +600,13 @@ func TestPropertiesAreSnapshottedAtCapture(t *testing.T) {
 
 func TestOnErrorPanicDoesNotStopWorker(t *testing.T) {
 	var attempts atomic.Int32
+	var sizes []int
+	var sizeMu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := readBatch(t, r)
+		sizeMu.Lock()
+		sizes = append(sizes, len(body.Batch))
+		sizeMu.Unlock()
 		attempts.Add(1)
 		w.WriteHeader(http.StatusBadRequest)
 	}))
@@ -617,8 +628,22 @@ func TestOnErrorPanicDoesNotStopWorker(t *testing.T) {
 	if !panicked {
 		t.Error("OnError was not called")
 	}
-	if got := attempts.Load(); got != 2 {
-		t.Errorf("attempts = %d, want 2", got)
+	if attempts.Load() == 0 {
+		t.Fatal("no batch was sent")
+	}
+	total := 0
+	for _, size := range sizes {
+		total += size
+	}
+	if total != 2 {
+		t.Errorf("events sent = %d, want 2 (sizes %v)", total, sizes)
+	}
+}
+
+func TestParseRetryAfterCapsLongDelay(t *testing.T) {
+	value := time.Now().Add(24 * time.Hour).UTC().Format(http.TimeFormat)
+	if got := parseRetryAfter(value); got > time.Minute {
+		t.Errorf("parseRetryAfter(%q) = %v, want at most one minute", value, got)
 	}
 }
 
@@ -631,7 +656,7 @@ func TestParseRetryAfter(t *testing.T) {
 		{value: "2", want: 2 * time.Second},
 		{value: "-1", want: 0},
 		{value: "nonsense", want: 0},
-		{value: time.Now().Add(time.Hour).UTC().Format(http.TimeFormat), want: time.Hour},
+		{value: time.Now().Add(time.Hour).UTC().Format(http.TimeFormat), want: maxRetryAfter},
 	}
 	for _, tt := range tests {
 		got := parseRetryAfter(tt.value)
