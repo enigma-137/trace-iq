@@ -1,0 +1,15 @@
+export const entry = {
+  title: 'Bring your history from PostHog',
+  date: '2026-11-28',
+  areas: ['Dashboard', 'Integrations', 'SDKs']
+}
+
+Moving to TraceIQ no longer means starting from zero. The new **Import** page (Integrations → Import) brings in past events with their original timestamps, users and sessions, so trends, funnels and retention cover the time before you switched.
+
+- **Import from PostHog:** paste a PostHog API key, pick a date range, and TraceIQ pulls the events for you. It keeps running if you leave the page, and you can continue from where it stopped. Your key is never stored.
+- **Upload a file:** a PostHog export (JSON Lines, JSON or gzip) or a TraceIQ export from another project. It's read in your browser, and the format is detected for you.
+- **Recent imports** lists every import with what was imported and which PostHog-only events were skipped.
+- If you use two-factor authentication, starting an import asks for your code.
+- **CLI:** `npx traceiq-cli import posthog` does the same from your terminal (traceiq-cli 0.4.0).
+
+[Migrate from PostHog →](/docs?page=migrate-posthog)
