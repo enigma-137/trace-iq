@@ -1,0 +1,14 @@
+export const entry = {
+  title: 'Security and sign-in fixes',
+  date: '2026-11-28',
+  areas: ['Fixes']
+}
+
+A round of fixes from a security review, plus a few smaller ones.
+
+- **Changed:** CI runs of synthetic monitors now need a personal access token instead of the project write key, because the write key is public. If your pipeline sends the write key, [switch it to a token](/docs?page=synthetic-monitors).
+- **Fixed:** revoking a write key now also stops survey and experiment requests that use it.
+- **Fixed:** webhooks and alert webhooks no longer follow redirects to private network addresses.
+- **Fixed:** the public write key can no longer read a project's recent events. Use a personal access token with the dashboard API instead.
+- **Fixed:** after a failed sign-in, the password field is cleared.
+- The Import and Status page settings are calmer: forms open in dialogs, and explanations sit behind a "?" button.
