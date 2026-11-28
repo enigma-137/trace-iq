@@ -6,6 +6,11 @@
     "access": "public"
   },
   "description": "TraceIQ server-side SDK for Node.js — capture backend events (payments, payouts, jobs) with trustworthy properties.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enigma-137/trace-iq.git",
+    "directory": "packages/node"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

@@ -8,14 +8,19 @@ and publishes it. A mismatched tag fails before anything is published.
 | --- | --- | --- | --- | --- |
 | Python | PyPI | `traceiq-py` | `python-v0.2.0` | `sdks/python/pyproject.toml` and `sdks/python/traceiq/__init__.py` |
 | Kotlin | Maven Central | `run.traceiq:traceiq` | `kotlin-v0.2.0` | `sdks/kotlin/build.gradle.kts` |
+| CLI | npm | `traceiq-cli` | `cli-v0.4.1` | `packages/usetrace/package.json` |
+| Browser | npm | `traceiq-sdk-js` | `sdk-js-v0.4.1` | `packages/sdk-js/package.json` and `context.sdk.version` in `packages/sdk-js/src/core/client.ts` |
+| Node | npm | `traceiq-node` | `node-v0.3.1` | `packages/node/package.json` |
+| React Native | npm | `traceiq-react-native` | `react-native-v0.3.1` | `packages/react-native/package.json` |
+| MCP server | npm | `traceiq-mcp-server` | `mcp-server-v0.8.1` | `packages/mcp-server/package.json` |
+
+The npm packages are all released by `.github/workflows/release-npm.yml`; the tag's prefix picks the
+package. It also refuses a version that is already on npm.
 
 The other packages are published by hand; see [Publishing by hand](#publishing-by-hand).
 
 | SDK | Registry | Package | Version lives in |
 | --- | --- | --- | --- |
-| Browser | npm | `traceiq-sdk-js` | `packages/sdk-js/package.json` and `context.sdk.version` in `packages/sdk-js/src/core/client.ts` |
-| Node | npm | `traceiq-node` | `packages/node/package.json` |
-| React Native | npm | `traceiq-react-native` | `packages/react-native/package.json` |
 | Rust | crates.io | `traceiq` | `sdks/rust/Cargo.toml` (then `cargo update -p traceiq` to refresh `Cargo.lock`) |
 | Flutter | pub.dev | `traceiq_flutter` | `packages/sdk-flutter/pubspec.yaml` |
 
@@ -26,12 +31,31 @@ To release: bump the version in those files, merge, then
 
 ```bash
 git tag python-v0.2.0 && git push origin python-v0.2.0
+git tag cli-v0.4.1 && git push origin cli-v0.4.1
 ```
 
 CI already builds both packages on every pull request (`python -m build` and
 `gradle publishToMavenLocal`), so packaging problems show up before release day.
 
 ## One-time setup
+
+### npm (CLI, browser, Node, React Native, MCP server)
+
+npm Trusted Publishing lets the workflow publish without an npm token, and npm records provenance
+(which commit and workflow built the package) on each version.
+
+1. On [npmjs.com](https://www.npmjs.com), for **each** of `traceiq-cli`, `traceiq-sdk-js`,
+   `traceiq-node`, `traceiq-react-native` and `traceiq-mcp-server`, open the package's
+   **Settings → Trusted publishing**, choose **GitHub Actions** and enter:
+   - Organization or user: `enigma-137`
+   - Repository: `trace-iq`
+   - Workflow filename: `release-npm.yml`
+   - Environment name: `npm`
+2. In GitHub, create the `npm` environment under **Settings → Environments**. Adding yourself as a
+   required reviewer makes every release wait for your approval. You can also limit it to tags
+   matching the release prefixes.
+3. Optional, once a release has worked: in each package's **Settings → Publishing access**, choose
+   to require two-factor authentication and disallow tokens, so only the workflow can publish.
 
 ### PyPI (Python)
 
@@ -79,7 +103,9 @@ appears on Maven Central within about 30 minutes.
 
 Bump the version and changelog in a PR, merge it, then publish from an up-to-date `main`.
 
-### npm (`traceiq-sdk-js`, `traceiq-node`, `traceiq-react-native`, `traceiq-cli`, `traceiq-mcp-server`)
+### npm, if the workflow can't be used
+
+Normally npm packages are released with a tag (above). To publish one by hand:
 
 ```bash
 npm ci --legacy-peer-deps
@@ -128,4 +154,4 @@ The first publish asks you to sign in with Google; that account becomes the uplo
   tell users to add `sdks/swift` as a local package.
 - **Kotlin:** the release workflow is ready, but the Maven Central setup above hasn't been done, so
   nothing is published yet. The docs tell users to `gradle publishToMavenLocal` from a clone.
-- **npm, crates.io and pub.dev** are published by hand (above).
+- **crates.io and pub.dev** are published by hand (above).

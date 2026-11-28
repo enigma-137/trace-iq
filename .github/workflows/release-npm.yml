@@ -1,0 +1,91 @@
+name: Release npm package
+
+# Push a tag to publish one npm package, for example `cli-v0.4.1` for traceiq-cli.
+# Uses npm Trusted Publishing (OIDC), so no npm token is stored. See RELEASING.md.
+on:
+  push:
+    tags:
+      - "cli-v*"
+      - "sdk-js-v*"
+      - "node-v*"
+      - "react-native-v*"
+      - "mcp-server-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Test and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # Trusted Publishing; npm also records provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - name: Use an npm that supports Trusted Publishing
+        run: npm install -g npm@latest && npm --version
+
+      - name: Find the package for the tag
+        id: package
+        run: |
+          case "$GITHUB_REF_NAME" in
+            cli-v*)          name=traceiq-cli;          dir=packages/usetrace;     version="${GITHUB_REF_NAME#cli-v}" ;;
+            sdk-js-v*)       name=traceiq-sdk-js;       dir=packages/sdk-js;       version="${GITHUB_REF_NAME#sdk-js-v}" ;;
+            node-v*)         name=traceiq-node;         dir=packages/node;         version="${GITHUB_REF_NAME#node-v}" ;;
+            react-native-v*) name=traceiq-react-native; dir=packages/react-native; version="${GITHUB_REF_NAME#react-native-v}" ;;
+            mcp-server-v*)   name=traceiq-mcp-server;   dir=packages/mcp-server;   version="${GITHUB_REF_NAME#mcp-server-v}" ;;
+            *) echo "::error::Unknown release tag $GITHUB_REF_NAME"; exit 1 ;;
+          esac
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag matches the package version
+        env:
+          NAME: ${{ steps.package.outputs.name }}
+          DIR: ${{ steps.package.outputs.dir }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          actual=$(node -p "require('./$DIR/package.json').version")
+          if [ "$actual" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match $DIR/package.json ($actual)."
+            exit 1
+          fi
+          if [ "$NAME" = traceiq-sdk-js ] && ! grep -q "version: '$VERSION'" packages/sdk-js/src/core/client.ts; then
+            echo "::error::context.sdk.version in packages/sdk-js/src/core/client.ts is not $VERSION."
+            exit 1
+          fi
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$NAME@$VERSION is already on npm. Bump the version."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      # The CLI's Next.js fixture test imports the workspace traceiq-sdk-js, whose entry point is its built dist/.
+      - name: Build browser SDK
+        run: npm run build --workspace=traceiq-sdk-js
+      - name: Build
+        run: npm run build --workspace=${{ steps.package.outputs.name }}
+      - name: Test
+        run: npm test --workspace=${{ steps.package.outputs.name }}
+
+      - name: Publish
+        run: npm publish --workspace=${{ steps.package.outputs.name }} --access public
+      - name: Summary
+        env:
+          NAME: ${{ steps.package.outputs.name }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: echo "Published [$NAME@$VERSION](https://www.npmjs.com/package/$NAME/v/$VERSION)" >> "$GITHUB_STEP_SUMMARY"
