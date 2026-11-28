@@ -17,7 +17,7 @@ export interface StatusComponentData {
   key: string;
   name: string;
   description: string;
-  status: 'operational' | 'degraded' | 'down' | 'unknown';
+  status: 'operational' | 'degraded' | 'down' | 'maintenance' | 'unknown';
   uptimePercent: number | null;
   history: StatusDay[];
 }
@@ -42,10 +42,11 @@ const STATUS_LABELS: Record<StatusComponentData['status'], string> = {
   operational: 'Operational',
   degraded: 'Degraded',
   down: 'Outage',
+  maintenance: 'Maintenance',
   unknown: 'Unknown'
 };
 
-const LEVEL_LABELS: Record<StatusLevel, string> = {
+export const LEVEL_LABELS: Record<StatusLevel, string> = {
   operational: 'No downtime',
   degraded: 'Degraded performance',
   down: 'Outage',
@@ -107,7 +108,8 @@ export function StatusView({ data }: { data: StatusData }) {
   );
 }
 
-function ComponentRow({ component, days }: { component: StatusComponentData; days: number }) {
+/** One component with its daily uptime bars. Also used by project status pages. */
+export function ComponentRow({ component, days }: { component: StatusComponentData; days: number }) {
   const [selected, setSelected] = useState<number | null>(null);
   const history = component.history;
   const active = selected === null ? null : history[selected];
@@ -174,7 +176,7 @@ function ComponentRow({ component, days }: { component: StatusComponentData; day
   );
 }
 
-function formatPercent(value: number) {
+export function formatPercent(value: number) {
   return `${value === 100 ? '100' : value.toFixed(2)}%`;
 }
 

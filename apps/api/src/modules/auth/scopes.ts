@@ -34,6 +34,8 @@ export const ALLOWED_SCOPES = [
   'webhooks:write',
   'synthetic_monitors:read',
   'synthetic_monitors:write',
+  'status_pages:read',
+  'status_pages:write',
   'exports:read',
   'imports:write',
   'sourcemaps:write'

@@ -23,6 +23,7 @@ import { FlagsModule } from './modules/flags/flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ExportModule } from './modules/export/export.module';
 import { ImportsModule } from './modules/imports/imports.module';
+import { StatusPagesModule } from './modules/status-pages/status-pages.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
 import { RequestsModule } from './modules/requests/requests.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -80,6 +81,7 @@ import { ObservabilityInterceptor } from './common/interceptors/observability.in
     WebhooksModule,
     ExportModule,
     ImportsModule,
+    StatusPagesModule,
     ObservabilityModule,
     RequestsModule,
     AnalyticsModule,
