@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Upload04Icon from '@hugeicons/core-free-icons/Upload04Icon';
 import { DashboardDialog } from '@/app/dashboard/DashboardDialog';
 import { ActionCard, HelpTip, Notice, buttonClass, fieldClass } from '@/components/dashboard/CalmUI';
+import { retryAfterStepUp } from '@/lib/step-up';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { detectFormat, readEventsFile, type ImportFormat } from './file-reader';
 
@@ -16,10 +17,12 @@ export interface ImportJob {
   id: string;
   source: string;
   status: 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed' | 'interrupted';
-  sourceHost: string;
-  sourceProject: string;
-  rangeStart: string;
-  rangeEnd: string;
+  sourceHost: string | null;
+  sourceProject: string | null;
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  fileName?: string | null;
+  fileFormat?: string | null;
   completedThrough: string | null;
   windowsTotal: number;
   windowsDone: number;
@@ -65,12 +68,17 @@ export function ImportPanel({ projectId, projectName, initialJobs }: ImportPanel
 
   const api = useCallback(
     async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
-      const token = await getToken();
-      if (!token) throw new Error('Your session has expired. Sign in again.');
-      const response = await fetch(`${apiBaseUrl}${path}`, {
-        ...init,
-        headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}) }
-      });
+      // Reads the token on every send, so a retry after 2FA carries the refreshed session.
+      const send = async () => {
+        const token = await getToken();
+        if (!token) throw new Error('Your session has expired. Sign in again.');
+        return fetch(`${apiBaseUrl}${path}`, {
+          ...init,
+          headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}) }
+        });
+      };
+      // Starting an import asks accounts with 2FA for a fresh code (the shared step-up dialog).
+      const response = await retryAfterStepUp(await send(), send);
       if (!response.ok) throw new Error(await readError(response));
       return (await response.json()) as T;
     },
@@ -126,7 +134,7 @@ function PostHogAndFile({
   return (
     <>
       <div className="grid gap-5 md:grid-cols-2">
-        <FileImportCard api={api} projectId={projectId} />
+        <FileImportCard api={api} projectId={projectId} onChange={posthog.refresh} />
 
         <ActionCard
           logo={{ src: '/brand/posthog-mark.svg', alt: 'PostHog' }}
@@ -160,7 +168,7 @@ function PostHogAndFile({
 
 // ─── File upload ────────────────────────────────────────────────────────────
 
-function FileImportCard({ api, projectId }: { api: Api; projectId?: string | null }) {
+function FileImportCard({ api, projectId, onChange }: { api: Api; projectId?: string | null; onChange: () => void }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [formatChoice, setFormatChoice] = useState<'auto' | ImportFormat>('auto');
@@ -182,12 +190,42 @@ function FileImportCard({ api, projectId }: { api: Api; projectId?: string | nul
     let format: ImportFormat | null = formatChoice === 'auto' ? null : formatChoice;
     let chunk: unknown[] = [];
     let chunkBytes = 0;
+    // Rows dropped here and never sent; added to the import's record when it finishes.
+    const local = { read: 0, skipped: 0, rejected: 0, skippedEvents: {} as Record<string, number> };
+
+    // The record that puts this upload in the history. Starting it is where 2FA is asked for.
+    let importId: string;
+    try {
+      const started = await api<{ job: ImportJob }>('/v1/dashboard/import/files', {
+        method: 'POST',
+        body: JSON.stringify({ projectId, fileName: file.name, format: format ?? undefined })
+      });
+      importId = started.job.id;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start the import.');
+      setProgress(null);
+      setBusy(false);
+      return;
+    }
+    onChange();
+
+    const finish = async (status: 'completed' | 'cancelled' | 'failed', message?: string) => {
+      try {
+        await api(`/v1/dashboard/import/files/${encodeURIComponent(importId)}/finish`, {
+          method: 'POST',
+          body: JSON.stringify({ projectId, status, error: message, ...local })
+        });
+      } catch {
+        // The upload itself is done; the record shows as interrupted after a while.
+      }
+      onChange();
+    };
 
     const send = async () => {
       if (chunk.length === 0) return;
       const result = await api<{ read: number; imported: number; skipped: number; rejected: number; skippedEvents: Record<string, number>; errors: string[] }>(
         '/v1/dashboard/import/events',
-        { method: 'POST', body: JSON.stringify({ projectId, format, events: chunk }) }
+        { method: 'POST', body: JSON.stringify({ projectId, format, events: chunk, importId }) }
       );
       chunk = [];
       chunkBytes = 0;
@@ -209,6 +247,9 @@ function FileImportCard({ api, projectId }: { api: Api; projectId?: string | nul
         if ('error' in row) {
           state.skipped += 1;
           state.skippedEvents['(lines that are not valid JSON)'] = (state.skippedEvents['(lines that are not valid JSON)'] ?? 0) + 1;
+          local.read += 1;
+          local.skipped += 1;
+          local.skippedEvents['(lines that are not valid JSON)'] = (local.skippedEvents['(lines that are not valid JSON)'] ?? 0) + 1;
           continue;
         }
         if (!format) {
@@ -220,6 +261,8 @@ function FileImportCard({ api, projectId }: { api: Api; projectId?: string | nul
         if (chunk.length > 0 && (chunk.length >= CHUNK_EVENTS || chunkBytes + size > CHUNK_BYTES)) await send();
         if (size > CHUNK_BYTES) {
           state.rejected += 1;
+          local.read += 1;
+          local.rejected += 1;
           if (state.errors.length < 5) state.errors.push(`An event on row ${state.read} is larger than 800 KB and was not imported.`);
           continue;
         }
@@ -227,13 +270,16 @@ function FileImportCard({ api, projectId }: { api: Api; projectId?: string | nul
         chunkBytes += size;
       }
       if (!state.stopped) await send();
-      state.done = true;
+      state.done = !state.stopped;
       setProgress({ ...state });
+      await finish(state.stopped ? 'cancelled' : 'completed');
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed.';
       setError(
-        `${err instanceof Error ? err.message : 'Import failed.'}${state.imported > 0 ? ` ${state.imported.toLocaleString()} events were imported before this; importing the file again would import those twice.` : ''}`
+        `${message}${state.imported > 0 ? ` ${state.imported.toLocaleString()} events were imported before this; importing the file again would import those twice.` : ''}`
       );
       setProgress({ ...state });
+      await finish('failed', message);
     } finally {
       setBusy(false);
     }
@@ -426,7 +472,9 @@ function usePostHogImport(api: Api, projectId: string | null | undefined, projec
   const [busy, setBusy] = useState<'check' | 'start' | null>(null);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
-  const active = jobs.some((job) => job.status === 'running' || job.status === 'cancelling');
+  // Any running import refreshes the history; only a PostHog pull blocks starting another one.
+  const running = jobs.some((job) => job.status === 'running' || job.status === 'cancelling');
+  const active = jobs.some((job) => job.source === 'posthog' && (job.status === 'running' || job.status === 'cancelling'));
 
   const refresh = useCallback(async () => {
     try {
@@ -438,10 +486,10 @@ function usePostHogImport(api: Api, projectId: string | null | undefined, projec
   }, [api, projectQuery]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!running) return;
     const timer = setInterval(refresh, 5000);
     return () => clearInterval(timer);
-  }, [active, refresh]);
+  }, [running, refresh]);
 
   const body = () => ({
     projectId,
@@ -490,14 +538,14 @@ function usePostHogImport(api: Api, projectId: string | null | undefined, projec
   }
 
   function resume(job: ImportJob) {
-    setSince((job.completedThrough ?? job.rangeStart).slice(0, 10));
-    setUntil(job.rangeEnd.slice(0, 10));
-    setPosthogProjectId(job.sourceProject);
+    setSince((job.completedThrough ?? job.rangeStart ?? '').slice(0, 10));
+    setUntil((job.rangeEnd ?? '').slice(0, 10));
+    setPosthogProjectId(job.sourceProject ?? '');
     if (job.sourceHost === 'https://us.posthog.com') setHost('us');
     else if (job.sourceHost === 'https://eu.posthog.com') setHost('eu');
     else {
       setHost('custom');
-      setCustomHost(job.sourceHost);
+      setCustomHost(job.sourceHost ?? '');
     }
     setMessage({ tone: 'ok', text: 'Filled in from where the import stopped. Paste your PostHog key to continue.' });
     setFormOpen(true);
@@ -536,7 +584,8 @@ function usePostHogImport(api: Api, projectId: string | null | undefined, projec
     check,
     start,
     cancel,
-    resume
+    resume,
+    refresh
   };
 }
 
@@ -673,7 +722,7 @@ function ImportHistory({ jobs, onCancel, onResume }: { jobs: ImportJob[]; onCanc
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold text-neutral-900 dark:text-white">PostHog imports</h2>
+        <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Recent imports</h2>
         <HelpTip label="What is not imported">
           Dashboards, funnels, cohorts and feature flags are definitions rather than events, so they aren’t imported.{' '}
           <Link href="/docs?page=migrate-posthog" className={buttonClass.link}>
@@ -684,7 +733,7 @@ function ImportHistory({ jobs, onCancel, onResume }: { jobs: ImportJob[]; onCanc
       </div>
       {jobs.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-neutral-200 px-6 py-8 text-center text-sm text-neutral-500 dark:border-slate-800 dark:text-slate-400">
-          No PostHog imports yet. They show up here with their progress.
+          No imports yet. File uploads and PostHog imports show up here with their results.
         </p>
       ) : (
         <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
@@ -707,6 +756,7 @@ const STATUS_LABEL: Record<ImportJob['status'], { label: string; tone: string }>
 };
 
 function JobRow({ job, onCancel, onResume }: { job: ImportJob; onCancel: () => void; onResume: () => void }) {
+  if (job.source === 'file') return <FileJobRow job={job} />;
   const status = STATUS_LABEL[job.status] ?? STATUS_LABEL.failed;
   const pct = job.windowsTotal > 0 ? Math.round((job.windowsDone / job.windowsTotal) * 100) : 0;
   const canResume = (job.status === 'failed' || job.status === 'interrupted' || job.status === 'cancelled') && job.completedThrough !== job.rangeEnd;
@@ -717,10 +767,10 @@ function JobRow({ job, onCancel, onResume }: { job: ImportJob; onCancel: () => v
         <div className="flex flex-wrap items-center gap-2.5 text-sm">
           <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${status.tone}`}>{status.label}</span>
           <span className="font-semibold text-neutral-900 dark:text-white">
-            {job.rangeStart.slice(0, 10)} → {job.rangeEnd.slice(0, 10)}
+            {job.rangeStart?.slice(0, 10)} → {job.rangeEnd?.slice(0, 10)}
           </span>
           <span className="text-xs text-neutral-400 dark:text-slate-500">
-            {job.sourceHost.replace(/^https:\/\//, '')} · project {job.sourceProject}
+            PostHog · {job.sourceHost?.replace(/^https:\/\//, '')} · project {job.sourceProject} · {formatWhen(job.createdAt)}
           </span>
         </div>
         <div className="flex gap-3">
@@ -731,7 +781,7 @@ function JobRow({ job, onCancel, onResume }: { job: ImportJob; onCancel: () => v
           ) : null}
           {canResume ? (
             <button type="button" onClick={onResume} className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
-              Continue from {(job.completedThrough ?? job.rangeStart).slice(0, 10)}
+              Continue from {(job.completedThrough ?? job.rangeStart)?.slice(0, 10)}
             </button>
           ) : null}
         </div>
@@ -755,7 +805,43 @@ function JobRow({ job, onCancel, onResume }: { job: ImportJob; onCancel: () => v
   );
 }
 
+function FileJobRow({ job }: { job: ImportJob }) {
+  const running = job.status === 'running';
+  const status = running ? { label: 'Uploading', tone: STATUS_LABEL.running.tone } : job.status === 'cancelled' ? { label: 'Stopped', tone: STATUS_LABEL.cancelled.tone } : (STATUS_LABEL[job.status] ?? STATUS_LABEL.failed);
+  const format = job.fileFormat === 'posthog' ? 'PostHog format' : job.fileFormat === 'traceiq' ? 'TraceIQ format' : null;
+
+  return (
+    <li className="space-y-2 px-5 py-4">
+      <div className="flex flex-wrap items-center gap-2.5 text-sm">
+        <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${status.tone}`}>{status.label}</span>
+        <span className="min-w-0 truncate font-semibold text-neutral-900 dark:text-white">{job.fileName ?? 'File upload'}</span>
+        <span className="text-xs text-neutral-400 dark:text-slate-500">
+          File upload{format ? ` · ${format}` : ''} · {formatWhen(job.createdAt)}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
+        <span>
+          <strong className="text-neutral-900 dark:text-white">{job.imported.toLocaleString()}</strong> imported
+        </span>
+        <span>{job.read.toLocaleString()} read</span>
+        <span>{job.skipped.toLocaleString()} skipped</span>
+        {job.rejected > 0 ? <span className="text-red-600 dark:text-red-400">{job.rejected.toLocaleString()} rejected</span> : null}
+      </div>
+      {job.status === 'interrupted' ? (
+        <p className="text-xs text-red-600 dark:text-red-400">The upload stopped when its tab was closed. Events sent before that were imported.</p>
+      ) : job.error ? (
+        <p className="text-xs text-red-600 dark:text-red-400">{job.error}</p>
+      ) : null}
+      <SkippedList skipped={job.skippedEvents} />
+    </li>
+  );
+}
+
 // ─── Small pieces ───────────────────────────────────────────────────────────
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
 function SkippedList({ skipped }: { skipped: Record<string, number> }) {
   const entries = Object.entries(skipped).sort((a, b) => b[1] - a[1]);

@@ -21,6 +21,25 @@ export interface ImportEventsBody {
   projectId?: string;
   format?: string;
   events?: unknown[];
+  /** The file import (from POST /import/files) this chunk belongs to. Its counters are added to that record. */
+  importId?: string;
+}
+
+export interface StartFileImportBody {
+  projectId?: string;
+  fileName?: string;
+  format?: string;
+}
+
+export interface FinishFileImportBody {
+  projectId?: string;
+  status?: string;
+  error?: string;
+  /** Rows the browser dropped before sending (lines that are not JSON, events too large to send). */
+  read?: number;
+  skipped?: number;
+  rejected?: number;
+  skippedEvents?: Record<string, number>;
 }
 
 export interface PostHogImportBody {
@@ -38,10 +57,12 @@ export interface ImportJobRow {
   project_id: string;
   source: string;
   status: string;
-  source_host: string;
-  source_project: string;
-  range_start: Date;
-  range_end: Date;
+  source_host: string | null;
+  source_project: string | null;
+  range_start: Date | null;
+  range_end: Date | null;
+  file_name: string | null;
+  file_format: string | null;
   completed_through: Date | null;
   windows_total: number;
   windows_done: number;
@@ -86,9 +107,83 @@ export class ImportsService {
     return project;
   }
 
+  /**
+   * Starts the record of a file upload. The browser then sends the file in chunks with
+   * this id, and each chunk adds to the record, so the upload shows in the import history.
+   */
+  async startFileImport(user: DashboardUser, body: StartFileImportBody) {
+    const project = await this.requireImportProject(user, body.projectId);
+    const fileName = typeof body.fileName === 'string' ? body.fileName.trim().slice(0, 200) : '';
+    if (!fileName) throw new BadRequestException('fileName is required.');
+    const format = body.format === 'posthog' || body.format === 'traceiq' ? body.format : null;
+    const id = `imp_${randomUUID()}`;
+    await this.database.query(
+      `
+        INSERT INTO import_jobs (id, project_id, source, status, file_name, file_format, created_by_user_id)
+        VALUES ($1, $2, 'file', 'running', $3, $4, $5)
+      `,
+      [id, project.id, fileName, format, user.id]
+    );
+    return this.getJob(user, id, project.id);
+  }
+
+  /** Checks that `id` is a running file import this user started in this project. */
+  private async requireRunningFileImport(user: DashboardUser, project: ResolvedProject, id: string) {
+    const result = await this.database.query<{ status: string; created_by_user_id: string }>(
+      `SELECT status, created_by_user_id FROM import_jobs WHERE id = $1 AND project_id = $2 AND source = 'file'`,
+      [id, project.id]
+    );
+    const job = result.rows[0];
+    if (!job || job.created_by_user_id !== user.id) throw new NotFoundException('Import not found.');
+    if (job.status !== 'running') throw new ConflictException('This import has already finished. Start a new one.');
+  }
+
+  private async addToFileImport(id: string, counters: Counters, format: string | null) {
+    await this.database.query(
+      `
+        UPDATE import_jobs SET
+          read_count = read_count + $2, imported_count = imported_count + $3,
+          skipped_count = skipped_count + $4, rejected_count = rejected_count + $5,
+          skipped_events = (
+            SELECT COALESCE(jsonb_object_agg(key, total), '{}'::jsonb)
+            FROM (
+              SELECT key, SUM(value::bigint) AS total
+              FROM (SELECT * FROM jsonb_each_text(import_jobs.skipped_events) UNION ALL SELECT * FROM jsonb_each_text($6::jsonb)) AS entries
+              GROUP BY key
+            ) AS merged
+          ),
+          file_format = COALESCE(file_format, $7),
+          heartbeat_at = now()
+        WHERE id = $1
+      `,
+      [id, counters.read, counters.imported, counters.skipped, counters.rejected, JSON.stringify(counters.skippedEvents), format]
+    );
+  }
+
+  /** Closes a file import: done, stopped by the person, or failed in the browser. */
+  async finishFileImport(user: DashboardUser, id: string, body: FinishFileImportBody) {
+    const project = await this.requireImportProject(user, body.projectId);
+    const status = body.status;
+    if (status !== 'completed' && status !== 'cancelled' && status !== 'failed') {
+      throw new BadRequestException('status must be "completed", "cancelled" or "failed".');
+    }
+    await this.requireRunningFileImport(user, project, id);
+    const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0);
+    const skippedEvents: Record<string, number> = {};
+    for (const [name, value] of Object.entries(body.skippedEvents ?? {}).slice(0, 50)) {
+      if (count(value) > 0) skippedEvents[name.slice(0, 200)] = count(value);
+    }
+    const extra = { read: count(body.read), imported: 0, skipped: count(body.skipped), rejected: count(body.rejected), skippedEvents };
+    if (extra.read || extra.skipped || extra.rejected || Object.keys(skippedEvents).length) await this.addToFileImport(id, extra, null);
+    const error = status === 'failed' && typeof body.error === 'string' ? body.error.slice(0, 500) : undefined;
+    await this.finish(id, status, error);
+    return this.getJob(user, id, project.id);
+  }
+
   /** One chunk of a file import. The browser (or CLI) reads the file and sends it in chunks. */
   async importEvents(user: DashboardUser, body: ImportEventsBody) {
     const project = await this.requireImportProject(user, body.projectId);
+    const importId = typeof body.importId === 'string' && body.importId ? body.importId : null;
     const format = body.format;
     if (format !== 'posthog' && format !== 'traceiq') {
       throw new BadRequestException('format must be "posthog" or "traceiq".');
@@ -97,9 +192,12 @@ export class ImportsService {
     if (!Array.isArray(rows) || rows.length === 0) throw new BadRequestException('events must be a non-empty array.');
     if (rows.length > IMPORT_BATCH_SIZE) throw new BadRequestException(`Send at most ${IMPORT_BATCH_SIZE} events per request.`);
 
+    if (importId) await this.requireRunningFileImport(user, project, importId);
+
     const counters = emptyCounters();
     const mapped = mapRows(rows, format, counters);
     const errors = mapped.length > 0 ? await this.ingest(project, mapped, counters) : [];
+    if (importId) await this.addToFileImport(importId, counters, format);
     return {
       read: counters.read,
       imported: counters.imported,
@@ -291,7 +389,7 @@ export class ImportsService {
   async listJobs(user: DashboardUser, projectId?: string) {
     const project = await this.projects.requireActiveProject(user, projectId);
     const result = await this.database.query<ImportJobRow>(
-      `SELECT * FROM import_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 10`,
+      `SELECT * FROM import_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [project.id]
     );
     return { jobs: result.rows.map(serializeJob) };
@@ -313,7 +411,7 @@ export class ImportsService {
         UPDATE import_jobs SET
           status = CASE WHEN heartbeat_at < now() - ($3 || ' milliseconds')::interval THEN 'cancelled' ELSE 'cancelling' END,
           finished_at = CASE WHEN heartbeat_at < now() - ($3 || ' milliseconds')::interval THEN now() ELSE finished_at END
-        WHERE id = $1 AND project_id = $2 AND status = 'running'
+        WHERE id = $1 AND project_id = $2 AND status = 'running' AND source = 'posthog'
         RETURNING *
       `,
       [id, project.id, String(STALE_AFTER_MS)]
@@ -367,8 +465,10 @@ export function serializeJob(row: ImportJobRow) {
     status: stale ? 'interrupted' : row.status,
     sourceHost: row.source_host,
     sourceProject: row.source_project,
-    rangeStart: new Date(row.range_start).toISOString(),
-    rangeEnd: new Date(row.range_end).toISOString(),
+    rangeStart: row.range_start ? new Date(row.range_start).toISOString() : null,
+    rangeEnd: row.range_end ? new Date(row.range_end).toISOString() : null,
+    fileName: row.file_name ?? null,
+    fileFormat: row.file_format ?? null,
     completedThrough: row.completed_through ? new Date(row.completed_through).toISOString() : null,
     windowsTotal: row.windows_total,
     windowsDone: row.windows_done,
