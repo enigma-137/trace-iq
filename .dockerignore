@@ -1,11 +1,14 @@
-# Dependencies
+# Dependencies (in every workspace too: the API image copies apps/api after npm ci)
 node_modules
+**/node_modules
 .pnp
 .pnp.js
 
 # Build outputs
 dist
+**/dist
 .next
+**/.next
 build
 *.tsbuildinfo
 

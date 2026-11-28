@@ -1,0 +1,62 @@
+name: API image
+
+# Builds the API Docker image the VPS deploys, and checks that a dashboard-only change
+# reuses the slow layers (npm ci, Playwright + Chromium, the API build). The dashboard
+# is deployed by Vercel, so those changes should not rebuild the API on the server.
+
+on:
+  pull_request:
+    paths:
+      - apps/api/**
+      - packages/types/**
+      - contracts/**
+      - package.json
+      - package-lock.json
+      - apps/*/package.json
+      - packages/*/package.json
+      - .dockerignore
+      - docker-compose.yml
+      - .github/workflows/api-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build API image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        run: docker buildx build -f apps/api/Dockerfile --load -t traceiq-api:ci .
+
+      - name: Check the image contents
+        run: |
+          docker run --rm --entrypoint sh traceiq-api:ci -c '
+            set -e
+            test -f apps/api/dist/apps/api/src/main.js || test -f apps/api/dist/main.js
+            test -f contracts/mobile-replay/v1.schema.json
+            test -d apps/api/migrations
+            test ! -e apps/dashboard/src
+            echo "Image contents OK"
+          '
+
+      - name: A dashboard-only change reuses the slow layers
+        run: |
+          echo "// cache check" >> apps/dashboard/src/app/layout.tsx
+          docker buildx build -f apps/api/Dockerfile --load -t traceiq-api:ci2 --progress=plain . 2>&1 | tee rebuild.log
+          fail=0
+          for step in 'RUN npm ci' 'playwright install' 'RUN npm --prefix apps/api run build'; do
+            id=$(grep -F "$step" rebuild.log | grep -oE '^#[0-9]+' | head -1)
+            if [ -n "$id" ] && grep -qE "^$id CACHED" rebuild.log; then
+              echo "cached: $step"
+            else
+              echo "::error::Rebuilt after a dashboard-only change: $step"
+              fail=1
+            fi
+          done
+          exit $fail
