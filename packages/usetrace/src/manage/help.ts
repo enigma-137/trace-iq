@@ -38,6 +38,9 @@ ${colors.bold('Builds')}
   sourcemaps upload      Upload a build's source maps so error stacks show original code
   sourcemaps list        List releases with uploaded source maps
 
+${colors.bold('Migrate')}
+  import posthog        Import events from PostHog, directly with a PostHog key or from an export file
+
 ${colors.bold('Other')}
   open [page]            Open the dashboard (overview, logs, events, errors, settings, ...)
   help [command]         Show help for a command
@@ -58,6 +61,7 @@ Scopes the CLI uses:
   analytics:read   logs, status
   errors:read      errors
   sourcemaps:write sourcemaps upload (a CI token can have only this scope)
+  imports:write    import posthog
 
 Without --token you are prompted for it (input is hidden). In CI, set
 TRACEIQ_TOKEN instead of logging in.
@@ -133,6 +137,47 @@ ${colors.bold('traceiq errors')} [--days <n>] [--json]
 
 Lists error issues (grouped by type and message) for the active project,
 most frequent first. --days defaults to 7.
+`,
+  import: `
+${colors.bold('traceiq import posthog')} --posthog-key <phx_...> --posthog-project <id> --since <date> [--until <date>] [--posthog-host us|eu|<url>]
+${colors.bold('traceiq import posthog')} <file>
+
+Copies events from PostHog into the active TraceIQ project, with their original
+timestamps.
+
+Directly from PostHog: the CLI asks PostHog for a file download export of each
+week in the range, waits for it, downloads it and imports it. Create a PostHog
+personal API key with the batch_export:read and batch_export:write scopes. The
+key is only sent to PostHog, never to TraceIQ. PostHog bills these exports per
+exported row; events TraceIQ would skip ($autocapture and similar) are excluded
+from the export.
+
+  --posthog-key <phx_...>    Personal API key (env POSTHOG_PERSONAL_API_KEY; the env var keeps it out of shell history)
+  --posthog-project <id>     The number after /project/ in your PostHog URL (env POSTHOG_PROJECT_ID)
+  --posthog-host <host>      us (default), eu, or your self-hosted URL (env POSTHOG_HOST)
+  --since <date>             Start of the range, e.g. 2025-01-01 (required)
+  --until <date>             End of the range (default: now)
+
+From a file: JSON Lines (optionally gzipped, as PostHog exports write them), a
+JSON array of events, or a saved API response with a "results" array.
+
+  --token <tiq_pat_...>      TraceIQ personal access token with the imports:write scope (or \`traceiq login\`)
+  --dry-run                  Check access / read the file and show what would happen; send nothing.
+                             With --posthog-key, no export is started (and nothing is billed).
+
+What is mapped:
+  $pageview, $screen     → $page (URL, path, referrer, title and UTM tags kept)
+  $identify, $set        → $identify (person properties become traits)
+  $create_alias          → $alias
+  your own events        → same name; PostHog's $-prefixed properties are dropped
+  $autocapture, $exception, $feature_flag_called and other PostHog-internal
+  events are skipped and listed at the end.
+
+Imported events keep their original location (not the location of the machine
+running the import), count toward your plan's monthly events, and are not sent
+to your webhooks. Owners and admins can import. There is no de-duplication: importing the same
+range twice imports its events twice. If a direct import stops partway, it
+prints the --since value to continue from.
 `,
   sourcemaps: `
 ${colors.bold('traceiq sourcemaps upload')} --release <version> [--dir <build folder>] [--delete-after] [--dry-run]

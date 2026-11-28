@@ -135,6 +135,39 @@ In CI, use a token with only `sourcemaps:write`:
     TRACEIQ_API_URL: https://api.traceiq.run
 ```
 
+## Import from PostHog
+
+```bash
+# Directly from PostHog (one-off file download exports, one week at a time)
+export POSTHOG_PERSONAL_API_KEY=phx_...   # scopes: batch_export:read, batch_export:write
+traceiq import posthog --posthog-project 12345 --posthog-host eu --since 2025-01-01 --dry-run
+traceiq import posthog --posthog-project 12345 --posthog-host eu --since 2025-01-01
+
+# Or from a file you exported yourself
+traceiq import posthog events.jsonl --dry-run
+traceiq import posthog events.jsonl
+```
+
+With a PostHog key, the CLI starts a PostHog file download export for each week of the range
+(PostHog's limit per export), waits for it, downloads the JSON Lines files and imports them. The
+PostHog key is only sent to PostHog. PostHog bills these exports per exported row, so events
+TraceIQ skips anyway (`$autocapture`, `$feature_flag_called`, ...) are excluded from the export.
+`--dry-run` checks the key and project without starting an export. If an import stops partway,
+the CLI prints the `--since` value to continue from.
+
+Files can be JSON Lines (gzipped or not), a JSON array of events, or a saved API response with a
+`results` array.
+
+Either way, events keep their original timestamps. `$pageview`/`$screen` become `$page`,
+`$identify`/`$set` become `$identify`, `$create_alias` becomes `$alias`, and your own events keep
+their names. `$autocapture`, `$exception` and other PostHog-internal events are skipped and listed.
+
+Imports use your personal access token (`traceiq login`, or `TRACEIQ_TOKEN` in CI), which needs
+the `imports:write` scope, and only owners and admins can import. Imported events keep their
+original location, count toward your monthly allowance and are not sent to your webhooks.
+Imports are not de-duplicated, so importing the same range twice stores its events twice.
+You can also import from the dashboard: **Import** in the sidebar.
+
 ## Status and dashboard
 
 ```bash

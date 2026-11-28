@@ -82,6 +82,7 @@ const SCOPE_GROUPS: ScopeGroup[] = [
     mcp: true
   },
   { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false },
+  { key: 'imports', label: 'Imports (CLI event imports)', write: 'imports:write', mcp: false },
   { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false }
 ];
 

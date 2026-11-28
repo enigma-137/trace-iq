@@ -95,13 +95,13 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
     expect(keys).toEqual(['flags', 'experiments', 'surveys', 'links', 'achievements']);
   });
 
-  it('Integrations group renders Webhooks and Export', () => {
+  it('Integrations group renders Webhooks, Import and Export', () => {
     const integrations = navGroups.find((g) => g.key === 'integrations');
     expect(integrations).toBeDefined();
     expect(integrations?.label).toBe('Integrations');
 
     const keys = integrations?.items.map((i) => i.key);
-    expect(keys).toEqual(['webhooks', 'export']);
+    expect(keys).toEqual(['webhooks', 'import', 'export']);
   });
 
   it("preserves all bottom navigation items for Settings, Docs and What's new", () => {
@@ -113,8 +113,8 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
   });
 
   it('navItems and allNavItems contain all grouped and standalone items without omissions', () => {
-    expect(navItems).toHaveLength(24);
-    expect(allNavItems).toHaveLength(27);
+    expect(navItems).toHaveLength(25);
+    expect(allNavItems).toHaveLength(28);
   });
 
   it('findGroupForActiveItem maps active child keys to their parent group', () => {

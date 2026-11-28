@@ -83,6 +83,19 @@ function pageRoute(context: unknown): string | null {
   return typeof page?.path === 'string' && page.path ? page.path : null;
 }
 
+/**
+ * Imported events keep the location they had in the source tool. Only plain location
+ * fields are kept; an IP address is never imported.
+ */
+function sanitizeImportedNetworkInfo(info: JsonObject | undefined): JsonObject {
+  const out: JsonObject = {};
+  for (const key of ['country', 'region', 'city'] as const) {
+    const value = info?.[key];
+    if (typeof value === 'string' && value.trim()) out[key] = value.trim().slice(0, 120);
+  }
+  return out;
+}
+
 function isTransientSessionConflict(error: unknown): boolean {
   const pg = error as { code?: string; constraint?: string };
   if (pg?.code === '40P01') return true;
@@ -155,6 +168,38 @@ export class EventsService {
     }
 
     const auth = await this.authenticateWriteKey(key, pid);
+    return this.ingestBatchWithAuth(auth, batch, meta, false);
+  }
+
+  /**
+   * Imports historical events (from another tool, or a TraceIQ export) into a project
+   * the caller already has access to. Differences from SDK ingestion:
+   * - no IP geolocation: the request comes from whoever runs the import, not from the
+   *   original users, so the location in each event's networkInfo is kept instead;
+   * - no webhook deliveries, log mirroring, setup verification or Linear issues, which
+   *   are reactions to live traffic.
+   * Usage still counts against the plan.
+   */
+  async ingestImportBatch(
+    project: { id: string; organizationId: string },
+    batch: IngestEventRequest[] | undefined
+  ): Promise<BatchIngestResponse> {
+    if (!Array.isArray(batch) || batch.length === 0) {
+      throw new BadRequestException('events must be a non-empty array.');
+    }
+    if (batch.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`An import request is limited to ${MAX_BATCH_SIZE} events.`);
+    }
+    const auth: WriteKeyRecord = { project_id: project.id, organization_id: project.organizationId };
+    return this.ingestBatchWithAuth(auth, batch, {}, true);
+  }
+
+  private async ingestBatchWithAuth(
+    auth: WriteKeyRecord,
+    batch: IngestEventRequest[],
+    meta: IngestMeta,
+    historical: boolean
+  ): Promise<BatchIngestResponse> {
     const results: BatchIngestResponse['results'] = new Array(batch.length);
 
     // Validate + normalize each event up front. A bad event fails only itself; the
@@ -173,7 +218,7 @@ export class EventsService {
           properties: withExceptionFingerprint(eventName, stripApiRequestPayload(eventName, item.properties)),
           rawProperties: eventName === API_REQUEST_EVENT ? item.properties : undefined,
           deviceInfo: item.deviceInfo,
-          networkInfo: this.buildNetworkInfo(item.networkInfo, meta),
+          networkInfo: historical ? sanitizeImportedNetworkInfo(item.networkInfo) : this.buildNetworkInfo(item.networkInfo, meta),
           context: item.context ?? {},
           userId: null
         });
@@ -239,6 +284,14 @@ export class EventsService {
           );
         }
       }
+    }
+
+    if (historical) {
+      prepared.forEach((p, i) => {
+        results[p.index] = { accepted: true, eventId: eventIds[i] };
+      });
+      void this.achievements.afterProjectIngest(auth.project_id);
+      return { accepted: true, results, ...(usageWarningPercentage ? { usageWarningPercentage } : {}) };
     }
 
     this.mirrorToLogs(

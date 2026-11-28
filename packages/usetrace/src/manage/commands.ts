@@ -22,6 +22,17 @@ import { CliError, FetchLike, LogEntry, ProjectSummary, RecentEvent, TraceIQApiC
 import { CliConfig, ResolvedContext, loadConfig, maskToken, resolveContext, saveConfig } from './config.js';
 import { formatErrorIssue, formatEventLine, formatLogLine, formatRelative, renderTable, resolveSince } from './format.js';
 import { MAIN_HELP, commandHelp } from './help.js';
+import { TraceIQImportEvent, mapPostHogEvent, readPostHogExport } from './posthog-import.js';
+import {
+  PostHogPullError,
+  PostHogPullOptions,
+  PostHogWindow,
+  PulledRow,
+  checkPostHogAccess,
+  normalizePostHogHost,
+  planWindows,
+  pullPostHogEvents
+} from './posthog-pull.js';
 
 /**
  * Everything a command touches outside its own logic, so tests can swap it out.
@@ -53,6 +64,7 @@ export const MANAGE_COMMANDS = new Set([
   'sourcemaps',
   'sourcemap',
   'keys',
+  'import',
   'help'
 ]);
 
@@ -158,6 +170,8 @@ export async function runManageCommand(command: string, rawArgs: string[], deps:
         return await open(context);
       case 'sourcemaps':
         return await sourcemaps(context);
+      case 'import':
+        return await importCommand(context);
       case 'keys':
         deps.out(commandHelp('keys'));
         process.exitCode = 1;
@@ -430,6 +444,269 @@ async function env({ args, ctx, client, deps }: CommandContext) {
   if (!dryRun) {
     logInfo('Restart your dev server so it picks up the change.');
   }
+}
+
+// ─── Import ─────────────────────────────────────────────────────────────────
+
+const IMPORT_BATCH_SIZE = 500; // the API's per-request maximum
+const IMPORT_MAX_REQUEST_BYTES = 800_000; // stays under the API's 1 MB body limit
+const IMPORT_MAX_ATTEMPTS = 5;
+
+async function importCommand(context: CommandContext) {
+  const source = context.args.positionals[0]?.toLowerCase();
+  if (source === 'posthog') return importPostHog(context);
+  context.deps.out(commandHelp('import'));
+  process.exitCode = 1;
+}
+
+async function importPostHog({ args, ctx, deps }: CommandContext) {
+  const posthogKey = flagString(args.flags, 'posthog-key') ?? deps.env.POSTHOG_PERSONAL_API_KEY?.trim();
+  const fileArg = flagString(args.flags, 'file') ?? args.positionals[1];
+  let file: string | undefined;
+  let pull: { options: PostHogPullOptions; windows: PostHogWindow[] } | undefined;
+
+  if (fileArg) {
+    file = path.resolve(deps.cwd, fileArg);
+    try {
+      await fs.access(file);
+    } catch {
+      throw new CliError(`Cannot read ${file}.`);
+    }
+  } else if (posthogKey) {
+    pull = planPostHogPull(args, deps, posthogKey);
+  } else {
+    throw new CliError(
+      'Tell the CLI where the PostHog events are.',
+      'Pull them directly: traceiq import posthog --posthog-key phx_... --posthog-project <id> --since 2025-01-01\n' +
+        '  Or import an export file: traceiq import posthog events.jsonl'
+    );
+  }
+
+  const dryRun = flagBool(args.flags, 'dry-run');
+  const projectId = ctx.projectId;
+  const apiUrl = ctx.apiUrl;
+
+  // Imports go through the authenticated import endpoint, not SDK ingestion: it keeps
+  // each event's original location instead of geolocating the machine running the
+  // import, and does not fire webhooks for historical events.
+  if (!dryRun) {
+    if (!ctx.token) {
+      throw new CliError(
+        'Log in first: imports use a personal access token.',
+        'Run `traceiq login` with a token that has the imports:write scope (or set TRACEIQ_TOKEN).'
+      );
+    }
+    if (!projectId) {
+      throw new CliError('No project selected.', 'Pass --project <id>, set TRACEIQ_PROJECT_ID, or run `traceiq projects use`.');
+    }
+  }
+
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const endpoint = `${apiUrl.replace(/\/+$/, '')}/v1/dashboard/import/events`;
+  const skipped = new Map<string, number>();
+  const failures: string[] = [];
+  let read = 0;
+  let mapped = 0;
+  let imported = 0;
+  let rejected = 0;
+  let first: string | undefined;
+  let last: string | undefined;
+  let batch: TraceIQImportEvent[] = [];
+  let batchBytes = 0;
+  let completedThrough: Date | undefined;
+  const resumeHint = () => (pull ? pullResumeHint(imported, completedThrough) : importResumeHint(imported));
+
+  async function send(events: TraceIQImportEvent[]) {
+    for (let attempt = 1; ; attempt++) {
+      let response: Response | undefined;
+      try {
+        response = await fetchImpl(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${ctx.token}` },
+          body: JSON.stringify({ projectId, format: 'traceiq', events })
+        });
+      } catch (error) {
+        if (attempt >= IMPORT_MAX_ATTEMPTS) {
+          throw new CliError(`Could not reach ${apiUrl}: ${error instanceof Error ? error.message : String(error)}`, resumeHint());
+        }
+      }
+
+      if (response?.ok) {
+        const body = (await response.json().catch(() => ({}))) as { imported?: number; rejected?: number; skipped?: number; errors?: string[] };
+        imported += body.imported ?? 0;
+        rejected += (body.rejected ?? 0) + (body.skipped ?? 0);
+        for (const error of body.errors ?? []) if (failures.length < 5) failures.push(error);
+        return;
+      }
+
+      if (response && response.status !== 429 && response.status < 500) {
+        const text = await response.text().catch(() => '');
+        let message = text;
+        try {
+          const parsed = JSON.parse(text) as { message?: unknown };
+          if (parsed.message) message = Array.isArray(parsed.message) ? parsed.message.join(', ') : String(parsed.message);
+        } catch {
+          // keep the raw text
+        }
+        const scopeHint = response.status === 403 && /imports:write/.test(message) ? 'Create a token with the imports:write scope and run `traceiq login` again. ' : '';
+        throw new CliError(`The API rejected the import (HTTP ${response.status}): ${message || response.statusText}`, scopeHint + resumeHint());
+      }
+      if (attempt >= IMPORT_MAX_ATTEMPTS) {
+        throw new CliError(`The API kept failing (HTTP ${response?.status ?? 'network error'}).`, resumeHint());
+      }
+      const retryAfter = Number(response?.headers.get('retry-after'));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1000 * 2 ** (attempt - 1);
+      if (!(await deps.sleep(waitMs))) throw new CliError('Import interrupted.', resumeHint());
+    }
+  }
+
+  if (pull) {
+    deps.out();
+    logInfo(`PostHog ${colors.bold(pull.options.host)}, project ${colors.bold(pull.options.projectId)}`);
+    logInfo(
+      `${pull.windows[0].start.toISOString().slice(0, 10)} → ${pull.windows[pull.windows.length - 1].end.toISOString().slice(0, 10)}: ` +
+        `${pull.windows.length} weekly export${pull.windows.length === 1 ? '' : 's'}`
+    );
+    await withPostHogErrors(() => checkPostHogAccess(pull!.options));
+    logSuccess('PostHog key works');
+    if (dryRun) {
+      logInfo('PostHog bills file download exports per exported row; $autocapture and other events TraceIQ skips are excluded from the export.');
+      logInfo('Nothing was exported or sent. Run again without --dry-run to import.');
+      return;
+    }
+  }
+
+  const rows = pull ? pullPostHogEvents(pull.options, pull.windows) : readPostHogExport(file as string);
+
+  async function* guarded(): AsyncGenerator<PulledRow> {
+    try {
+      yield* rows;
+    } catch (error) {
+      if (error instanceof PostHogPullError) {
+        throw new CliError(error.message, [error.hint, pullResumeHint(imported, completedThrough)].filter(Boolean).join('\n  '));
+      }
+      throw error;
+    }
+  }
+
+  for await (const item of guarded()) {
+    if (item.windowDone) {
+      if (!dryRun && batch.length > 0) {
+        await send(batch);
+        batch = [];
+        batchBytes = 0;
+      }
+      const through = item.windowDone.end;
+      completedThrough = through;
+      deps.out(`  ${colors.dim(`${imported.toLocaleString()} events imported through ${through.toISOString().slice(0, 10)}`)}`);
+      continue;
+    }
+    read += 1;
+    if (!item.event) {
+      const reason = `(lines that are ${item.error})`;
+      skipped.set(reason, (skipped.get(reason) ?? 0) + 1);
+      continue;
+    }
+    const result = mapPostHogEvent(item.event);
+    if ('skipped' in result) {
+      skipped.set(result.skipped, (skipped.get(result.skipped) ?? 0) + 1);
+      continue;
+    }
+    mapped += 1;
+    const ts = result.event.timestamp;
+    if (!first || ts < first) first = ts;
+    if (!last || ts > last) last = ts;
+    if (dryRun) continue;
+
+    const size = Buffer.byteLength(JSON.stringify(result.event));
+    if (batch.length > 0 && (batch.length >= IMPORT_BATCH_SIZE || batchBytes + size > IMPORT_MAX_REQUEST_BYTES)) {
+      await send(batch);
+      batch = [];
+      batchBytes = 0;
+      deps.out(`  ${colors.dim(`${imported.toLocaleString()} events imported...`)}`);
+    }
+    batch.push(result.event);
+    batchBytes += size;
+  }
+  if (!dryRun && batch.length > 0) await send(batch);
+
+  deps.out();
+  const range = first && last ? colors.dim(` (${first.slice(0, 10)} → ${last.slice(0, 10)})`) : '';
+  if (dryRun) {
+    logSuccess(`${mapped.toLocaleString()} of ${read.toLocaleString()} PostHog events would be imported${range}`);
+  } else {
+    logSuccess(`Imported ${imported.toLocaleString()} of ${read.toLocaleString()} PostHog events${range}`);
+  }
+
+  const totalSkipped = [...skipped.values()].reduce((sum, n) => sum + n, 0);
+  if (totalSkipped > 0) {
+    logInfo(`Skipped ${totalSkipped.toLocaleString()} with no TraceIQ equivalent:`);
+    const rows = [...skipped.entries()].sort((a, b) => b[1] - a[1]);
+    for (const [name, count] of rows.slice(0, 10)) deps.out(`    ${symbols.bullet} ${name} ${colors.dim(`× ${count.toLocaleString()}`)}`);
+    if (rows.length > 10) deps.out(`    ${colors.dim(`and ${rows.length - 10} more`)}`);
+  }
+  if (rejected > 0) {
+    logWarning(`${rejected.toLocaleString()} events were rejected by the API:`);
+    for (const failure of failures) deps.out(`    ${symbols.bullet} ${failure}`);
+    process.exitCode = 1;
+  }
+  if (dryRun) {
+    logInfo('Nothing was sent. Run again without --dry-run to import. Running an import twice imports the events twice.');
+  }
+}
+
+function pullResumeHint(imported: number, completedThrough: Date | undefined): string {
+  if (!completedThrough) return imported > 0 ? importResumeHint(imported) : 'Nothing was imported.';
+  return `Everything before ${completedThrough.toISOString()} was imported. To continue, run the same command with --since ${completedThrough.toISOString()}.`;
+}
+
+async function withPostHogErrors<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof PostHogPullError) throw new CliError(error.message, error.hint);
+    throw error;
+  }
+}
+
+function parseDateFlag(value: string | undefined, name: string): Date | undefined {
+  if (!value) return undefined;
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value);
+  if (Number.isNaN(date.getTime())) throw new CliError(`--${name} must be a date like 2025-01-31 or an ISO timestamp.`);
+  return date;
+}
+
+function planPostHogPull(args: ParsedArgs, deps: ManageDeps, apiKey: string): { options: PostHogPullOptions; windows: PostHogWindow[] } {
+  const projectId = flagString(args.flags, 'posthog-project') ?? deps.env.POSTHOG_PROJECT_ID?.trim();
+  if (!projectId) {
+    throw new CliError('Which PostHog project?', 'Pass --posthog-project <id>: the number after /project/ in your PostHog URL.');
+  }
+  const since = parseDateFlag(flagString(args.flags, 'since'), 'since');
+  if (!since) {
+    throw new CliError('Pass --since <date> to choose how far back to import.', 'For example --since 2025-01-01. PostHog bills exports per row, so start with a short range.');
+  }
+  const now = new Date(deps.now());
+  const requestedUntil = parseDateFlag(flagString(args.flags, 'until'), 'until');
+  const until = requestedUntil && requestedUntil < now ? requestedUntil : now;
+  if (since >= until) throw new CliError('--since must be before --until (and before now).');
+
+  return {
+    options: {
+      host: normalizePostHogHost(flagString(args.flags, 'posthog-host') ?? deps.env.POSTHOG_HOST),
+      projectId,
+      apiKey,
+      fetchImpl: deps.fetchImpl ?? fetch,
+      sleep: deps.sleep,
+      onStatus: (message) => deps.out(`  ${colors.dim(message)}`)
+    },
+    windows: planWindows(since, until)
+  };
+}
+
+function importResumeHint(imported: number): string {
+  return imported > 0
+    ? `${imported.toLocaleString()} events were already imported. Remove them from the file (or export from a later date) before retrying, or they will be imported twice.`
+    : 'Nothing was imported.';
 }
 
 // ─── Logs ───────────────────────────────────────────────────────────────────
