@@ -692,13 +692,27 @@ await traceiq.shutdown();`}</Code>
 
         <h3 className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">2. Import your history</h3>
         <P>
-          Export your events from PostHog as JSON Lines (a batch export to S3 writes this format) or save a JSON array
-          of events, then load them with the CLI. Events keep their original timestamps, so funnels, retention and
-          trends cover the period before you switched.
+          The CLI can pull your events straight from PostHog. In PostHog, create a personal API key with the{' '}
+          <Mono>batch_export:read</Mono> and <Mono>batch_export:write</Mono> scopes, and note your project ID (the
+          number after <Mono>/project/</Mono> in the PostHog URL). Events keep their original timestamps, so funnels,
+          retention and trends cover the period before you switched.
         </P>
-        <Code lang="bash">{`npx traceiq-cli import posthog events.jsonl --dry-run   # see what would be imported
-npx traceiq-cli import posthog events.jsonl \\
+        <Code lang="bash">{`export POSTHOG_PERSONAL_API_KEY=phx_...
+npx traceiq-cli import posthog --posthog-project 12345 --posthog-host us --since 2025-01-01 --dry-run
+npx traceiq-cli import posthog --posthog-project 12345 --posthog-host us --since 2025-01-01 \\
   --project ${projectId} --write-key YOUR_PROJECT_WRITE_KEY --api-url ${apiBaseUrl}`}</Code>
+        <P>
+          The CLI asks PostHog for a file download export of each week in the range (PostHog’s limit per export),
+          waits for it, downloads it and imports it. Your PostHog key is only sent to PostHog. Use{' '}
+          <Mono>--posthog-host eu</Mono> for PostHog EU or your own URL if you self-host. PostHog bills these exports
+          per exported row, so events TraceIQ would skip anyway are left out of the export. <Mono>--dry-run</Mono>{' '}
+          checks the key and project without starting an export. If an import stops partway, the CLI prints the{' '}
+          <Mono>--since</Mono> value to continue from.
+        </P>
+        <P>
+          Already have an export? Pass the file instead: <Mono>npx traceiq-cli import posthog events.jsonl</Mono>{' '}
+          (JSON Lines, gzipped or not, or a JSON array of events).
+        </P>
         <Bullets
           items={[
             ['$pageview, $screen', 'Imported as $page, with URL, path, referrer, title and UTM tags.'],
@@ -710,7 +724,7 @@ npx traceiq-cli import posthog events.jsonl \\
         />
         <P>
           Imported events count toward your monthly event allowance and are delivered to your webhooks like live
-          events. Imports are not de-duplicated: importing the same file twice stores its events twice. If you run
+          events. Imports are not de-duplicated: importing the same date range twice stores its events twice. If you run
           both SDKs side by side first, export PostHog only up to the day TraceIQ went live.
         </P>
 

@@ -184,3 +184,144 @@ describe('traceiq import posthog', () => {
     expect(process.exitCode).toBe(1);
   });
 });
+
+describe('traceiq import posthog --posthog-key (direct pull)', () => {
+  let dir: string;
+  let out: string[];
+  let deps: ManageDeps;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'traceiq-pull-'));
+    out = [];
+    process.exitCode = undefined;
+    deps = {
+      cwd: dir,
+      env: { HOME: dir, TRACEIQ_CONFIG_DIR: path.join(dir, '.traceiq') },
+      out: (line = '') => out.push(line),
+      sleep: async () => true,
+      openUrl: async () => {},
+      now: () => Date.parse('2024-03-20T00:00:00Z')
+    };
+  });
+
+  afterEach(async () => {
+    process.exitCode = undefined;
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  function fakePostHog(options: { failRun?: number; gzip?: boolean } = {}) {
+    const log: Array<{ method: string; url: string; auth?: string; body?: any }> = [];
+    const sent: unknown[] = [];
+    let runs = 0;
+    const polls = new Map<string, number>();
+    const impl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      log.push({ method, url, auth, body });
+
+      if (url.startsWith('https://api.traceiq.test/')) {
+        sent.push(...body.batch);
+        return Response.json({ accepted: true, results: body.batch.map(() => ({ accepted: true })) });
+      }
+      const base = 'https://eu.posthog.com/api/projects/42/file_download_batch_exports/';
+      if (url === base && method === 'GET') return Response.json({ results: [] });
+      if (url === base && method === 'POST') {
+        runs += 1;
+        return Response.json({ id: `run${runs}` }, { status: 202 });
+      }
+      const poll = url.match(/exports\/(run\d+)\/$/);
+      if (poll) {
+        const id = poll[1];
+        const n = (polls.get(id) ?? 0) + 1;
+        polls.set(id, n);
+        if (options.failRun && id === `run${options.failRun}`) return Response.json({ status: 'Failed', error: 'boom' });
+        return Response.json(n === 1 ? { status: 'Running' } : { status: 'Completed', files: ['file1'] });
+      }
+      const download = url.match(/exports\/(run\d+)\/download\/file1\/$/);
+      if (download) return new Response(null, { status: 302, headers: { location: `https://signed.example/${download[1]}` } });
+      const signed = url.match(/^https:\/\/signed\.example\/run(\d+)$/);
+      if (signed) {
+        const n = Number(signed[1]);
+        const text = [
+          JSON.stringify({ ...pageview, uuid: `p${n}`, timestamp: `2024-03-0${n}T10:00:00Z` }),
+          JSON.stringify({ event: 'signed_up', distinct_id: 'user_1', timestamp: `2024-03-0${n}T11:00:00Z`, properties: { plan: 'pro' } })
+        ].join('\n');
+        const { gzipSync } = await import('node:zlib');
+        return new Response(options.gzip ? gzipSync(text) : text);
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+    return { impl, log, sent };
+  }
+
+  const pullArgs = [
+    'posthog',
+    '--posthog-key', 'phx_secret',
+    '--posthog-project', '42',
+    '--posthog-host', 'eu',
+    '--since', '2024-03-01',
+    '--until', '2024-03-11',
+    '--write-key', 'trq_test',
+    '--project', 'proj_a',
+    '--api-url', 'https://api.traceiq.test'
+  ];
+
+  it('exports week by week, downloads without the API key, and imports the events', async () => {
+    const posthog = fakePostHog({ gzip: true });
+    deps.fetchImpl = posthog.impl;
+    await runManageCommand('import', pullArgs, deps);
+
+    expect(process.exitCode).toBeUndefined();
+    const creates = posthog.log.filter((c) => c.method === 'POST' && c.url.endsWith('file_download_batch_exports/'));
+    expect(creates.map((c) => [c.body.data_interval_start, c.body.data_interval_end])).toEqual([
+      ['2024-03-01T00:00:00.000Z', '2024-03-08T00:00:00.000Z'],
+      ['2024-03-08T00:00:00.000Z', '2024-03-11T00:00:00.000Z']
+    ]);
+    expect(creates[0].body).toMatchObject({ model: 'events', file: { format: 'JSONLines' } });
+    expect(creates[0].body.exclude).toContain('$autocapture');
+    expect(posthog.log.filter((c) => c.url.includes('posthog.com')).every((c) => c.auth === 'Bearer phx_secret')).toBe(true);
+    expect(posthog.log.filter((c) => c.url.startsWith('https://signed.example/')).every((c) => c.auth === undefined)).toBe(true);
+    expect(posthog.log.filter((c) => c.url.startsWith('https://api.traceiq.test/')).every((c) => !JSON.stringify(c).includes('phx_secret'))).toBe(true);
+    expect(posthog.sent).toHaveLength(4);
+    expect(posthog.sent).toEqual(expect.arrayContaining([expect.objectContaining({ eventName: '$page' }), expect.objectContaining({ eventName: 'signed_up' })]));
+  });
+
+  it('checks access on --dry-run without starting an export', async () => {
+    const posthog = fakePostHog();
+    deps.fetchImpl = posthog.impl;
+    const info: string[] = [];
+    const original = console.log;
+    console.log = (...parts: unknown[]) => info.push(parts.join(' '));
+    try {
+      await runManageCommand('import', [...pullArgs, '--dry-run'], deps);
+    } finally {
+      console.log = original;
+    }
+    expect(process.exitCode).toBeUndefined();
+    expect(posthog.log.map((c) => c.method)).toEqual(['GET']);
+    expect(info.join('\n')).toContain('2 weekly exports');
+  });
+
+  it('says where to resume when a later week fails', async () => {
+    const posthog = fakePostHog({ failRun: 2 });
+    deps.fetchImpl = posthog.impl;
+    const info: string[] = [];
+    const original = console.log;
+    console.log = (...parts: unknown[]) => info.push(parts.join(' '));
+    try {
+      await runManageCommand('import', pullArgs, deps);
+    } finally {
+      console.log = original;
+    }
+    expect(process.exitCode).toBe(1);
+    expect(posthog.sent).toHaveLength(2);
+    expect(info.join('\n')).toContain('--since 2024-03-08T00:00:00.000Z');
+  });
+
+  it('requires --since and a project', async () => {
+    await runManageCommand('import', ['posthog', '--posthog-key', 'phx_x', '--posthog-project', '42'], deps);
+    expect(process.exitCode).toBe(1);
+  });
+});

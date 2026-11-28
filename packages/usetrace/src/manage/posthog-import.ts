@@ -1,6 +1,8 @@
 import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import readline from 'node:readline';
+import { Readable } from 'node:stream';
+import { createGunzip } from 'node:zlib';
 
 /**
  * Turns events from a PostHog export into TraceIQ ingestion events.
@@ -38,7 +40,7 @@ export type MapResult = { event: TraceIQImportEvent } | { skipped: string };
  * skipped on purpose: importing them would reopen error issues and could fire
  * alerts or create Linear tickets for errors that are long gone.
  */
-const SKIPPED_BY_DEFAULT = new Set([
+export const POSTHOG_SKIPPED_EVENTS = [
   '$autocapture',
   '$pageleave',
   '$feature_flag_called',
@@ -56,7 +58,9 @@ const SKIPPED_BY_DEFAULT = new Set([
   'survey shown',
   'survey sent',
   'survey dismissed'
-]);
+];
+
+const SKIPPED_BY_DEFAULT = new Set(POSTHOG_SKIPPED_EVENTS);
 
 const PLATFORMS: Record<string, string> = {
   web: 'web',
@@ -245,8 +249,14 @@ export async function* readPostHogExport(file: string): AsyncGenerator<{ line: n
     return;
   }
 
-  const lines = readline.createInterface({ input: createReadStream(file, 'utf8'), crlfDelay: Infinity });
-  let line = 0;
+  yield* readJsonLines(createReadStream(file));
+}
+
+/** Reads JSON Lines from a stream, transparently un-gzipping it if needed. */
+export async function* readJsonLines(stream: Readable, startLine = 0): AsyncGenerator<{ line: number; event?: PostHogEvent; error?: string }> {
+  const input = await maybeGunzip(stream);
+  const lines = readline.createInterface({ input, crlfDelay: Infinity });
+  let line = startLine;
   for await (const text of lines) {
     line += 1;
     const trimmed = text.trim();
@@ -258,3 +268,17 @@ export async function* readPostHogExport(file: string): AsyncGenerator<{ line: n
     }
   }
 }
+
+async function maybeGunzip(stream: Readable): Promise<Readable> {
+  const iterator = stream[Symbol.asyncIterator]();
+  const first = await iterator.next();
+  if (first.done) return Readable.from([]);
+  const head = Buffer.from(first.value as Uint8Array);
+  async function* rest() {
+    yield head;
+    for (let next = await iterator.next(); !next.done; next = await iterator.next()) yield Buffer.from(next.value as Uint8Array);
+  }
+  const combined = Readable.from(rest());
+  return head[0] === 0x1f && head[1] === 0x8b ? combined.pipe(createGunzip()) : combined;
+}
+
