@@ -51,6 +51,9 @@ npm Trusted Publishing lets the workflow publish without an npm token, and npm r
    - Repository: `trace-iq`
    - Workflow filename: `release-npm.yml`
    - Environment name: `npm`
+   - Allowed actions: tick **Allow npm publish** (without it the workflow can only stage a release)
+
+   These fields can't be edited later; to change one, delete the connection and add it again.
 2. In GitHub, create the `npm` environment under **Settings → Environments**. Adding yourself as a
    required reviewer makes every release wait for your approval. You can also limit it to tags
    matching the release prefixes.
