@@ -35,6 +35,24 @@ export interface StatusPageSettings {
   components: Array<{ id: string; monitorId: string; displayName: string; description: string | null }>;
   monitors: Array<{ id: string; name: string; status: string; schedule: string; lastRunStatus: string | null }>;
   incidents: StatusPageIncident[];
+  /** Confirmed email subscribers, and whether this server can send email. */
+  subscribers?: { count: number; emailAvailable: boolean };
+}
+
+/** How many subscribers a post would email: 0 when it wouldn't email anyone. */
+function emailAudience(data: StatusPageSettings): number {
+  if (!data.page?.enabled || !data.subscribers?.emailAvailable) return 0;
+  return data.subscribers.count;
+}
+
+function NotifyCheckbox({ count, checked, onChange }: { count: number; checked: boolean; onChange: (value: boolean) => void }) {
+  if (count === 0) return null;
+  return (
+    <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-slate-300">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-blue-600" />
+      Email {count.toLocaleString()} subscriber{count === 1 ? '' : 's'}
+    </label>
+  );
 }
 
 interface DraftComponent {
@@ -156,7 +174,9 @@ export function StatusPageManager({ initial, projectId }: { initial: StatusPageS
           title={page ? page.title : 'Your page'}
           description={
             page
-              ? `${data.components.length} component${data.components.length === 1 ? '' : 's'} · ${page.enabled ? 'public' : 'not public yet'}`
+              ? `${data.components.length} component${data.components.length === 1 ? '' : 's'} · ${page.enabled ? 'public' : 'not public yet'}${
+                  data.subscribers?.count ? ` · ${data.subscribers.count.toLocaleString()} email subscriber${data.subscribers.count === 1 ? '' : 's'}` : ''
+                }`
               : 'Pick an address and the monitors to show.'
           }
           helpLabel="How components work"
@@ -472,7 +492,7 @@ function IncidentList({ data, api, projectId }: { data: StatusPageSettings; api:
       ) : (
         <div className="space-y-3">
           {[...open, ...closed].map((incident) => (
-            <IncidentItem key={incident.id} incident={incident} canEdit={data.canEdit} api={api} projectId={projectId} componentName={componentName} now={now} />
+            <IncidentItem key={incident.id} incident={incident} canEdit={data.canEdit} audience={emailAudience(data)} api={api} projectId={projectId} componentName={componentName} now={now} />
           ))}
         </div>
       )}
@@ -500,8 +520,10 @@ function NewIncidentForm({
   const [body, setBody] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const audience = emailAudience(data);
 
   async function submit() {
     setBusy(true);
@@ -518,7 +540,8 @@ function NewIncidentForm({
           componentIds,
           body,
           scheduledStart: start ? new Date(start).toISOString() : undefined,
-          scheduledEnd: end ? new Date(end).toISOString() : undefined
+          scheduledEnd: end ? new Date(end).toISOString() : undefined,
+          notify: audience > 0 && notify
         })
       });
       onDone();
@@ -622,6 +645,7 @@ function NewIncidentForm({
           />
         </label>
       </div>
+      <NotifyCheckbox count={audience} checked={notify} onChange={setNotify} />
       {error ? <Notice tone="error">{error}</Notice> : null}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button type="button" onClick={onDone} disabled={busy} className={buttonClass.quiet}>
@@ -638,6 +662,7 @@ function NewIncidentForm({
 function IncidentItem({
   incident,
   canEdit,
+  audience,
   api,
   projectId,
   componentName,
@@ -645,6 +670,7 @@ function IncidentItem({
 }: {
   incident: StatusPageIncident;
   canEdit: boolean;
+  audience: number;
   api: Api;
   projectId?: string;
   componentName: (id: string) => string;
@@ -654,6 +680,7 @@ function IncidentItem({
   const [updating, setUpdating] = useState(false);
   const [status, setStatus] = useState<IncidentStatus>(incident.status);
   const [body, setBody] = useState('');
+  const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const closed = incident.status === 'resolved' || incident.status === 'completed';
@@ -663,7 +690,10 @@ function IncidentItem({
     setBusy(true);
     setError(null);
     try {
-      await api(`/incidents/${encodeURIComponent(incident.id)}/updates`, { method: 'POST', body: JSON.stringify({ projectId, status, body }) });
+      await api(`/incidents/${encodeURIComponent(incident.id)}/updates`, {
+        method: 'POST',
+        body: JSON.stringify({ projectId, status, body, notify: audience > 0 && notify })
+      });
       setBody('');
       setUpdating(false);
     } catch (err) {
@@ -767,6 +797,7 @@ function IncidentItem({
               placeholder="What changed for customers?"
             />
           </label>
+          <NotifyCheckbox count={audience} checked={notify} onChange={setNotify} />
           {error ? <Notice tone="error">{error}</Notice> : null}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button type="button" onClick={() => setUpdating(false)} disabled={busy} className={buttonClass.quiet}>

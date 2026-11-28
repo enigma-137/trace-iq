@@ -28,6 +28,110 @@
   letter-spacing: 0.7px;
   color: var(--muted);
 }
+.header {
+  position: relative;
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.subscribeButton {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: var(--blue, #2563eb);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.subscribeButton:hover {
+  filter: brightness(0.95);
+}
+.subscribeButton:focus-visible,
+.subscribeSubmit:focus-visible,
+.subscribeInput:focus-visible {
+  outline: 2px solid var(--blue, #2563eb);
+  outline-offset: 2px;
+}
+.subscribePanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 24px;
+  z-index: 10;
+  width: min(420px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(10, 10, 10, 0.12);
+}
+.subscribeForm {
+  display: grid;
+  gap: 10px;
+}
+.subscribeLabel {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.subscribeRow {
+  display: flex;
+  gap: 8px;
+}
+.subscribeInput {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 400;
+}
+.subscribeSubmit {
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue, #2563eb);
+  color: #fff;
+  font-weight: 650;
+  cursor: pointer;
+}
+.subscribeSubmit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.subscribeNote {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.subscribeError {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #dc2626;
+}
+.result {
+  max-width: 520px;
+  margin: 64px auto;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.result h1 {
+  font-size: 22px;
+  letter-spacing: -0.4px;
+  margin-bottom: 10px;
+}
+.result p {
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 18px;
+}
 .description {
   margin-top: 14px;
   max-width: 720px;
@@ -144,6 +248,9 @@
 }
 
 @media (max-width: 600px) {
+  .subscribePanel {
+    right: 16px;
+  }
   .header,
   .incidents,
   .footer {
@@ -153,4 +260,8 @@
     flex-direction: column;
     gap: 8px;
   }
+}
+.result > p:last-child {
+  margin: 18px 0 0;
+  font-size: 13px;
 }

@@ -4,6 +4,7 @@ import { QueryResultRow } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { DashboardUser } from '../auth/auth.service';
 import { ProjectsService, ResolvedProject } from '../projects/projects.service';
+import { StatusSubscribersService } from './status-subscribers.service';
 
 export const STATUS_PAGE_HISTORY_DAYS = 90;
 const PAST_INCIDENT_DAYS = 14;
@@ -43,12 +44,16 @@ export interface CreateIncidentBody {
   componentIds?: string[];
   scheduledStart?: string;
   scheduledEnd?: string;
+  /** Email the page's subscribers (default true). */
+  notify?: boolean;
 }
 
 export interface IncidentUpdateBody {
   projectId?: string;
   status?: string;
   body?: string;
+  /** Email the page's subscribers (default true). */
+  notify?: boolean;
 }
 
 interface PageRow extends QueryResultRow {
@@ -111,8 +116,25 @@ export class StatusPagesService {
 
   constructor(
     private readonly database: DatabaseService,
-    private readonly projects: ProjectsService
+    private readonly projects: ProjectsService,
+    private readonly subscribers?: StatusSubscribersService
   ) {}
+
+  /** Emails subscribers in the background; the incident is already saved. */
+  private notifySubscribers(
+    page: { id: string; enabled: boolean },
+    notify: boolean | undefined,
+    content: Parameters<StatusSubscribersService['notify']>[1]
+  ) {
+    if (notify === false || !page.enabled || !this.subscribers) return;
+    void this.subscribers.notify(page.id, content);
+  }
+
+  private async componentNames(pageId: string, ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const names = new Map((await this.components(pageId)).map((c) => [c.id, c.display_name]));
+    return ids.flatMap((id) => (names.has(id) ? [names.get(id) as string] : []));
+  }
 
   // ─── Dashboard ────────────────────────────────────────────────────────────
 
@@ -138,7 +160,9 @@ export class StatusPagesService {
     );
     const components = page ? await this.components(page.id) : [];
     const incidents = page ? await this.incidents(page.id, { sinceDays: 30, includeOpen: true }) : [];
+    const subscriberCount = page && this.subscribers ? await this.subscribers.confirmedCount(page.id) : 0;
     return {
+      subscribers: { count: subscriberCount, emailAvailable: Boolean(this.subscribers?.available) },
       canEdit: ['owner', 'admin'].includes(project.role),
       page: page
         ? { id: page.id, slug: page.slug, title: page.title, description: page.description, enabled: page.enabled, updatedAt: iso(page.updated_at) }
@@ -254,6 +278,16 @@ export class StatusPagesService {
       );
     });
     this.cache.clear();
+    this.notifySubscribers(page, body.notify, {
+      incidentTitle: title,
+      kind,
+      status,
+      body: message,
+      isNew: true,
+      scheduledStart,
+      scheduledEnd,
+      affected: await this.componentNames(page.id, componentIds)
+    });
     return this.getSettings(user, project.id);
   }
 
@@ -281,6 +315,19 @@ export class StatusPagesService {
       );
     });
     this.cache.clear();
+    const page = await this.pageForProject(project.id);
+    if (page) {
+      this.notifySubscribers(page, body.notify, {
+        incidentTitle: incident.title,
+        kind: incident.kind,
+        status,
+        body: message,
+        isNew: false,
+        scheduledStart: incident.scheduled_start,
+        scheduledEnd: incident.scheduled_end,
+        affected: await this.componentNames(page.id, incident.component_ids ?? [])
+      });
+    }
     return this.getSettings(user, project.id);
   }
 

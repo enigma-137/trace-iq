@@ -7,6 +7,7 @@ import landing from '../../landing-light.module.css';
 import styles from '../status.module.css';
 import own from './project-status.module.css';
 import { ComponentRow, LEVEL_LABELS, type StatusComponentData } from '../StatusView';
+import { SubscribeForm } from './SubscribeForm';
 
 export interface ProjectIncident {
   id: string;
@@ -74,7 +75,10 @@ export function ProjectStatusView({ data }: { data: ProjectStatusData | null }) 
     <div className={`${landing.site} ${own.page}`}>
       <header className={`${landing.frame} ${own.header}`}>
         <span className={own.brand}>{data?.page.title ?? 'Status'}</span>
-        <span className={own.headerNote}>Status</span>
+        <span className={own.headerActions}>
+          <span className={own.headerNote}>Status</span>
+          {data ? <SubscribeForm slug={data.page.slug} title={data.page.title} /> : null}
+        </span>
       </header>
 
       <main>
