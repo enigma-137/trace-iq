@@ -169,6 +169,7 @@ traceiq.track('signup_completed', { plan: 'starter' });
 | [Next.js](https://traceiq.run/docs?page=javascript) | [Flutter](packages/sdk-flutter/README.md) | [Python](sdks/python/README.md) · `traceiq-py` |
 | [React (Vite)](https://traceiq.run/docs?page=javascript) | [Swift (iOS)](sdks/swift/README.md) | [Rust](sdks/rust/README.md) · `traceiq` |
 | | [Kotlin (Android)](sdks/kotlin/README.md) | [PHP](https://traceiq.run/docs?page=php) |
+| | | [Go](sdks/go/README.md) |
 
 Anything else can send events to the [HTTP API](https://traceiq.run/docs?page=ingestion).
 
@@ -207,7 +208,7 @@ More detail: [Architecture](docs/architecture.md) · [Event schema](docs/event-s
 apps/api/              NestJS API, migrations and tests
 apps/dashboard/        Next.js dashboard and public docs
 packages/              JS, Node, React Native and Flutter SDKs, CLI, MCP server, shared packages
-sdks/                  Python, Rust, Swift and Kotlin SDKs
+sdks/                  Python, Rust, Swift, Kotlin and Go SDKs
 src/ and tests/        PHP SDK
 docs/                  Architecture, deployment and protocol docs
 ```

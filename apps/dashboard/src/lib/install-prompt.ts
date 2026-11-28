@@ -9,6 +9,7 @@ import { AI_LANGUAGES, type AiLanguage, type AiLanguageId } from '@/app/docs/ai-
 export const INSTALL_STACKS: Array<{ id: AiLanguageId; label: string; hint: string }> = [
   { id: 'javascript', label: 'Next.js / React / JS', hint: 'Browser SDK' },
   { id: 'node', label: 'Node.js', hint: 'Express, NestJS, scripts' },
+  { id: 'go', label: 'Go', hint: 'net/http, Gin, Echo' },
   { id: 'python', label: 'Python', hint: 'Django, Flask, FastAPI' },
   { id: 'php', label: 'PHP', hint: 'Laravel, Symfony' },
   { id: 'react-native', label: 'React Native', hint: 'Expo or bare' },
@@ -16,7 +17,7 @@ export const INSTALL_STACKS: Array<{ id: AiLanguageId; label: string; hint: stri
   { id: 'swift', label: 'Swift', hint: 'iOS and macOS' },
   { id: 'kotlin', label: 'Kotlin', hint: 'Android and JVM' },
   { id: 'rust', label: 'Rust', hint: 'Axum, Actix' },
-  { id: 'other', label: 'Other', hint: 'Go, Ruby, Java… over HTTP' }
+  { id: 'other', label: 'Other', hint: 'Ruby, Java… over HTTP' }
 ];
 
 export interface InstallPromptInput {
@@ -30,7 +31,7 @@ export interface InstallPromptInput {
   products: string[];
 }
 
-const SERVER_STACKS: AiLanguageId[] = ['node', 'python', 'php', 'rust', 'other'];
+const SERVER_STACKS: AiLanguageId[] = ['node', 'go', 'python', 'php', 'rust', 'other'];
 const MOBILE_STACKS: AiLanguageId[] = ['react-native', 'flutter', 'swift', 'kotlin'];
 
 const PRODUCT_LABELS: Record<string, string> = {
@@ -79,7 +80,7 @@ function stackWarnings(id: AiLanguageId): string[] {
   if (id === 'node') {
     return ['Create one shared client for the whole process, and call `await traceiq.shutdown()` before short-lived processes such as scripts and serverless functions exit.'];
   }
-  if (id === 'python' || id === 'php' || id === 'rust') {
+  if (id === 'go' || id === 'python' || id === 'php' || id === 'rust') {
     return ['Create one shared client. Flush or shut it down before a short-lived process exits so queued events are sent.'];
   }
   return [];

@@ -18,6 +18,7 @@ The other packages are published by hand; see [Publishing by hand](#publishing-b
 | React Native | npm | `traceiq-react-native` | `packages/react-native/package.json` |
 | Rust | crates.io | `traceiq` | `sdks/rust/Cargo.toml` (then `cargo update -p traceiq` to refresh `Cargo.lock`) |
 | Flutter | pub.dev | `traceiq_flutter` | `packages/sdk-flutter/pubspec.yaml` |
+| Go | Go module proxy | `github.com/enigma-137/trace-iq/sdks/go` | `sdks/go/doc.go` (`Version`) |
 
 Each package keeps a `CHANGELOG.md`; add the release's entry in the same PR as the version bump. After
 publishing, update `apps/dashboard/src/lib/sdkVersions.ts` so the docs show the new versions.
@@ -121,6 +122,20 @@ flutter pub publish
 
 The first publish asks you to sign in with Google; that account becomes the uploader.
 
+### Go modules (`sdks/go`)
+
+Go modules are published by tags, not by an upload command. Use a subdirectory tag so
+the module is addressable at `sdks/go`:
+
+```bash
+cd sdks/go
+go vet ./...
+go test -race ./...
+git tag sdks/go/v0.1.0 && git push origin sdks/go/v0.1.0
+```
+
+Users then install with `go get github.com/enigma-137/trace-iq/sdks/go@v0.1.0`.
+
 ## Not automated yet
 
 - **Swift:** SwiftPM installs from a git repository with `Package.swift` at its root,
@@ -129,3 +144,4 @@ The first publish asks you to sign in with Google; that account becomes the uplo
 - **Kotlin:** the release workflow is ready, but the Maven Central setup above hasn't been done, so
   nothing is published yet. The docs tell users to `gradle publishToMavenLocal` from a clone.
 - **npm, crates.io and pub.dev** are published by hand (above).
+- **Go:** published by a manual subdirectory tag (above). Do not tag until the PR is merged and the API supports Go stacks.

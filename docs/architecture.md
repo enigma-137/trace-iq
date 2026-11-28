@@ -22,7 +22,7 @@ flowchart LR
 - `packages/sdk-js`, `packages/node`, and `packages/react-native` collect application events.
 - `packages/types`, `packages/shared`, and `packages/ui` contain reusable TypeScript contracts and UI code.
 - `packages/mcp-server` exposes selected TraceIQ operations through the Model Context Protocol.
-- `sdks` contains the Python, Rust, Swift, and Kotlin SDKs. The PHP SDK is at the repository root.
+- `sdks` contains the Python, Rust, Swift, Kotlin, and Go SDKs. The PHP SDK is at the repository root.
 
 ## Event ingestion
 

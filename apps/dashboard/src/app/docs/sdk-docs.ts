@@ -4,6 +4,7 @@ export const sdkDocsSections = [
   { id: 'flutter', label: 'Flutter SDK', category: 'SDKs' },
   { id: 'react-native', label: 'React Native SDK', category: 'SDKs' },
   { id: 'node', label: 'Node.js SDK', category: 'SDKs' },
+  { id: 'go', label: 'Go SDK', category: 'SDKs' },
   { id: 'python', label: 'Python SDK', category: 'SDKs' },
   { id: 'swift', label: 'Swift SDK', category: 'SDKs' },
   { id: 'kotlin', label: 'Kotlin SDK', category: 'SDKs' },
