@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- The package now declares its license (MIT), so npm shows it.
+- First release published from GitHub Actions with npm provenance.
+
 ## 0.8.0
 
 - `create_feature_flag`: create a flag with a key, name, description, rollout percentage, environment

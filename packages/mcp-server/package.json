@@ -1,11 +1,12 @@
 {
   "name": "traceiq-mcp-server",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
   "description": "TraceIQ MCP server — an analytics copilot for the TraceIQ dashboard (funnels, retention, errors, users, API health) with guarded mutations and scope-aware access.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/enigma-137/trace-iq.git",

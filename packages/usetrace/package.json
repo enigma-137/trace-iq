@@ -6,6 +6,7 @@
     "access": "public"
   },
   "description": "TraceIQ setup wizard and project CLI: install the SDK, switch projects, pull env vars, and tail logs and events.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/enigma-137/trace-iq.git",
