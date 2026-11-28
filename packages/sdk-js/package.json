@@ -6,6 +6,11 @@
     "access": "public"
   },
   "description": "TraceIQ SDK for JavaScript and TypeScript clients.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enigma-137/trace-iq.git",
+    "directory": "packages/sdk-js"
+  },
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",

@@ -6,6 +6,11 @@
     "access": "public"
   },
   "description": "TraceIQ SDK for React Native and Expo: analytics and opt-in structural session replay.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enigma-137/trace-iq.git",
+    "directory": "packages/react-native"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

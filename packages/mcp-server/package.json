@@ -6,6 +6,11 @@
     "access": "public"
   },
   "description": "TraceIQ MCP server — an analytics copilot for the TraceIQ dashboard (funnels, retention, errors, users, API health) with guarded mutations and scope-aware access.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enigma-137/trace-iq.git",
+    "directory": "packages/mcp-server"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
