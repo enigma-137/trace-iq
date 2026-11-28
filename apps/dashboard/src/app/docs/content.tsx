@@ -977,7 +977,7 @@ traceiq.capture({ event: 'transfer_started', properties: { amount: 5000, currenc
     return (
       <Section id="python" title="Python SDK">
         <P>
-          <Mono>traceiq</Mono> for Python (3.8+) — standard library only, with a background flush thread.
+          <Mono>traceiq</Mono> for Python (3.9+) — standard library only, with a background flush thread.
         </P>
         <Code lang="bash">{`pip install traceiq-py`}</Code>
         <P>

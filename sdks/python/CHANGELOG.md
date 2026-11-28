@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Requires Python 3.9 or newer.** The package declared 3.8 support, but it could not be built on 3.8: its license field needs setuptools 77, which no longer runs on 3.8 (end of life since October 2024).
+
 ## 0.3.0
 
 - **Request timing middleware** in `traceiq.middleware`, so a Python backend reports *server* response times to API performance and the Requests explorer, the same number your logs and Postman show. It sends a `$api_request` event per request with method, route, status, duration, request and trace ids, service, environment and sizes, and never reads headers, query strings or bodies.
