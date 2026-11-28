@@ -139,6 +139,8 @@ export function AuthForm() {
             });
 
       if (authResult.error) {
+        // A wrong password should not stay in the field to be resubmitted or read off the screen.
+        if (mode === 'signin') setPassword('');
         await reportAuthFailure(
           authResult.error,
           mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed',
@@ -154,6 +156,7 @@ export function AuthForm() {
 
       await decideNextStep(false, mode === 'signin' ? 'Signed in successfully.' : 'Account created successfully.');
     } catch (error) {
+      if (mode === 'signin') setPassword('');
       await reportAuthFailure(
         error,
         mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed',
