@@ -46,6 +46,27 @@ ValueError: bad cart`);
     expect(frames[1].inApp).toBe(false);
   });
 
+  it('reads Go stacks and marks stdlib frames as not in-app', () => {
+    const frames = parseStack(`panic: boom
+
+goroutine 1 [running]:
+main.checkout(0x1, 0x2)
+	/srv/app/checkout.go:42 +0x1d
+main.(*Server).handle(0xc000, {0x0, 0x0})
+	/srv/app/server.go:18 +0x2a
+created by main.main in goroutine 1
+	/srv/app/main.go:10 +0x20
+runtime.goexit()
+	/usr/local/go/src/runtime/asm_amd64.s:1700 +0x1`);
+
+    expect(frames).toEqual([
+      { fn: 'main.checkout', file: '/srv/app/checkout.go', inApp: true },
+      { fn: 'main.(*Server).handle', file: '/srv/app/server.go', inApp: true },
+      { fn: 'main.main', file: '/srv/app/main.go', inApp: true },
+      { fn: 'runtime.goexit', file: '/usr/local/go/src/runtime/asm_amd64.s', inApp: false }
+    ]);
+  });
+
   it('does not treat an email address in a message as a frame', () => {
     expect(parseStack('Error: invite for user@example.com failed')).toEqual([]);
   });
@@ -96,6 +117,15 @@ describe('computeExceptionFingerprint', () => {
     const a = computeExceptionFingerprint({ stack: 'Error\n    at e (/assets/index-AAAA1111.js:1:100)' });
     const b = computeExceptionFingerprint({ stack: 'Error\n    at t (/assets/index-BBBB2222.js:1:900)' });
     expect(a).toBe(b);
+  });
+
+  it('groups Go errors by function and file, not line number', () => {
+    const stack = (fn: string, line: number) => `panic: boom\n\ngoroutine 1 [running]:\n${fn}(0x1)\n\t/srv/app/${fn.split('.')[1]}.go:${line} +0x1d\n`;
+    const a = computeExceptionFingerprint({ type: 'Error', message: 'boom', stack: stack('main.checkout', 42) });
+    const b = computeExceptionFingerprint({ type: 'Error', message: 'boom', stack: stack('main.checkout', 99) });
+    const c = computeExceptionFingerprint({ type: 'Error', message: 'boom', stack: stack('main.refund', 42) });
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
   });
 
   it('falls back to type + normalized message without a stack', () => {
