@@ -51,7 +51,7 @@ export function DashboardDialog({
       onMouseDown={onClose}
     >
       <section
-        className={`w-full ${maxWidthClass} rounded-lg border border-neutral-200 bg-white p-5 shadow-2xl shadow-neutral-950/20 dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-black/40`}
+        className={`max-h-[calc(100dvh-3rem)] w-full ${maxWidthClass} overflow-y-auto rounded-lg border border-neutral-200 bg-white p-5 shadow-2xl shadow-neutral-950/20 dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-black/40`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dashboard-dialog-title"

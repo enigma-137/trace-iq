@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Upload04Icon from '@hugeicons/core-free-icons/Upload04Icon';
+import { DashboardDialog } from '@/app/dashboard/DashboardDialog';
+import { ActionCard, HelpTip, Notice, buttonClass, fieldClass } from '@/components/dashboard/CalmUI';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { detectFormat, readEventsFile, type ImportFormat } from './file-reader';
 
@@ -48,6 +51,8 @@ interface FileProgress {
   stopped: boolean;
 }
 
+type Api = <T>(path: string, init?: RequestInit) => Promise<T>;
+
 export function ImportPanel({ projectId, projectName, initialJobs }: ImportPanelProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
@@ -75,98 +80,88 @@ export function ImportPanel({ projectId, projectName, initialJobs }: ImportPanel
   const projectQuery = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-950 sm:p-8">
-        <div className="max-w-3xl space-y-3">
-          {projectName ? (
-            <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-[11px] font-semibold text-neutral-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-              Importing into: {projectName}
-            </span>
-          ) : null}
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-950 dark:text-white sm:text-3xl">Import events</h1>
-          <p className="text-sm leading-relaxed text-neutral-600 dark:text-slate-400">
-            Bring your history with you. Imported events keep their original timestamps and locations, so trends,
-            funnels and retention cover the time before you switched to TraceIQ.
-          </p>
-          <ul className="grid gap-1.5 pt-1 text-xs text-neutral-600 dark:text-slate-400 sm:grid-cols-2">
-            <Check>Original timestamps, users and sessions are kept</Check>
-            <Check>Webhooks are not triggered for imported events</Check>
-            <Check>Imported events count toward your monthly events</Check>
-            <Check>Only owners and admins can import</Check>
-          </ul>
+    <div className="mx-auto max-w-5xl space-y-8">
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">Import events</h1>
+          <HelpTip label="What importing keeps">
+            <ul className="space-y-1.5">
+              <li>Original timestamps, users and sessions are kept, so trends, funnels and retention cover the time before TraceIQ.</li>
+              <li>Webhooks are not triggered for imported events.</li>
+              <li>Imported events count toward your monthly events.</li>
+              <li>Only owners and admins can import.</li>
+            </ul>
+          </HelpTip>
         </div>
-      </section>
+        <p className="text-sm text-neutral-500 dark:text-slate-400">
+          Bring your history with you{projectName ? (
+            <>
+              {' '}into <span className="font-semibold text-blue-600 dark:text-blue-400">{projectName}</span>
+            </>
+          ) : null}
+          .
+        </p>
+      </header>
 
-      <FormatsSection />
-
-      <FileImportCard api={api} projectId={projectId} />
-
-      <PostHogSection api={api} projectId={projectId} projectQuery={projectQuery} initialJobs={initialJobs} />
+      <PostHogAndFile api={api} projectId={projectId} projectQuery={projectQuery} initialJobs={initialJobs} />
     </div>
   );
 }
 
-// ─── Supported formats ──────────────────────────────────────────────────────
+// ─── Layout: the two ways in, then the history ──────────────────────────────
 
-function FormatsSection() {
-  const formats = [
-    {
-      badge: 'PostHog',
-      title: 'PostHog events',
-      files: '.jsonl  .json  .gz',
-      body: 'JSON Lines from PostHog batch or file download exports (gzipped or not), a JSON array of events, or a saved API response with a "results" array.',
-      fields: 'event, distinct_id, timestamp, properties'
-    },
-    {
-      badge: 'TraceIQ',
-      title: 'TraceIQ export',
-      files: '.json',
-      body: 'A JSON file from the Export page of this or another TraceIQ project, including self-hosted instances.',
-      fields: 'occurredAt, eventName, userId, properties, …'
-    },
-    {
-      badge: 'TraceIQ',
-      title: 'TraceIQ events',
-      files: '.jsonl  .json  .gz',
-      body: 'Events in the same shape the SDKs send, one per line or as an array. Use this to load data from any other tool after a small transform.',
-      fields: 'eventName, timestamp, userId | anonymousId, properties'
-    }
-  ];
+function PostHogAndFile({
+  api,
+  projectId,
+  projectQuery,
+  initialJobs
+}: {
+  api: Api;
+  projectId?: string | null;
+  projectQuery: string;
+  initialJobs: ImportJob[];
+}) {
+  const posthog = usePostHogImport(api, projectId, projectQuery, initialJobs);
 
   return (
-    <section>
-      <div className="mb-4">
-        <h2 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white">Supported formats</h2>
-        <p className="text-xs text-neutral-500 dark:text-slate-400">
-          The format is detected from the file. CSV is not supported, because it can’t carry nested event properties.
-        </p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {formats.map((format) => (
-          <div key={format.title} className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">{format.title}</h3>
-              <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-bold text-neutral-700 dark:bg-slate-800 dark:text-slate-300">
-                {format.badge}
-              </span>
+    <>
+      <div className="grid gap-5 md:grid-cols-2">
+        <FileImportCard api={api} projectId={projectId} />
+
+        <ActionCard
+          logo={{ src: '/brand/posthog-mark.svg', alt: 'PostHog' }}
+          tone="orange"
+          title="Import from PostHog"
+          description="Pull events straight from PostHog with an API key. Nothing to download."
+          helpLabel="How the PostHog import works"
+          help={
+            <div className="space-y-2">
+              <p>TraceIQ asks PostHog for one export per week of your range, downloads it on the server and imports it. It keeps running if you leave the page.</p>
+              <p>PostHog bills exports per exported row, so try a short range first. PostHog-internal events TraceIQ would skip anyway are left out of the export.</p>
             </div>
-            <p className="mt-1 font-mono text-[11px] text-neutral-400 dark:text-slate-500">{format.files}</p>
-            <p className="mt-3 text-xs leading-relaxed text-neutral-600 dark:text-slate-400">{format.body}</p>
-            <p className="mt-3 rounded-md bg-neutral-50 px-2.5 py-1.5 font-mono text-[11px] text-neutral-700 dark:bg-slate-900 dark:text-slate-300">
-              {format.fields}
-            </p>
-          </div>
-        ))}
+          }
+        >
+          <button type="button" onClick={() => posthog.openForm()} className={buttonClass.orange}>
+            Connect PostHog
+          </button>
+          <button type="button" onClick={() => posthog.setCliOpen(true)} className={buttonClass.link}>
+            Use the CLI instead
+          </button>
+        </ActionCard>
       </div>
-    </section>
+
+      <ImportHistory jobs={posthog.jobs} onCancel={posthog.cancel} onResume={posthog.resume} />
+
+      <PostHogFormDialog posthog={posthog} />
+      <PostHogCliDialog posthog={posthog} projectId={projectId} />
+    </>
   );
 }
 
 // ─── File upload ────────────────────────────────────────────────────────────
 
-type Api = <T>(path: string, init?: RequestInit) => Promise<T>;
-
 function FileImportCard({ api, projectId }: { api: Api; projectId?: string | null }) {
+  const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [formatChoice, setFormatChoice] = useState<'auto' | ImportFormat>('auto');
   const [progress, setProgress] = useState<FileProgress | null>(null);
@@ -251,127 +246,176 @@ function FileImportCard({ api, projectId }: { api: Api; projectId?: string | nul
     setError(null);
   }
 
+  const statusLine = progress
+    ? busy
+      ? `Importing… ${progress.imported.toLocaleString()} imported so far`
+      : progress.done
+        ? `Last file: ${progress.imported.toLocaleString()} events imported`
+        : progress.stopped
+          ? `Stopped after ${progress.imported.toLocaleString()} events`
+          : null
+    : null;
+
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
-      <div className="mb-4">
-        <h2 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white">Upload a file</h2>
-        <p className="text-xs text-neutral-500 dark:text-slate-400">
-          The file is read in your browser and sent in batches of up to 500 events. Keep this tab open until it finishes.
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            pick(e.dataTransfer.files?.[0]);
-          }}
-          disabled={busy}
-          className={`flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-6 text-center transition ${
-            dragging
-              ? 'border-blue-500 bg-blue-50/50 dark:border-cyan-400 dark:bg-cyan-500/5'
-              : 'border-neutral-300 hover:border-neutral-400 dark:border-slate-700 dark:hover:border-slate-600'
-          }`}
-        >
-          {file ? (
-            <>
-              <span className="break-all text-sm font-semibold text-neutral-900 dark:text-white">{file.name}</span>
-              <span className="text-xs text-neutral-500 dark:text-slate-400">{formatBytes(file.size)} · click to choose another file</span>
-            </>
-          ) : (
-            <>
-              <span className="text-sm font-semibold text-neutral-900 dark:text-white">Drop a file here or click to choose</span>
-              <span className="text-xs text-neutral-500 dark:text-slate-400">.jsonl, .json, .ndjson or .gz</span>
-            </>
-          )}
+    <>
+      <ActionCard
+        icon={Upload04Icon}
+        tone="blue"
+        title="Upload a file"
+        description="A PostHog or TraceIQ export: .jsonl, .json or .gz."
+        helpLabel="Supported file formats"
+        help={<FormatsHelp />}
+      >
+        <button type="button" onClick={() => setOpen(true)} className={buttonClass.blue}>
+          {busy ? 'View progress' : 'Choose a file'}
         </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".json,.jsonl,.ndjson,.gz,application/json,application/gzip"
-          className="hidden"
-          onChange={(e) => pick(e.target.files?.[0])}
-        />
+        {statusLine ? <span className="text-xs text-neutral-500 dark:text-slate-400">{statusLine}</span> : null}
+      </ActionCard>
 
-        <div className="flex flex-col gap-3">
-          <label className="grid gap-1 text-xs font-semibold text-neutral-700 dark:text-slate-300">
-            Format
+      <DashboardDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Upload a file"
+        description="Read in your browser and sent in batches of 500 events. Keep this tab open until it finishes."
+        maxWidthClass="max-w-xl"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              pick(e.dataTransfer.files?.[0]);
+            }}
+            disabled={busy}
+            className={`flex min-h-[140px] w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
+              dragging
+                ? 'border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10'
+                : 'border-neutral-200 hover:border-blue-600 hover:bg-blue-50/40 dark:border-slate-700 dark:hover:border-blue-400 dark:hover:bg-blue-500/5'
+            }`}
+          >
+            {file ? (
+              <>
+                <span className="break-all text-sm font-semibold text-neutral-900 dark:text-white">{file.name}</span>
+                <span className="text-xs text-neutral-500 dark:text-slate-400">{formatBytes(file.size)} · click to choose another</span>
+              </>
+            ) : (
+              <>
+                <span className="text-sm font-semibold text-neutral-900 dark:text-white">Drop a file here or click to choose</span>
+                <span className="text-xs text-neutral-500 dark:text-slate-400">.jsonl, .json, .ndjson or .gz</span>
+              </>
+            )}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".json,.jsonl,.ndjson,.gz,application/json,application/gzip"
+            className="hidden"
+            onChange={(e) => pick(e.target.files?.[0])}
+          />
+
+          <label className={fieldClass.label}>
+            <span className="flex items-center gap-1.5">
+              Format
+              <HelpTip label="Supported file formats">
+                <FormatsHelp />
+              </HelpTip>
+            </span>
             <select
               value={formatChoice}
               onChange={(e) => setFormatChoice(e.target.value as 'auto' | ImportFormat)}
               disabled={busy}
-              className={inputClass}
+              className={fieldClass.input}
             >
               <option value="auto">Detect automatically</option>
               <option value="posthog">PostHog</option>
               <option value="traceiq">TraceIQ</option>
             </select>
           </label>
-          {busy ? (
-            <button type="button" onClick={() => (stopRef.current = true)} className={secondaryButton}>
-              Stop
-            </button>
-          ) : (
-            <button type="button" onClick={runImport} disabled={!file} className={primaryButton}>
-              Import file
-            </button>
-          )}
-        </div>
-      </div>
 
-      {error ? <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">{error}</p> : null}
+          {error ? <Notice tone="error">{error}</Notice> : null}
 
-      {progress ? (
-        <div className="mt-5 space-y-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-neutral-600 dark:text-slate-400">
-            <span>
-              <strong className="text-neutral-900 dark:text-white">{progress.imported.toLocaleString()}</strong> imported
-            </span>
-            <span>{progress.read.toLocaleString()} read</span>
-            <span>{progress.skipped.toLocaleString()} skipped</span>
-            {progress.rejected > 0 ? <span className="text-red-600 dark:text-red-400">{progress.rejected.toLocaleString()} rejected</span> : null}
-            {progress.format ? <span>Format: {progress.format === 'posthog' ? 'PostHog' : 'TraceIQ'}</span> : null}
-            <span className="font-semibold">
-              {busy ? 'Importing…' : progress.done ? 'Done' : progress.stopped ? 'Stopped' : ''}
-            </span>
-          </div>
-          {busy ? <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800"><div className="h-full w-1/3 animate-pulse rounded-full bg-blue-600 dark:bg-cyan-400" /></div> : null}
-          <SkippedList skipped={progress.skippedEvents} />
-          {progress.errors.length > 0 ? (
-            <ul className="space-y-1 text-xs text-red-600 dark:text-red-400">
-              {progress.errors.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
+          {progress ? (
+            <div className="space-y-3 rounded-xl bg-neutral-50 p-4 dark:bg-slate-900/60">
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
+                <span>
+                  <strong className="text-base font-semibold text-neutral-900 dark:text-white">{progress.imported.toLocaleString()}</strong> imported
+                </span>
+                <span>{progress.read.toLocaleString()} read</span>
+                <span>{progress.skipped.toLocaleString()} skipped</span>
+                {progress.rejected > 0 ? <span className="text-red-600 dark:text-red-400">{progress.rejected.toLocaleString()} rejected</span> : null}
+                {progress.format ? <span>{progress.format === 'posthog' ? 'PostHog' : 'TraceIQ'} format</span> : null}
+                <span className="font-semibold text-neutral-700 dark:text-slate-200">
+                  {busy ? 'Importing…' : progress.done ? 'Done' : progress.stopped ? 'Stopped' : ''}
+                </span>
+              </div>
+              {busy ? (
+                <div className="h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-slate-800">
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-600" />
+                </div>
+              ) : null}
+              <SkippedList skipped={progress.skippedEvents} />
+              {progress.errors.length > 0 ? (
+                <ul className="space-y-1 text-xs text-red-600 dark:text-red-400">
+                  {progress.errors.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
+
+          <div className="flex justify-end gap-3 pt-1">
+            {busy ? (
+              <button type="button" onClick={() => (stopRef.current = true)} className={buttonClass.quiet}>
+                Stop
+              </button>
+            ) : (
+              <>
+                <button type="button" onClick={() => setOpen(false)} className={buttonClass.quiet}>
+                  Close
+                </button>
+                <button type="button" onClick={runImport} disabled={!file} className={buttonClass.blue}>
+                  Import file
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      ) : null}
-    </section>
+      </DashboardDialog>
+    </>
+  );
+}
+
+function FormatsHelp() {
+  return (
+    <div className="space-y-2.5">
+      <p>The format is detected from the file.</p>
+      <p>
+        <strong className="text-neutral-900 dark:text-white">PostHog events</strong>: JSON Lines from a PostHog export (gzipped or not), a JSON array, or a saved API response with a <Mono>results</Mono> array.
+      </p>
+      <p>
+        <strong className="text-neutral-900 dark:text-white">TraceIQ export</strong>: a file from the Export page of any TraceIQ project, self-hosted included.
+      </p>
+      <p>
+        <strong className="text-neutral-900 dark:text-white">TraceIQ events</strong>: events shaped like the SDKs send them (<Mono>eventName</Mono>, <Mono>timestamp</Mono>, <Mono>userId</Mono>, <Mono>properties</Mono>), one per line or as an array.
+      </p>
+      <p>CSV is not supported, because it can’t carry nested event properties.</p>
+    </div>
   );
 }
 
 // ─── PostHog ────────────────────────────────────────────────────────────────
 
-function PostHogSection({
-  api,
-  projectId,
-  projectQuery,
-  initialJobs
-}: {
-  api: Api;
-  projectId?: string | null;
-  projectQuery: string;
-  initialJobs: ImportJob[];
-}) {
-  const [tab, setTab] = useState<'dashboard' | 'cli'>('dashboard');
+function usePostHogImport(api: Api, projectId: string | null | undefined, projectQuery: string, initialJobs: ImportJob[]) {
+  const [formOpen, setFormOpen] = useState(false);
+  const [cliOpen, setCliOpen] = useState(false);
   const [jobs, setJobs] = useState<ImportJob[]>(initialJobs);
   const [host, setHost] = useState<'us' | 'eu' | 'custom'>('us');
   const [customHost, setCustomHost] = useState('');
@@ -427,7 +471,8 @@ function PostHogSection({
     try {
       await api('/v1/dashboard/import/posthog', { method: 'POST', body: JSON.stringify(body()) });
       setApiKey('');
-      setMessage({ tone: 'ok', text: 'Import started. It keeps running if you leave this page.' });
+      setMessage(null);
+      setFormOpen(false);
       await refresh();
     } catch (err) {
       setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Could not start the import.' });
@@ -445,7 +490,6 @@ function PostHogSection({
   }
 
   function resume(job: ImportJob) {
-    setTab('dashboard');
     setSince((job.completedThrough ?? job.rangeStart).slice(0, 10));
     setUntil(job.rangeEnd.slice(0, 10));
     setPosthogProjectId(job.sourceProject);
@@ -455,178 +499,207 @@ function PostHogSection({
       setHost('custom');
       setCustomHost(job.sourceHost);
     }
-    setMessage({ tone: 'ok', text: 'Form filled in from where the import stopped. Paste your PostHog key to continue.' });
+    setMessage({ tone: 'ok', text: 'Filled in from where the import stopped. Paste your PostHog key to continue.' });
+    setFormOpen(true);
   }
 
-  const ready = posthogProjectId.trim() && apiKey.trim() && since && (host !== 'custom' || customHost.trim());
-  const cliHost = host === 'custom' ? customHost || 'https://posthog.example.com' : host;
+  function openForm() {
+    setMessage(null);
+    setFormOpen(true);
+  }
 
+  const ready = Boolean(posthogProjectId.trim() && apiKey.trim() && since && (host !== 'custom' || customHost.trim()));
+
+  return {
+    jobs,
+    active,
+    formOpen,
+    setFormOpen,
+    cliOpen,
+    setCliOpen,
+    openForm,
+    host,
+    setHost,
+    customHost,
+    setCustomHost,
+    posthogProjectId,
+    setPosthogProjectId,
+    apiKey,
+    setApiKey,
+    since,
+    setSince,
+    until,
+    setUntil,
+    busy,
+    message,
+    ready,
+    check,
+    start,
+    cancel,
+    resume
+  };
+}
+
+type PostHogImport = ReturnType<typeof usePostHogImport>;
+
+function PostHogFormDialog({ posthog }: { posthog: PostHogImport }) {
+  const p = posthog;
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <h2 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white">Import from PostHog</h2>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-neutral-500 dark:text-slate-400">
-            TraceIQ pulls your events straight from PostHog with your PostHog API key: no export to download. Or upload a
-            file you already exported above.
-          </p>
-        </div>
-        <div className="inline-flex shrink-0 rounded-lg border border-neutral-200 p-0.5 text-xs font-semibold dark:border-slate-800">
-          {(['dashboard', 'cli'] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`rounded-md px-3 py-1.5 transition ${
-                tab === key ? 'bg-neutral-900 text-white dark:bg-white dark:text-black' : 'text-neutral-600 hover:text-neutral-900 dark:text-slate-400 dark:hover:text-white'
-              }`}
-            >
-              {key === 'dashboard' ? 'In the dashboard' : 'With the CLI'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <ol className="mt-5 grid gap-3 text-xs leading-relaxed text-neutral-600 dark:text-slate-400 md:grid-cols-3">
-        <Step n={1}>
-          In PostHog, go to <strong>Settings → Personal API keys</strong> and create a key with the{' '}
-          <Mono>batch_export:read</Mono> and <Mono>batch_export:write</Mono> scopes.
-        </Step>
-        <Step n={2}>
-          Find your PostHog project ID: the number after <Mono>/project/</Mono> in your PostHog URL. Note whether you use
-          US or EU cloud.
-        </Step>
-        <Step n={3}>
-          Pick how far back to go. TraceIQ asks PostHog for one export per week, downloads it and imports it.
-        </Step>
-      </ol>
-
-      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-        PostHog bills these exports per exported row. Events TraceIQ would skip anyway ($autocapture,
-        $feature_flag_called and other PostHog-internal events) are left out of the export. Try a short range first.
-      </div>
-
-      {tab === 'dashboard' ? (
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className={labelClass}>
+    <DashboardDialog
+      open={p.formOpen}
+      onClose={() => p.setFormOpen(false)}
+      title="Import from PostHog"
+      description="Your key is used only while the import runs. It is never stored."
+      maxWidthClass="max-w-xl"
+    >
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className={fieldClass.label}>
             PostHog region
-            <select value={host} onChange={(e) => setHost(e.target.value as 'us' | 'eu' | 'custom')} className={inputClass}>
-              <option value="us">US cloud (us.posthog.com)</option>
-              <option value="eu">EU cloud (eu.posthog.com)</option>
+            <select value={p.host} onChange={(e) => p.setHost(e.target.value as 'us' | 'eu' | 'custom')} className={fieldClass.input}>
+              <option value="us">US cloud</option>
+              <option value="eu">EU cloud</option>
               <option value="custom">Self-hosted</option>
             </select>
           </label>
-          <label className={labelClass}>
-            PostHog project ID
-            <input value={posthogProjectId} onChange={(e) => setPosthogProjectId(e.target.value)} inputMode="numeric" placeholder="12345" className={inputClass} />
+          <label className={fieldClass.label}>
+            <span className="flex items-center gap-1.5">
+              PostHog project ID
+              <HelpTip label="Where to find the PostHog project ID" align="end">
+                The number after <Mono>/project/</Mono> in your PostHog URL, for example <Mono>us.posthog.com/project/12345</Mono>.
+              </HelpTip>
+            </span>
+            <input value={p.posthogProjectId} onChange={(e) => p.setPosthogProjectId(e.target.value)} inputMode="numeric" placeholder="12345" className={fieldClass.input} />
           </label>
-          {host === 'custom' ? (
-            <label className={`${labelClass} md:col-span-2`}>
+          {p.host === 'custom' ? (
+            <label className={`${fieldClass.label} sm:col-span-2`}>
               PostHog URL
-              <input value={customHost} onChange={(e) => setCustomHost(e.target.value)} placeholder="https://posthog.example.com" className={inputClass} />
+              <input value={p.customHost} onChange={(e) => p.setCustomHost(e.target.value)} placeholder="https://posthog.example.com" className={fieldClass.input} />
             </label>
           ) : null}
-          <label className={`${labelClass} md:col-span-2`}>
-            Personal API key
-            <input
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="phx_..."
-              className={inputClass}
-            />
-            <span className="font-normal text-neutral-400 dark:text-slate-500">Used only while the import runs. It is never stored.</span>
+          <label className={`${fieldClass.label} sm:col-span-2`}>
+            <span className="flex items-center gap-1.5">
+              Personal API key
+              <HelpTip label="How to create a PostHog API key">
+                In PostHog, open <strong>Settings → Personal API keys</strong> and create a key with the <Mono>batch_export:read</Mono> and{' '}
+                <Mono>batch_export:write</Mono> scopes.
+              </HelpTip>
+            </span>
+            <input type="password" autoComplete="off" value={p.apiKey} onChange={(e) => p.setApiKey(e.target.value)} placeholder="phx_..." className={fieldClass.input} />
           </label>
-          <label className={labelClass}>
+          <label className={fieldClass.label}>
             From (UTC)
-            <input type="date" value={since} onChange={(e) => setSince(e.target.value)} className={inputClass} />
+            <input type="date" value={p.since} onChange={(e) => p.setSince(e.target.value)} className={fieldClass.input} />
           </label>
-          <label className={labelClass}>
-            To (UTC)
-            <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={inputClass} />
-            <span className="font-normal text-neutral-400 dark:text-slate-500">Leave empty to import up to now.</span>
+          <label className={fieldClass.label}>
+            <span className="flex items-center gap-1.5">
+              To (UTC)
+              <HelpTip label="About the end date" align="end">
+                Leave it empty to import up to now.
+              </HelpTip>
+            </span>
+            <input type="date" value={p.until} onChange={(e) => p.setUntil(e.target.value)} className={fieldClass.input} />
           </label>
-
-          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-            <button type="button" onClick={check} disabled={!ready || busy !== null} className={secondaryButton}>
-              {busy === 'check' ? 'Checking…' : 'Check connection'}
-            </button>
-            <button type="button" onClick={start} disabled={!ready || busy !== null || active} className={primaryButton}>
-              {busy === 'start' ? 'Starting…' : 'Start import'}
-            </button>
-            {active ? <span className="text-xs text-neutral-500 dark:text-slate-400">An import is already running for this project.</span> : null}
-          </div>
-          {message ? (
-            <p
-              className={`md:col-span-2 rounded-md px-3 py-2 text-xs ${
-                message.tone === 'ok'
-                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
-                  : 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300'
-              }`}
-            >
-              {message.text}
-            </p>
-          ) : null}
         </div>
-      ) : (
-        <div className="mt-5 space-y-3 text-xs leading-relaxed text-neutral-600 dark:text-slate-400">
-          <p>
-            The CLI does the same thing from your terminal. Log in with a personal access token that has the{' '}
-            <Mono>imports:write</Mono> scope (create one in{' '}
-            <Link href="/dashboard/settings" className="font-semibold text-blue-600 hover:underline dark:text-cyan-400">
+
+        <Notice tone="warn">PostHog bills exports per row. Try a short range first.</Notice>
+        {p.active ? <Notice tone="warn">An import is already running for this project. Wait for it to finish or cancel it.</Notice> : null}
+        {p.message ? <Notice tone={p.message.tone}>{p.message.text}</Notice> : null}
+
+        <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
+          <button type="button" onClick={p.check} disabled={!p.ready || p.busy !== null} className={buttonClass.quiet}>
+            {p.busy === 'check' ? 'Checking…' : 'Check connection'}
+          </button>
+          <button type="button" onClick={p.start} disabled={!p.ready || p.busy !== null || p.active} className={buttonClass.orange}>
+            {p.busy === 'start' ? 'Starting…' : 'Start import'}
+          </button>
+        </div>
+      </div>
+    </DashboardDialog>
+  );
+}
+
+function PostHogCliDialog({ posthog, projectId }: { posthog: PostHogImport; projectId?: string | null }) {
+  const p = posthog;
+  const cliHost = p.host === 'custom' ? p.customHost || 'https://posthog.example.com' : p.host;
+  const project = projectId ?? 'YOUR_PROJECT_ID';
+  return (
+    <DashboardDialog
+      open={p.cliOpen}
+      onClose={() => p.setCliOpen(false)}
+      title="Import from PostHog with the CLI"
+      description="The same import, run from your terminal."
+      maxWidthClass="max-w-2xl"
+    >
+      <div className="space-y-4 text-sm text-neutral-600 dark:text-slate-400">
+        <p className="flex flex-wrap items-center gap-1.5">
+          Log in with a personal access token that has the <Mono>imports:write</Mono> scope.
+          <HelpTip label="Where to create a personal access token">
+            Create one in{' '}
+            <Link href="/dashboard/settings" className={buttonClass.link}>
               Settings → Personal access tokens
             </Link>
-            ).
-          </p>
-          <Snippet
-            code={`npx traceiq-cli login
+            .
+          </HelpTip>
+        </p>
+        <Snippet
+          code={`npx traceiq-cli login
 export POSTHOG_PERSONAL_API_KEY=phx_...
 
 # Check the key and see the plan, without starting an export
-npx traceiq-cli import posthog --project ${projectId ?? 'YOUR_PROJECT_ID'} \\
-  --posthog-host ${cliHost} --posthog-project ${posthogProjectId || '12345'} --since ${since} --dry-run
+npx traceiq-cli import posthog --project ${project} \\
+  --posthog-host ${cliHost} --posthog-project ${p.posthogProjectId || '12345'} --since ${p.since} --dry-run
 
 # Import
-npx traceiq-cli import posthog --project ${projectId ?? 'YOUR_PROJECT_ID'} \\
-  --posthog-host ${cliHost} --posthog-project ${posthogProjectId || '12345'} --since ${since}`}
-          />
-          <p>Already have a PostHog export file? Import it from the terminal too:</p>
-          <Snippet code={`npx traceiq-cli import posthog events.jsonl --project ${projectId ?? 'YOUR_PROJECT_ID'}`} />
-          <p>
-            If an import stops partway, the CLI prints the <Mono>--since</Mono> value to continue from.{' '}
-            <Link href="/docs?page=migrate-posthog" className="font-semibold text-blue-600 hover:underline dark:text-cyan-400">
-              Full migration guide →
-            </Link>
-          </p>
-        </div>
+npx traceiq-cli import posthog --project ${project} \\
+  --posthog-host ${cliHost} --posthog-project ${p.posthogProjectId || '12345'} --since ${p.since}`}
+        />
+        <p>Already have a PostHog export file?</p>
+        <Snippet code={`npx traceiq-cli import posthog events.jsonl --project ${project}`} />
+        <p className="text-xs">
+          If an import stops partway, the CLI prints the <Mono>--since</Mono> value to continue from.{' '}
+          <Link href="/docs?page=migrate-posthog" className={buttonClass.link}>
+            Full migration guide →
+          </Link>
+        </p>
+      </div>
+    </DashboardDialog>
+  );
+}
+
+// ─── History ────────────────────────────────────────────────────────────────
+
+function ImportHistory({ jobs, onCancel, onResume }: { jobs: ImportJob[]; onCancel: (job: ImportJob) => void; onResume: (job: ImportJob) => void }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-base font-semibold text-neutral-900 dark:text-white">PostHog imports</h2>
+        <HelpTip label="What is not imported">
+          Dashboards, funnels, cohorts and feature flags are definitions rather than events, so they aren’t imported.{' '}
+          <Link href="/docs?page=migrate-posthog" className={buttonClass.link}>
+            The migration guide
+          </Link>{' '}
+          shows how to recreate them.
+        </HelpTip>
+      </div>
+      {jobs.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-neutral-200 px-6 py-8 text-center text-sm text-neutral-500 dark:border-slate-800 dark:text-slate-400">
+          No PostHog imports yet. They show up here with their progress.
+        </p>
+      ) : (
+        <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+          {jobs.map((job) => (
+            <JobRow key={job.id} job={job} onCancel={() => onCancel(job)} onResume={() => onResume(job)} />
+          ))}
+        </ul>
       )}
-
-      {jobs.length > 0 ? (
-        <div className="mt-6">
-          <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Recent PostHog imports</h3>
-          <ul className="mt-3 divide-y divide-neutral-100 rounded-lg border border-neutral-200 dark:divide-slate-800 dark:border-slate-800">
-            {jobs.map((job) => (
-              <JobRow key={job.id} job={job} onCancel={() => cancel(job)} onResume={() => resume(job)} />
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <p className="mt-5 text-xs text-neutral-500 dark:text-slate-400">
-        Dashboards, funnels, cohorts and feature flags are definitions rather than events, so they aren’t imported.{' '}
-        <Link href="/docs?page=migrate-posthog" className="font-semibold text-blue-600 hover:underline dark:text-cyan-400">
-          See the PostHog migration guide
-        </Link>{' '}
-        for mapping SDK calls and recreating them.
-      </p>
     </section>
   );
 }
 
 const STATUS_LABEL: Record<ImportJob['status'], { label: string; tone: string }> = {
-  running: { label: 'Running', tone: 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
-  cancelling: { label: 'Cancelling', tone: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
+  running: { label: 'Running', tone: 'bg-blue-600 text-white' },
+  cancelling: { label: 'Cancelling', tone: 'bg-orange-500 text-white' },
   cancelled: { label: 'Cancelled', tone: 'bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-slate-300' },
   completed: { label: 'Completed', tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' },
   failed: { label: 'Failed', tone: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' },
@@ -639,32 +712,32 @@ function JobRow({ job, onCancel, onResume }: { job: ImportJob; onCancel: () => v
   const canResume = (job.status === 'failed' || job.status === 'interrupted' || job.status === 'cancelled') && job.completedThrough !== job.rangeEnd;
 
   return (
-    <li className="space-y-2 px-4 py-3">
+    <li className="space-y-3 px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${status.tone}`}>{status.label}</span>
+        <div className="flex flex-wrap items-center gap-2.5 text-sm">
+          <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${status.tone}`}>{status.label}</span>
           <span className="font-semibold text-neutral-900 dark:text-white">
             {job.rangeStart.slice(0, 10)} → {job.rangeEnd.slice(0, 10)}
           </span>
-          <span className="text-neutral-400 dark:text-slate-500">
+          <span className="text-xs text-neutral-400 dark:text-slate-500">
             {job.sourceHost.replace(/^https:\/\//, '')} · project {job.sourceProject}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {job.status === 'running' ? (
             <button type="button" onClick={onCancel} className="text-xs font-semibold text-red-600 hover:underline dark:text-red-400">
               Cancel
             </button>
           ) : null}
           {canResume ? (
-            <button type="button" onClick={onResume} className="text-xs font-semibold text-blue-600 hover:underline dark:text-cyan-400">
+            <button type="button" onClick={onResume} className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
               Continue from {(job.completedThrough ?? job.rangeStart).slice(0, 10)}
             </button>
           ) : null}
         </div>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-slate-800">
-        <div className="h-full rounded-full bg-blue-600 transition-all dark:bg-cyan-400" style={{ width: `${job.status === 'completed' ? 100 : pct}%` }} />
+        <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${job.status === 'completed' ? 100 : pct}%` }} />
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-500 dark:text-slate-400">
         <span>
@@ -702,28 +775,6 @@ function SkippedList({ skipped }: { skipped: Record<string, number> }) {
   );
 }
 
-function Check({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-1.5">
-      <svg className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M20 6L9 17l-5-5" />
-      </svg>
-      {children}
-    </li>
-  );
-}
-
-function Step({ n, children }: { n: number; children: React.ReactNode }) {
-  return (
-    <li className="flex gap-2.5 rounded-lg bg-neutral-50 p-3 dark:bg-slate-900/60">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white dark:bg-white dark:text-black">
-        {n}
-      </span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
 function Mono({ children }: { children: React.ReactNode }) {
   return <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[11px] text-neutral-800 dark:bg-slate-800 dark:text-slate-200">{children}</code>;
 }
@@ -732,7 +783,7 @@ function Snippet({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-lg bg-neutral-950 p-4 pr-16 font-mono text-xs text-neutral-200 dark:bg-slate-900">{code}</pre>
+      <pre className="overflow-x-auto rounded-xl bg-neutral-950 p-4 pr-16 font-mono text-xs text-neutral-200 dark:bg-slate-900">{code}</pre>
       <button
         type="button"
         onClick={() => {
@@ -740,7 +791,7 @@ function Snippet({ code }: { code: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}
-        className="absolute right-2 top-2 rounded border border-neutral-700 bg-neutral-900 px-2 py-0.5 text-[11px] font-semibold text-neutral-200 hover:bg-neutral-800"
+        className="absolute right-2 top-2 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-0.5 text-[11px] font-semibold text-neutral-200 hover:bg-neutral-800"
       >
         {copied ? 'Copied' : 'Copy'}
       </button>
@@ -767,11 +818,3 @@ function formatBytes(bytes: number): string {
 function toDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
-
-const labelClass = 'grid gap-1 text-xs font-semibold text-neutral-700 dark:text-slate-300';
-const inputClass =
-  'h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm font-normal text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-white dark:focus:ring-white/10';
-const primaryButton =
-  'inline-flex h-10 items-center justify-center rounded-lg bg-neutral-900 px-5 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-slate-200';
-const secondaryButton =
-  'inline-flex h-10 items-center justify-center rounded-lg border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
