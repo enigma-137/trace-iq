@@ -61,6 +61,7 @@ Scopes the CLI uses:
   analytics:read   logs, status
   errors:read      errors
   sourcemaps:write sourcemaps upload (a CI token can have only this scope)
+  imports:write    import posthog
 
 Without --token you are prompted for it (input is hidden). In CI, set
 TRACEIQ_TOKEN instead of logging in.
@@ -160,7 +161,7 @@ from the export.
 From a file: JSON Lines (optionally gzipped, as PostHog exports write them), a
 JSON array of events, or a saved API response with a "results" array.
 
-  --write-key <trq_...>      The TraceIQ project's write key (env TRACEIQ_WRITE_KEY, or your .env file)
+  --token <tiq_pat_...>      TraceIQ personal access token with the imports:write scope (or \`traceiq login\`)
   --dry-run                  Check access / read the file and show what would happen; send nothing.
                              With --posthog-key, no export is started (and nothing is billed).
 
@@ -172,8 +173,9 @@ What is mapped:
   $autocapture, $exception, $feature_flag_called and other PostHog-internal
   events are skipped and listed at the end.
 
-Imported events count toward your plan's monthly events and are sent to your
-webhooks like live events. There is no de-duplication: importing the same
+Imported events keep their original location (not the location of the machine
+running the import), count toward your plan's monthly events, and are not sent
+to your webhooks. Owners and admins can import. There is no de-duplication: importing the same
 range twice imports its events twice. If a direct import stops partway, it
 prints the --since value to continue from.
 `,

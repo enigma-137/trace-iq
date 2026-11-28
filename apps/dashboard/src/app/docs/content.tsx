@@ -692,26 +692,37 @@ await traceiq.shutdown();`}</Code>
 
         <h3 className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">2. Import your history</h3>
         <P>
-          The CLI can pull your events straight from PostHog. In PostHog, create a personal API key with the{' '}
+          TraceIQ can pull your events straight from PostHog. In PostHog, create a personal API key with the{' '}
           <Mono>batch_export:read</Mono> and <Mono>batch_export:write</Mono> scopes, and note your project ID (the
-          number after <Mono>/project/</Mono> in the PostHog URL). Events keep their original timestamps, so funnels,
-          retention and trends cover the period before you switched.
-        </P>
-        <Code lang="bash">{`export POSTHOG_PERSONAL_API_KEY=phx_...
-npx traceiq-cli import posthog --posthog-project 12345 --posthog-host us --since 2025-01-01 --dry-run
-npx traceiq-cli import posthog --posthog-project 12345 --posthog-host us --since 2025-01-01 \\
-  --project ${projectId} --write-key YOUR_PROJECT_WRITE_KEY --api-url ${apiBaseUrl}`}</Code>
-        <P>
-          The CLI asks PostHog for a file download export of each week in the range (PostHog’s limit per export),
-          waits for it, downloads it and imports it. Your PostHog key is only sent to PostHog. Use{' '}
-          <Mono>--posthog-host eu</Mono> for PostHog EU or your own URL if you self-host. PostHog bills these exports
-          per exported row, so events TraceIQ would skip anyway are left out of the export. <Mono>--dry-run</Mono>{' '}
-          checks the key and project without starting an export. If an import stops partway, the CLI prints the{' '}
-          <Mono>--since</Mono> value to continue from.
+          number after <Mono>/project/</Mono> in the PostHog URL). Events keep their original timestamps and
+          locations, so funnels, retention and trends cover the period before you switched.
         </P>
         <P>
-          Already have an export? Pass the file instead: <Mono>npx traceiq-cli import posthog events.jsonl</Mono>{' '}
-          (JSON Lines, gzipped or not, or a JSON array of events).
+          <strong>From the dashboard:</strong> open <Link className="text-blue-600 underline dark:text-cyan-400" href="/dashboard/import">Import</Link>{' '}
+          (under Integrations), choose your PostHog region, paste the project ID and key, pick a date range, and click{' '}
+          <em>Check connection</em>, then <em>Start import</em>. The import runs on TraceIQ’s servers, so you can close
+          the page; progress shows on the Import page. The PostHog key is used only while the import runs and is never
+          stored. If an import stops, <em>Continue from</em> fills in the form from where it got to.
+        </P>
+        <P>
+          <strong>From the terminal:</strong> log in with a personal access token that has the{' '}
+          <Mono>imports:write</Mono> scope, then:
+        </P>
+        <Code lang="bash">{`npx traceiq-cli login
+export POSTHOG_PERSONAL_API_KEY=phx_...
+npx traceiq-cli import posthog --project ${projectId} --posthog-project 12345 --posthog-host us --since 2025-01-01 --dry-run
+npx traceiq-cli import posthog --project ${projectId} --posthog-project 12345 --posthog-host us --since 2025-01-01`}</Code>
+        <P>
+          Either way, TraceIQ asks PostHog for a file download export of each week in the range (PostHog’s limit per
+          export), waits for it, downloads it and imports it. Use the EU region (<Mono>--posthog-host eu</Mono>) or your
+          own URL if you self-host. PostHog bills these exports per exported row, so events TraceIQ would skip anyway
+          are left out of the export. <Mono>--dry-run</Mono> and <em>Check connection</em> verify the key and project
+          without starting an export.
+        </P>
+        <P>
+          Already have an export file? Upload it on the Import page, or run{' '}
+          <Mono>npx traceiq-cli import posthog events.jsonl</Mono>. JSON Lines (gzipped or not), a JSON array of
+          events, and TraceIQ’s own JSON export are all accepted.
         </P>
         <Bullets
           items={[
@@ -723,8 +734,9 @@ npx traceiq-cli import posthog --posthog-project 12345 --posthog-host us --since
           ]}
         />
         <P>
-          Imported events count toward your monthly event allowance and are delivered to your webhooks like live
-          events. Imports are not de-duplicated: importing the same date range twice stores its events twice. If you run
+          Imported events count toward your monthly event allowance. They don’t trigger webhooks, and they keep
+          PostHog’s location data rather than the location of whoever runs the import. Only owners and admins can
+          import. Imports are not de-duplicated: importing the same date range twice stores its events twice. If you run
           both SDKs side by side first, export PostHog only up to the day TraceIQ went live.
         </P>
 

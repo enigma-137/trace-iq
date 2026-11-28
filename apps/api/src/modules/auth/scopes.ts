@@ -35,6 +35,7 @@ export const ALLOWED_SCOPES = [
   'synthetic_monitors:read',
   'synthetic_monitors:write',
   'exports:read',
+  'imports:write',
   'sourcemaps:write'
 ] as const;
 

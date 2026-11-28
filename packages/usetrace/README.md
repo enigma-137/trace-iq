@@ -162,9 +162,11 @@ Either way, events keep their original timestamps. `$pageview`/`$screen` become 
 `$identify`/`$set` become `$identify`, `$create_alias` becomes `$alias`, and your own events keep
 their names. `$autocapture`, `$exception` and other PostHog-internal events are skipped and listed.
 
-The TraceIQ write key comes from `--write-key`, `TRACEIQ_WRITE_KEY` or your `.env` file. Imported
-events count toward your monthly allowance and reach your webhooks. Imports are not
-de-duplicated, so importing the same range twice stores its events twice.
+Imports use your personal access token (`traceiq login`, or `TRACEIQ_TOKEN` in CI), which needs
+the `imports:write` scope, and only owners and admins can import. Imported events keep their
+original location, count toward your monthly allowance and are not sent to your webhooks.
+Imports are not de-duplicated, so importing the same range twice stores its events twice.
+You can also import from the dashboard: **Import** in the sidebar.
 
 ## Status and dashboard
 

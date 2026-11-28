@@ -136,7 +136,7 @@ describe('traceiq import posthog', () => {
     const lines = Array.from({ length: 1201 }, (_, i) => JSON.stringify({ ...pageview, event: i === 0 ? '$autocapture' : 'clicked' }));
     await fs.writeFile(file, lines.join('\n'));
 
-    const calls: Array<{ url: string; headers: Record<string, string>; body: { projectId: string; batch: unknown[] } }> = [];
+    const calls: Array<{ url: string; headers: Record<string, string>; body: { projectId: string; format: string; events: unknown[] } }> = [];
     let first = true;
     deps.fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
@@ -145,20 +145,21 @@ describe('traceiq import posthog', () => {
         return new Response('slow down', { status: 429 });
       }
       calls.push({ url: String(input), headers: init?.headers as Record<string, string>, body });
-      return new Response(JSON.stringify({ accepted: true, results: body.batch.map(() => ({ accepted: true })) }), { status: 200 });
+      return new Response(JSON.stringify({ imported: body.events.length, rejected: 0, skipped: 0, errors: [] }), { status: 200 });
     }) as typeof fetch;
 
     await runManageCommand(
       'import',
-      ['posthog', 'events.jsonl', '--write-key', 'trq_test', '--project', 'proj_a', '--api-url', 'https://api.example.com/'],
+      ['posthog', 'events.jsonl', '--token', 'tiq_pat_test', '--project', 'proj_a', '--api-url', 'https://api.example.com/'],
       deps
     );
 
     expect(process.exitCode).toBeUndefined();
-    expect(calls.map((c) => c.body.batch.length)).toEqual([500, 500, 200]);
-    expect(calls[0].url).toBe('https://api.example.com/v1/events/batch');
-    expect(calls[0].headers['x-traceiq-write-key']).toBe('trq_test');
+    expect(calls.map((c) => c.body.events.length)).toEqual([500, 500, 200]);
+    expect(calls[0].url).toBe('https://api.example.com/v1/dashboard/import/events');
+    expect(calls[0].headers.authorization).toBe('Bearer tiq_pat_test');
     expect(calls[0].body.projectId).toBe('proj_a');
+    expect(calls[0].body.format).toBe('traceiq');
     const text = out.join('\n');
     expect(text).toContain('$autocapture');
   });
@@ -177,11 +178,26 @@ describe('traceiq import posthog', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
-  it('requires a write key to send', async () => {
+  it('requires a personal access token to send', async () => {
     const file = path.join(dir, 'events.jsonl');
     await fs.writeFile(file, JSON.stringify(pageview));
     await runManageCommand('import', ['posthog', file, '--project', 'proj_a'], deps);
     expect(process.exitCode).toBe(1);
+  });
+
+  it('keeps each request under the API body limit', async () => {
+    const file = path.join(dir, 'big.jsonl');
+    const big = 'x'.repeat(10_000);
+    await fs.writeFile(file, Array.from({ length: 200 }, () => JSON.stringify({ ...pageview, event: 'big', properties: { blob: big } })).join('\n'));
+    const sizes: number[] = [];
+    deps.fetchImpl = (async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      sizes.push(String(init?.body).length);
+      return new Response(JSON.stringify({ imported: body.events.length }), { status: 200 });
+    }) as typeof fetch;
+    await runManageCommand('import', ['posthog', file, '--token', 't', '--project', 'proj_a', '--api-url', 'https://api.example.com'], deps);
+    expect(sizes.length).toBeGreaterThan(1);
+    expect(Math.max(...sizes)).toBeLessThan(1_000_000);
   });
 });
 
@@ -222,8 +238,8 @@ describe('traceiq import posthog --posthog-key (direct pull)', () => {
       log.push({ method, url, auth, body });
 
       if (url.startsWith('https://api.traceiq.test/')) {
-        sent.push(...body.batch);
-        return Response.json({ accepted: true, results: body.batch.map(() => ({ accepted: true })) });
+        sent.push(...body.events);
+        return Response.json({ imported: body.events.length, rejected: 0, skipped: 0, errors: [] });
       }
       const base = 'https://eu.posthog.com/api/projects/42/file_download_batch_exports/';
       if (url === base && method === 'GET') return Response.json({ results: [] });
@@ -263,7 +279,7 @@ describe('traceiq import posthog --posthog-key (direct pull)', () => {
     '--posthog-host', 'eu',
     '--since', '2024-03-01',
     '--until', '2024-03-11',
-    '--write-key', 'trq_test',
+    '--token', 'tiq_pat_test',
     '--project', 'proj_a',
     '--api-url', 'https://api.traceiq.test'
   ];

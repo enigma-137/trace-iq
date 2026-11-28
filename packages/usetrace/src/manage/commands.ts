@@ -449,6 +449,7 @@ async function env({ args, ctx, client, deps }: CommandContext) {
 // ─── Import ─────────────────────────────────────────────────────────────────
 
 const IMPORT_BATCH_SIZE = 500; // the API's per-request maximum
+const IMPORT_MAX_REQUEST_BYTES = 800_000; // stays under the API's 1 MB body limit
 const IMPORT_MAX_ATTEMPTS = 5;
 
 async function importCommand(context: CommandContext) {
@@ -482,28 +483,26 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
   }
 
   const dryRun = flagBool(args.flags, 'dry-run');
-  const existing = await detectExistingEnvCredentials(deps.cwd);
-  const projectId = ctx.projectId ?? existing.projectId;
-  let writeKey = flagString(args.flags, 'write-key') ?? deps.env.TRACEIQ_WRITE_KEY?.trim();
-  if (!writeKey && existing.writeKey && (!existing.projectId || existing.projectId === projectId)) {
-    writeKey = existing.writeKey;
-  }
-  const apiUrl = flagString(args.flags, 'api-url') ?? deps.env.TRACEIQ_API_URL?.trim() ?? existing.apiUrl ?? ctx.apiUrl;
+  const projectId = ctx.projectId;
+  const apiUrl = ctx.apiUrl;
 
+  // Imports go through the authenticated import endpoint, not SDK ingestion: it keeps
+  // each event's original location instead of geolocating the machine running the
+  // import, and does not fire webhooks for historical events.
   if (!dryRun) {
+    if (!ctx.token) {
+      throw new CliError(
+        'Log in first: imports use a personal access token.',
+        'Run `traceiq login` with a token that has the imports:write scope (or set TRACEIQ_TOKEN).'
+      );
+    }
     if (!projectId) {
       throw new CliError('No project selected.', 'Pass --project <id>, set TRACEIQ_PROJECT_ID, or run `traceiq projects use`.');
-    }
-    if (!writeKey) {
-      throw new CliError(
-        'A write key is required to send events.',
-        'Pass --write-key <trq_...> or set TRACEIQ_WRITE_KEY. Copy it from the project settings (`traceiq open settings`).'
-      );
     }
   }
 
   const fetchImpl = deps.fetchImpl ?? fetch;
-  const endpoint = `${apiUrl.replace(/\/+$/, '')}/v1/events/batch`;
+  const endpoint = `${apiUrl.replace(/\/+$/, '')}/v1/dashboard/import/events`;
   const skipped = new Map<string, number>();
   const failures: string[] = [];
   let read = 0;
@@ -513,6 +512,7 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
   let first: string | undefined;
   let last: string | undefined;
   let batch: TraceIQImportEvent[] = [];
+  let batchBytes = 0;
   let completedThrough: Date | undefined;
   const resumeHint = () => (pull ? pullResumeHint(imported, completedThrough) : importResumeHint(imported));
 
@@ -522,8 +522,8 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
       try {
         response = await fetchImpl(endpoint, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-traceiq-write-key': writeKey as string },
-          body: JSON.stringify({ projectId, batch: events })
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${ctx.token}` },
+          body: JSON.stringify({ projectId, format: 'traceiq', events })
         });
       } catch (error) {
         if (attempt >= IMPORT_MAX_ATTEMPTS) {
@@ -532,16 +532,10 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
       }
 
       if (response?.ok) {
-        const body = (await response.json().catch(() => ({}))) as { results?: Array<{ accepted: boolean; error?: string }> };
-        const results = body.results ?? [];
-        results.forEach((result, i) => {
-          if (result?.accepted) {
-            imported += 1;
-          } else {
-            rejected += 1;
-            if (failures.length < 5) failures.push(`${events[i]?.eventName}: ${result?.error ?? 'rejected'}`);
-          }
-        });
+        const body = (await response.json().catch(() => ({}))) as { imported?: number; rejected?: number; skipped?: number; errors?: string[] };
+        imported += body.imported ?? 0;
+        rejected += (body.rejected ?? 0) + (body.skipped ?? 0);
+        for (const error of body.errors ?? []) if (failures.length < 5) failures.push(error);
         return;
       }
 
@@ -554,7 +548,8 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
         } catch {
           // keep the raw text
         }
-        throw new CliError(`The API rejected the import (HTTP ${response.status}): ${message || response.statusText}`, resumeHint());
+        const scopeHint = response.status === 403 && /imports:write/.test(message) ? 'Create a token with the imports:write scope and run `traceiq login` again. ' : '';
+        throw new CliError(`The API rejected the import (HTTP ${response.status}): ${message || response.statusText}`, scopeHint + resumeHint());
       }
       if (attempt >= IMPORT_MAX_ATTEMPTS) {
         throw new CliError(`The API kept failing (HTTP ${response?.status ?? 'network error'}).`, resumeHint());
@@ -599,6 +594,7 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
       if (!dryRun && batch.length > 0) {
         await send(batch);
         batch = [];
+        batchBytes = 0;
       }
       const through = item.windowDone.end;
       completedThrough = through;
@@ -622,12 +618,15 @@ async function importPostHog({ args, ctx, deps }: CommandContext) {
     if (!last || ts > last) last = ts;
     if (dryRun) continue;
 
-    batch.push(result.event);
-    if (batch.length >= IMPORT_BATCH_SIZE) {
+    const size = Buffer.byteLength(JSON.stringify(result.event));
+    if (batch.length > 0 && (batch.length >= IMPORT_BATCH_SIZE || batchBytes + size > IMPORT_MAX_REQUEST_BYTES)) {
       await send(batch);
       batch = [];
+      batchBytes = 0;
       deps.out(`  ${colors.dim(`${imported.toLocaleString()} events imported...`)}`);
     }
+    batch.push(result.event);
+    batchBytes += size;
   }
   if (!dryRun && batch.length > 0) await send(batch);
 

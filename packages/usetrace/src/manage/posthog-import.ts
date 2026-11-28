@@ -12,6 +12,7 @@ import { createGunzip } from 'node:zlib';
  * Each event needs at least `event`, `distinct_id` and `timestamp`.
  */
 
+// >>> posthog-mapper (keep identical to apps/api/src/modules/imports/posthog-mapper.ts; a test checks)
 export interface PostHogEvent {
   uuid?: string;
   event?: string;
@@ -29,6 +30,7 @@ export interface TraceIQImportEvent {
   sessionId?: string;
   properties: Record<string, unknown>;
   deviceInfo?: Record<string, unknown>;
+  networkInfo?: Record<string, unknown>;
   context: Record<string, unknown>;
   timestamp: string;
 }
@@ -135,6 +137,16 @@ function deviceInfo(props: Record<string, unknown>): Record<string, unknown> | u
   return Object.keys(info).length > 0 ? info : undefined;
 }
 
+/** PostHog's GeoIP properties → TraceIQ's location fields (the IP itself is not kept). */
+function networkInfo(props: Record<string, unknown>): Record<string, unknown> | undefined {
+  const info = compact({
+    country: str(props.$geoip_country_code),
+    region: str(props.$geoip_subdivision_1_name),
+    city: str(props.$geoip_city_name)
+  });
+  return Object.keys(info).length > 0 ? info : undefined;
+}
+
 function normalizeTimestamp(value: unknown): string | undefined {
   const raw = str(value);
   if (!raw) return undefined;
@@ -188,6 +200,7 @@ export function mapPostHogEvent(raw: PostHogEvent): MapResult {
     anonymousId,
     sessionId: str(props.$session_id),
     deviceInfo: deviceInfo(props),
+    networkInfo: networkInfo(props),
     context,
     timestamp
   });
@@ -220,6 +233,8 @@ export function mapPostHogEvent(raw: PostHogEvent): MapResult {
 
   return { event: { ...base, eventName: name, properties: customProperties(props) } };
 }
+
+// <<< posthog-mapper
 
 function unwrap(parsed: unknown): PostHogEvent[] {
   if (Array.isArray(parsed)) return parsed as PostHogEvent[];

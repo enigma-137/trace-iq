@@ -59,6 +59,7 @@ export const navGroups: NavGroup[] = [
     label: 'Integrations',
     items: [
       { label: 'Webhooks', href: '/dashboard/webhooks', key: 'webhooks' },
+      { label: 'Import', href: '/dashboard/import', key: 'import' },
       { label: 'Export', href: '/dashboard/export', key: 'export' }
     ]
   }
