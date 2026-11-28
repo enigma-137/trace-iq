@@ -89,6 +89,7 @@ export function HelpTip({ label, children, align = 'start' }: { label: string; c
 /** A card that offers one action: icon, title, one line, a "?" for details, and a button. */
 export function ActionCard({
   icon,
+  logo,
   tone,
   title,
   description,
@@ -96,7 +97,9 @@ export function ActionCard({
   helpLabel,
   children
 }: {
-  icon: IconSvgElement;
+  icon?: IconSvgElement;
+  /** A brand mark shown on a white tile instead of the coloured icon tile. */
+  logo?: { src: string; alt: string };
   tone: 'blue' | 'orange';
   title: string;
   description: string;
@@ -107,12 +110,19 @@ export function ActionCard({
   return (
     <section className="flex flex-col rounded-2xl border border-neutral-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-start gap-4">
-        <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${tone === 'blue' ? 'bg-blue-600' : 'bg-orange-500'}`}
-          aria-hidden="true"
-        >
-          <HugeiconsIcon icon={icon} size={22} strokeWidth={1.8} />
-        </span>
+        {logo ? (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white p-1.5 dark:border-slate-700">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG mark */}
+            <img src={logo.src} alt={logo.alt} className="h-auto w-full" />
+          </span>
+        ) : (
+          <span
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${tone === 'blue' ? 'bg-blue-600' : 'bg-orange-500'}`}
+            aria-hidden="true"
+          >
+            {icon ? <HugeiconsIcon icon={icon} size={22} strokeWidth={1.8} /> : null}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-white">{title}</h2>

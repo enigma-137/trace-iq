@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Upload04Icon from '@hugeicons/core-free-icons/Upload04Icon';
-import CloudDownloadIcon from '@hugeicons/core-free-icons/CloudDownloadIcon';
 import { DashboardDialog } from '@/app/dashboard/DashboardDialog';
 import { ActionCard, HelpTip, Notice, buttonClass, fieldClass } from '@/components/dashboard/CalmUI';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
@@ -130,7 +129,7 @@ function PostHogAndFile({
         <FileImportCard api={api} projectId={projectId} />
 
         <ActionCard
-          icon={CloudDownloadIcon}
+          logo={{ src: '/brand/posthog-mark.svg', alt: 'PostHog' }}
           tone="orange"
           title="Import from PostHog"
           description="Pull events straight from PostHog with an API key. Nothing to download."
