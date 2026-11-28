@@ -1,6 +1,6 @@
 {
   "name": "traceiq-cli",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -9,10 +9,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "traceiq-cli": "./bin/usetrace.js",
-    "traceiq": "./bin/usetrace.js",
-    "traceiqcli": "./bin/usetrace.js",
-    "usetrace": "./bin/usetrace.js"
+    "traceiq-cli": "bin/usetrace.js",
+    "traceiq": "bin/usetrace.js",
+    "traceiqcli": "bin/usetrace.js",
+    "usetrace": "bin/usetrace.js"
   },
   "files": [
     "bin",
