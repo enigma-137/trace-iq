@@ -1,6 +1,6 @@
 # traceiq (Python)
 
-Server-side TraceIQ SDK for Python (3.8+). Pure standard library — no dependencies.
+Server-side TraceIQ SDK for Python (3.9+). Pure standard library — no dependencies.
 Events are queued and flushed in batches by a background thread, so your code never
 blocks on the network.
 
