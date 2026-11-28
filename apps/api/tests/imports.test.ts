@@ -1,8 +1,9 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { EventsService } from '../src/modules/events/events.service';
+import { ImportsController } from '../src/modules/imports/imports.controller';
 import { ImportsService } from '../src/modules/imports/imports.service';
 import { PostHogClient, normalizePostHogHost, planWindows } from '../src/modules/imports/posthog-client';
 import { mapPostHogEvent } from '../src/modules/imports/posthog-mapper';
@@ -273,5 +274,111 @@ describe('ImportsService PostHog jobs', () => {
     await expect(service.startPostHogImport(user, { ...body, posthogProjectId: 'abc' })).rejects.toBeInstanceOf(BadRequestException);
     await expect(service.startPostHogImport(user, { ...body, since: undefined })).rejects.toBeInstanceOf(BadRequestException);
     expect(service.createPostHogClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('ImportsService file imports', () => {
+  function fileSetup(job: { status?: string; created_by_user_id?: string } | null = {}) {
+    const setup = importsSetup();
+    setup.db.query.mockImplementation(async (text: string, values: unknown[] = []) => {
+      setup.db.calls.push({ text, values });
+      if (text.includes('SELECT status, created_by_user_id FROM import_jobs')) {
+        return job ? rows([{ status: job.status ?? 'running', created_by_user_id: job.created_by_user_id ?? 'user_1' }]) : rows([]);
+      }
+      if (text.includes('SELECT * FROM import_jobs')) {
+        return rows([
+          {
+            id: 'imp_f', project_id: 'proj_1', source: 'file', status: 'running', source_host: null, source_project: null,
+            range_start: null, range_end: null, file_name: 'events.jsonl', file_format: 'posthog', completed_through: null,
+            windows_total: 0, windows_done: 0, read_count: '3', imported_count: '1', skipped_count: '2', rejected_count: '0',
+            skipped_events: {}, error: null, created_at: new Date(), heartbeat_at: new Date(), finished_at: null
+          }
+        ]);
+      }
+      return affected(1);
+    });
+    return setup;
+  }
+
+  it('records a file upload and adds each chunk to it', async () => {
+    const { service, db } = fileSetup();
+    const { job } = await service.startFileImport(user, { fileName: '  events.jsonl ', format: 'posthog' });
+    expect(job).toMatchObject({ source: 'file', fileName: 'events.jsonl', rangeStart: null, rangeEnd: null });
+    expect(db.queryCalls('INSERT INTO import_jobs')[0].values.slice(2)).toEqual(['events.jsonl', 'posthog', 'user_1']);
+
+    await service.importEvents(user, {
+      importId: 'imp_f',
+      format: 'posthog',
+      events: [
+        { event: '$pageview', distinct_id: 'u1', timestamp: '2024-01-01T00:00:00Z' },
+        { event: '$autocapture', distinct_id: 'u1', timestamp: '2024-01-01T00:00:00Z' }
+      ]
+    });
+    const add = db.queryCalls('read_count = read_count + $2')[0];
+    expect(add.values).toEqual(['imp_f', 2, 1, 1, 0, JSON.stringify({ $autocapture: 1 }), 'posthog']);
+  });
+
+  it('adds what the browser dropped and closes the record', async () => {
+    const { service, db } = fileSetup();
+    await service.finishFileImport(user, 'imp_f', { status: 'completed', read: 1, skipped: 1, skippedEvents: { '(lines that are not valid JSON)': 1, bad: -4 } });
+    expect(db.queryCalls('read_count = read_count + $2')[0].values.slice(1, 6)).toEqual([1, 0, 1, 0, JSON.stringify({ '(lines that are not valid JSON)': 1 })]);
+    expect(db.queryCalls(/SET status = \$2/)[0].values.slice(1)).toEqual(['completed', null]);
+  });
+
+  it('only accepts chunks for a running import the same person started', async () => {
+    await expect(fileSetup({ created_by_user_id: 'someone_else' }).service.importEvents(user, { importId: 'imp_f', format: 'traceiq', events: [{}] })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(fileSetup(null).service.finishFileImport(user, 'imp_x', { status: 'completed' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(fileSetup({ status: 'completed' }).service.importEvents(user, { importId: 'imp_f', format: 'traceiq', events: [{}] })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('validates the file name and the finishing status', async () => {
+    const { service } = fileSetup();
+    await expect(service.startFileImport(user, { fileName: ' ' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.finishFileImport(user, 'imp_f', { status: 'running' })).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('ImportsController 2FA', () => {
+  function controllerSetup(authMethod: 'supabase' | 'pat') {
+    const stepUpError = new ForbiddenException('Step-up authentication is required.', 'STEP_UP_REQUIRED');
+    const auth = {
+      getDashboardUser: vi.fn().mockResolvedValue({ id: 'user_1', authMethod }),
+      requireScope: vi.fn(),
+      requireStepUpIfEnrolled: vi.fn(() => {
+        throw stepUpError;
+      })
+    };
+    const service = {
+      startFileImport: vi.fn().mockResolvedValue({}),
+      importEvents: vi.fn().mockResolvedValue({}),
+      startPostHogImport: vi.fn().mockResolvedValue({}),
+      finishFileImport: vi.fn().mockResolvedValue({})
+    };
+    return { auth, service, controller: new ImportsController(auth as never, service as never) };
+  }
+
+  it('asks a 2FA account to verify before an import starts', async () => {
+    const { controller, service } = controllerSetup('supabase');
+    await expect(controller.startFileImport('Bearer t', { fileName: 'a.jsonl' })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.startPostHog('Bearer t', {})).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.importEvents('Bearer t', { events: [] })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(service.startFileImport).not.toHaveBeenCalled();
+    expect(service.startPostHogImport).not.toHaveBeenCalled();
+    expect(service.importEvents).not.toHaveBeenCalled();
+  });
+
+  it('does not ask again for each chunk of a started import, or to finish it', async () => {
+    const { controller, auth } = controllerSetup('supabase');
+    await controller.importEvents('Bearer t', { importId: 'imp_f', events: [] });
+    await controller.finishFileImport('imp_f', 'Bearer t', { status: 'completed' });
+    expect(auth.requireStepUpIfEnrolled).not.toHaveBeenCalled();
+  });
+
+  it('lets the CLI import with a personal access token', async () => {
+    const { controller, auth, service } = controllerSetup('pat');
+    await controller.importEvents('Bearer pat', { events: [] });
+    await controller.startPostHog('Bearer pat', {});
+    expect(auth.requireStepUpIfEnrolled).not.toHaveBeenCalled();
+    expect(service.importEvents).toHaveBeenCalled();
   });
 });
