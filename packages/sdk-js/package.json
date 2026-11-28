@@ -6,6 +6,7 @@
     "access": "public"
   },
   "description": "TraceIQ SDK for JavaScript and TypeScript clients.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/enigma-137/trace-iq.git",

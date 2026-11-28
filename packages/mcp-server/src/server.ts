@@ -21,7 +21,7 @@ import { WIDGET_URI } from './widget.js';
 
 const WIDGET_TOOLS = new Set(widgetTools);
 
-export const SERVER_VERSION = '0.8.0';
+export const SERVER_VERSION = '0.8.1';
 
 export const SERVER_INSTRUCTIONS = [
   'TraceIQ is product analytics plus API and error monitoring.',
