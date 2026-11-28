@@ -56,42 +56,54 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+        # The script reaches the VPS on stdin (bash -s). Two guards keep a command that reads
+        # stdin (docker compose exec does) from eating the rest of it and ending the job early
+        # with exit 0: the body is one function that bash parses in full before running it,
+        # and the job only passes if the script printed its final DEPLOY_OK line.
         run: |
+          set -o pipefail
           ssh -i ~/.ssh/deploy_key -p "$VPS_PORT" -o StrictHostKeyChecking=yes \
-            "$VPS_USER@$VPS_HOST" "DEPLOY_SHA=$DEPLOY_SHA bash -s" <<'REMOTE'
-          set -euo pipefail
-          cd /opt/traceiq
+            "$VPS_USER@$VPS_HOST" "DEPLOY_SHA=$DEPLOY_SHA bash -s" <<'REMOTE' | tee deploy.log
+          deploy() {
+            set -euo pipefail
+            cd /opt/traceiq
 
-          echo "Backing up PostgreSQL..."
-          backup_dir=/opt/traceiq-backups
-          mkdir -p "$backup_dir"
-          backup="$backup_dir/traceiq-$(date -u +%Y%m%dT%H%M%SZ)-${DEPLOY_SHA:0:7}.sql.gz"
-          docker compose exec -T postgres pg_dump -U traceiq -d traceiq --no-owner --no-acl | gzip > "$backup"
-          echo "Backup written to $backup"
-          # Keep the 14 most recent backups.
-          ls -1t "$backup_dir"/traceiq-*.sql.gz | tail -n +15 | xargs -r rm --
+            echo "Backing up PostgreSQL..."
+            backup_dir=/opt/traceiq-backups
+            mkdir -p "$backup_dir"
+            backup="$backup_dir/traceiq-$(date -u +%Y%m%dT%H%M%SZ)-${DEPLOY_SHA:0:7}.sql.gz"
+            docker compose exec -T postgres pg_dump -U traceiq -d traceiq --no-owner --no-acl < /dev/null | gzip > "$backup"
+            gzip -t "$backup"
+            echo "Backup written to $backup ($(du -h "$backup" | cut -f1))"
+            # Keep the 14 most recent backups.
+            ls -1t "$backup_dir"/traceiq-*.sql.gz | tail -n +15 | xargs -r rm --
 
-          echo "Updating to $DEPLOY_SHA..."
-          git fetch origin main
-          git merge --ff-only "$DEPLOY_SHA"
+            echo "Updating to $DEPLOY_SHA..."
+            git fetch origin main
+            git merge --ff-only "$DEPLOY_SHA"
+            test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
 
-          echo "Building, migrating and starting services..."
-          docker compose up -d --build --remove-orphans
+            echo "Building, migrating and starting services..."
+            docker compose up -d --build --remove-orphans < /dev/null
 
-          echo "Waiting for API health..."
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:4000/health > /dev/null; then
-              echo "API healthy"
-              docker compose ps
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "API did not become healthy"
-          docker compose ps -a
-          docker compose logs --tail=100 migrate api
-          exit 1
+            echo "Waiting for API health..."
+            for i in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:4000/health > /dev/null; then
+                echo "API healthy"
+                docker compose ps < /dev/null
+                echo "DEPLOY_OK $DEPLOY_SHA"
+                return 0
+              fi
+              sleep 5
+            done
+            echo "API did not become healthy"
+            docker compose ps -a < /dev/null
+            docker compose logs --tail=100 migrate api < /dev/null
+            return 1
+          }
+          deploy
           REMOTE
+          grep -qx "DEPLOY_OK $DEPLOY_SHA" deploy.log || { echo "::error::The deploy script did not finish."; exit 1; }
 
       - name: Check public health
         run: curl -sf --retry 5 --retry-delay 5 --retry-all-errors https://api.traceiq.run/health
