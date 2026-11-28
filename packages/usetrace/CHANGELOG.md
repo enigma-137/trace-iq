@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Add `traceiq import posthog <file>` to import events from a PostHog export (JSON Lines, a JSON array, or an API response with `results`). Page views, identifies and aliases are mapped to their TraceIQ equivalents, custom events keep their names, and PostHog-internal events are skipped and listed. `--dry-run` shows what would be imported without sending anything.
 - `traceiq import posthog --posthog-key phx_... --posthog-project <id> --since <date>` pulls events directly from PostHog using PostHog file download exports, one week at a time, then imports them. Events TraceIQ skips are excluded from the export, since PostHog bills exports per row. Gzipped JSON Lines files can also be imported.
