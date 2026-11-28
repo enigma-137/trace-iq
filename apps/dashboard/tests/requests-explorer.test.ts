@@ -148,7 +148,9 @@ describe('formatting', () => {
     expect(formatBytes(null)).toBe('—');
     expect(formatBytes(512)).toBe('512 B');
     expect(formatBytes(2048)).toBe('2.0 KB');
-    expect(statusTone(0)).toBe('none');
+    // Status 0 means the request got no response, which counts as a failure (#93).
+    expect(statusTone(0)).toBe('network');
+    expect(statusTone(101)).toBe('none');
     expect(statusTone(204)).toBe('success');
     expect(statusTone(302)).toBe('redirect');
     expect(statusTone(404)).toBe('client');
