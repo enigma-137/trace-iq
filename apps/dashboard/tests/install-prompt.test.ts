@@ -110,7 +110,7 @@ describe('browser stack', () => {
 
 describe('server stacks', () => {
   it('sets the endpoint explicitly, since the SDKs default to localhost', () => {
-    for (const id of ['node', 'python', 'php', 'rust'] as const) {
+    for (const id of ['node', 'go', 'python', 'php', 'rust'] as const) {
       const text = prompt(id);
       expect(text).toContain(`TRACEIQ_API_URL (${API})`);
       expect(text).toContain('TRACEIQ_WRITE_KEY');
@@ -121,6 +121,7 @@ describe('server stacks', () => {
     expect(prompt('python')).toContain('pip install traceiq-py');
     expect(prompt('php')).toContain('composer require traceiq/traceiq-php');
     expect(prompt('node')).toContain('npm install traceiq-node');
+    expect(prompt('go')).toContain('go get github.com/enigma-137/trace-iq/sdks/go');
   });
 
   it('warns to flush before a short-lived process exits', () => {

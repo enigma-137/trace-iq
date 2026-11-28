@@ -200,7 +200,7 @@ export function DocsSectionBody({ id, projectId, apiBaseUrl, snippet }: DocsSect
             items={[
               ['Getting started', 'Quickstart, SDK methods, configuration options, and automatic event capture.'],
               ['Deployment', 'One-command private setup, production topology, authentication modes, backups, migrations, and safe upgrades.'],
-              ['SDKs', 'JavaScript, Flutter, React Native, Node.js, Python, Swift, Kotlin, Rust, and PHP.'],
+              ['SDKs', 'JavaScript, Flutter, React Native, Node.js, Go, Python, Swift, Kotlin, Rust, and PHP.'],
               ['Features', 'Web analytics, Web Vitals, public sharing, flags, alerts, dashboards, webhooks, and export.'],
               ['Reference', 'Direct REST ingestion over HTTP and the Model Context Protocol (MCP) server copilot.']
             ]}
@@ -599,6 +599,7 @@ traceiq.log('error', 'Result upload failed', { error, courseId: 'CSC201' });`}</
             headers={['SDK', 'Methods', 'Notes']}
             rows={[
               ['Node, Python, Rust', 'capture(), identify(), group(), alias()', 'No session or stored user: pass userId (or anonymousId) on every call.'],
+              ['Go', 'Capture(), Identify(), CaptureError()', 'Events are queued and flushed by a background goroutine; call Shutdown before exit.'],
               ['Kotlin, Swift', 'capture(), identify(), group()', 'Same payloads as the other SDKs; pass userId to group().'],
               ['React Native', 'capture(), screen(), identify(), group(), alias(), reset()', 'screen() replaces page(). reset() on sign-out.'],
               ['Flutter', 'track(), screen(), identify(), alias(), captureException(), reset()', 'No group() yet: track the $group event as shown above.']
@@ -930,6 +931,72 @@ const payload = await traceiq.getFeatureFlagPayload('new-billing-flow', userId, 
               ['captureConsole', 'false', 'Forward console.log/info/warn/error to TraceIQ Logs.']
             ]}
           />
+        </Section>
+      </div>
+    );
+  }
+
+  if (id === 'go') {
+    return (
+      <div className="space-y-8">
+        <Section id="go" title="Go SDK">
+          <P>
+            <Mono>traceiq</Mono> for Go 1.22+ — standard library only, with a background goroutine that
+            batches events. Request handlers never wait on the network.
+          </P>
+          <Code lang="bash">{`go get github.com/enigma-137/trace-iq/sdks/go`}</Code>
+          <Code lang="go">{`package main
+
+import (
+  "context"
+  "log"
+
+  traceiq "github.com/enigma-137/trace-iq/sdks/go"
+)
+
+func main() {
+  client, err := traceiq.New(
+    "${projectId}",
+    "YOUR_WRITE_KEY", // keep server write keys secret
+    traceiq.WithEndpoint("${apiBaseUrl}"),
+  )
+  if err != nil {
+    log.Fatal(err)
+  }
+  defer client.Shutdown(context.Background())
+
+  ctx := context.Background()
+  _ = client.Capture(ctx, traceiq.Event{
+    Name:       "payout_succeeded",
+    UserID:     "user_123",
+    Properties: map[string]any{"amount": 50000, "currency": "NGN"},
+  })
+  _ = client.Identify(ctx, "user_123", map[string]any{"kyc_tier": 2})
+}`}</Code>
+        </Section>
+        <Section id="go-http" title="net/http servers">
+          <P>
+            Pass the request context to <Mono>Capture</Mono> and <Mono>CaptureError</Mono>, then call{' '}
+            <Mono>Shutdown</Mono> after the HTTP server stops so queued events flush.
+          </P>
+          <Code lang="go">{`mux.HandleFunc("POST /checkout", func(w http.ResponseWriter, r *http.Request) {
+  if err := checkout(r.Context()); err != nil {
+    _ = client.CaptureError(r.Context(), err, traceiq.ErrorOptions{
+      UserID: "user_123",
+    })
+    http.Error(w, "checkout failed", http.StatusInternalServerError)
+    return
+  }
+  _ = client.Capture(r.Context(), traceiq.Event{
+    Name:   "checkout_completed",
+    UserID: "user_123",
+  })
+  w.WriteHeader(http.StatusNoContent)
+})`}</Code>
+          <P>
+            The same pattern works with chi, gorilla/mux, Gin, Echo, and Fiber. Keep the write key in
+            an environment variable and call <Mono>Shutdown</Mono> before the process exits.
+          </P>
         </Section>
       </div>
     );

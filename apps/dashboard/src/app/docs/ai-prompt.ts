@@ -6,6 +6,7 @@ import { SDK_VERSIONS } from '@/lib/sdkVersions';
 export type AiLanguageId =
   | 'javascript'
   | 'node'
+  | 'go'
   | 'python'
   | 'rust'
   | 'php'
@@ -127,6 +128,44 @@ const traceiq = new TraceIQ({
     docs: [
       { label: 'Node.js SDK', href: '/docs?page=node' },
       { label: 'API performance', href: '/docs?page=api-performance' }
+    ]
+  },
+  {
+    id: 'go',
+    label: 'Go',
+    blurb: 'Standard-library client for Go servers and workers',
+    install: 'go get github.com/enigma-137/trace-iq/sdks/go',
+    init: `import traceiq "github.com/enigma-137/trace-iq/sdks/go"
+
+client, err := traceiq.New(
+    "YOUR_PROJECT_ID",
+    "YOUR_WRITE_KEY",
+    traceiq.WithEndpoint("__API_BASE_URL__"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Shutdown(context.Background())`,
+    steps: [
+      'Install the module and create one `Client` for your process.',
+      'Keep the write key in an environment variable — server keys stay secret.',
+      'Call `Capture` for events and `Identify` to associate a user profile; delivery happens in the background.',
+      'Call `Shutdown` before a short-lived process exits so queued events flush.'
+    ],
+    featureSnippets: {
+      'event-tracking': `_ = client.Capture(ctx, traceiq.Event{
+    Name:       "payout_succeeded",
+    UserID:     "user_123",
+    Properties: map[string]any{"amount": 50000, "currency": "NGN"},
+})`,
+      'user-identity': `_ = client.Identify(ctx, "user_123", map[string]any{
+    "email":    "a@b.com",
+    "kyc_tier": 2,
+})`
+    },
+    docs: [
+      { label: 'Go SDK', href: '/docs?page=go' },
+      { label: 'Server-side ingestion', href: '/docs?page=ingestion' }
     ]
   },
   {

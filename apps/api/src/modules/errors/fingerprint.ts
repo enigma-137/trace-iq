@@ -17,6 +17,14 @@ export interface StackFrame {
 
 // Python:  File "/app/x.py", line 12, in handler
 const PYTHON_FRAME = /^\s*File "([^"]+)", line \d+, in (.+?)\s*$/;
+// Go:      main.checkout(...)
+//              /app/checkout.go:42 +0x1d
+const GO_LOCATION = /^(.+?):(\d+)(?:\s+\+0x[0-9a-f]+.*)?$/;
+const GO_FUNCTION = /^([^\s]+)\(.*\)\s*$/;
+// The TraceIQ Go SDK keeps function and location on separate lines with no args.
+const GO_BARE_FUNCTION = /^([^\s]+)\s*$/;
+const GO_CREATED_BY = /^created by (.+?) in goroutine \d+$/;
+const GO_GOROUTINE = /^goroutine \d+ \[/;
 const LINE_COLUMN = /(?::\d+){1,2}$/;
 
 /**
@@ -28,6 +36,7 @@ const LINE_COLUMN = /(?::\d+){1,2}$/;
 export function parseStack(stack: string): StackFrame[] {
   const frames: StackFrame[] = [];
   const pythonFrames: StackFrame[] = [];
+  let pendingGoFunction = '';
 
   for (const rawLine of stack.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -36,6 +45,27 @@ export function parseStack(stack: string): StackFrame[] {
     if (python) {
       pythonFrames.push(toFrame(python[2], python[1]));
       continue;
+    }
+
+    // Go prints a goroutine header, then pairs of "function(...)" and
+    // "\t/file.go:line +0xoffset" lines. Keep the function until its location.
+    if (GO_GOROUTINE.test(line)) {
+      pendingGoFunction = '';
+      continue;
+    }
+    const createdBy = GO_CREATED_BY.exec(line);
+    if (createdBy) {
+      pendingGoFunction = createdBy[1];
+      continue;
+    }
+    if (pendingGoFunction) {
+      const location = GO_LOCATION.exec(line);
+      if (location) {
+        frames.push(toFrame(pendingGoFunction, `${location[1]}:${location[2]}`));
+        pendingGoFunction = '';
+        continue;
+      }
+      pendingGoFunction = '';
     }
 
     if (line.startsWith('at ')) {
@@ -57,6 +87,17 @@ export function parseStack(stack: string): StackFrame[] {
       if (LINE_COLUMN.test(location) || /^[a-z][\w+.-]*:\/\//i.test(location)) {
         frames.push(toFrame(line.slice(0, at), location));
       }
+      continue;
+    }
+
+    const goFunction = GO_FUNCTION.exec(line);
+    if (goFunction && goFunction[1].includes('.')) {
+      pendingGoFunction = goFunction[1];
+      continue;
+    }
+    // A bare line with a dotted name and no colon is a function, not a file:line.
+    if (GO_BARE_FUNCTION.test(line) && line.includes('.') && !line.includes(':') && !LINE_COLUMN.test(line)) {
+      pendingGoFunction = line;
     }
   }
 
@@ -102,6 +143,8 @@ function isInApp(normalizedFile: string, rawFile: string): boolean {
   if (/^node:|^internal\/|<anonymous>|^native$/.test(rawFile.trim())) return false;
   if (/^(chrome|moz|safari(-web)?)-extension:/.test(rawFile.trim())) return false;
   if (/site-packages\/|dist-packages\/|\/lib\/python\d/.test(normalizedFile)) return false;
+  // Go standard library and downloaded modules are not the app's code.
+  if (/\/go\/src\/|\/pkg\/mod\//.test(normalizedFile)) return false;
   return true;
 }
 

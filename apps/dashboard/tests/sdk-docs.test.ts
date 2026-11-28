@@ -8,6 +8,7 @@ describe('SDK documentation navigation', () => {
       'flutter',
       'react-native',
       'node',
+      'go',
       'python',
       'swift',
       'kotlin',
