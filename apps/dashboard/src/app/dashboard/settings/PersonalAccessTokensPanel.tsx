@@ -81,6 +81,7 @@ const SCOPE_GROUPS: ScopeGroup[] = [
     write: 'synthetic_monitors:write',
     mcp: true
   },
+  { key: 'status_pages', label: 'Status page', read: 'status_pages:read', write: 'status_pages:write', mcp: false },
   { key: 'exports', label: 'Exports', read: 'exports:read', mcp: false },
   { key: 'imports', label: 'Imports (CLI event imports)', write: 'imports:write', mcp: false },
   { key: 'sourcemaps', label: 'Source map uploads', write: 'sourcemaps:write', mcp: false }

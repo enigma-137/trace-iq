@@ -1,0 +1,156 @@
+/* Project status pages. Rendered inside landing-light.module.css's .site, so its
+   tokens (--ink, --muted, --green, --orange, --blue, --line, --mono) apply. */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.page main {
+  flex: 1;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
+}
+.headerNote {
+  font: 10px/1.7 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+}
+.description {
+  margin-top: 14px;
+  max-width: 720px;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.incidents {
+  padding: 28px 24px 30px;
+  border-top: 1px solid var(--line);
+}
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.none {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.incident {
+  margin-top: 16px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  background: var(--panel);
+}
+.incident[data-level="degraded"] {
+  border-left-color: var(--orange);
+}
+.incident[data-level="down"] {
+  border-left-color: #d13a2c;
+}
+.incident[data-level="maintenance"] {
+  border-left-color: var(--blue);
+}
+.incident[data-level="operational"] {
+  border-left-color: var(--green);
+}
+.incidentHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.incidentHead h3 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  overflow-wrap: anywhere;
+}
+.badge {
+  flex: none;
+  padding: 2px 8px;
+  font: 600 11px/1.6 var(--mono);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.badge[data-level="degraded"] {
+  color: var(--orange-ink);
+}
+.badge[data-level="down"] {
+  color: #b42318;
+}
+.badge[data-level="maintenance"] {
+  color: var(--blue);
+}
+.badge[data-level="operational"] {
+  color: var(--green);
+}
+.meta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.updates {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.updates li {
+  padding: 10px 0 0;
+  border-top: 1px dashed var(--line);
+}
+.updates li + li {
+  margin-top: 10px;
+}
+.updates p {
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.updates time {
+  display: block;
+  margin-top: 4px;
+  font: 11px/1.5 var(--mono);
+  color: var(--muted);
+}
+.footer {
+  padding: 22px 24px 28px;
+  border-top: 1px solid var(--line);
+}
+.powered {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.powered:hover strong {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .header,
+  .incidents,
+  .footer {
+    padding-inline: 16px;
+  }
+  .incidentHead {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

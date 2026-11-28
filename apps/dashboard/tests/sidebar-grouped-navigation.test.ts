@@ -62,7 +62,7 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
     expect(analytics?.items).toEqual(expectedAnalytics);
   });
 
-  it('Observability group leads with API performance and Requests, then logs, errors, alerts, replays, synthetic monitors', () => {
+  it('Observability group leads with API performance and Requests, then logs, errors, alerts, replays, synthetic monitors, status page', () => {
     const obs = navGroups.find((g) => g.key === 'observability');
     expect(obs).toBeDefined();
     expect(obs?.label).toBe('Observability');
@@ -75,7 +75,8 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
       'errors',
       'alerts',
       'replays',
-      'synthetic-monitors'
+      'synthetic-monitors',
+      'status-page'
     ]);
 
     const syntheticItem = obs?.items.find((i) => i.key === 'synthetic-monitors');
@@ -113,8 +114,8 @@ describe('Sidebar Grouped Navigation Structure & Routing', () => {
   });
 
   it('navItems and allNavItems contain all grouped and standalone items without omissions', () => {
-    expect(navItems).toHaveLength(25);
-    expect(allNavItems).toHaveLength(28);
+    expect(navItems).toHaveLength(26);
+    expect(allNavItems).toHaveLength(29);
   });
 
   it('findGroupForActiveItem maps active child keys to their parent group', () => {

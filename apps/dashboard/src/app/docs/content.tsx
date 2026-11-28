@@ -26,6 +26,7 @@ export const docsSections = [
   { id: 'experiments', label: 'Experiments', category: 'Features' },
   { id: 'surveys', label: 'Surveys', category: 'Features' },
   { id: 'synthetic-monitors', label: 'Synthetic monitors', category: 'Features' },
+  { id: 'status-pages', label: 'Status pages', category: 'Features' },
   { id: 'alerts', label: 'Alerts', category: 'Features' },
   { id: 'dashboards', label: 'Dashboards', category: 'Features' },
   { id: 'public-sharing', label: 'Public sharing', category: 'Features' },
@@ -1759,6 +1760,37 @@ await traceiq.surveys.submitResponse(survey.id, [
         <P>
           The preview URL must be publicly reachable; private and internal addresses are rejected. Mark the job as a
           required status check in your branch protection rules to block merging when a journey fails.
+        </P>
+      </Section>
+    );
+  }
+
+  if (id === 'status-pages') {
+    return (
+      <Section id="status-pages" title="Status pages">
+        <P>
+          Give your customers a public page that shows whether your services are up: current status, 90 days of
+          uptime, active incidents, scheduled maintenance and recent incident history. Status pages are free on every
+          plan.
+        </P>
+        <P>
+          Set one up under <Link className="text-blue-600 underline dark:text-cyan-400" href="/dashboard/status-page">Observability → Status page</Link>.
+          Pick an address (your page lives at <Mono>traceiq.run/status/your-name</Mono>), choose which{' '}
+          <Link className="text-blue-600 underline dark:text-cyan-400" href="?page=synthetic-monitors">synthetic monitors</Link> to show,
+          and give each a public name. Then publish. Only owners and admins can change the page or post incidents.
+        </P>
+        <Bullets
+          items={[
+            ['Component status', 'From the latest monitor runs: the last run passed → Operational; one failure → Degraded; two failures in a row → Outage. A paused monitor shows Unknown.'],
+            ['Uptime bars', 'One bar per UTC day: green when every run passed, orange at 95% or more, red below that, grey with no runs.'],
+            ['Incidents', 'Report an incident with an impact (minor, major, critical) and the affected components, then post updates as it moves through Investigating, Identified, Monitoring and Resolved. An open incident lowers the status of the components it affects.'],
+            ['Maintenance', 'Schedule a window with a start and end. It shows as upcoming, switches to In progress at the start time and to Completed at the end, on its own.'],
+            ['Privacy', 'The public page shows only the names, descriptions and messages you write, plus uptime. Monitor names, URLs, errors, screenshots and network logs never appear.']
+          ]}
+        />
+        <P>
+          The page refreshes every minute and changes appear within about 30 seconds. Custom domains (for example{' '}
+          <Mono>status.yourcompany.com</Mono>) are planned for paid plans.
         </P>
       </Section>
     );

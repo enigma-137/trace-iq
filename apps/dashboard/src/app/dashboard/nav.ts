@@ -40,7 +40,8 @@ export const navGroups: NavGroup[] = [
       { label: 'Errors', href: '/dashboard/errors', key: 'errors' },
       { label: 'Alerts', href: '/dashboard/alerts', key: 'alerts' },
       { label: 'Replays', href: '/dashboard/replays', key: 'replays' },
-      { label: 'Synthetic monitors', href: '/dashboard/synthetic-monitors', key: 'synthetic-monitors' }
+      { label: 'Synthetic monitors', href: '/dashboard/synthetic-monitors', key: 'synthetic-monitors' },
+      { label: 'Status page', href: '/dashboard/status-page', key: 'status-page' }
     ]
   },
   {

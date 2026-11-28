@@ -47,6 +47,9 @@
 .bar[data-level="down"] {
   background: #d13a2c;
 }
+.mark[data-level="maintenance"] {
+  background: var(--blue);
+}
 .components {
   border-top: 1px solid var(--line);
 }
@@ -88,6 +91,9 @@
 }
 .componentStatus[data-status="down"] {
   color: #b42318;
+}
+.componentStatus[data-status="maintenance"] {
+  color: var(--blue);
 }
 .componentStatus[data-status="unknown"] {
   color: var(--muted);

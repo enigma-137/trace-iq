@@ -1,6 +1,7 @@
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import Upload04Icon from '@hugeicons/core-free-icons/Upload04Icon';
+import Radar01Icon from '@hugeicons/core-free-icons/Radar01Icon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import AnalyticsUpIcon from '@hugeicons/core-free-icons/AnalyticsUpIcon';
 import BookOpen02Icon from '@hugeicons/core-free-icons/BookOpen02Icon';
@@ -48,6 +49,7 @@ const ICONS: Record<string, IconSvgElement> = {
   surveys: Comment01Icon,
   links: Link04Icon,
   'synthetic-monitors': Activity01Icon,
+  'status-page': Radar01Icon,
   webhooks: WebhookIcon,
   achievements: ChampionIcon,
   export: Download04Icon,
