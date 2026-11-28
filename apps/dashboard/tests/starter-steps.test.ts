@@ -93,12 +93,13 @@ describe('Overview page', () => {
     expect(page).not.toContain('Lightweight Onboarding Setup Reminder');
   });
 
-  it('shows the full Overview only once there is an event to show', () => {
-    expect(page).toContain('const isBrandNew = hasNoProject || (Boolean(overview?.project) && !overview?.lastEventAt);');
-    expect(page).toContain('{!isBrandNew ? (');
-    // The wrapped region starts at Today's story and ends before the closing of the container.
-    expect(page.indexOf('{!isBrandNew ? (')).toBeLessThan(page.indexOf("Highlighted Insight Banner: Today's Story"));
-    expect(page.indexOf("Highlighted Insight Banner: Today's Story")).toBeLessThan(page.indexOf('</DashboardShell>'));
+  it('keeps the checklist in the header and renders the Overview under it (#94)', () => {
+    expect(page).not.toContain('isBrandNew');
+    expect(page).toMatch(/headerActions=\{\s*showStarter && overview\?\.project && onboardingSteps \? \(\s*<StarterChecklist /);
+    // The Overview renders for any project, whether or not an event has arrived.
+    expect(page).toMatch(/\{overview\?\.project \? \(\s*<>\s*<OverviewHero /);
+    expect(page.indexOf('<StarterChecklist')).toBeLessThan(page.indexOf('<OverviewHero'));
+    expect(page.indexOf('<OverviewWorkspace')).toBeLessThan(page.indexOf('</DashboardShell>'));
   });
 
   it('still works if the status request fails, falling back to what the Overview knows', () => {
@@ -106,8 +107,11 @@ describe('Overview page', () => {
     expect(page).toContain("'/v1/dashboard/onboarding'");
   });
 
-  it('keeps a hidden compact card from flashing, and survives blocked storage', () => {
-    expect(card).toContain('if (dismissed !== false) return null;');
-    expect(card).toMatch(/catch \{\s*setDismissed\(false\)/);
+  it('opens the dialog once per project, never flashes, and survives blocked storage', () => {
+    // Closed on first render, so a dismissed checklist never flashes open.
+    expect(card).toContain('const [open, setOpen] = useState(false);');
+    // Opens on its own only when this project's dismissal is not stored, and stays closed if storage throws.
+    expect(card).toMatch(/try \{\s*if \(window\.localStorage\.getItem\(starterDismissKey\(projectId\)\) !== '1'\) setOpen\(true\);\s*\} catch \{\s*(\/\/.*\s*)?\}/);
+    expect(card).toMatch(/localStorage\.setItem\(starterDismissKey\(projectId\), '1'\);\s*\} catch \{/);
   });
 });

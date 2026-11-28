@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:traceiq_flutter/src/client.dart';
 import 'package:traceiq_flutter/src/config.dart';
@@ -39,8 +39,12 @@ void main() {
     final screens = <String>[];
     final observer = TraceIQNavigatorObserver(screenTracker: (name) async => screens.add(name));
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(MaterialApp(
+    // WidgetsApp rather than MaterialApp: the SDK only depends on the widgets layer.
+    await tester.pumpWidget(WidgetsApp(
       navigatorKey: navigatorKey,
+      color: const Color(0xFF000000),
+      pageRouteBuilder: <T>(RouteSettings settings, WidgetBuilder builder) =>
+          PageRouteBuilder<T>(settings: settings, pageBuilder: (context, _, __) => builder(context)),
       navigatorObservers: <NavigatorObserver>[observer],
       routes: <String, WidgetBuilder>{
         '/': (_) => const SizedBox(),
@@ -56,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
     navigatorKey.currentState!.pushReplacementNamed('/two');
     await tester.pumpAndSettle();
-    navigatorKey.currentState!.push(MaterialPageRoute<void>(builder: (_) => const SizedBox()));
+    navigatorKey.currentState!.push(PageRouteBuilder<void>(pageBuilder: (_, __, ___) => const SizedBox()));
     await tester.pumpAndSettle();
     expect(screens, <String>['/', '/one', '/two']);
   });
