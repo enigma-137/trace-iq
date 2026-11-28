@@ -21,6 +21,8 @@ const PYTHON_FRAME = /^\s*File "([^"]+)", line \d+, in (.+?)\s*$/;
 //              /app/checkout.go:42 +0x1d
 const GO_LOCATION = /^(.+?):(\d+)(?:\s+\+0x[0-9a-f]+.*)?$/;
 const GO_FUNCTION = /^([^\s]+)\(.*\)\s*$/;
+// The TraceIQ Go SDK keeps function and location on separate lines with no args.
+const GO_BARE_FUNCTION = /^([^\s]+)\s*$/;
 const GO_CREATED_BY = /^created by (.+?) in goroutine \d+$/;
 const GO_GOROUTINE = /^goroutine \d+ \[/;
 const LINE_COLUMN = /(?::\d+){1,2}$/;
@@ -91,6 +93,11 @@ export function parseStack(stack: string): StackFrame[] {
     const goFunction = GO_FUNCTION.exec(line);
     if (goFunction && goFunction[1].includes('.')) {
       pendingGoFunction = goFunction[1];
+      continue;
+    }
+    // A bare line with a dotted name and no colon is a function, not a file:line.
+    if (GO_BARE_FUNCTION.test(line) && line.includes('.') && !line.includes(':') && !LINE_COLUMN.test(line)) {
+      pendingGoFunction = line;
     }
   }
 
