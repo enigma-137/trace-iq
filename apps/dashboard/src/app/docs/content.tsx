@@ -13,6 +13,7 @@ export const docsSections = [
   { id: 'methods', label: 'SDK methods', category: 'Getting started' },
   { id: 'config', label: 'Configuration', category: 'Getting started' },
   { id: 'autocapture', label: 'Autocapture', category: 'Getting started' },
+  { id: 'migrate-posthog', label: 'Migrate from PostHog', category: 'Getting started' },
   { id: 'self-hosting', label: 'Self-hosting', category: 'Deployment' },
   ...sdkDocsSections,
   { id: 'web-analytics', label: 'Web analytics', category: 'Features' },
@@ -648,6 +649,77 @@ traceiq.log('error', 'Result upload failed', { error, courseId: 'CSC201' });`}</
             ['location', 'Country / region / city resolved server-side from the request IP (GeoIP). Needs public-IP traffic.']
           ]}
         />
+      </Section>
+    );
+  }
+
+  if (id === 'migrate-posthog') {
+    return (
+      <Section id="migrate-posthog" title="Migrate from PostHog">
+        <P>
+          The calls map almost one to one, so most apps switch in an afternoon. A safe path: add TraceIQ next to
+          PostHog, compare the numbers for a week, import your history, then remove PostHog.
+        </P>
+
+        <h3 className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">1. Swap the SDK calls</h3>
+        <OptionsTable
+          headers={['PostHog', 'TraceIQ', 'Notes']}
+          rows={[
+            ["posthog.init(key, { api_host })", 'traceiq.initialize({ projectId, writeKey, endpoint })', 'Page views, errors and Web Vitals are captured by default.'],
+            ['posthog.capture(event, props)', 'traceiq.track(event, props)', 'Same event names and properties.'],
+            ['posthog.capture(\'$pageview\')', 'traceiq.page(name?)', 'Automatic when autoTrackPageViews is on.'],
+            ['posthog.identify(id, $set)', 'traceiq.identify({ userId, traits })', 'Earlier anonymous events are linked to the user.'],
+            ['posthog.alias(alias)', 'traceiq.alias(userId, previousId)', ''],
+            ['posthog.group(type, key, props)', 'traceiq.group({ organizationId, traits })', 'One account per user rather than several group types.'],
+            ['posthog.captureException(err)', 'traceiq.captureException(err)', 'Powers Error tracking.'],
+            ['posthog.isFeatureEnabled(key)', 'traceiq.flags.isEnabled(key)', 'Call await traceiq.flags.load() once after identify().'],
+            ['posthog.getFeatureFlagPayload(key)', 'traceiq.flags.getPayload(key)', ''],
+            ['posthog.register(props)', '—', 'No super properties: pass shared properties with each track() call.'],
+            ['posthog.reset()', '—', 'No equivalent yet.']
+          ]}
+        />
+        <P>On the server, posthog-node maps to traceiq-node:</P>
+        <Code>{`// Before
+posthog.capture({ distinctId: user.id, event: 'payout_succeeded', properties: { amount } });
+await posthog.shutdown();
+
+// After
+import { TraceIQ } from 'traceiq-node';
+
+const traceiq = new TraceIQ({ projectId: '${projectId}', writeKey: process.env.TRACEIQ_WRITE_KEY!, endpoint: '${apiBaseUrl}' });
+traceiq.capture({ userId: user.id, event: 'payout_succeeded', properties: { amount } });
+await traceiq.shutdown();`}</Code>
+
+        <h3 className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">2. Import your history</h3>
+        <P>
+          Export your events from PostHog as JSON Lines (a batch export to S3 writes this format) or save a JSON array
+          of events, then load them with the CLI. Events keep their original timestamps, so funnels, retention and
+          trends cover the period before you switched.
+        </P>
+        <Code lang="bash">{`npx traceiq-cli import posthog events.jsonl --dry-run   # see what would be imported
+npx traceiq-cli import posthog events.jsonl \\
+  --project ${projectId} --write-key YOUR_PROJECT_WRITE_KEY --api-url ${apiBaseUrl}`}</Code>
+        <Bullets
+          items={[
+            ['$pageview, $screen', 'Imported as $page, with URL, path, referrer, title and UTM tags.'],
+            ['$identify, $set', 'Imported as $identify; person properties become traits.'],
+            ['$create_alias', 'Imported as $alias.'],
+            ['your own events', 'Imported under the same name. PostHog’s $-prefixed metadata properties are dropped; browser, OS and device go to device info.'],
+            ['skipped', '$autocapture, $pageleave, $feature_flag_called, $exception and other PostHog-internal events. Old exceptions are skipped so they don’t reopen issues or fire alerts. The CLI lists everything it skipped.']
+          ]}
+        />
+        <P>
+          Imported events count toward your monthly event allowance and are delivered to your webhooks like live
+          events. Imports are not de-duplicated: importing the same file twice stores its events twice. If you run
+          both SDKs side by side first, export PostHog only up to the day TraceIQ went live.
+        </P>
+
+        <h3 className="mt-2 text-base font-semibold text-neutral-900 dark:text-white">3. Recreate what isn’t data</h3>
+        <P>
+          Dashboards, insights, funnels, cohorts, feature flags, experiments and surveys are definitions, not events,
+          so the importer does not move them. Recreate the ones you still use (the <Link className="text-blue-600 underline dark:text-cyan-400" href="?page=mcp">MCP server</Link> can
+          create funnels, cohorts, flags and dashboards for you). Session recordings stay in PostHog.
+        </P>
       </Section>
     );
   }

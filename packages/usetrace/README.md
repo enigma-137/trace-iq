@@ -135,6 +135,23 @@ In CI, use a token with only `sourcemaps:write`:
     TRACEIQ_API_URL: https://api.traceiq.run
 ```
 
+## Import from PostHog
+
+```bash
+traceiq import posthog events.jsonl --dry-run          # what would be imported
+traceiq import posthog events.jsonl --write-key trq_... # send it
+```
+
+Reads a PostHog export (JSON Lines as written by batch exports, a JSON array of events, or a
+saved API response with a `results` array) and sends it to the active project in batches of 500,
+keeping each event's original timestamp. `$pageview`/`$screen` become `$page`, `$identify`/`$set`
+become `$identify`, `$create_alias` becomes `$alias`, and your own events keep their names.
+`$autocapture`, `$exception` and other PostHog-internal events are skipped and listed.
+
+The write key comes from `--write-key`, `TRACEIQ_WRITE_KEY` or your `.env` file. Imported events
+count toward your monthly allowance and reach your webhooks. Imports are not de-duplicated, so
+importing a file twice stores its events twice.
+
 ## Status and dashboard
 
 ```bash

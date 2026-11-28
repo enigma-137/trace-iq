@@ -38,6 +38,9 @@ ${colors.bold('Builds')}
   sourcemaps upload      Upload a build's source maps so error stacks show original code
   sourcemaps list        List releases with uploaded source maps
 
+${colors.bold('Migrate')}
+  import posthog <file>  Import events from a PostHog export (JSON Lines or JSON)
+
 ${colors.bold('Other')}
   open [page]            Open the dashboard (overview, logs, events, errors, settings, ...)
   help [command]         Show help for a command
@@ -133,6 +136,29 @@ ${colors.bold('traceiq errors')} [--days <n>] [--json]
 
 Lists error issues (grouped by type and message) for the active project,
 most frequent first. --days defaults to 7.
+`,
+  import: `
+${colors.bold('traceiq import posthog')} <file> [--write-key <trq_...>] [--dry-run]
+
+Sends the events in a PostHog export to the active project, with their
+original timestamps. The file can be JSON Lines (one event per line, as PostHog
+batch exports write it), a JSON array of events, or a saved API response with a
+"results" array. Each event needs event, distinct_id and timestamp.
+
+  --write-key <trq_...>  The project's write key (env TRACEIQ_WRITE_KEY, or your .env file)
+  --dry-run              Read and map the file, show what would be imported, send nothing
+
+What is mapped:
+  $pageview, $screen     → $page (URL, path, referrer, title and UTM tags kept)
+  $identify, $set        → $identify (person properties become traits)
+  $create_alias          → $alias
+  your own events        → same name; PostHog's $-prefixed properties are dropped
+  $autocapture, $exception, $feature_flag_called and other PostHog-internal
+  events are skipped and listed at the end.
+
+Imported events count toward your plan's monthly events and are sent to your
+webhooks like live events. There is no de-duplication: importing a file twice
+imports its events twice. Run with --dry-run first.
 `,
   sourcemaps: `
 ${colors.bold('traceiq sourcemaps upload')} --release <version> [--dir <build folder>] [--delete-after] [--dry-run]
