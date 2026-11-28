@@ -148,7 +148,7 @@ jobs:
     name: Python SDK checks (3.8)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    container: python:3.8-slim
+    container: python:3.8 # the full image has git, which actions/checkout needs inside a container
     defaults:
       run:
         working-directory: sdks/python
